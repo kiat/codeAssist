@@ -15,3 +15,5 @@ https://docs.djangoproject.com/en/4.0/topics/http/file-uploads/
 
 
 
+# Running Code Style Check on the Code 
+* https://pylint.pycqa.org/en/latest/ 
