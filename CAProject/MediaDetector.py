@@ -4,6 +4,8 @@ import logging
 
 path_to_watch = "./media" # ./media
 
+print("Hi it's Sid")
+
 old = os.listdir(path_to_watch)
 
 while True:
