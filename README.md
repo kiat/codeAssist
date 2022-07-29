@@ -6,6 +6,7 @@ CodeAssist - Code Assist is a system that provides feedback about student's code
 * Sutton Landers-Carlyon <sutton.landerscarlyon@gmail.com>
 * Siddharth Vinay Sundaram <siddharthsundaram@utexas.edu>
 * Lauren Adams
+* Richard G Woodruff <woodruffr@utexas.edu>
 
 
 # File Upload
