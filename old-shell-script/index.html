@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>CodeAssist: An Adaptive AI-Assisted Feedback System for Learning  Programming Languages.</h2>
+
+<h3>CodeAssist provides you helpful feedback about your implementation assignment.</h3>
+
+<p>Provide your GitHub name or upload a zip file, select your assignment, select feedback type, and submit:</p>
+
+<form action="http://server1.teymourian.info/cgi-bin/codeassist.sh">
+
+  <hr style="height:2px;border-width:0;color:gray;background-color:gray">
+
+  Enter Your Github Account Name:<br>
+  <input type="text" name="User" value="">
+  <br><br>
+
+  <!-- Or upload a zip file:<br>
+  <input type="file" name="fileToUpload" id="fileToUpload">
+-->
+  <br>
+
+  <br>
+  <hr style="height:2px;border-width:0;color:gray;background-color:gray">
+
+  Select Your Course:
+
+  <select name="Course">
+    <option value="cs665">MET CS665</option>
+    <option value="cs521">MET CS521</option>
+  </select>
+
+  <br>
+  Select Your Programming Language:
+
+  <select name="Lang">
+    <option value="Java">Java</option>
+    <option value="Python">Python</option>
+  </select>
+
+  <br>
+
+   Select Your Assignment:
+  <select name="Nr">
+    <option value="Assignment-1">Assignment-1</option>
+    <option value="Assignment-2">Assignment-2</option>
+    <option value="Assignment-3">Assignment-3</option>
+    <option value="Assignment-4">Assignment-4</option>
+    <option value="Assignment-5">Assignment-5</option>
+    <option value="Assignment-6">Assignment-6</option>
+    <option value="Assignment-7">Assignment-7</option>
+    <option value="Assignment-8">Assignment-8</option>
+    <option value="Assignment-9">Assignment-9</option>
+    <option value="Assignment-10">Assignment-10</option>
+    <option value="Assignment-11">Assignment-11</option>
+    <option value="Assignment-12">Assignment-12</option>
+    <option value="assignment-project">Term Project</option>
+  </select>
+
+  <hr style="height:2px;border-width:0;color:gray;background-color:gray">
+
+  Which kind of Feedback do you want (select one): <br>
+
+
+ <div>
+    <input type="radio" id="build" name="Feedback" value="build">
+    <label for="build">Check if my code compiles </label>
+    <br>
+
+    <input type="radio" id="tests" name="Feedback" value="tests">
+    <label for="tests"> Run my Tests </label>
+    <br>
+
+    <input type="radio" id="spotbugs" name="Feedback" value="spotbugs">
+    <label for="spotbugs""> Find bugs in my code </label>
+    <br>
+
+    <input type="radio" id="stylegoogle" name="Feedback" value="stylegoogle">
+    <label for="stylegoogle"> Check my code style (Google Code Sytle Guide)</label>
+    <br>
+
+    <input type="radio" id="stats" name="Feedback" value="stats">
+    <label for="stats"> Provide statistics about my code  </label>
+    <br>
+
+ </div>
+
+
+
+
+  <br><br>
+
+
+  <label for="compileCheck">Do you think your code compiles without any problems?:</label>
+  <select name="compileCheck" id="compileCheck" required>
+    <option disabled selected value> -- select an option -- </option>
+    <option value="yes">Yes</option>
+    <option value="no">No</option>
+    <option value="maybe">Don't know</option>
+  </select>
+  <br><br>
+
+
+  <input type="submit">
+</form>
+
+</body>
+</html>
