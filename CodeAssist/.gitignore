@@ -1,0 +1,5 @@
+/.vscode
+
+# backend
+/backend/backend
+/backend/__pycache__

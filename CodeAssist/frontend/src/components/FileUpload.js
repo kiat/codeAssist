@@ -1,0 +1,30 @@
+import React from "react";
+import { useState } from "react";
+import axios from "axios"
+
+const FileUpload = (props) => {
+
+    const [file, setFile] = useState(null);
+
+    const uploadFile = async (e) => {
+        e.preventDefault()
+        const data = new FormData()
+
+        data.append("file", file)
+        const url = "http://localhost:5000/upload"
+        const response = await axios.post(url, data, {})
+        console.log(response.data)
+    }
+
+    return (
+        <div>
+            <form onSubmit={uploadFile} encType="multipart/form-data">
+                <input type="file" name="file" onChange={e => setFile(e.target.files[0])}/>
+                <input type="submit"/>
+            </form>
+
+        </div>
+    )
+}
+
+export default FileUpload
