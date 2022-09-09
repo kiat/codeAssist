@@ -27,7 +27,7 @@ const FileUpload = (props) => {
             </div>
             <div>
                 <h1>Results</h1>
-                <p>{response ?? ""}</p>
+                {response ? <pre>{response}</pre> : ""}
             </div>
         </div>
     )
