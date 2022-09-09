@@ -12,8 +12,18 @@ def run_container(container: str, file, filename, uuid):
 
     # Create docker image
     image = client.images.build(path=run_dir, tag=container, rm=True)[0]
+
     # Execute docker container
-    res = client.containers.run(image=image, auto_remove=True)
+    res = "No output"
+    try:
+        # Run container in detached mode and stream logs
+        logs = client.containers.run(image=image, auto_remove=True, detach=True).logs(stream=True)
+        res = ""
+        for log in logs:
+            res+=log.decode("utf-8")
+        res = res[0:-1]
+    except docker.errors.ContainerError:
+        print("There was a container error")
 
     clean_directory(run_dir)
     return res
