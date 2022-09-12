@@ -1,6 +1,7 @@
 import docker
 import os
 import shutil
+import zipfile
 
 docker_dir = '/Users/rickywoodruff/Desktop/UT Austin/Fall 2022 (Senior)/CS370/codeAssist/CodeAssist/backend/dockerfiles'
 runs_dir = '/Users/rickywoodruff/Desktop/UT Austin/Fall 2022 (Senior)/CS370/codeAssist/CodeAssist/backend/runs'
@@ -28,12 +29,24 @@ def run_container(container: str, file, filename, uuid):
     clean_directory(run_dir)
     return res
 
+def saveFile(file, filename, run_dir):
+    save_path = os.path.join(run_dir, filename)
+    file.save(save_path)
+
+    # Extract zip file contents
+    if filename.endswith(".zip"):
+        with zipfile.ZipFile(save_path, 'r') as zip_ref:
+            zip_ref.extractall(run_dir)
+
+        # Remove zip file
+        os.remove(save_path)
+
 def setup_directory(container, file, filename, run_dir):
     if not os.path.exists(runs_dir):
         os.mkdir(runs_dir)
         
     os.mkdir(run_dir)
-    file.save(os.path.join(run_dir, filename))
+    saveFile(file, filename, run_dir)
     shutil.copy(os.path.join(docker_dir, container, "Dockerfile"), run_dir)
 
 def clean_directory(run_dir):
