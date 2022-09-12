@@ -3,8 +3,8 @@ import os
 import shutil
 import zipfile
 
-docker_dir = '/Users/rickywoodruff/Desktop/UT Austin/Fall 2022 (Senior)/CS370/codeAssist/CodeAssist/backend/dockerfiles'
-runs_dir = '/Users/rickywoodruff/Desktop/UT Austin/Fall 2022 (Senior)/CS370/codeAssist/CodeAssist/backend/runs'
+docker_dir = '/usr/app/dockerfiles'
+runs_dir = '/usr/app/runs'
 client = docker.from_env()
 
 def run_container(container: str, file, filename, uuid):

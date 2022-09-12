@@ -1,0 +1,31 @@
+version: "3.7"
+services:
+  frontend:
+    build:
+      context: ./frontend/
+      target: prod
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: nodemon -L index.js
+  frontend-test:
+    build:
+      context: ./frontend/
+      target: test
+    volumes:
+      - /app/node_modules
+    environment:
+      - CI=true
+    command: npm run test
+  backend:
+    build: ./backend/
+    environment:
+      FLASK_APP: app.py
+      FLASK_DEBUG: 1
+    ports:
+      - '5000:5000'
+    volumes:
+      - ./backend/:/usr/app
+      - /var/run/docker.sock:/var/run/docker.sock

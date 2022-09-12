@@ -7,7 +7,7 @@ import docker_client
 import uuid
 
 ALLOWED_EXTENSIONS = {'py','zip'}
-UPLOAD_FOLDER = '/Users/rickywoodruff/Desktop/UT Austin/Fall 2022 (Senior)/CS370/codeAssist/CodeAssist/backend/files'
+UPLOAD_FOLDER = '/usr/app/files'
  
 app = Flask(__name__)
 app.secret_key = 'codeassist'
