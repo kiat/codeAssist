@@ -36,3 +36,30 @@
     transform: rotate(360deg);
   }
 }
+
+#dockerfile > select {
+  margin-left: 20px;
+}
+
+#file > #fileUpload {
+  display: inline-block;
+  margin-left: 20px;
+}
+
+.inline {
+  display: inline-block;
+} 
+
+#form {
+  margin-bottom: 50px;
+}
+
+#file > #submit {
+  display: block;
+  position: absolute;
+  right: 50px;
+}
+
+form {
+  margin-left: 20px;
+}
