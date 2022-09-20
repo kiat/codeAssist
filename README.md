@@ -37,3 +37,10 @@ https://prospector.landscape.io/en/master/index.html
 Create a file upload interface so that users can upload a file to the system. 
 
 https://docs.djangoproject.com/en/4.0/topics/http/file-uploads/
+
+
+# Gradescope 
+
+* https://gradescope-autograders.readthedocs.io/en/latest/python/
+
+* https://github.com/gradescope/gradescope-utils
