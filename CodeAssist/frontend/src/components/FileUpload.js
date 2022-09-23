@@ -1,20 +1,24 @@
 import React from "react";
 import { useState } from "react";
 import axios from "axios"
+import TestResults from "./TestResults";
 
 const FileUpload = () => {
 
     const [file, setFile] = useState(null);
     const [response, setResponse] = useState(null);
+    const [assignment, setAssignment] = useState("A1");
 
     const uploadFile = async (e) => {
         e.preventDefault()
         const data = new FormData()
 
         data.append("file", file)
+        data.append("assignment", assignment)
         const url = "http://localhost:5000/upload"
         const response = await axios.post(url, data, {})
         setResponse(response.data);
+        console.log(response.data)
     }
 
     return (
@@ -23,8 +27,9 @@ const FileUpload = () => {
                 <form onSubmit={uploadFile} encType="multipart/form-data">
                     <div id="dockerfile">
                         <p className="inline">Select assignment</p>
-                        <select className="inline">
+                        <select className="inline" value={assignment} onChange={(e) => setAssignment(e.target.value)}>
                             <option value="test">test</option>
+                            <option value="A1">A1</option>
                         </select>
                     </div>
                     <div id="file">
@@ -36,7 +41,8 @@ const FileUpload = () => {
             </div>
             <div>
                 <h1>Results</h1>
-                {response ? <pre>{response}</pre> : ""}
+                {response && <TestResults data={response} />}
+                {/* {response ?? <TestResults data={response} />} */}
             </div>
         </div>
     )

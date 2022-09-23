@@ -29,6 +29,7 @@ def upload_file():
         flash("No file part")
         return "no file"
     file = request.files["file"]
+    assignment = request.form["assignment"].lower()
 
     if file.filename == "":
         flash("No selected file")
@@ -36,7 +37,7 @@ def upload_file():
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         new_uuid = uuid.uuid4()
-        res = docker_client.run_container("test", file, filename, str(new_uuid))
+        res = docker_client.run_container(assignment, file, filename, str(new_uuid))
         print(res)
         return res
     if file and not allowed_file(file.filename):

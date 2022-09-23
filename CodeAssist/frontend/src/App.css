@@ -63,3 +63,40 @@
 form {
   margin-left: 20px;
 }
+
+.testResultBox {
+  display: block;
+  margin: 20px;
+  width: auto;
+  margin-bottom: 10px;
+}
+
+.testResultBox > h3 {
+  background-color: lightgray;
+  border: 1px solid black;
+  border-radius: 2px;
+  padding-left: 10px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 0;
+  border-bottom-left-radius: 0px;
+  border-bottom-right-radius: 0px;
+}
+
+.testResultBox > p {
+  border: 1px solid black;
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  width: auto;
+  height: auto;
+  white-space: pre;
+  padding-left: 10px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  /* font-size: .8em; */
+}
+
+#results > h2 {
+  margin-left: 10px;
+}
