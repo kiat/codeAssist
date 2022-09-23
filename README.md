@@ -28,8 +28,19 @@ Two options:
 2. Rut it within python on a string variable (see https://mail.python.org/pipermail/code-quality/2015-February/000503.html)
 
 
+**Prospector** is a tool to analyse Python code and output information about errors, potential problems, convention violations and complexity.
+
+https://prospector.landscape.io/en/master/index.html 
+
 
 # File Upload with Django 
 Create a file upload interface so that users can upload a file to the system. 
 
 https://docs.djangoproject.com/en/4.0/topics/http/file-uploads/
+
+
+# Gradescope 
+
+* https://gradescope-autograders.readthedocs.io/en/latest/python/
+
+* https://github.com/gradescope/gradescope-utils
