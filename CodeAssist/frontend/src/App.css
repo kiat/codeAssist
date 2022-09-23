@@ -72,7 +72,6 @@ form {
 }
 
 .testResultBox > h3 {
-  background-color: lightgray;
   border: 1px solid black;
   border-radius: 2px;
   padding-left: 10px;
@@ -99,4 +98,16 @@ form {
 
 #results > h2 {
   margin-left: 10px;
+}
+
+.testPassed {
+  background-color: lightgreen;
+}
+
+.testPartial {
+  background-color: lightyellow;
+}
+
+.testFailed {
+  background-color: lightcoral;
 }

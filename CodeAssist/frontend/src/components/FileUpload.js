@@ -42,7 +42,6 @@ const FileUpload = () => {
             <div>
                 <h1>Results</h1>
                 {response && <TestResults data={response} />}
-                {/* {response ?? <TestResults data={response} />} */}
             </div>
         </div>
     )

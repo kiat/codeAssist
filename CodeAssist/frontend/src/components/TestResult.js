@@ -1,9 +1,9 @@
 import React from "react"
 
-const TestResult = ({ testName, testOutput }) => {
+const TestResult = ({ colorClass, testName, testOutput }) => {
     return (
         <div className="testResultBox">
-            <h3>{testName}</h3>
+            <h3 className={colorClass}>{testName}</h3>
             {testOutput && <p>{testOutput}</p>}
         </div>
     )
