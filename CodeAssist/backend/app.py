@@ -1,4 +1,4 @@
-from flask import Flask, flash, request
+from flask import Flask, flash, request, jsonify
 from flask_cors import CORS, cross_origin
 from werkzeug.utils import secure_filename
 import docker_client
@@ -34,10 +34,12 @@ def upload_file():
         return "no selected file"
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        new_uuid = uuid.uuid4()
-        res = docker_client.run_container(assignment, file, filename, str(new_uuid))
-        print(res)
-        return res
+        new_uuid = str(uuid.uuid4())
+
+        logs, results = docker_client.run_container(assignment, file, filename, new_uuid)
+
+        return jsonify(logs=logs, results=results)
+
     if file and not allowed_file(file.filename):
         return "invalid extension"
  

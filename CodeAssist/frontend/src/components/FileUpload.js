@@ -2,10 +2,12 @@ import React from "react";
 import { useState } from "react";
 import axios from "axios";
 import TestResults from "./TestResults";
+import TestResult from "./TestResult";
 
 const FileUpload = () => {
 	const [file, setFile] = useState(null);
 	const [response, setResponse] = useState(null);
+	const [logs, setLogs] = useState(null);
 	const [assignment, setAssignment] = useState("A1");
 
 	const uploadFile = async (e) => {
@@ -16,8 +18,9 @@ const FileUpload = () => {
 		data.append("assignment", assignment);
 		const url = "http://localhost:5000/upload";
 		const response = await axios.post(url, data, {});
-		setResponse(response.data);
-		console.log(response.data);
+		setResponse(JSON.parse(response.data["results"]));
+		setLogs(response.data["logs"]);
+		console.log("got results and logs");
 	};
 
 	return (
@@ -50,6 +53,16 @@ const FileUpload = () => {
 			<div>
 				<h1>Results</h1>
 				{response && <TestResults data={response} />}
+			</div>
+			<div>
+				<h1>Logs</h1>
+				{logs && (
+					<TestResult
+						colorClass={""}
+						testName={"Log Output"}
+						testOutput={logs}
+					/>
+				)}
 			</div>
 		</div>
 	);
