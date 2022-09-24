@@ -2,9 +2,9 @@ import React from "react";
 import TestResult from "./TestResult";
 
 const getClassNameFromScore = (score, maxScore) => {
-	if (score == maxScore) {
+	if (score === maxScore) {
 		return "testPassed";
-	} else if (score == 0) {
+	} else if (score === 0) {
 		return "testFailed";
 	} else {
 		return "testPartial";
