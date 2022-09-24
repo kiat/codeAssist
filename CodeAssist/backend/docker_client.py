@@ -1,3 +1,4 @@
+import tarfile
 import docker
 import os
 import shutil
@@ -7,27 +8,49 @@ runs_dir = '/usr/app/runs'
 assignment_dir = '/usr/app/assignments'
 client = docker.from_env()
 
-def run_container(container: str, file, filename, uuid):
-    run_dir = os.path.join(runs_dir, uuid)
-    setup_directory(container, file, filename, run_dir)
+def get_run_dir_for_uuid(uuid: str) -> str:
+    return os.path.join(runs_dir, uuid)
+
+def run_container(container_name: str, file, filename, uuid: str):
+    run_dir = get_run_dir_for_uuid(uuid)
+    setup_directory(container_name, file, filename, run_dir)
 
     # Create docker image
-    image = client.images.build(path=run_dir, tag=container, rm=True)[0]
+    image = client.images.build(path=run_dir, tag=container_name, rm=True)[0]
 
     # Execute docker container
-    res = "No output"
+    logs = "No output"
+    res = ""
     try:
-        # Run container in detached mode and stream logs
-        logs = client.containers.run(image=image, auto_remove=True, detach=True).logs(stream=True)
-        res = ""
-        for log in logs:
-            res+=log.decode("utf-8")
-        res = res[0:-1]
+        # Run container in detached mode
+        container = client.containers.run(image=image, detach=True)
+
+        # Stream logs to catch output and errors
+        streamed_logs = container.logs(stream=True)
+        logs = ""
+        for log in streamed_logs:
+            logs+=log.decode("utf-8")
+        logs = logs[0:-1]
+
+        # Download final results to local tar file
+        bits, _ = container.get_archive("/usr/app/results.json")
+        tar_file = open(os.path.join(run_dir,"results.tar"), "wb")
+        for chunk in bits:
+            tar_file.write(chunk)
+        tar_file.close()
+
+        # Unpack tar file and capture results
+        tar_file = open(os.path.join(run_dir,"results.tar"), "rb")
+        tar = tarfile.open(fileobj=tar_file)
+        files = tar.getmembers()
+        res = tar.extractfile(files[0]).read().decode("utf-8")
+
+        container.remove()
     except docker.errors.ContainerError:
         print("There was a container error")
 
     clean_directory(run_dir)
-    return res
+    return (logs, res)
 
 def saveFile(file, filename, run_dir):
     save_path = os.path.join(run_dir, filename)
