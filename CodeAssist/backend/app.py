@@ -1,8 +1,6 @@
-import os
-from flask import Flask, flash, request, redirect, url_for
+from flask import Flask, flash, request
 from flask_cors import CORS, cross_origin
 from werkzeug.utils import secure_filename
-import webbrowser
 import docker_client
 import uuid
 
