@@ -3,17 +3,17 @@ from flask_cors import CORS, cross_origin
 from werkzeug.utils import secure_filename
 import docker_client
 import uuid
+from api import app, db
+from api.models import Student
 
 ALLOWED_EXTENSIONS = {'py','zip'}
 UPLOAD_FOLDER = '/usr/app/files'
  
-app = Flask(__name__)
-app.secret_key = 'codeassist'
-cors = CORS(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
  
 @app.route('/')
 def hello_world():
+    print(db.session.query(Student))
     return 'Hello World'
 
 def allowed_file(filename):

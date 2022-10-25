@@ -37,7 +37,7 @@ def run_container(container_name: str, file, filename, uuid: str):
         tar_file = open(os.path.join(run_dir,"results.tar"), "wb")
         for chunk in bits:
             tar_file.write(chunk)
-        tar_file.close()
+        tar_file.close()  # timeout, kubernetes, docker on separate server
 
         # Unpack tar file and capture results
         tar_file = open(os.path.join(run_dir,"results.tar"), "rb")
