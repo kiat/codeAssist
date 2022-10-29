@@ -1,11 +1,11 @@
 from marshmallow import Schema, fields
-from sqlalchemy.dialects.postgresql import DATE
+from sqlalchemy.dialects.postgresql import DATE, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
 
 class Student(db.Model):
     __tablename__ = "students"
-    id = db.Column(db.UUID, primary_key=True, nullable=False)
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     password = db.Column(db.String, nullable=False)
     name = db.Column(db.String, nullable=False)
     email_address = db.Column(db.String, nullable=False)
@@ -14,28 +14,29 @@ class Student(db.Model):
 
 class Course(db.Model):
     __tablename__ = "courses"
-    id = db.Column(db.UUID, primary_key=True, nullable=False)
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     name = db.Column(db.String, nullable=False)
     sis_course_id = db.Column(db.String, nullable=True)
 
 
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
-    student_id = db.Column(db.UUID, db.ForeignKey("students.id"), primary_key=True, nullable=False)
-    course_id = db.Column(db.UUID, db.ForeignKey("courses.id"), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), primary_key=True, nullable=False)
+    course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key=True, nullable=False)
 
 
 class Assignment(db.Model):
     __tablename__ = "assignments"
-    id = db.Column(db.UUID, primary_key=True, nullable=False)
-    name = db.Column(db.String, primary_key=True, nullable=False)
-    course_id = db.Column(db.UUID, db.ForeignKey("courses.id"), nullable=False)
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    name = db.Column(db.String, nullable=False)
+    course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), nullable=False)
     autograder_file = db.Column(LargeBinary, nullable=False)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
-    student_id = db.Column(db.UUID, db.ForeignKey("students.id"), nullable=False)
-    assignment_id = db.Column(db.UUID, db.ForeignKey("assignemnts.id"), nullable=False)
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False, index=True)
     student_code_file = db.Column(LargeBinary, nullable=False)
     results = db.Column(LargeBinary, nullable=True)
     score = db.Column(db.Float, nullable=True)

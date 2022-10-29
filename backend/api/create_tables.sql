@@ -35,6 +35,7 @@ create table assignments (
 
 /* Create Submissions table */
 create table submissions (
+    id uuid primary key,
     student_id uuid not null,
     assignment_id uuid not null,
     student_code_file bytea not null,

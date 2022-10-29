@@ -13,7 +13,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
  
 @app.route('/')
 def hello_world():
-    print(db.session.query(Student))
+    res = db.session.query(Student).first()
+    print("results",res,"here")
     return 'Hello World'
 
 def allowed_file(filename):
