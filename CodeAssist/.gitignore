@@ -1,7 +1,0 @@
-/.vscode
-.DS_Store
-
-# backend
-/backend/backend
-/backend/__pycache__
-/backend/runs
