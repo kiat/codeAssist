@@ -30,7 +30,7 @@ class Assignment(db.Model):
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     name = db.Column(db.String, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), nullable=False)
-    autograder_file = db.Column(LargeBinary, nullable=False)
+    autograder_file = db.Column(LargeBinary, nullable=True)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
