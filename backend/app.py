@@ -26,9 +26,9 @@ def allowed_file(filename):
 @cross_origin()
 def create_user():
     user_id = str(uuid.uuid4())
-    name = request.json['name']
-    password = request.json['password']
-    email_address=request.json['email']
+    name = request.form['name']
+    password = request.form['password']
+    email_address=request.form['email']
 
     user_data = {
         "id": user_id,
