@@ -84,8 +84,46 @@ def create_assignment():
     newAssignment = AssignmentSchema().dump(newAssignment, many=True)[0]
 
     return jsonify(newAssignment)
-    
 
+@app.route('/create_enrollment', methods=["POST"])
+@cross_origin()
+def create_new_assignment():
+    student_id = request.json["student_id"]
+    course_id = request.json["course_id"]
+
+    enrollment_data = {
+        "student_id": student_id,
+        "course_id": course_id,
+    }
+
+    db.session.add(Enrollment(**enrollment_data))
+    db.session.commit()
+
+    newEnrollment = db.session.query(Enrollment).filter_by(student_id=student_id, course_id=course_id)
+    newEnrollment = EnrollmentSchema().dump(newEnrollment, many=True)[0]
+
+    return jsonify(newEnrollment)
+
+@app.route('/get_student_enrollments', methods=["POST"])
+@cross_origin()
+def get_student_enrollments():
+    student_id = request.json["student_id"]
+
+    enrollments = db.session.query(Enrollment).filter_by(student_id=student_id)
+    enrollments = EnrollmentSchema().dump(enrollments, many=True)
+
+    return jsonify(enrollments)
+
+@app.route('/get_course_assignments', methods=["POST"])
+@cross_origin()
+def get_course_assignments():
+    course_id = request.json["course_id"]
+
+    assignments = db.session.query(Assignment).filter_by(course_id=course_id)
+    assignments = AssignmentSchema().dump(assignments, many=True)
+    
+    return jsonify(assignments)
+    
 @app.route('/upload', methods=["GET", "POST"])
 @cross_origin()
 def upload_file():
