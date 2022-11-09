@@ -1,112 +1,38 @@
 .App {
-	text-align: center;
+  text-align: center;
 }
 
 .App-logo {
-	height: 40vmin;
-	pointer-events: none;
+  height: 40vmin;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.App-logo {
-		animation: App-logo-spin infinite 20s linear;
-	}
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
 }
 
 .App-header {
-	background-color: #282c34;
-	min-height: 100vh;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	font-size: calc(10px + 2vmin);
-	color: white;
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
 }
 
 .App-link {
-	color: #61dafb;
+  color: #61dafb;
 }
 
 @keyframes App-logo-spin {
-	from {
-		transform: rotate(0deg);
-	}
-	to {
-		transform: rotate(360deg);
-	}
-}
-
-#dockerfile > select {
-	margin-left: 20px;
-}
-
-#file > #fileUpload {
-	display: inline-block;
-	margin-left: 20px;
-}
-
-.inline {
-	display: inline-block;
-}
-
-#form {
-	margin-bottom: 50px;
-}
-
-#file > #submit {
-	display: block;
-	position: absolute;
-	right: 50px;
-}
-
-form {
-	margin-left: 20px;
-}
-
-.testResultBox {
-	display: block;
-	margin: 20px;
-	width: auto;
-	margin-bottom: 10px;
-}
-
-.testResultBox > h3 {
-	border: 1px solid black;
-	border-radius: 2px;
-	padding-left: 10px;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	margin-bottom: 0;
-	border-bottom-left-radius: 0px;
-	border-bottom-right-radius: 0px;
-}
-
-.testResultBox > p {
-	border: 1px solid black;
-	margin: 0;
-	padding: 0;
-	border-top: none;
-	width: auto;
-	height: auto;
-	white-space: pre;
-	padding-left: 10px;
-	padding-top: 10px;
-	padding-bottom: 10px;
-}
-
-#results > h2 {
-	margin-left: 10px;
-}
-
-.testPassed {
-	background-color: lightgreen;
-}
-
-.testPartial {
-	background-color: lightyellow;
-}
-
-.testFailed {
-	background-color: lightcoral;
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
