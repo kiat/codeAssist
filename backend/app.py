@@ -22,13 +22,13 @@ def allowed_file(filename):
     return "." in filename and \
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/create_user', methods=["POST"])
+@app.route('/create_student', methods=["POST"])
 @cross_origin()
-def create_user():
+def create_student():
     user_id = str(uuid.uuid4())
     name = request.form['name']
     password = request.form['password']
-    email_address=request.form['email']
+    email_address = request.form['email']
 
     user_data = {
         "id": user_id,
@@ -42,6 +42,51 @@ def create_user():
 
     res = db.session.query(Student).filter_by(id=user_id)
     res = StudentSchema().dump(res, many=True)[0]
+
+    return jsonify(res)
+
+@app.route('/student_login', methods=["POST"])
+@cross_origin()
+def student_login():
+    email = request.form['email']
+    password = request.form['password']
+
+    res = db.session.query(Student).filter_by(email_address=email, password=password)
+    res = StudentSchema().dump(res, many=True)
+
+    return jsonify(res)
+
+@app.route('/create_instructor', methods=["POST"])
+@cross_origin()
+def create_instructor():
+    user_id = str(uuid.uuid4())
+    name = request.form['name']
+    password = request.form['password']
+    email_address = request.form['email']
+
+    user_data = {
+        "id": user_id,
+        "name": name,
+        "email_address": email_address,
+        "password": password,
+    }
+
+    db.session.add(Instructor(**user_data))
+    db.session.commit()
+
+    res = db.session.query(Instructor).filter_by(id=user_id)
+    res = InstructorSchema().dump(res, many=True)[0]
+
+    return jsonify(res)
+
+@app.route('/instructor_login', methods=["POST"])
+@cross_origin()
+def instructor_login():
+    email = request.form['email']
+    password = request.form['password']
+
+    res = db.session.query(Instructor).filter_by(email_address=email, password=password)
+    res = InstructorSchema().dump(res, many=True)
 
     return jsonify(res)
 

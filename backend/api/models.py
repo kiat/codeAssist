@@ -11,6 +11,13 @@ class Student(db.Model):
     email_address = db.Column(db.String, nullable=False)
     sis_user_id = db.Column(db.String, nullable=True)
 
+class Instructor(db.Model):
+    __tablename__ = "instructors"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    password = db.Column(db.String, nullable=False)
+    name = db.Column(db.String, nullable=False)
+    email_address = db.Column(db.String, nullable=False)
+    sis_user_id = db.Column(db.String, nullable=True)
 
 class Course(db.Model):
     __tablename__ = "courses"
