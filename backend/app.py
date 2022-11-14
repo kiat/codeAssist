@@ -52,7 +52,7 @@ def student_login():
     password = request.form['password']
 
     res = db.session.query(Student).filter_by(email_address=email, password=password)
-    res = StudentSchema().dump(res, many=True)
+    res = StudentSchema().dump(res, many=True)[0]
 
     return jsonify(res)
 
@@ -86,7 +86,7 @@ def instructor_login():
     password = request.form['password']
 
     res = db.session.query(Instructor).filter_by(email_address=email, password=password)
-    res = InstructorSchema().dump(res, many=True)
+    res = InstructorSchema().dump(res, many=True)[0]
 
     return jsonify(res)
 
@@ -170,6 +170,16 @@ def get_course_assignments():
     assignments = AssignmentSchema().dump(assignments, many=True)
     
     return jsonify(assignments)
+
+@app.route('/get_instructor_courses', methods=["GET"])
+@cross_origin()
+def get_instructor_courses():
+    instructor_id = request.args.get("instructor_id")
+
+    courses = db.session.query(Course).filter_by(instructor_id=instructor_id)
+    courses = CourseSchema().dump(courses, many=True)
+
+    return jsonify(courses)
     
 @app.route('/upload', methods=["GET", "POST"])
 @cross_origin()
