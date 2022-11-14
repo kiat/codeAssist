@@ -111,6 +111,30 @@ def create_course():
 
     return jsonify(newCourse)
 
+@app.route('/update_assignment', methods=["POST"])
+@cross_origin()
+def update_course():
+    assignment_id = request.json["assignment_id"]
+
+    data = request.json
+    del data["assignment_id"]
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).update(data)
+    db.session.commit()
+
+    return jsonify({"message": "Success"}), 200
+
+@app.route('/get_assignment', methods=["GET"])
+@cross_origin()
+def get_assignment():
+    assignment_id = request.args.get("assignment_id")
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id)
+    assignment = AssignmentSchema().dump(assignment, many=True)[0]
+
+    return jsonify(assignment)
+
+
 @app.route('/create_assignment', methods=["POST"])
 @cross_origin()
 def create_assignment():

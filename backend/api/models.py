@@ -38,6 +38,9 @@ class Assignment(db.Model):
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     name = db.Column(db.String, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), nullable=False)
+    due_date = db.Column(DATE, nullable=True)
+    autograder_points = db.Column(db.Float, nullable=True)
+    published = db.Column(db.Boolean, default=False)
     autograder_file = db.Column(LargeBinary, nullable=True)
 
 class Submission(db.Model):
