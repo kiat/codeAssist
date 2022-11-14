@@ -175,6 +175,22 @@ def create_new_assignment():
 
     return jsonify(newEnrollment)
 
+@app.route('/create_enrollment_bulk', methods=["POST"])
+@cross_origin()
+def create_bulk_enrollments():
+    course_id = request.json["course_id"]
+    students = request.json["student_ids"]
+
+    students_to_add = [Enrollment(**{
+        "student_id": id,
+        "course_id": course_id,
+    }) for id in students]
+
+    db.session.add_all(students_to_add)
+    db.session.commit()
+
+    return jsonify({"message":"Success"}), 200
+
 @app.route('/get_student_enrollments', methods=["GET"])
 @cross_origin()
 def get_student_enrollments():
@@ -194,6 +210,22 @@ def get_course_assignments():
     assignments = AssignmentSchema().dump(assignments, many=True)
     
     return jsonify(assignments)
+
+@app.route('/get_course_enrollment', methods=["GET"])
+@cross_origin()
+def get_course_enrollment():
+    course_id = request.args.get("course_id")
+
+    students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id)
+    students = EnrollmentSchema().dump(students, many=True)
+
+    list_of_students = [x["student_id"] for x in students]
+
+    students = db.session.query(Student.name, Student.email_address).filter(Student.id.in_(list_of_students))
+    students = StudentSchema().dump(students, many=True)
+
+    return jsonify(students)
+    
 
 @app.route('/get_instructor_courses', methods=["GET"])
 @cross_origin()
