@@ -95,10 +95,12 @@ def instructor_login():
 def create_course():
     course_id = str(uuid.uuid4())
     name = request.json['name']
+    instructor_id = request.json['instructor_id']
 
     course_data = {
         "id": course_id,
         "name": name,
+        "instructor_id": instructor_id,
     }
 
     db.session.add(Course(**course_data))

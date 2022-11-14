@@ -23,6 +23,7 @@ class Course(db.Model):
     __tablename__ = "courses"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     name = db.Column(db.String, nullable=False)
+    instructor_id = db.Column(UUID(as_uuid=False), db.ForeignKey("instructors.id"), nullable=False)
     sis_course_id = db.Column(db.String, nullable=True)
 
 
