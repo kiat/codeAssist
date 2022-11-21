@@ -2,6 +2,9 @@ from flask import Flask, flash, request, jsonify
 from flask_cors import CORS, cross_origin
 from werkzeug.utils import secure_filename
 import docker_client
+from functools import reduce
+import json
+import sys
 import uuid
 from api import app, db
 from api.models import *
@@ -14,8 +17,6 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
  
 @app.route('/')
 def hello_world():
-    res = db.session.query(Student).first()
-    print("results",res,"here")
     return 'Hello World'
 
 def allowed_file(filename):
@@ -236,15 +237,28 @@ def get_instructor_courses():
     courses = CourseSchema().dump(courses, many=True)
 
     return jsonify(courses)
+
+@app.route('/get_submissions', methods=["GET"])
+@cross_origin()
+def get_submission():
+    student_id = request.args.get("student_id")
+    assignment_id = request.args.get("assignment_id")
+
+    submissions = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
+    submissions = SubmissionSchema().dump(submissions, many=True)
+
+    return jsonify(submissions)
     
-@app.route('/upload', methods=["GET", "POST"])
+@app.route('/upload_submission', methods=["POST"])
 @cross_origin()
 def upload_file():
     if "file" not in request.files:
         flash("No file part")
-        return "no file"
+        return "no file\n"
     file = request.files["file"]
     assignment = request.form["assignment"].lower()
+    student_id = request.form["student_id"]
+    assignment_id = request.form["assignment_id"]
 
     if file.filename == "":
         flash("No selected file")
@@ -253,12 +267,76 @@ def upload_file():
         filename = secure_filename(file.filename)
         new_uuid = str(uuid.uuid4())
 
+        # TODO (ricky): Need to copy file contents before saving
+        # to database
+
+        submission_data = {
+            "id": new_uuid,
+            "student_id": student_id,
+            "assignment_id": assignment_id,
+            "student_code_file": file.read(),
+            "completed": False
+        }
+
+        db.session.add(Submission(**submission_data))
+        db.session.commit()
+
         logs, results = docker_client.run_container(assignment, file, filename, new_uuid)
 
-        return jsonify(logs=logs, results=results)
+        submission_data["results"] = results.encode('utf8')
+        submission_data["completed"] = True
+
+        print(results, file=sys.stderr)
+        tests = json.loads(results)["tests"]
+        print(tests, file=sys.stderr)
+        score = reduce(lambda x,y: x+y, list(map(lambda x: x["score"], tests)))
+        print(score, file=sys.stderr)
+
+        submission_data["score"] = score
+        
+        db.session.query(Submission).filter_by(id=new_uuid).update(submission_data)
+        db.session.commit()
+
+        new_submission = db.session.query(Submission).filter_by(id=new_uuid)
+        new_submission = SubmissionSchema().dump(new_submission, many=True)[0]
+
+        return jsonify(new_submission)
 
     if file and not allowed_file(file.filename):
         return "invalid extension"
+
+@app.route('/upload_assignment_autograder', methods=["POST"])
+@cross_origin()
+def upload_assignment_autograder():
+    if "file" not in request.files:
+        flash("No file part")
+        return "no file\n"
+    file = request.files["file"]
+    assignment_id = request.form["assignment_id"]
+
+    if file.filename == "":
+        flash("No selected file")
+        return "no selected file"
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+
+        docker_client.saveFile(file, filename, docker_client.assignment_dir, False)
+
+        # TODO (ricky): copy file contents here before saving to database
+
+        assignment_data = {
+            'autograder_file': file.read(),
+        }
+
+        assignment = db.session.query(Assignment).filter_by(assignment_id=assignment_id).update(assignment_data)
+        db.session.commit()
+
+        assignment = AssignmentSchema().dump(assignment, many=True)[0]
+
+        return jsonify(assignment)
+    else:
+        return "something went wrong", 400
+
  
 if __name__ == '__main__':
     app.run()

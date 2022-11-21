@@ -52,11 +52,11 @@ def run_container(container_name: str, file, filename, uuid: str):
     clean_directory(run_dir)
     return (logs, res)
 
-def saveFile(file, filename, run_dir):
+def saveFile(file, filename, run_dir, unzip=True):
     save_path = os.path.join(run_dir, filename)
     file.save(save_path)
     # Extract zip file contents
-    if filename.endswith(".zip"):
+    if filename.endswith(".zip") and unzip:
         copyAndDecompressZip(save_path, run_dir)
         # Remove zip file
         os.remove(save_path)
