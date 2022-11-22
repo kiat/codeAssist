@@ -13,6 +13,7 @@
     - `python` ([Install](https://www.python.org/downloads/))
     - `docker` ([Install](https://docs.docker.com/get-docker/))
     - `postgresql` ([Install](https://www.postgresql.org/download/))
+    - `pip3 install -r ./backend/requirements.txt`
     - `docker-compose`
 
         ```bash
@@ -25,7 +26,7 @@
 4. Create a `.env` file in the backend directory and add your DB connection string
 
     ```bash
-    touch /backend/.env
+    touch ./backend/.env
     ```
 
     In your `.env` file, add your connection string:
@@ -36,7 +37,7 @@
 
 5. Create the required tables
     ```bash
-    python /backend/init_db.py
+    python3 ./backend/init_db.py
     ```
 6. Start the backend service
 
