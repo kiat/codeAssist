@@ -35,17 +35,31 @@
     DB_CONNECTION_STRING="postgresql://{username}:{password}@localhost:5432/{database}"
     ```
 
-5. Create the required tables
+5. Start Docker and Postgres
+
+    ```bash
+    sudo systemctl start docker
+    sudo systemctl start postgresql
+    ```
+
+    (Optional) Enable Docker and Postgres to start on boot
+
+    ```bash
+    sudo systemctl enable docker
+    sudo systemctl enable postgresql
+    ```
+
+6. Create the required tables
     ```bash
     python3 ./backend/init_db.py
     ```
-6. Start the backend service
+7. Start the backend service
 
     ```bash
     docker-compose up backend
     ```
 
-7. Start the frontend service
+8. Start the frontend service
 
     ```bash
     docker-compose up frontend
