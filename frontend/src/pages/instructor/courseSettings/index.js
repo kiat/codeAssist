@@ -14,20 +14,36 @@ import {
   Space,
   Typography,
 } from "antd";
+import { useEffect } from "react";
+import { useContext } from "react";
+import { useParams } from "react-router-dom";
+import { GlobalContext } from "../../../App";
 
 export default () => {
+  const { courseId } = useParams();
+  const { updateCourseInfo, courseInfo } = useContext(GlobalContext);
+
+  useEffect(() => {
+    if (!courseInfo.id) {
+      updateCourseInfo({ id: courseId });
+    }
+  }, [courseId, courseInfo.id, updateCourseInfo]);
+
   return (
     <Form
       layout='vertical'
       wrapperCol={{
         lg: 12,
       }}
+      style={{
+        marginLeft: "20px",
+      }}
     >
       <Space direction='vertical' style={{ width: "100%" }}>
         <PageHeader title='Edit Course' />
         <Card
           title='Basic Settings'
-          bordered={false}
+          // bordered={false}
           bodyStyle={{
             width: "100%",
           }}
@@ -78,7 +94,7 @@ export default () => {
                     options={[
                       { value: "Spring" },
                       { value: "Summer" },
-                      { value: "Autumn" },
+                      { value: "Fall" },
                       { value: "Winter" },
                     ]}
                   />
@@ -100,7 +116,10 @@ export default () => {
             </Row>
           </Form.Item>
         </Card>
-        <Card title='Grading Defaults' bordered={false}>
+        <Card
+          title='Grading Defaults'
+          // bordered={false}
+        >
           <p>
             Any newly created assignments will have these settings. Existing
             assignments won't be changed.
@@ -129,7 +148,10 @@ export default () => {
             </Checkbox.Group>
           </Form.Item>
         </Card>
-        <Card title='Modify Course' bordered={false}>
+        <Card
+          title='Modify Course'
+          // bordered={false}
+        >
           <Typography.Title level={5}>COURSE ACTIONS</Typography.Title>
           <Space>
             <Button type='primary'>Update Course</Button>
@@ -147,6 +169,8 @@ export default () => {
                 Delete Course
               </Button>
             </Popover>
+            <Button type='primary'>Deactivate</Button>
+            <Button type='primary'>Reactivate</Button>
           </Space>
         </Card>
       </Space>

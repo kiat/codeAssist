@@ -1,7 +1,7 @@
 import Course from "./course";
 
 /**
- * Semester modal
+ * semester course modal
  * @param {*} param0
  * @returns
  */

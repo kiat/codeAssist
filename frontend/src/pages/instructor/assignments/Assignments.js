@@ -1,28 +1,44 @@
 import { Button, Card, Progress, Table } from "antd";
 import moment from "moment";
+import { Link } from "react-router-dom";
 import { tableData } from "./constant";
 
 const columns = [
-  { title: "NAME", dataIndex: "assignmentName" },
+  {
+    title: "NAME",
+    dataIndex: "assignmentName",
+    sorter: (a, b) => a.assignmentName > b.assignmentName,
+    render: (text, record) => (
+      <Link to={`/assignment/reviewGrades/${record.id}`}>{text}</Link>
+    ),
+  },
   {
     title: "POINTS",
     dataIndex: "points",
+    sorter: (a, b) => a.points - b.points,
   },
   {
     title: "RELEASED",
     dataIndex: "released",
     render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+    sorter: (a, b) => a.released - b.released,
   },
   {
     title: "DUE(CDT)",
     dataIndex: "due",
     render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+    sorter: (a, b) => a.due - b.due,
   },
-  { title: "SUBMISSIONS", dataIndex: "submissions" },
+  {
+    title: "SUBMISSIONS",
+    dataIndex: "submissions",
+    sorter: (a, b) => a.submissions - b.submissions,
+  },
   {
     title: "% GRADED",
     dataIndex: "graded",
     render: text => <Progress percent={text} size='small' status='normal' />,
+    sorter: (a, b) => a.graded - b.graded,
   },
   {
     title: "PUBLISHED",

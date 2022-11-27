@@ -1,7 +1,7 @@
 import { Button, message, Modal, Upload } from "antd";
 
 /**
- * 文档上传弹窗组件
+ * file upload windows modal
  * @param {*} param0
  * @returns
  */
@@ -24,7 +24,7 @@ export default function UploadModal({
       {/* <div style={{ textAlign: "center" }}> */}
       <Upload
         name='file'
-        // 上传地址
+        // upload address
         action={url}
         data={data}
         onChange={info => {

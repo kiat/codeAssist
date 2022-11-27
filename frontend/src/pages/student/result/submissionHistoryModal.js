@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { columns } from "./constant";
 
 /**
- * assignment submission history modal
+ * assignment submission history window modal
  * @param {*} param0
  * @returns
  */

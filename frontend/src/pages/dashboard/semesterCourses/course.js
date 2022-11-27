@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { GlobalContext } from "../../../App";
 
 /**
- * course modals
+ * course modal
  * @param {*} param0
  * @returns
  */
@@ -27,11 +27,11 @@ export default function Course({ courseInfo }) {
           name: name,
           // semester: semester,
         });
-        // click on the course and jump to the assignment page
+        //click assignments and navigate to destination assignment page
         if (userInfo.isStudent) {
           navigate(`/assignments/${id}`);
         } else {
-          navigate("/instructorDashboard");
+          navigate(`/instructorDashboard/${id}`);
         }
       }}
     >

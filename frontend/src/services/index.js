@@ -1,0 +1,27 @@
+import { message } from "antd";
+import axios from "axios";
+import { URL_PREFIX } from "../config/url";
+
+const instance = axios.create({
+  baseURL: URL_PREFIX,
+});
+
+instance.interceptors.response.use(
+  res => {
+    return res;
+  },
+  err => {
+    message.error("操作失败");
+  }
+);
+
+const service = (url, params, method, options) =>
+  instance({
+    method: method || "get",
+    url,
+    params: method === "get" ? params : "",
+    data: method === "get" ? "" : params,
+    ...options,
+  });
+
+export default service;
