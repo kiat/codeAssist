@@ -9,12 +9,15 @@ export default function AddForm({ onFinish, onCancel }) {
           <Input />
         </Form.Item>
       ))} */}
+      <Form.Item label='YEAR' name='year'>
+        <Input />
+      </Form.Item>
       <Form.Item label='SEMESTER' name='semester'>
         <Select
           options={[
             { value: "Spring" },
             { value: "Summer" },
-            { value: "Autumn" },
+            { value: "Fall" },
             { value: "Winter" },
           ]}
         />

@@ -4,7 +4,7 @@ import { GlobalContext } from "../../App";
 import axios from "axios";
 
 /**
- * login modal
+ * login window modal
  * @param {*} param0
  * @returns
  */
@@ -22,11 +22,11 @@ export default function LogInModal({ open, onCancel, logIn }) {
           localStorage.setItem("userInfo", JSON.stringify(userInfo));
           updateUserInfo(userInfo);
         } else {
-          message.error("Login failed");
+          message.error("login failed");
         }
       })
       .catch(err => {
-        message.error("Connecting failed");
+        message.error("connection failed");
       });
     return;
   };

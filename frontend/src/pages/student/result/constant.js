@@ -1,6 +1,6 @@
 import { CheckOutlined } from "@ant-design/icons";
 
-// assignment history format and name
+// assignment history column name
 export const columns = [
   {
     title: "#",

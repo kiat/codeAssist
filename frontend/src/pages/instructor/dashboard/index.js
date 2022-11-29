@@ -12,39 +12,72 @@ import {
 import { tableData, texts } from "./constant";
 import TextItem from "./TextItem";
 import moment from "moment";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
+import { useContext } from "react";
+import { GlobalContext } from "../../../App";
+import { useEffect } from "react";
 
 const columns = [
-  { title: "ACTIVE ASSIGNMENTS", dataIndex: "assignmentName" },
+  {
+    title: "ACTIVE ASSIGNMENTS",
+    dataIndex: "assignmentName",
+    sorter: (a, b) => a.assignmentName > b.assignmentName,
+    render: (text, record) => (
+      <Link to={`/assignment/reviewGrades/${record.id}`}>{text}</Link>
+    ),
+  },
   {
     title: "RELEASED",
     dataIndex: "released",
+    sorter: (a, b) => a.released - b.released,
     render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
   },
   {
     title: "DUE(CDT)",
     dataIndex: "due",
+    sorter: (a, b) => a.due - b.due,
     render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
   },
-  { title: "SUBMISSIONS", dataIndex: "submissions" },
+  {
+    title: "SUBMISSIONS",
+    dataIndex: "submissions",
+    sorter: (a, b) => a.submissions - b.submissions,
+  },
   {
     title: "% GRADED",
     dataIndex: "graded",
+    sorter: (a, b) => a.graded - b.graded,
     render: text => <Progress percent={text} size='small' status='normal' />,
   },
   {
     title: "PUBLISHED",
     dataIndex: "published",
+    sorter: (a, b) => a.published - b.published,
     render: text => (
       <Button type={text ? "primary" : "default"} shape='circle' size='small'>
         {" "}
       </Button>
     ),
   },
-  { title: "REGRAEDS", dataIndex: "regrades" },
+  {
+    title: "REGRADES",
+    dataIndex: "regrades",
+    sorter: (a, b) => a.regrades - b.regrades,
+  },
 ];
 
 export default function InstructorDashboard() {
+  const { courseId } = useParams();
+  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+
+  useEffect(() => {
+    if (!courseInfo.id) {
+      updateCourseInfo({
+        id: courseId,
+      });
+    }
+  });
+
   return (
     <>
       {/* <div>
@@ -65,7 +98,7 @@ export default function InstructorDashboard() {
         <div>
           <span>Edit your course descrption on the </span>
           {/* <Typography.Link>Course Settings</Typography.Link> */}
-          <Link to='/courseSettings'>Course Settings</Link>
+          <Link to={`/courseSettings/${courseId}`}>Course Settings</Link>
           <span> page.</span>
         </div>
       </Card>

@@ -1,34 +1,54 @@
-import { Button, Form, Input, message, Modal, Radio } from "antd";
-import axios from "axios";
+import { Button, Form, Input, Modal, Radio } from "antd";
+// import axios from "axios";
 import { useContext } from "react";
 import { GlobalContext } from "../../App";
+// import service from "../../services";
+import { signUpInstructor, signUpStudent } from "../../services/user";
 
 /**
- * User registration modal
+ * user signup window modal
  * @param {*} param0
  * @returns
  */
 export default function SignUpModal({ open, onCancel }) {
   const { updateUserInfo } = useContext(GlobalContext);
 
-  // action after registration succeed
-  const finishSignUp = values => {
-    axios
-      .post("/signUp", values)
-      .then(res => {
-        if (res.data.status === 1) {
-          const { name, isStudent } = res.data.data;
-          const userInfo = { name, isStudent };
-          localStorage.setItem("userInfo", JSON.stringify(userInfo));
-          updateUserInfo(userInfo);
-        } else {
-          message.error("Register failed");
-        }
-      })
-      .catch(err => {
-        message.error("Connecting failed");
-      });
-    return;
+  // action after successfully signup
+  const finishSignUp = async values => {
+    const isStudent = values.isStudent;
+    let res;
+    if (isStudent) {
+      res = await signUpStudent(values);
+    } else {
+      res = await signUpInstructor(values);
+    }
+    // console.log("res3", res);
+    if (res) {
+      const userInfo = {
+        name: res.data?.name,
+        isStudent,
+      };
+      localStorage.setItem("userInfo", JSON.stringify(userInfo));
+      updateUserInfo(userInfo);
+    }
+
+    // axios
+    //   .post("/signUp", values)
+    //   // .post("http://127.0.0.1:4523/m1/1927806-0-default/create_student", values)
+    //   .then(res => {
+    //     if (res.data.status === 1) {
+    //       const { name, isStudent } = res.data.data;
+    //       const userInfo = { name, isStudent };
+    //       localStorage.setItem("userInfo", JSON.stringify(userInfo));
+    //       updateUserInfo(userInfo);
+    //     } else {
+    //       message.error("signup failed");
+    //     }
+    //   })
+    //   .catch(err => {
+    //     message.error("connection failed");
+    //   });
+    // return;
   };
 
   return (

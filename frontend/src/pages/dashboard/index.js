@@ -10,8 +10,7 @@ import RelationForm from "./relationForm";
 import AddForm from "./addForm";
 
 /**
- * dashboard
- * for both instructor and student
+ * dashboard for both student and instructors
  * @returns
  */
 export default function Dashboard() {
@@ -19,7 +18,7 @@ export default function Dashboard() {
   const [courses, setCourses] = useState([]);
   const { userInfo } = useContext(GlobalContext);
 
-  //add course windows
+  // control course adding modal
   const toggleModalOpen = useCallback(() => {
     setModalOpen(bool => !bool);
   }, []);
@@ -37,7 +36,7 @@ export default function Dashboard() {
     getCourses();
   }, [getCourses]);
 
-  // after add a course action
+  // action after successfully adding courses
   const afterAddCourse = useCallback(
     values => {
       axios
@@ -53,7 +52,7 @@ export default function Dashboard() {
     [getCourses, toggleModalOpen, userInfo?.isStudent]
   );
 
-  // identify student or instructor
+  // find if the user is an instructor or a student
   return (
     <>
       <PageHeader title='Your Courses' />

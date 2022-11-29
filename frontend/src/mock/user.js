@@ -1,7 +1,8 @@
 import IMock from "./common";
 import { FAIL, SUCCESS } from "./constant";
 
-// 测试登录接口均返回学生身份
+// 
+//test: login port return student identity
 IMock(
   "/logIn",
   function (params) {
@@ -20,7 +21,7 @@ IMock(
   "post"
 );
 
-// 注册接口
+// sign up port
 IMock(
   "/signUp",
   function (params) {

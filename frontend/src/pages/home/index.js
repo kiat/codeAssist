@@ -15,17 +15,17 @@ export default function Home() {
   const { userInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
 
-  // login modal setup
+  // control login window modal
   const toggleLogInModal = useCallback(() => {
     setlogInModalOpen(logInModalOpen => !logInModalOpen);
   }, []);
 
-  // open registration window
+  // open signup window
   const openModal = () => {
     setModalOpen(true);
   };
 
-  // close registration window
+  // close signup window
   const closeModal = () => {
     setModalOpen(false);
   };

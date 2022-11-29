@@ -1,7 +1,7 @@
 import { Alert, Button, Form, Input, Modal } from "antd";
 
 /**
- * student relate course adding window modal
+ * student relate to course window modal
  * @param {*} param0
  * @returns
  */

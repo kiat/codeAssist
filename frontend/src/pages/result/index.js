@@ -1,0 +1,338 @@
+import {
+  CheckOutlined,
+  ClockCircleOutlined,
+  DownloadOutlined,
+  ReloadOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
+import {
+  Button,
+  Card,
+  Collapse,
+  PageHeader,
+  Radio,
+  Space,
+  Table,
+  Typography,
+} from "antd";
+import axios from "axios";
+import { useContext } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
+import { GlobalContext } from "../../App";
+import PageBottom from "../../components/layout/pageBottom";
+import PageContent from "../../components/layout/pageContent";
+import UploadModal from "../../components/UploadModal";
+import { formattingData } from "./constant";
+import FormattingModal from "./FormattingModal";
+
+import "./index.css";
+import SubmissionHistoryModal from "./submissionHistoryModal";
+
+/**
+ * assignment result modal
+ * @returns
+ */
+export default function AssignmentResult() {
+  const [pageHeaderTitle, setPageHeaderTitle] = useState("Autograder Results");
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [assignment, setAssignment] = useState({});
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const { assignmentId } = useParams();
+  const location = useLocation();
+  const { userInfo, assignmentInfo } = useContext(GlobalContext);
+  const [formattingModalOpen, setFormattingOpen] = useState(false);
+  const [formattingSelected, setFormattingSelected] = useState([1, 3]);
+
+  const formattingSelectedUpdate = useCallback(value => {
+    setFormattingSelected(value);
+  }, []);
+
+  const toggleFormattingModalOpen = useCallback(() => {
+    setFormattingOpen(t => !t);
+  }, []);
+
+  // control assignment history window modal
+  const toggleHistoryModalOpen = useCallback(() => {
+    setHistoryModalOpen(bool => !bool);
+  }, []);
+
+  // control assignment upload window modal
+  const toggleUploadModalOpen = useCallback(() => {
+    setUploadModalOpen(bool => !bool);
+  }, []);
+
+  const getAssignmentResult = () => {
+    axios.post("/api/getAssignmentResult").then(res => {
+      const { assignmentName, codes, results, score, due, released } = res.data;
+      const now = Date.now();
+      setAssignment({
+        assignmentName,
+        codes,
+        results,
+        score,
+        isUpdate: now >= released && now <= due ? 1 : 0,
+        formattingData: formattingData,
+      });
+    });
+  };
+
+  // update assignment information
+  const updateAssignment = useCallback(() => {
+    getAssignmentResult();
+  }, []);
+
+  const radioChange = useCallback(e => {
+    setPageHeaderTitle(e.target.value);
+  }, []);
+
+  useEffect(() => {
+    getAssignmentResult();
+  }, [location.key]);
+
+  const formattingColumns = [
+    {
+      title: "",
+      dataIndex: "id",
+      render: text =>
+        formattingSelected.includes(text) ? <CheckOutlined /> : null,
+    },
+    { title: "points", dataIndex: "points" },
+    { title: "description", dataIndex: "description" },
+  ];
+
+  const items =
+    pageHeaderTitle === "Autograder Results"
+      ? assignment.results
+      : assignment.codes;
+
+  return (
+    <>
+      <PageContent>
+        {/* <div style={{ display: "flex", flexWrap: "wrap" }}> */}
+        <div style={{ display: "flex" }}>
+          <div
+            style={{
+              flex: "1",
+              height: "calc(100vh - 40px)",
+            }}
+          >
+            <PageHeader
+              style={{ borderBottom: "1px solid #f0f0f0" }}
+              title={pageHeaderTitle}
+              extra={[
+                <Button
+                  key={1}
+                  onClick={toggleUploadModalOpen}
+                  style={{
+                    display:
+                      assignment.isUpdate && userInfo?.isStudent
+                        ? "inline"
+                        : "none",
+                  }}
+                >
+                  upload
+                </Button>,
+                <Radio.Group
+                  key={2}
+                  buttonStyle='solid'
+                  defaultValue='Autograder Results'
+                  onChange={radioChange}
+                >
+                  <Radio.Button value='Autograder Results'>
+                    Results
+                  </Radio.Button>
+                  <Radio.Button value='Submitted Files'>Code</Radio.Button>
+                </Radio.Group>,
+              ]}
+            />
+            <Card bordered={false}>
+              <Collapse
+                style={{
+                  border: "0px",
+                  backgroundColor: "white",
+                }}
+              >
+                {items?.map(item => (
+                  <Collapse.Panel
+                    key={item.name}
+                    header={
+                      <span style={{ color: "#20716a" }}>{item.name}</span>
+                    }
+                    showArrow={false}
+                    style={{
+                      marginBottom: "20px",
+                      border: "1px solid #d9d9d9",
+                      backgroundColor: "#f9f9fb",
+                    }}
+                  >
+                    {item.text}
+                  </Collapse.Panel>
+                ))}
+              </Collapse>
+            </Card>
+            <div
+              style={{
+                height: "40px",
+                backgroundColor: "#1890ff",
+                position: "fixed",
+                bottom: 0,
+                width: "100%",
+                marginLeft: "-1px",
+              }}
+            />
+          </div>
+          <div
+            style={{
+              width: "430px",
+              paddingLeft: "30px",
+              paddingTop: "20px",
+              height: "100vh",
+            }}
+          >
+            <Space direction='vertical' size='middle'>
+              <div>
+                <Typography.Title level={5}>STUDENT</Typography.Title>
+                <Typography.Text>
+                  {assignmentInfo?.studentName ?? userInfo?.name}
+                </Typography.Text>
+              </div>
+              <div>
+                <Typography.Title level={5}>AUTOGRADER SCORE</Typography.Title>
+                <Typography.Title
+                  level={4}
+                  style={{ marginTop: "-15px", fontWeight: "700" }}
+                >
+                  {assignment.score}
+                </Typography.Title>
+              </div>
+              <div>
+                <Typography.Title level={5}>FAILED TESTS</Typography.Title>
+                <Typography.Text style={{ color: "red" }}>
+                  test_1 (tester.TestDiffs) (0.0/5.0)
+                </Typography.Text>
+              </div>
+              <div>
+                <Typography.Title level={5}>PASSED TESTS</Typography.Title>
+                {assignment.results?.map(item => (
+                  <Typography.Paragraph
+                    key={item.id}
+                    style={{ color: "#20716a" }}
+                  >
+                    {item.name}
+                  </Typography.Paragraph>
+                ))}
+              </div>
+              <div>
+                <div style={{ lineHeight: "30px" }}>
+                  <span style={{ fontSize: "18px", fontWeight: 600 }}>
+                    formatting
+                  </span>
+                  <span style={{ float: "right" }}>10.0/10.0 pts</span>
+                </div>
+                <Table
+                  rowKey='id'
+                  columns={formattingColumns}
+                  // dataSource={formattingData}
+                  dataSource={assignment.formattingData}
+                  size='small'
+                  showHeader={false}
+                  // rowSelection={{}}
+                  pagination={false}
+                />
+              </div>
+            </Space>
+
+            {/* <h3>PASSED TESTS</h3> */}
+            {/* {assignment.results?.map(item => (
+          <p key={item.id} style={{ color: "#20716a" }}>
+            {item.name}
+          </p>
+        ))} */}
+            {/* <div
+              style={{
+                position: "fixed",
+                bottom: "0px",
+                // backgroundColor: "#1ca0a0",
+                backgroundColor: "#1890ff",
+                lineHeight: "40px",
+                width: "100%",
+              }}
+            >
+              <Button
+                icon={<ClockCircleOutlined />}
+                style={{
+                  marginRight: "10px",
+                  marginLeft: "15px",
+                }}
+                // className='right-bottom-but'
+                onClick={toggleHistoryModalOpen}
+              >
+                Submission History
+              </Button>
+              <Button
+                icon={<DownloadOutlined />}
+                // className='right-bottom-but'
+                download='submission'
+                href='http://localhost:3000/static/js/bundle.js'
+              >
+                Download Submission
+              </Button>
+            </div> */}
+          </div>
+          <UploadModal
+            title='UPLOAD'
+            url='/api/uploadFile'
+            data={{ assignmentId }}
+            open={uploadModalOpen}
+            onCancel={toggleUploadModalOpen}
+            afterUpdate={updateAssignment}
+          />
+          <SubmissionHistoryModal
+            open={historyModalOpen}
+            onCancel={toggleHistoryModalOpen}
+          />
+        </div>
+      </PageContent>
+      <PageBottom>
+        <Space>
+          <Button icon={<ReloadOutlined />}>Rerun Autograder</Button>
+          {!userInfo?.isStudent ? (
+            <Button onClick={toggleFormattingModalOpen}>Grades</Button>
+          ) : null}
+
+          <Button
+            icon={<ClockCircleOutlined />}
+            // style={{
+            //   marginRight: "10px",
+            //   marginLeft: "15px",
+            // }}
+            // className='right-bottom-but'
+            onClick={toggleHistoryModalOpen}
+          >
+            Submission History
+          </Button>
+          <Button
+            icon={<DownloadOutlined />}
+            // className='right-bottom-but'
+            download='submission'
+            href='http://localhost:3000/static/js/bundle.js'
+          >
+            Download Submission
+          </Button>
+          <Button>
+            <span>Resubmit</span>
+            <UploadOutlined />
+          </Button>
+        </Space>
+      </PageBottom>
+      <FormattingModal
+        open={formattingModalOpen}
+        onCancel={toggleFormattingModalOpen}
+        formattingData={assignment.formattingData}
+        formattingSelectedUpdate={formattingSelectedUpdate}
+        formattingSelected={formattingSelected}
+      />
+    </>
+  );
+}

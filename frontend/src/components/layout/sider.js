@@ -16,10 +16,15 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import AccountPopoverContent from "./accountPopoverContent";
+import GradeSider from "./GradeSider";
 import styles from "./styles.module.css";
 
-export default function RootSider({ pathname, courseInfo, userInfo }) {
-  console.log("pathname", pathname);
+export default function RootSider({
+  pathname,
+  courseInfo,
+  userInfo,
+  assignmentInfo,
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
 
@@ -92,22 +97,6 @@ export default function RootSider({ pathname, courseInfo, userInfo }) {
               }
             }
           >
-            {/* <div
-              style={{
-                fontWeight: "bold",
-                color: "#1ca0a0",
-                marginLeft: "15px",
-              }}
-            >
-              <HeatMapOutlined />
-              <span> GRADING </span>
-              <MenuFoldOutlined
-                onClick={toggleCollapsed}
-                style={{
-                  marginLeft: "80px",
-                }}
-              />
-            </div> */}
             <Typography.Title
               level={4}
               style={{
@@ -128,148 +117,10 @@ export default function RootSider({ pathname, courseInfo, userInfo }) {
               />
             </Typography.Title>
 
-            {/* {/\/dashboard/.test(pathname) ? (
-              <Card
-                title={
-                  <Typography.Title level={5} style={{ fontWeight: "bold" }}>
-                    Your Courses
-                  </Typography.Title>
-                }
-                bordered={false}
-                size='small'
-              >
-                <span>
-                  Welcome to grading! Click on one of your courses to the right,
-                  or on the Account menu below.
-                </span>
-              </Card>
-            ) : userInfo?.isStudent ? (
-              <div
-                style={{
-                  marginTop: "10px",
-                  marginBottom: "10px",
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: "bolder",
-                    fontSize: "16px",
-                  }}
-                >
-                  {courseInfo?.code}
-                </div>
-                <div
-                  style={{
-                    fontSize: "12px",
-                  }}
-                >
-                  {courseInfo?.name}
-                </div>
-              </div>
-            ) : (
-              <>
-                <Card
-                  bordered={false}
-                  title={
-                    <>
-                      <Typography.Title
-                        level={4}
-                        style={{ fontWeight: "bold" }}
-                      >
-                        C S N313E
-                      </Typography.Title>
-                      <div style={{ whiteSpace: "normal" }}>
-                        Su22 - ELEMENTS OF SOFTWARE DESIGN-WB(86439)
-                      </div>
-                    </>
-                  }
-                  size='small'
-                >
-                  <Space
-                    direction='vertical'
-                    // style={{
-                    //   marginLeft: "10px",
-                    // }}
-                    className={styles.iconText}
-                  >
-                    <Link to='/instructorDashboard' className={styles.linkText}>
-                      <TableOutlined />
-                      <span> Dashboard</span>
-                    </Link>
-                    <Link
-                      to='/instructorAssignments'
-                      className={styles.linkText}
-                    >
-                      <FileTextOutlined />
-                      <span> Assignments</span>
-                    </Link>
-                    <Link to='/roster' className={styles.linkText}>
-                      <UsergroupAddOutlined />
-                      <span> Roster</span>
-                    </Link>
-                    <Link to='/courseSettings' className={styles.linkText}>
-                      <SettingOutlined />
-                      <span> Course Settings</span>
-                    </Link>
-                  </Space>
-                </Card>
-                <Card
-                  title={userInfo?.isStudent ? "STUDENT" : "INSTRUCTOR"}
-                  size='small'
-                  bordered={false}
-                >
-                  <div
-                    className={styles.iconText}
-                    // style={{
-                    //   marginLeft: "10px",
-                    // }}
-                  >
-                    <UserOutlined />
-                    <span> {userInfo?.name}</span>
-                  </div>
-                </Card>
-                <Card title='COURSE ACTIONS' size='small' bordered={false}>
-                  <div className={styles.iconText}>
-                    <Link to='/dashboard' className={styles.linkText}>
-                      <LogoutOutlined />
-                      <span> Leave Course</span>
-                    </Link>
-                  </div>
-                </Card>
-                <Link to='/dashboard'>
-                  <div
-                    style={{
-                      color: "#1ca0a0",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    <PicRightOutlined />
-                    <span> Dashboard</span>
-                  </div>
-                </Link>
-                <div
-                  style={{
-                    cursor: "pointer",
-                  }}
-                  onClick={() => {
-                    navigate();
-                  }}
-                >
-                  <RedoOutlined />
-                  <span> Regrade Requests</span>
-                </div>
-              </>
-            )} */}
-            {/* <div style={{ marginTop: "20px" }}>
-              <h4>{userInfo?.isStudent ? "STUDENT" : "INSTRUCTOR"}</h4>
-              <div>
-                <UserOutlined />
-                <span> {userInfo?.name}</span>
-              </div>
-            </div> */}
-            {/dashboard/.test(pathname) ? (
+            {/\/assignment\//.test(pathname) ||
+            (/\/assignmentResult\//i.test(pathname) && !userInfo?.isStudent) ? (
+              <GradeSider />
+            ) : /dashboard/.test(pathname) ? (
               <Card
                 title={
                   <Typography.Title level={5} style={{ fontWeight: "bold" }}>
@@ -313,11 +164,16 @@ export default function RootSider({ pathname, courseInfo, userInfo }) {
                     <Link
                       to={
                         userInfo?.isStudent
-                          ? "/dashboard"
-                          : "/instructorDashboard"
+                          ? // ? "/dashboard/"
+                            `/assignments/${courseInfo.id}`
+                          : // "/assignments/" + courseInfo.id
+                            `/instructorDashboard/${courseInfo.id}`
                       }
                       className={
-                        /dashboard/i.test(pathname) ? "" : styles.linkText
+                        /dashboard/i.test(pathname) ||
+                        /\/assignments\//i.test(pathname)
+                          ? ""
+                          : styles.linkText
                       }
                     >
                       <TableOutlined />
@@ -338,9 +194,10 @@ export default function RootSider({ pathname, courseInfo, userInfo }) {
                     ) : (
                       <>
                         <Link
-                          to='/instructorAssignments'
+                          to={`/instructorAssignments/${courseInfo.id}`}
                           className={
-                            pathname === "/instructorAssignments"
+                            // pathname === "/instructorAssignments"
+                            /\/instructorAssignments\//i.test(pathname)
                               ? ""
                               : styles.linkText
                           }
@@ -349,18 +206,23 @@ export default function RootSider({ pathname, courseInfo, userInfo }) {
                           <span> Assignments</span>
                         </Link>
                         <Link
-                          to='/enrollment'
+                          to={`/enrollment/${courseInfo.id}`}
                           className={
-                            pathname === "/enrollment" ? "" : styles.linkText
+                            // pathname === "/enrollment"
+                            /\/enrollment\//i.test(pathname)
+                              ? ""
+                              : styles.linkText
                           }
                         >
                           <UsergroupAddOutlined />
                           <span> Enrollment</span>
                         </Link>
                         <Link
-                          to='/courseSettings'
+                          // to='/courseSettings'
+                          to={`/courseSettings/${courseInfo.id}`}
                           className={
-                            pathname === "/courseSettings"
+                            // pathname === "/courseSettings"
+                            /\/courseSettings\//i.test(pathname)
                               ? ""
                               : styles.linkText
                           }

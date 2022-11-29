@@ -4,7 +4,7 @@ import Home from "./pages/home";
 import Dashboard from "./pages/dashboard";
 import { createContext, useCallback, useEffect, useState } from "react";
 import Assignments from "./pages/assignments";
-import AssignmentResult from "./pages/student/result";
+import AssignmentResult from "./pages/result";
 import RootSider from "./components/layout/sider";
 
 import "./mock";
@@ -12,18 +12,29 @@ import InstructorDashboard from "./pages/instructor/dashboard";
 import CourseSettings from "./pages/instructor/courseSettings";
 import InstructorAssignments from "./pages/instructor/assignments";
 import Enrollment from "./pages/instructor/enrollment";
+import ReviewGrades from "./pages/reviewGrades";
+import EditOutline from "./pages/editOutline";
+import ConfigureAutograder from "./pages/configureAutograder";
+import CreateRubric from "./pages/createRubric";
+import ManageSubmissions from "./pages/manageSubmissions";
+import GradeSubmissions from "./pages/gradeSubmissions";
+import Extensions from "./pages/extensions";
+import AssignmentSettings from "./pages/assignmentSettings";
 
 const { Content } = Layout;
 
 export const GlobalContext = createContext({
   userInfo: { name: "", isStudent: 1 },
-  curseInfo: { name: "", code: "" },
+  curseInfo: { id: "", name: "", code: "" },
+  assignmentInfo: { id: "", name: "" },
   updateCourseInfo: () => {},
   updateUserInfo: () => {},
+  updateAssignmentInfo: () => {},
 });
 
 function App() {
   const [courseInfo, setCourseInfo] = useState({ code: "", name: "" });
+  const [assignmentInfo, setAssignmentInfo] = useState({ name: "" });
   const [userInfo, setUserInfo] = useState(
     JSON.parse(localStorage.getItem("userInfo"))
   );
@@ -35,6 +46,10 @@ function App() {
 
   const updateUserInfo = useCallback(info => {
     setUserInfo(info);
+  }, []);
+
+  const updateAssignmentInfo = useCallback(info => {
+    setAssignmentInfo(info);
   }, []);
 
   const pathname = window.location.pathname;
@@ -52,6 +67,8 @@ function App() {
         updateCourseInfo,
         userInfo,
         updateUserInfo,
+        assignmentInfo,
+        updateAssignmentInfo,
       }}
     >
       <Layout>
@@ -60,6 +77,7 @@ function App() {
             pathname={pathname}
             courseInfo={courseInfo}
             userInfo={userInfo}
+            assignmentInfo={assignmentInfo}
           />
         )}
         <Layout style={{ height: "100vh" }}>
@@ -76,19 +94,54 @@ function App() {
               <Route path='/dashboard' element={<Dashboard />} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
-                path='/assignmentresult/:assignmentId'
+                path='/assignmentResult/:assignmentId'
                 element={<AssignmentResult />}
               />
               <Route
-                path='/instructorDashboard'
+                path='/instructorDashboard/:courseId'
                 element={<InstructorDashboard />}
               />
               <Route
-                path='/instructorAssignments'
+                path='/instructorAssignments/:courseId'
                 element={<InstructorAssignments />}
               />
-              <Route path='/courseSettings' element={<CourseSettings />} />
-              <Route path='/enrollment' element={<Enrollment />} />
+              <Route
+                path='/courseSettings/:courseId'
+                element={<CourseSettings />}
+              />
+              <Route path='/enrollment/:courseId' element={<Enrollment />} />
+              <Route
+                path='/assignment/reviewGrades/:assignmentId'
+                element={<ReviewGrades />}
+              />
+              <Route
+                path='/assignment/editOutline/:assignmentId'
+                element={<EditOutline />}
+              />
+              <Route
+                path='/assignment/configureAutograder/:assignmentId'
+                element={<ConfigureAutograder />}
+              />
+              <Route
+                path='/assignment/createRubric/:assignmentId'
+                element={<CreateRubric />}
+              />
+              <Route
+                path='/assignment/manageSubmissions/:assignmentId'
+                element={<ManageSubmissions />}
+              />
+              <Route
+                path='/assignment/gradeSubmissions/:assignmentId'
+                element={<GradeSubmissions />}
+              />
+              <Route
+                path='/assignment/extensions/:assignmentId'
+                element={<Extensions />}
+              />
+              <Route
+                path='/assignment/assignmentSettings/:assignmentId'
+                element={<AssignmentSettings />}
+              />
             </Routes>
           </Content>
         </Layout>

@@ -1,16 +1,16 @@
-// 请求成功接口
+// request success port
 export const SUCCESS = {
   status: 1,
-  message: "请求成功",
+  message: "request succeed",
 };
 
-// 请求失败接口
+// request fail port
 export const FAIL = {
   status: 0,
-  message: "请求失败",
+  message: "request failed",
 };
 
-// 课程接口
+// course port
 export const COURSES = [
   {
     semester: "Fall 2022",
@@ -54,7 +54,7 @@ export const COURSES = [
   },
 ];
 
-// 课程作业
+// assignment port
 export const COURSE = {
   id: 54321,
   code: "T S 22",
@@ -148,7 +148,7 @@ export const COURSE = {
   ],
 };
 
-// 作业结果
+// assignment result port
 export const ASSIGNMENTRESULT = {
   assignmentName: "A123",
   score: "2.0/2.0",
@@ -188,7 +188,7 @@ export const ASSIGNMENTRESULT = {
   ],
 };
 
-// 作业提交历史
+// assignment submission history port
 export const SUBMISSIONHISTORY = [
   {
     id: "2",

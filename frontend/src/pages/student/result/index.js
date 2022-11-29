@@ -9,7 +9,7 @@ import "./index.css";
 import SubmissionHistoryModal from "./submissionHistoryModal";
 
 /**
- * assignment grading
+ * assignment result modal
  * @returns
  */
 export default function AssignmentResult() {
@@ -20,12 +20,12 @@ export default function AssignmentResult() {
   const { assignmentId } = useParams();
   const location = useLocation();
 
-  // assignment history window control
+  // control assignment history window modal
   const toggleHistoryModalOpen = useCallback(() => {
     setHistoryModalOpen(bool => !bool);
   }, []);
 
-  // assignment upload window control
+  // control assignment upload modal
   const toggleUploadModalOpen = useCallback(() => {
     setUploadModalOpen(bool => !bool);
   }, []);
@@ -44,7 +44,7 @@ export default function AssignmentResult() {
     });
   };
 
-  // update assignment info
+  // update assignment information
   const updateAssignment = useCallback(() => {
     getAssignmentResult();
   }, []);
