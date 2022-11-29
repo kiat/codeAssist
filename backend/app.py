@@ -267,9 +267,6 @@ def upload_file():
         filename = secure_filename(file.filename)
         new_uuid = str(uuid.uuid4())
 
-        # TODO (ricky): Need to copy file contents before saving
-        # to database
-
         submission_data = {
             "id": new_uuid,
             "student_id": student_id,
@@ -277,6 +274,8 @@ def upload_file():
             "student_code_file": file.read(),
             "completed": False
         }
+
+        file.seek(0)
 
         db.session.add(Submission(**submission_data))
         db.session.commit()
@@ -322,11 +321,11 @@ def upload_assignment_autograder():
 
         docker_client.saveFile(file, filename, docker_client.assignment_dir, False)
 
-        # TODO (ricky): copy file contents here before saving to database
-
         assignment_data = {
             'autograder_file': file.read(),
         }
+
+        file.seek(0)
 
         assignment = db.session.query(Assignment).filter_by(assignment_id=assignment_id).update(assignment_data)
         db.session.commit()
