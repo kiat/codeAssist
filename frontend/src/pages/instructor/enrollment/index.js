@@ -9,31 +9,62 @@ import {
   Table,
   Typography,
 } from "antd";
-import { tableData } from "./constant";
-import { CloseOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons";
+import { PlusOutlined, UploadOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
 import { useCallback, useState } from "react";
+import {
+  createEnrollment,
+  getCourseEnrollment,
+} from "../../../services/enrollment";
+import { useParams } from "react-router-dom";
+import { useEffect } from "react";
 
 const columns = [
-  { title: "FIRST & LAST NAME", dataIndex: "username" },
+  { title: "FIRST & LAST NAME", dataIndex: "name" },
   { title: "EMAIL", dataIndex: "email" },
-  { title: "ROLE", dataIndex: "role" },
-  { title: "SECTIONS", dataIndex: "sections" },
-  { title: "SUBMISSIONS", dataIndex: "submissions" },
-  {
-    title: "REMOVE",
-    render: () => (
-      <Button type='primary' size='small' danger icon={<CloseOutlined />} />
-    ),
-  },
+  // { title: "ROLE", dataIndex: "role" },
+  // { title: "SECTIONS", dataIndex: "sections" },
+  // { title: "SUBMISSIONS", dataIndex: "submissions" },
+  // {
+  //   title: "REMOVE",
+  //   render: () => (
+  //     <Button type='primary' size='small' danger icon={<CloseOutlined />} />
+  //   ),
+  // },
 ];
 
 export default () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [enrollment, setEnrollment] = useState([]);
+  const { courseId } = useParams();
 
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen(t => !t);
   }, []);
+
+  const getEnrollment = useCallback(() => {
+    getCourseEnrollment({ course_id: courseId }).then(res => {
+      setEnrollment(res.data);
+    });
+  }, [courseId]);
+
+  const finishForm = useCallback(
+    values => {
+      // console.log("values", values);
+      const { studentId } = values;
+      createEnrollment({ student_id: studentId, course_id: courseId }).then(
+        res => {
+          toggleAddModalOpen();
+          getEnrollment();
+        }
+      );
+    },
+    [courseId, getEnrollment, toggleAddModalOpen]
+  );
+
+  useEffect(() => {
+    getEnrollment();
+  }, [getEnrollment]);
 
   return (
     <>
@@ -66,7 +97,7 @@ export default () => {
             <Button type='primary'>search</Button>
           </Form.Item>
         </Form>
-        <Table columns={columns} dataSource={tableData} />
+        <Table columns={columns} dataSource={enrollment} rowKey='id' />
       </Card>
       <div
         style={{
@@ -102,6 +133,7 @@ export default () => {
       <AddUserModal
         open={addModalOpen}
         toggleAddModalOpen={toggleAddModalOpen}
+        onFinish={finishForm}
       />
     </>
   );

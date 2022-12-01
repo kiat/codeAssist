@@ -9,6 +9,9 @@ export default function AddForm({ onFinish, onCancel }) {
           <Input />
         </Form.Item>
       ))} */}
+      <Form.Item label='COURSE NAME' name='courseName'>
+        <Input />
+      </Form.Item>
       <Form.Item label='YEAR' name='year'>
         <Input />
       </Form.Item>
@@ -23,9 +26,6 @@ export default function AddForm({ onFinish, onCancel }) {
         />
       </Form.Item>
       <Form.Item label='COURSE ENTRY CODE' name='entryCode'>
-        <Input />
-      </Form.Item>
-      <Form.Item label='COURSE NAME' name='courseName'>
         <Input />
       </Form.Item>
       <Form.Item style={{ textAlign: "center" }}>
