@@ -26,7 +26,7 @@ import { useState } from "react";
 
 const { Sider, Content } = Layout;
 
-export default ({ currentStep, updateCurrentStep, toggleIsCreate }) => {
+export default ({ currentStep, updateCurrentStep, toggleIsCreate, form }) => {
   // const [currentStep, setCurrentStep] = useState(0);
   const [assignmentType, setAssignmentType] = useState(0);
   return (
@@ -117,12 +117,16 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate }) => {
           </Sider>
           <Content>
             <Card bordered={false}>
-              <Form layout='vertical'>
-                <Form.Item label='ASSIGNMENT NAME' name='assignmentName'>
+              <Form layout='vertical' form={form}>
+                <Form.Item label='ASSIGNMENT NAME' name='name'>
                   <Input placeholder='Name your assignment' />
                 </Form.Item>
                 {assignmentType !== "2" ? (
-                  <Form.Item label='TEMPLATE' name='template'>
+                  <Form.Item
+                    label='TEMPLATE'
+                    name='template'
+                    valuePropName='fileList'
+                  >
                     <Upload>
                       <Button icon={<UploadOutlined />}>select PDF</Button>
                     </Upload>
@@ -131,6 +135,7 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate }) => {
                 <Form.Item
                   label='SUBMISSION ANONYMIZATION'
                   name='submissionAnonymization'
+                  valuePropName='checked'
                 >
                   <Checkbox>Enable Anonymous Grading</Checkbox>
                 </Form.Item>
@@ -142,7 +147,11 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate }) => {
                     >
                       <Input />
                     </Form.Item>
-                    <Form.Item label='MANUAL GRADING' name='manualGrading'>
+                    <Form.Item
+                      label='MANUAL GRADING'
+                      name='manualGrading'
+                      valuePropName='checked'
+                    >
                       <Checkbox>Enable Manual Grading</Checkbox>
                     </Form.Item>
                   </>
@@ -173,7 +182,10 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate }) => {
                           </Form.Item>
                         </Col>
                         <Col span={24} md={12}>
-                          <Form.Item name='allowLateSubmissions'>
+                          <Form.Item
+                            name='allowLateSubmissions'
+                            valuePropName='checked'
+                          >
                             <Checkbox>Allow Late Submissions</Checkbox>
                           </Form.Item>
                         </Col>
@@ -188,7 +200,10 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate }) => {
                         {assignmentType === "1" ? (
                           <>
                             <Col span={24} md={12}>
-                              <Form.Item name='enforceTimeLimit'>
+                              <Form.Item
+                                name='enforceTimeLimit'
+                                valuePropName='checked'
+                              >
                                 <Checkbox>Enforce time limit</Checkbox>
                               </Form.Item>
                             </Col>
@@ -217,7 +232,11 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate }) => {
                         </Radio.Group>
                       </Form.Item>
                     )}
-                    <Form.Item label='GROUP SUBMISSION' name='groupSubmission'>
+                    <Form.Item
+                      label='GROUP SUBMISSION'
+                      name='groupSubmission'
+                      valuePropName='checked'
+                    >
                       <Checkbox>Enable Group Submission</Checkbox>
                     </Form.Item>
                     <Form.Item label='LIMIT GROUP SIZE' name='limitGroupSize'>
@@ -227,7 +246,11 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate }) => {
                 )}
                 {assignmentType === "2" ? (
                   <>
-                    <Form.Item label='LEADERBOARD' name='leaderBoard'>
+                    <Form.Item
+                      label='LEADERBOARD'
+                      name='leaderBoard'
+                      valuePropName='checked'
+                    >
                       <Checkbox>Enable Leaderboard</Checkbox>
                     </Form.Item>
                     <Form.Item label='DEFAULT # OF ENTRIES' name='leaderBoard'>
@@ -248,6 +271,7 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate }) => {
                   <Form.Item
                     label='TEMPLATE VISIBILITY'
                     name='templateVisibility'
+                    valuePropName='checked'
                   >
                     <Checkbox>
                       Allow student to view and download the template

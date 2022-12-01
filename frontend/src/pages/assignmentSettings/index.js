@@ -7,21 +7,78 @@ import {
   DatePicker,
   Form,
   Input,
+  message,
   PageHeader,
+  Radio,
   Row,
-  Select,
   Space,
 } from "antd";
+import { useCallback, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import { getAssignment, updateAssignment } from "../../services/assignment";
+import moment from "moment";
 
 export default () => {
+  // const [assignment, setAssignment] = useState(null);
+  // const initial = useRef(true);
+  const { assignmentId } = useParams();
+  const [form] = Form.useForm();
+
+  const getAssignmentInfo = useCallback(() => {
+    getAssignment({ assignment_id: assignmentId }).then(res => {
+      // setAssignment(res.data);
+      // console.log("res", res);
+      const { name, published, due_date, autograder_points } = res.data || {};
+      form.setFieldsValue({
+        name,
+        published,
+        autograderPoints: autograder_points,
+        dueDate: moment(due_date, "YYYY-MM-DD"),
+      });
+    });
+  }, [assignmentId, form]);
+
+  useEffect(() => {
+    getAssignmentInfo();
+  }, [getAssignmentInfo]);
+
+  // if(initial.current){
+  //   getAssignment()
+  // }
+  // console.log("assignment", assignment);
   return (
     <>
       <PageHeader title='Edit Programming Assignment' />
-      <Form layout='vertical'>
+      <Form
+        layout='vertical'
+        form={form}
+        onFinish={values => {
+          console.log("values", values);
+          const { name, published, dueDate, autograderPoints } = values;
+          updateAssignment({
+            name,
+            published,
+            due_date: dueDate.format("YYYY-MM-DD"),
+            autograder_points: autograderPoints,
+            assignment_id: assignmentId,
+          }).then(res => {
+            message.success("操作成功！");
+            getAssignment();
+          });
+        }}
+      >
         <Card bordered={false} title='Basic Settings'>
           {/* <Form.Item label='TITLE'> */}
-          <Form.Item label={<span>TITLE</span>}>
+          <Form.Item label={<span>TITLE</span>} name='name'>
             <Input />
+          </Form.Item>
+          <Form.Item label='PUBLISHED' name='published'>
+            <Radio.Group
+              options={[
+                { label: "YES", value: true },
+                { label: "NO", value: false },
+              ]}
+            />
           </Form.Item>
           <Form.Item label='SUBMISSION ANONYMIZATION'>
             <Checkbox>Enable Anonymous Grading</Checkbox>
@@ -43,18 +100,18 @@ export default () => {
             <Row gutter={20}>
               <Col>
                 <Form.Item label='RELEASE DATE (CST)'>
-                  <DatePicker showTime />
+                  <DatePicker />
                 </Form.Item>
                 <Form.Item>
                   <Checkbox>Allow Late Submissions</Checkbox>
                 </Form.Item>
               </Col>
               <Col>
-                <Form.Item label='DUE DATE (CST)'>
-                  <DatePicker showTime />
+                <Form.Item label='DUE DATE (CST)' name='dueDate'>
+                  <DatePicker />
                 </Form.Item>
                 <Form.Item label='LATE DUE DATE (CST)'>
-                  <DatePicker showTime />
+                  <DatePicker />
                 </Form.Item>
               </Col>
             </Row>
@@ -87,7 +144,10 @@ export default () => {
           </Form.Item>
         </Card>
         <Card bordered={false} title='Autograder Settings'>
-          <Form.Item
+          <Form.Item label='AUTOGRADER POINTS' name='autograderPoints'>
+            <Input />
+          </Form.Item>
+          {/* <Form.Item
             label={
               <Space direction='vertical'>
                 <div>CONTAINER SPECIFICATIONS</div>
@@ -121,10 +181,12 @@ export default () => {
                 { label: "20 minutes", value: "20" },
               ]}
             />
-          </Form.Item>
+          </Form.Item> */}
           <Form.Item>
             <Space>
-              <Button type='primary'>Save</Button>
+              <Button type='primary' htmlType='submit'>
+                Save
+              </Button>
               <Button danger type='primary' icon={<DeleteOutlined />}>
                 Delete assignment
               </Button>

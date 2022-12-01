@@ -11,7 +11,7 @@ import {
   Space,
 } from "antd";
 
-export default ({ open, toggleAddModalOpen }) => {
+export default ({ open, toggleAddModalOpen, onFinish }) => {
   return (
     <Modal
       open={open}
@@ -19,17 +19,20 @@ export default ({ open, toggleAddModalOpen }) => {
       footer={null}
       onCancel={toggleAddModalOpen}
     >
-      <Form layout='vertical'>
-        <Form.Item>
+      <Form layout='vertical' onFinish={onFinish}>
+        <Form.Item label='STUDENT ID' name='studentId'>
+          <Input />
+        </Form.Item>
+        <Form.Item noStyle>
           <Row gutter={20}>
             <Col span={12}>
-              <Form.Item label='FIRST NAME' NAME='firstName'>
+              <Form.Item label='FIRST NAME' name='firstName'>
                 <Input />
               </Form.Item>
             </Col>
             <Col span={12}>
               {" "}
-              <Form.Item label='LAST NAME' NAME='lastName'>
+              <Form.Item label='LAST NAME' name='lastName'>
                 <Input />
               </Form.Item>
             </Col>
@@ -38,9 +41,7 @@ export default ({ open, toggleAddModalOpen }) => {
         <Form.Item label='EMAIL ADDRESS' name='emailAddress'>
           <Input />
         </Form.Item>
-        <Form.Item label='STUDENT ID # (OPTIONAL)' name='emailAddress'>
-          <Input />
-        </Form.Item>
+
         <Form.Item label='SECTIONS' name='sections'>
           <Select
             options={[
@@ -60,7 +61,9 @@ export default ({ open, toggleAddModalOpen }) => {
         </Form.Item>
         <Form.Item>
           <Space>
-            <Button type='primary'>Submit</Button>
+            <Button type='primary' htmlType='submit'>
+              Submit
+            </Button>
             <Button type='primary' danger onClick={toggleAddModalOpen}>
               Cancel
             </Button>

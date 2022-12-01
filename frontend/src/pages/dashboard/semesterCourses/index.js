@@ -1,3 +1,5 @@
+import { useContext } from "react";
+import { GlobalContext } from "../../../App";
 import Course from "./course";
 
 /**
@@ -9,25 +11,58 @@ export default function SemesterCourses({
   semesterInfo,
   toggleRelationModalOpen,
   isFirst,
+  yearInfo,
 }) {
-  const { semester, courses } = semesterInfo;
+  const { userInfo } = useContext(GlobalContext);
+  // const { semester, courses } = semesterInfo;
+  // console.log("yearInfo", yearInfo);
+  const matches = /(\d{4})(\d)/.exec(yearInfo);
+  // console.log("matches", matches);
+  let year,
+    semester = undefined;
+  if (matches) {
+    year = matches[1];
+    // let semester = undefined;
+    switch (matches[2]) {
+      case "1":
+        semester = "Spring";
+        break;
+      case "2":
+        semester = "Summer";
+        break;
+      case "3":
+        semester = "Fall";
+        break;
+      case "4":
+        semester = "Winetr";
+        break;
+      default:
+        break;
+    }
+  }
+  // const semester = matches[2] === 1 ? 'Spring' : ();
+  // console.log("semester", semester);
+  // console.log("year", year);
+  // console.log("semesterInfo", semesterInfo);
   return (
     <div
       style={{
         marginBottom: "20px",
+        display:
+          semesterInfo.length > 0 || !userInfo.isStudent ? "inline" : "none",
       }}
     >
-      <h3>{semester}</h3>
+      <h3>{year && semester ? `${semester} ${year}` : null}</h3>
       <div
         style={{
           display: "flex",
           flexWrap: "wrap",
         }}
       >
-        {courses?.map(item => (
-          <Course key={item.id} courseInfo={item} />
+        {semesterInfo?.map(item => (
+          <Course key={item.name} courseInfo={item} />
         ))}
-        {isFirst ? (
+        {isFirst && !userInfo.isStudent ? (
           <div
             style={{
               border: "1px dashed green",
