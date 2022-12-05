@@ -62,11 +62,9 @@ const columns = [
 export default ({ isCreate }) => {
   const [assignments, setAssignments] = useState([]);
   const { courseId } = useParams();
-  // console.log("params", params);
 
   const getAssignments = useCallback(() => {
     getCourseAssignments({ cpurse_id: courseId }).then(res => {
-      // console.log("res", res);
       setAssignments(res.data);
     });
   }, [courseId]);

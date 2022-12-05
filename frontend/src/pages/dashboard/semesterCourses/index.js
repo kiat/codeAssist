@@ -15,9 +15,7 @@ export default function SemesterCourses({
 }) {
   const { userInfo } = useContext(GlobalContext);
   // const { semester, courses } = semesterInfo;
-  // console.log("yearInfo", yearInfo);
   const matches = /(\d{4})(\d)/.exec(yearInfo);
-  // console.log("matches", matches);
   let year,
     semester = undefined;
   if (matches) {
@@ -41,15 +39,12 @@ export default function SemesterCourses({
     }
   }
   // const semester = matches[2] === 1 ? 'Spring' : ();
-  // console.log("semester", semester);
-  // console.log("year", year);
-  // console.log("semesterInfo", semesterInfo);
   return (
     <div
       style={{
         marginBottom: "20px",
         display:
-          semesterInfo.length > 0 || !userInfo.isStudent ? "inline" : "none",
+          semesterInfo.length > 0 || !userInfo?.isStudent ? "inline" : "none",
       }}
     >
       <h3>{year && semester ? `${semester} ${year}` : null}</h3>
@@ -62,7 +57,7 @@ export default function SemesterCourses({
         {semesterInfo?.map(item => (
           <Course key={item.name} courseInfo={item} />
         ))}
-        {isFirst && !userInfo.isStudent ? (
+        {isFirst && !userInfo?.isStudent ? (
           <div
             style={{
               border: "1px dashed green",

@@ -23,7 +23,6 @@ export default function SignUpModal({ open, onCancel }) {
     } else {
       res = await signUpInstructor(restValue);
     }
-    // console.log("res3", res);
     if (res) {
       const userInfo = {
         name: res.data?.name,

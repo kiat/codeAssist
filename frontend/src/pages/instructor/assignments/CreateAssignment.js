@@ -51,10 +51,6 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, form }) => {
               setAssignmentType(key);
               // setCurrentStep(1);
               updateCurrentStep(1);
-              // console.log("item", item);
-              // console.log("key", key);
-              // console.log("keyPath", keyPath);
-              // console.log("domEvent", domEvent);
             }}
             items={[
               { label: "Exam / Quiz", key: 0, icon: <FileTextOutlined /> },

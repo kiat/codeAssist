@@ -26,8 +26,6 @@ export default () => {
   // const {} = useParams();
   // const { assignmentId } = useParams();
   // const [searchParams] = useSearchParams();
-  // console.log("assignmentId", assignmentId);
-  // console.log("searchParams", searchParams);
 
   const toggleDownloadModalOpen = useCallback(() => {
     setDownloadModalOpen(t => !t);

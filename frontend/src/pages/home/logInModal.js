@@ -14,7 +14,6 @@ export default function LogInModal({ open, onCancel, logIn }) {
 
   // login action
   const onSubmit = async values => {
-    console.log("values", values);
     // const isStudent = values.isStudent;
     const { isStudent, ...restValue } = values;
     let res;
@@ -23,7 +22,6 @@ export default function LogInModal({ open, onCancel, logIn }) {
     } else {
       res = await instructorLogin(restValue);
     }
-    // console.log("res3", res);
     if (res) {
       const userInfo = {
         name: res.data?.name,
