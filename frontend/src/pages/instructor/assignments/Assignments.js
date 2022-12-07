@@ -1,13 +1,17 @@
 import { Button, Card, Progress, Table } from "antd";
 import moment from "moment";
-import { Link } from "react-router-dom";
-import { tableData } from "./constant";
+import { useCallback } from "react";
+import { useEffect } from "react";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { getCourseAssignments } from "../../../services/course";
+// import { tableData } from "./constant";
 
 const columns = [
   {
     title: "NAME",
-    dataIndex: "assignmentName",
-    sorter: (a, b) => a.assignmentName > b.assignmentName,
+    dataIndex: "name",
+    sorter: (a, b) => a.name > b.name,
     render: (text, record) => (
       <Link to={`/assignment/reviewGrades/${record.id}`}>{text}</Link>
     ),
@@ -20,13 +24,15 @@ const columns = [
   {
     title: "RELEASED",
     dataIndex: "released",
-    render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+    render: text =>
+      text ? moment(text).format("MMM DD [AT] h:mmA").toUpperCase() : null,
     sorter: (a, b) => a.released - b.released,
   },
   {
     title: "DUE(CDT)",
     dataIndex: "due",
-    render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+    render: text =>
+      text ? moment(text).format("MMM DD [AT] h:mmA").toUpperCase() : null,
     sorter: (a, b) => a.due - b.due,
   },
   {
@@ -52,11 +58,27 @@ const columns = [
   { title: "REGRADES", dataIndex: "regrades" },
 ];
 
-export default ({ toggleIsCreate }) => {
+// export default ({ toggleIsCreate }) => {
+export default ({ isCreate }) => {
+  const [assignments, setAssignments] = useState([]);
+  const { courseId } = useParams();
+
+  const getAssignments = useCallback(() => {
+    getCourseAssignments({ cpurse_id: courseId }).then(res => {
+      setAssignments(res.data);
+    });
+  }, [courseId]);
+
+  useEffect(() => {
+    if (!isCreate) {
+      getAssignments();
+    }
+  }, [getAssignments, isCreate]);
+
   return (
     <>
       <Card bordered={false}>
-        <Table rowKey='id' columns={columns} dataSource={tableData} />
+        <Table rowKey='id' columns={columns} dataSource={assignments} />
       </Card>
 
       {/* <Modal

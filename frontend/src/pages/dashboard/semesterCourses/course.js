@@ -9,7 +9,7 @@ import { GlobalContext } from "../../../App";
  */
 export default function Course({ courseInfo }) {
   const navigate = useNavigate();
-  const { code, name, assignmentCount, id } = courseInfo;
+  const { code, name, assignments, id } = courseInfo;
   const { userInfo, updateCourseInfo } = useContext(GlobalContext);
 
   return (
@@ -53,7 +53,7 @@ export default function Course({ courseInfo }) {
           color: "white",
         }}
       >
-        {assignmentCount} assignments
+        {assignments} assignments
       </div>
     </div>
   );

@@ -15,17 +15,18 @@ export default function SignUpModal({ open, onCancel }) {
 
   // action after successfully signup
   const finishSignUp = async values => {
-    const isStudent = values.isStudent;
+    const { isStudent, ...restValue } = values;
+    // const isStudent = values.isStudent;
     let res;
     if (isStudent) {
-      res = await signUpStudent(values);
+      res = await signUpStudent(restValue);
     } else {
-      res = await signUpInstructor(values);
+      res = await signUpInstructor(restValue);
     }
-    // console.log("res3", res);
     if (res) {
       const userInfo = {
         name: res.data?.name,
+        id: res.data?.id,
         isStudent,
       };
       localStorage.setItem("userInfo", JSON.stringify(userInfo));
@@ -74,7 +75,7 @@ export default function SignUpModal({ open, onCancel }) {
             </Radio.Button>
           </Radio.Group>
         </Form.Item>
-        <Form.Item label='Name' name='userName'>
+        <Form.Item label='Name' name='name'>
           <Input placeholder='Your Name' />
         </Form.Item>
         <Form.Item label='Email' name='email'>

@@ -1,21 +1,29 @@
-// import service from ".";
+import service from ".";
 
 export async function signUpStudent(params) {
-  // return service("create_student", params, "post");
-  return {
-    data: {
-      id: 123456,
-      name: "aaa bbb",
-    },
-  };
+  return service("create_student", params, "post");
+  // return {
+  //   data: {
+  //     id: 123456,
+  //     name: "aaa bbb",
+  //   },
+  // };
 }
 
 export async function signUpInstructor(params) {
-  // return service("create_instructor", params, "post");
-  return {
-    data: {
-      id: 123456,
-      name: "aaa bbb",
-    },
-  };
+  return service("create_instructor", params, "post");
+  // return {
+  //   data: {
+  //     id: 123456,
+  //     name: "aaa bbb",
+  //   },
+  // };
+}
+
+export async function studentLogin(params) {
+  return service("student_login", params, "post");
+}
+
+export async function instructorLogin(params) {
+  return service("instructor_login", params, "post");
 }

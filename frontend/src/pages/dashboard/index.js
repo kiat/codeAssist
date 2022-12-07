@@ -1,5 +1,5 @@
 import { PageHeader } from "antd";
-import axios from "axios";
+// import axios from "axios";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { GlobalContext } from "../../App";
 import SemesterCourses from "./semesterCourses";
@@ -8,6 +8,11 @@ import "../../mock/course";
 import CourseModal from "./courseModal";
 import RelationForm from "./relationForm";
 import AddForm from "./addForm";
+import {
+  createCourse,
+  getInstructorCourses,
+  getStudentCourses,
+} from "../../services/dashboard";
 
 /**
  * dashboard for both student and instructors
@@ -15,7 +20,7 @@ import AddForm from "./addForm";
  */
 export default function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState({});
   const { userInfo } = useContext(GlobalContext);
 
   // control course adding modal
@@ -23,14 +28,45 @@ export default function Dashboard() {
     setModalOpen(bool => !bool);
   }, []);
 
+  const formatCourse = data => {
+    const coursesTemp = { 99999: [] };
+    data?.forEach(item => {
+      const { semester, year, name, assignments, id } = item;
+      if (!coursesTemp[`${year}${semester}`] && semester && year) {
+        coursesTemp[`${year}${semester}`] = [];
+      }
+      // if (!semester && !year && !coursesTemp["noTitle"]) {
+      //   coursesTemp["noTitle"] = [];
+      // }
+      if (semester && year) {
+        coursesTemp[`${year}${semester}`].push({ name, assignments, id });
+      } else {
+        coursesTemp[99999].push({ name, assignments, id });
+      }
+    });
+    return coursesTemp;
+  };
+
   // get course information
   const getCourses = useCallback(() => {
-    axios
-      .post("/api/getCourses", { isStudent: userInfo?.isStudent })
-      .then(res => {
-        setCourses(res.data.data);
+    const { isStudent, id } = userInfo || {};
+    if (isStudent) {
+      // getInstructorCourses({ id }).then(res => {
+      getStudentCourses({ student_id: id }).then(res => {
+        setCourses(formatCourse(res.data));
       });
-  }, [userInfo?.isStudent]);
+    } else {
+      getInstructorCourses({ instructor_id: id }).then(res => {
+        setCourses(formatCourse(res.data));
+      });
+    }
+
+    // axios
+    //   .post("/api/getCourses", { isStudent: userInfo?.isStudent })
+    //   .then(res => {
+    //     setCourses(res.data.data);
+    //   });
+  }, [userInfo]);
 
   useEffect(() => {
     getCourses();
@@ -39,17 +75,22 @@ export default function Dashboard() {
   // action after successfully adding courses
   const afterAddCourse = useCallback(
     values => {
-      axios
-        .post("/api/addCourse", {
-          isStudent: userInfo?.isStudent,
-          ...values,
-        })
-        .then(res => {
-          getCourses();
-          toggleModalOpen();
-        });
+      const { courseName, ...restValues } = values;
+      createCourse({ id: userInfo.id, courseName, ...restValues }).then(res => {
+        getCourses();
+        toggleModalOpen();
+      });
+      // axios
+      //   .post("/api/addCourse", {
+      //     isStudent: userInfo?.isStudent,
+      //     ...values,
+      //   })
+      //   .then(res => {
+      //     getCourses();
+      //     toggleModalOpen();
+      //   });
     },
-    [getCourses, toggleModalOpen, userInfo?.isStudent]
+    [getCourses, toggleModalOpen, userInfo?.id]
   );
 
   // find if the user is an instructor or a student
@@ -61,14 +102,25 @@ export default function Dashboard() {
           marginLeft: "25px",
         }}
       >
-        {courses.map((item, index) => (
+        {/* {courses?.map((item, index) => (
           <SemesterCourses
             key={item.semester}
             semesterInfo={item}
             isFirst={index === 0 ? true : false}
             toggleRelationModalOpen={toggleModalOpen}
           />
-        ))}
+        ))} */}
+        {Object.keys(courses)
+          ?.sort((a, b) => b - a)
+          .map((item, index) => (
+            <SemesterCourses
+              key={item}
+              yearInfo={item}
+              semesterInfo={courses[item]}
+              isFirst={index === 0 ? true : false}
+              toggleRelationModalOpen={toggleModalOpen}
+            />
+          ))}
       </div>
       <CourseModal
         title='ADD COURSE'

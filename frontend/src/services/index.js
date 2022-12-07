@@ -11,13 +11,13 @@ instance.interceptors.response.use(
     return res;
   },
   err => {
-    message.error("操作失败");
+    message.error("Action Failed");
   }
 );
 
-const service = (url, params, method, options) =>
+const service = (url, params, method = "get", options) =>
   instance({
-    method: method || "get",
+    method: method,
     url,
     params: method === "get" ? params : "",
     data: method === "get" ? "" : params,

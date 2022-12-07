@@ -1,7 +1,9 @@
 // import { Tabs } from "antd";
 import { CopyFilled, DownloadOutlined } from "@ant-design/icons";
-import { Button, PageHeader, Popover, Space, Typography } from "antd";
+import { Button, Form, PageHeader, Popover, Space, Typography } from "antd";
 import { useCallback, useState } from "react";
+import { useParams } from "react-router-dom";
+import { createAssignment } from "../../../services/course";
 import Assignments from "./Assignments";
 import CreateAssignment from "./CreateAssignment";
 import DuplicateAssignmentModal from "./DuplicateAssignmentModal";
@@ -11,6 +13,8 @@ export default function InstructorAssignments() {
   const [isDuplicateAssignmentModalOpen, setIsDuplicateAssignmentModalOpen] =
     useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [form] = Form.useForm();
+  const { courseId } = useParams();
 
   const updateCurrentStep = useCallback(current => {
     setCurrentStep(current);
@@ -23,6 +27,14 @@ export default function InstructorAssignments() {
   const toggleIsCreate = useCallback(() => {
     setIsCreate(t => !t);
   }, []);
+
+  const finishForm = () => {
+    const values = form.getFieldsValue();
+    createAssignment({ name: values.name, course_Id: courseId }).then(res => {
+      toggleIsCreate();
+    });
+  };
+
   return (
     <>
       <div
@@ -33,13 +45,15 @@ export default function InstructorAssignments() {
       >
         <PageHeader title={isCreate ? "Create Assignment" : "38 Assignments"} />
         <div style={{ display: isCreate ? "none" : "inline" }}>
-          <Assignments toggleIsCreate={toggleIsCreate} />
+          {/* <Assignments toggleIsCreate={toggleIsCreate} /> */}
+          <Assignments isCreate={isCreate} />
         </div>
         <div style={{ display: isCreate ? "inline" : "none" }}>
           <CreateAssignment
             currentStep={currentStep}
             updateCurrentStep={updateCurrentStep}
             toggleIsCreate={toggleIsCreate}
+            form={form}
           />
         </div>
       </div>
@@ -63,7 +77,7 @@ export default function InstructorAssignments() {
         >
           {isCreate ? (
             currentStep === 1 ? (
-              <Button>Save Assignment</Button>
+              <Button onClick={finishForm}>Save Assignment</Button>
             ) : (
               <div style={{ height: "40px" }} />
             )
