@@ -12,10 +12,11 @@ from api.schemas import *
 
 ALLOWED_EXTENSIONS = {'py','zip'}
 UPLOAD_FOLDER = '/usr/app/files'
- 
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
- 
-@app.route('/')
+
+@app.route('/', methods=["GET", "POST"])
+@cross_origin()
 def hello_world():
     return 'Hello World'
 
@@ -23,7 +24,7 @@ def allowed_file(filename):
     return "." in filename and \
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/create_student')
+@app.route('/create_student', methods=["GET", "POST"])
 @cross_origin()
 def create_student():
     if request.method != "POST":
@@ -45,8 +46,8 @@ def create_student():
 
     res = db.session.query(Student).filter_by(id=user_id)
     res = StudentSchema().dump(res, many=True)[0]
-
-    return jsonify(res)
+    response = jsonify(res)
+    return response
 
 @app.route('/student_login', methods=["POST", "GET"])
 @cross_origin()
