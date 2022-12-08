@@ -23,7 +23,7 @@ def allowed_file(filename):
     return "." in filename and \
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/create_student', methods=["POST", "GET"])
+@app.route('/create_student')
 @cross_origin()
 def create_student():
     user_id = str(uuid.uuid4())
