@@ -23,7 +23,7 @@ def allowed_file(filename):
     return "." in filename and \
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/create_student', methods=["POST"])
+@app.route('/create_student', methods=["POST", "GET"])
 @cross_origin()
 def create_student():
     user_id = str(uuid.uuid4())
@@ -46,7 +46,7 @@ def create_student():
 
     return jsonify(res)
 
-@app.route('/student_login', methods=["POST"])
+@app.route('/student_login', methods=["POST", "GET"])
 @cross_origin()
 def student_login():
     email = request.json['email']
@@ -60,7 +60,7 @@ def student_login():
 
     return jsonify(res[0])
 
-@app.route('/create_instructor', methods=["POST"])
+@app.route('/create_instructor', methods=["POST", "GET"])
 @cross_origin()
 def create_instructor():
     user_id = str(uuid.uuid4())
@@ -83,7 +83,7 @@ def create_instructor():
 
     return jsonify(res)
 
-@app.route('/instructor_login', methods=["POST"])
+@app.route('/instructor_login', methods=["POST", "GET"])
 @cross_origin()
 def instructor_login():
     email = request.form['email']
@@ -94,7 +94,7 @@ def instructor_login():
 
     return jsonify(res)
 
-@app.route('/create_course', methods=["POST"])
+@app.route('/create_course', methods=["POST", "GET"])
 @cross_origin()
 def create_course():
     course_id = str(uuid.uuid4())
@@ -115,7 +115,7 @@ def create_course():
 
     return jsonify(newCourse)
 
-@app.route('/update_assignment', methods=["POST"])
+@app.route('/update_assignment', methods=["POST", "GET"])
 @cross_origin()
 def update_course():
     assignment_id = request.json["assignment_id"]
@@ -139,7 +139,7 @@ def get_assignment():
     return jsonify(assignment)
 
 
-@app.route('/create_assignment', methods=["POST"])
+@app.route('/create_assignment', methods=["POST", "GET"])
 @cross_origin()
 def create_assignment():
     assignment_id = str(uuid.uuid4())
@@ -160,7 +160,7 @@ def create_assignment():
 
     return jsonify(newAssignment)
 
-@app.route('/create_enrollment', methods=["POST"])
+@app.route('/create_enrollment', methods=["POST", "GET"])
 @cross_origin()
 def create_new_assignment():
     student_id = request.json["student_id"]
@@ -179,7 +179,7 @@ def create_new_assignment():
 
     return jsonify(newEnrollment)
 
-@app.route('/create_enrollment_bulk', methods=["POST"])
+@app.route('/create_enrollment_bulk', methods=["POST", "GET"])
 @cross_origin()
 def create_bulk_enrollments():
     course_id = request.json["course_id"]
@@ -252,7 +252,7 @@ def get_submission():
 
     return jsonify(submissions)
     
-@app.route('/upload_submission', methods=["POST"])
+@app.route('/upload_submission', methods=["POST", "GET"])
 @cross_origin()
 def upload_file():
     if "file" not in request.files:
@@ -307,7 +307,7 @@ def upload_file():
     if file and not allowed_file(file.filename):
         return "invalid extension"
 
-@app.route('/upload_assignment_autograder', methods=["POST"])
+@app.route('/upload_assignment_autograder', methods=["POST", "GET"])
 @cross_origin()
 def upload_assignment_autograder():
     if "file" not in request.files:
