@@ -67,9 +67,9 @@ def student_login():
 @cross_origin()
 def create_instructor():
     user_id = str(uuid.uuid4())
-    name = request.form['name']
-    password = request.form['password']
-    email_address = request.form['email']
+    name = request.json['name']
+    password = request.json['password']
+    email_address = request.json['email']
 
     user_data = {
         "id": user_id,
@@ -89,8 +89,8 @@ def create_instructor():
 @app.route('/instructor_login', methods=["POST", "GET"])
 @cross_origin()
 def instructor_login():
-    email = request.form['email']
-    password = request.form['password']
+    email = request.json['email']
+    password = request.json['password']
 
     res = db.session.query(Instructor).filter_by(email_address=email, password=password)
     res = InstructorSchema().dump(res, many=True)[0]

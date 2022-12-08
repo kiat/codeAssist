@@ -16,6 +16,7 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+    "preinstall": "npm i nodemon -g",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
@@ -52,5 +53,5 @@
     "mockjs": "^1.1.0",
     "moment": "^2.29.4"
   },
-  "proxy": "http://localhost:5000"
+  "proxy": "http://172.26.0.2:5000"
 }
