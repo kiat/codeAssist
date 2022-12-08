@@ -26,6 +26,8 @@ def allowed_file(filename):
 @app.route('/create_student')
 @cross_origin()
 def create_student():
+    if request.method != "POST":
+        return "all good"
     user_id = str(uuid.uuid4())
     name = request.json['name']
     password = request.json['password']
