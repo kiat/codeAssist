@@ -27,9 +27,9 @@ def allowed_file(filename):
 @cross_origin()
 def create_student():
     user_id = str(uuid.uuid4())
-    name = request.form['name']
-    password = request.form['password']
-    email_address = request.form['email']
+    name = request.json['name']
+    password = request.json['password']
+    email_address = request.json['email']
 
     user_data = {
         "id": user_id,
@@ -49,13 +49,16 @@ def create_student():
 @app.route('/student_login', methods=["POST"])
 @cross_origin()
 def student_login():
-    email = request.form['email']
-    password = request.form['password']
+    email = request.json['email']
+    password = request.json['password']
 
     res = db.session.query(Student).filter_by(email_address=email, password=password)
-    res = StudentSchema().dump(res, many=True)[0]
+    res = StudentSchema().dump(res, many=True)
 
-    return jsonify(res)
+    if len(res) == 0:
+        return "No user found", 404
+
+    return jsonify(res[0])
 
 @app.route('/create_instructor', methods=["POST"])
 @cross_origin()
