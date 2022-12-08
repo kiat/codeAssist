@@ -33,7 +33,6 @@ export default ({
       <Form
         initialValues={{ point, text }}
         onFinish={values => {
-          // console.log("values", values);
           updateFormattingRecord(order, values);
         }}
       >

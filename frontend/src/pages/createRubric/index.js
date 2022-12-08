@@ -123,7 +123,6 @@ export default () => {
                   icon={<PlusOutlined />}
                   // onClick={addFormattingRecord}
                   onClick={() => {
-                    // console.log("formattingData", formattingData);
                     // // formattingData.push({ point: "", text: "" });
                     // formattingData.splice(formattingData.length, 0, {
                     //   point: "",

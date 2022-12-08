@@ -53,12 +53,10 @@ export default function Dashboard() {
     if (isStudent) {
       // getInstructorCourses({ id }).then(res => {
       getStudentCourses({ student_id: id }).then(res => {
-        // console.log("res", res);
         setCourses(formatCourse(res.data));
       });
     } else {
       getInstructorCourses({ instructor_id: id }).then(res => {
-        // console.log("res", res);
         setCourses(formatCourse(res.data));
       });
     }
@@ -77,10 +75,8 @@ export default function Dashboard() {
   // action after successfully adding courses
   const afterAddCourse = useCallback(
     values => {
-      // console.log("values", values);
       const { courseName, ...restValues } = values;
       createCourse({ id: userInfo.id, courseName, ...restValues }).then(res => {
-        // console.log("res", res);
         getCourses();
         toggleModalOpen();
       });
@@ -94,10 +90,8 @@ export default function Dashboard() {
       //     toggleModalOpen();
       //   });
     },
-    [getCourses, toggleModalOpen, userInfo.id]
+    [getCourses, toggleModalOpen, userInfo?.id]
   );
-
-  // console.log("courses", courses);
 
   // find if the user is an instructor or a student
   return (

@@ -50,7 +50,6 @@ export default () => {
 
   const finishForm = useCallback(
     values => {
-      // console.log("values", values);
       const { studentId } = values;
       createEnrollment({ student_id: studentId, course_id: courseId }).then(
         res => {

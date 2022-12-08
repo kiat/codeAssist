@@ -26,8 +26,6 @@ export default () => {
 
   const getAssignmentInfo = useCallback(() => {
     getAssignment({ assignment_id: assignmentId }).then(res => {
-      // setAssignment(res.data);
-      // console.log("res", res);
       const { name, published, due_date, autograder_points } = res.data || {};
       form.setFieldsValue({
         name,
@@ -45,7 +43,6 @@ export default () => {
   // if(initial.current){
   //   getAssignment()
   // }
-  // console.log("assignment", assignment);
   return (
     <>
       <PageHeader title='Edit Programming Assignment' />
@@ -53,7 +50,6 @@ export default () => {
         layout='vertical'
         form={form}
         onFinish={values => {
-          console.log("values", values);
           const { name, published, dueDate, autograderPoints } = values;
           updateAssignment({
             name,
