@@ -12,10 +12,11 @@ from api.schemas import *
 
 ALLOWED_EXTENSIONS = {'py','zip'}
 UPLOAD_FOLDER = '/usr/app/files'
- 
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
- 
-@app.route('/')
+
+@app.route('/', methods=["GET", "POST"])
+@cross_origin()
 def hello_world():
     return 'Hello World'
 
@@ -23,13 +24,15 @@ def allowed_file(filename):
     return "." in filename and \
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/create_student', methods=["POST"])
+@app.route('/create_student', methods=["GET", "POST"])
 @cross_origin()
 def create_student():
+    if request.method != "POST":
+        return "all good"
     user_id = str(uuid.uuid4())
-    name = request.form['name']
-    password = request.form['password']
-    email_address = request.form['email']
+    name = request.json['name']
+    password = request.json['password']
+    email_address = request.json['email']
 
     user_data = {
         "id": user_id,
@@ -43,27 +46,30 @@ def create_student():
 
     res = db.session.query(Student).filter_by(id=user_id)
     res = StudentSchema().dump(res, many=True)[0]
+    response = jsonify(res)
+    return response
 
-    return jsonify(res)
-
-@app.route('/student_login', methods=["POST"])
+@app.route('/student_login', methods=["POST", "GET"])
 @cross_origin()
 def student_login():
-    email = request.form['email']
-    password = request.form['password']
+    email = request.json['email']
+    password = request.json['password']
 
     res = db.session.query(Student).filter_by(email_address=email, password=password)
-    res = StudentSchema().dump(res, many=True)[0]
+    res = StudentSchema().dump(res, many=True)
 
-    return jsonify(res)
+    if len(res) == 0:
+        return "No user found", 404
 
-@app.route('/create_instructor', methods=["POST"])
+    return jsonify(res[0])
+
+@app.route('/create_instructor', methods=["POST", "GET"])
 @cross_origin()
 def create_instructor():
     user_id = str(uuid.uuid4())
-    name = request.form['name']
-    password = request.form['password']
-    email_address = request.form['email']
+    name = request.json['name']
+    password = request.json['password']
+    email_address = request.json['email']
 
     user_data = {
         "id": user_id,
@@ -80,18 +86,18 @@ def create_instructor():
 
     return jsonify(res)
 
-@app.route('/instructor_login', methods=["POST"])
+@app.route('/instructor_login', methods=["POST", "GET"])
 @cross_origin()
 def instructor_login():
-    email = request.form['email']
-    password = request.form['password']
+    email = request.json['email']
+    password = request.json['password']
 
     res = db.session.query(Instructor).filter_by(email_address=email, password=password)
     res = InstructorSchema().dump(res, many=True)[0]
 
     return jsonify(res)
 
-@app.route('/create_course', methods=["POST"])
+@app.route('/create_course', methods=["POST", "GET"])
 @cross_origin()
 def create_course():
     course_id = str(uuid.uuid4())
@@ -112,7 +118,7 @@ def create_course():
 
     return jsonify(newCourse)
 
-@app.route('/update_assignment', methods=["POST"])
+@app.route('/update_assignment', methods=["POST", "GET"])
 @cross_origin()
 def update_course():
     assignment_id = request.json["assignment_id"]
@@ -136,7 +142,7 @@ def get_assignment():
     return jsonify(assignment)
 
 
-@app.route('/create_assignment', methods=["POST"])
+@app.route('/create_assignment', methods=["POST", "GET"])
 @cross_origin()
 def create_assignment():
     assignment_id = str(uuid.uuid4())
@@ -157,7 +163,7 @@ def create_assignment():
 
     return jsonify(newAssignment)
 
-@app.route('/create_enrollment', methods=["POST"])
+@app.route('/create_enrollment', methods=["POST", "GET"])
 @cross_origin()
 def create_new_assignment():
     student_id = request.json["student_id"]
@@ -176,7 +182,7 @@ def create_new_assignment():
 
     return jsonify(newEnrollment)
 
-@app.route('/create_enrollment_bulk', methods=["POST"])
+@app.route('/create_enrollment_bulk', methods=["POST", "GET"])
 @cross_origin()
 def create_bulk_enrollments():
     course_id = request.json["course_id"]
@@ -249,7 +255,7 @@ def get_submission():
 
     return jsonify(submissions)
     
-@app.route('/upload_submission', methods=["POST"])
+@app.route('/upload_submission', methods=["POST", "GET"])
 @cross_origin()
 def upload_file():
     if "file" not in request.files:
@@ -267,9 +273,6 @@ def upload_file():
         filename = secure_filename(file.filename)
         new_uuid = str(uuid.uuid4())
 
-        # TODO (ricky): Need to copy file contents before saving
-        # to database
-
         submission_data = {
             "id": new_uuid,
             "student_id": student_id,
@@ -277,6 +280,8 @@ def upload_file():
             "student_code_file": file.read(),
             "completed": False
         }
+
+        file.seek(0)
 
         db.session.add(Submission(**submission_data))
         db.session.commit()
@@ -305,7 +310,7 @@ def upload_file():
     if file and not allowed_file(file.filename):
         return "invalid extension"
 
-@app.route('/upload_assignment_autograder', methods=["POST"])
+@app.route('/upload_assignment_autograder', methods=["POST", "GET"])
 @cross_origin()
 def upload_assignment_autograder():
     if "file" not in request.files:
@@ -322,11 +327,11 @@ def upload_assignment_autograder():
 
         docker_client.saveFile(file, filename, docker_client.assignment_dir, False)
 
-        # TODO (ricky): copy file contents here before saving to database
-
         assignment_data = {
             'autograder_file': file.read(),
         }
+
+        file.seek(0)
 
         assignment = db.session.query(Assignment).filter_by(assignment_id=assignment_id).update(assignment_data)
         db.session.commit()
