@@ -1,10 +1,11 @@
-import { RightOutlined } from "@ant-design/icons";
+import { FileTextOutlined, RightOutlined } from "@ant-design/icons";
 import {
   Button,
   Card,
   Col,
   Form,
   Input,
+  message,
   PageHeader,
   Radio,
   Row,
@@ -15,12 +16,17 @@ import {
 } from "antd";
 import { useCallback } from "react";
 import { useState } from "react";
+import { useParams } from "react-router-dom";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
+import { uploadAssignmentAutograder } from "../../services/configureAutograder";
 import TestAutograder from "./TestAutograder";
 
 export default () => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [form] = Form.useForm();
+  const { assignmentId } = useParams();
 
   const toggleModalOpen = useCallback(() => {
     setModalOpen(t => !t);
@@ -42,7 +48,23 @@ export default () => {
           </Typography.Paragraph>
         </PageHeader>
         <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>
-          <Form layout='vertical'>
+          <Form
+            layout='vertical'
+            form={form}
+            onFinish={values => {
+              setSaveLoading(true);
+              const formData = new FormData();
+              formData.append("assignment_id", assignmentId);
+              formData.append("file", values.uploadFile.file);
+              uploadAssignmentAutograder(formData)
+                .then(() => {
+                  message.success("操作成功");
+                })
+                .finally(() => {
+                  setSaveLoading(false);
+                });
+            }}
+          >
             <Form.Item label='AUTOGRADER CONFIGURATION' name='operation'>
               <Radio.Group
                 // defaultValue='0'
@@ -63,10 +85,20 @@ export default () => {
                     <Form.Item label='AUTOGRADER'>
                       <Space>
                         <Form.Item name='fileName' noStyle>
-                          <Input disabled={true} />
+                          <Input
+                            prefix={<FileTextOutlined />}
+                            disabled={true}
+                          />
                         </Form.Item>
                         <Form.Item name='uploadFile' noStyle>
-                          <Upload showUploadList={false}>
+                          <Upload
+                            showUploadList={false}
+                            maxCount={1}
+                            beforeUpload={file => {
+                              form.setFieldValue("fileName", file.name);
+                              return false;
+                            }}
+                          >
                             <Button>Replace Autograder (.zip)</Button>
                           </Upload>
                         </Form.Item>
@@ -131,7 +163,9 @@ export default () => {
 
             <Form.Item>
               <Space>
-                <Button type='primary'>Update Autograder</Button>
+                <Button loading={saveLoading} type='primary' htmlType='submit'>
+                  Update Autograder
+                </Button>
                 <Button onClick={toggleModalOpen}>Test Autograder</Button>
               </Space>
             </Form.Item>

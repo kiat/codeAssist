@@ -1,4 +1,4 @@
-import { Button, message, Modal, Upload } from "antd";
+import { Button, Modal, Upload } from "antd";
 
 /**
  * file upload windows modal
@@ -24,16 +24,25 @@ export default function UploadModal({
       {/* <div style={{ textAlign: "center" }}> */}
       <Upload
         name='file'
-        // upload address
-        action={url}
-        data={data}
-        onChange={info => {
-          if (info.file.status === "done") {
-            afterUpdate();
-          } else if (info.file.status === "error") {
-            message.error(`${info.file.name} file upload failed`);
-          }
+        maxCount={1}
+        customRequest={({ file, onError, onSuccess }) => {
+          // console.log("obj", obj);
+          afterUpdate(file, onError, onSuccess);
+          // console.log("file", file);
+          // console.log("onSuccess", onSuccess);
+          // console.log("onError", onError);
         }}
+        // upload address
+        // action={url}
+        // data={data}
+        // onChange={info => {
+        //   console.log("info", info);
+        //   if (info.file.status === "done") {
+        //     afterUpdate();
+        //   } else if (info.file.status === "error") {
+        //     message.error(`${info.file.name} file upload failed`);
+        //   }
+        // }}
       >
         <Button>Click to Uplaod</Button>
       </Upload>

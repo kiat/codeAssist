@@ -19,8 +19,6 @@ import { getAssignment, updateAssignment } from "../../services/assignment";
 import moment from "moment";
 
 export default () => {
-  // const [assignment, setAssignment] = useState(null);
-  // const initial = useRef(true);
   const { assignmentId } = useParams();
   const [form] = Form.useForm();
 
@@ -40,9 +38,6 @@ export default () => {
     getAssignmentInfo();
   }, [getAssignmentInfo]);
 
-  // if(initial.current){
-  //   getAssignment()
-  // }
   return (
     <>
       <PageHeader title='Edit Programming Assignment' />

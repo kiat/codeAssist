@@ -23,6 +23,11 @@ import { GlobalContext } from "../../App";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import UploadModal from "../../components/UploadModal";
+import { getAssignment } from "../../services/assignment";
+import {
+  // updateSubmission,
+  uploadSubmission,
+} from "../../services/assignmentResult";
 import { formattingData } from "./constant";
 import FormattingModal from "./FormattingModal";
 
@@ -43,6 +48,9 @@ export default function AssignmentResult() {
   const { userInfo, assignmentInfo } = useContext(GlobalContext);
   const [formattingModalOpen, setFormattingOpen] = useState(false);
   const [formattingSelected, setFormattingSelected] = useState([1, 3]);
+  const [autoGraderPoints, setAutograderPoints] = useState(0);
+  const [results, setResults] = useState([]);
+  const [code, setCode] = useState("");
 
   const formattingSelectedUpdate = useCallback(value => {
     setFormattingSelected(value);
@@ -78,17 +86,39 @@ export default function AssignmentResult() {
   };
 
   // update assignment information
-  const updateAssignment = useCallback(() => {
-    getAssignmentResult();
-  }, []);
+  const updateAssignment = useCallback(
+    (file, onError, onSuccess) => {
+      // getAssignmentResult();
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("student_id", userInfo?.id);
+      formData.append("assignment_id", assignmentId);
+      uploadSubmission(formData)
+        .then(res => {
+          setCode(res?.data?.student_code_file);
+          // setResults(JSON.parse(res?.data?.results));
+          setResults(JSON.parse(JSON.parse(res?.data?.results)));
+          onSuccess(res.data, file);
+          toggleUploadModalOpen();
+        })
+        .catch(onError);
+    },
+    [assignmentId, toggleUploadModalOpen, userInfo?.id]
+  );
 
   const radioChange = useCallback(e => {
     setPageHeaderTitle(e.target.value);
   }, []);
 
   useEffect(() => {
+    const getAutoGraderPoints = async () => {
+      getAssignment({ assignment_id: assignmentId }).then(res => {
+        setAutograderPoints(res.data.autograder_points);
+      });
+    };
     getAssignmentResult();
-  }, [location.key]);
+    getAutoGraderPoints();
+  }, [assignmentId, location.key]);
 
   const formattingColumns = [
     {
@@ -101,10 +131,10 @@ export default function AssignmentResult() {
     { title: "description", dataIndex: "description" },
   ];
 
-  const items =
-    pageHeaderTitle === "Autograder Results"
-      ? assignment.results
-      : assignment.codes;
+  // const items =
+  //   pageHeaderTitle === "Autograder Results"
+  //     ? assignment.results
+  //     : assignment.codes;
 
   return (
     <>
@@ -153,12 +183,30 @@ export default function AssignmentResult() {
                   backgroundColor: "white",
                 }}
               >
-                {items?.map(item => (
+                {pageHeaderTitle === "Autograder Results" ? (
+                  results?.tests?.map((item, index) => (
+                    <Collapse.Panel
+                      key={index}
+                      header={
+                        <span
+                          style={{
+                            color: item?.score === 0 ? "red" : "#20716a",
+                          }}
+                        >{`${item.name} (${item.score}/${item.max_score})`}</span>
+                      }
+                      showArrow={false}
+                      style={{
+                        marginBottom: "20px",
+                        border: "1px solid #d9d9d9",
+                        backgroundColor: "#f9f9fb",
+                      }}
+                    >
+                      {item.output}
+                    </Collapse.Panel>
+                  ))
+                ) : (
                   <Collapse.Panel
-                    key={item.name}
-                    header={
-                      <span style={{ color: "#20716a" }}>{item.name}</span>
-                    }
+                    header='file'
                     showArrow={false}
                     style={{
                       marginBottom: "20px",
@@ -166,9 +214,9 @@ export default function AssignmentResult() {
                       backgroundColor: "#f9f9fb",
                     }}
                   >
-                    {item.text}
+                    {code}
                   </Collapse.Panel>
-                ))}
+                )}
               </Collapse>
             </Card>
             <div
@@ -203,25 +251,45 @@ export default function AssignmentResult() {
                   level={4}
                   style={{ marginTop: "-15px", fontWeight: "700" }}
                 >
-                  {assignment.score}
+                  {/* {assignment.score} */}
+                  <span>{results?.score ?? 0}</span>
+                  <span>/</span>
+                  <span>{autoGraderPoints}</span>
                 </Typography.Title>
               </div>
               <div>
                 <Typography.Title level={5}>FAILED TESTS</Typography.Title>
-                <Typography.Text style={{ color: "red" }}>
+                {results?.tests
+                  ?.filter(item => item.score === 0)
+                  ?.map((item, index) => (
+                    <div style={{ color: "red" }} key={index}>
+                      {/* test_1 (tester.TestDiffs) (0.0/5.0) */}
+                      <span>{item.name}</span>
+                      <span>{` (${item.score}/${item.max_score})`}</span>
+                    </div>
+                  ))}
+                {/* <Typography.Text style={{ color: "red" }}>
                   test_1 (tester.TestDiffs) (0.0/5.0)
-                </Typography.Text>
+                </Typography.Text> */}
               </div>
               <div>
                 <Typography.Title level={5}>PASSED TESTS</Typography.Title>
-                {assignment.results?.map(item => (
+                {results?.tests
+                  ?.filter(item => item.score !== 0)
+                  ?.map((item, index) => (
+                    <div key={index} style={{ color: "#20716a" }}>
+                      <span>{item.name}</span>
+                      <span>{` (${item.score}/${item.max_score})`}</span>
+                    </div>
+                  ))}
+                {/* {assignment.results?.map(item => (
                   <Typography.Paragraph
                     key={item.id}
                     style={{ color: "#20716a" }}
                   >
                     {item.name}
                   </Typography.Paragraph>
-                ))}
+                ))} */}
               </div>
               <div>
                 <div style={{ lineHeight: "30px" }}>
@@ -282,8 +350,8 @@ export default function AssignmentResult() {
           </div>
           <UploadModal
             title='UPLOAD'
-            url='/api/uploadFile'
-            data={{ assignmentId }}
+            // url='/api/uploadFile'
+            // data={{ assignmentId }}
             open={uploadModalOpen}
             onCancel={toggleUploadModalOpen}
             afterUpdate={updateAssignment}

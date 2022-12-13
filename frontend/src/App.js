@@ -7,7 +7,7 @@ import Assignments from "./pages/assignments";
 import AssignmentResult from "./pages/result";
 import RootSider from "./components/layout/sider";
 
-// import "./mock";
+import "./mock";
 import InstructorDashboard from "./pages/instructor/dashboard";
 import CourseSettings from "./pages/instructor/courseSettings";
 import InstructorAssignments from "./pages/instructor/assignments";

@@ -1,5 +1,4 @@
 import { PageHeader } from "antd";
-// import axios from "axios";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { GlobalContext } from "../../App";
 import SemesterCourses from "./semesterCourses";
@@ -60,12 +59,6 @@ export default function Dashboard() {
         setCourses(formatCourse(res.data));
       });
     }
-
-    // axios
-    //   .post("/api/getCourses", { isStudent: userInfo?.isStudent })
-    //   .then(res => {
-    //     setCourses(res.data.data);
-    //   });
   }, [userInfo]);
 
   useEffect(() => {

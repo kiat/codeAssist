@@ -9,15 +9,17 @@ import {
   Table,
   Typography,
 } from "antd";
-import { PlusOutlined, UploadOutlined } from "@ant-design/icons";
+import { PlusOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
 import { useCallback, useState } from "react";
 import {
   createEnrollment,
+  createEnrollmentBulk,
   getCourseEnrollment,
 } from "../../../services/enrollment";
 import { useParams } from "react-router-dom";
 import { useEffect } from "react";
+import AddMoreUsersModal from "./AddMoreUsersModal";
 
 const columns = [
   { title: "FIRST & LAST NAME", dataIndex: "name" },
@@ -35,11 +37,16 @@ const columns = [
 
 export default () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
   const [enrollment, setEnrollment] = useState([]);
   const { courseId } = useParams();
 
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen(t => !t);
+  }, []);
+
+  const toggleAddMoreUsersModalOpen = useCallback(() => {
+    setAddMoreUsersModalOpen(t => !t);
   }, []);
 
   const getEnrollment = useCallback(() => {
@@ -59,6 +66,19 @@ export default () => {
       );
     },
     [courseId, getEnrollment, toggleAddModalOpen]
+  );
+
+  const finishMoreUsers = useCallback(
+    values => {
+      createEnrollmentBulk({
+        course_id: courseId,
+        student_ids: values,
+      }).then(() => {
+        toggleAddMoreUsersModalOpen();
+        getEnrollment();
+      });
+    },
+    [courseId, getEnrollment, toggleAddMoreUsersModalOpen]
   );
 
   useEffect(() => {
@@ -122,9 +142,15 @@ export default () => {
           }}
         >
           <Space>
-            <Button icon={<UploadOutlined />}>Download Enrollment</Button>
+            {/* <Button icon={<UploadOutlined />}>Download Enrollment</Button> */}
             <Button icon={<PlusOutlined />} onClick={toggleAddModalOpen}>
               Add Students or Staff
+            </Button>
+            <Button
+              icon={<PlusOutlined />}
+              onClick={toggleAddMoreUsersModalOpen}
+            >
+              Add More Students
             </Button>
           </Space>
         </div>
@@ -133,6 +159,10 @@ export default () => {
         open={addModalOpen}
         toggleAddModalOpen={toggleAddModalOpen}
         onFinish={finishForm}
+      />
+      <AddMoreUsersModal
+        open={addMoreUsersModalOpen}
+        finishMoreUsers={finishMoreUsers}
       />
     </>
   );

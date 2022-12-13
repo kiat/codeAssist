@@ -54,7 +54,11 @@ export default ({ open, toggleAddModalOpen, onFinish }) => {
         <Form.Item label='ROLE' name='role'>
           <Radio.Group options={["Student", "Instructor", "TA"]} />
         </Form.Item>
-        <Form.Item label='EMAIL NOTIFICATION' name='emailNotification'>
+        <Form.Item
+          label='EMAIL NOTIFICATION'
+          name='emailNotification'
+          valuePropName='checked'
+        >
           <Checkbox>
             Let this user know that they were added to the course
           </Checkbox>

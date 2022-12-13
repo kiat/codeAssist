@@ -11,7 +11,8 @@ instance.interceptors.response.use(
     return res;
   },
   err => {
-    message.error("Action Failed");
+    message.error("operation failed");
+    return Promise.reject(err);
   }
 );
 
