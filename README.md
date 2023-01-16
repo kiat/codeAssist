@@ -73,7 +73,15 @@ Your backend should now be running on `http://localhost:5000` and your frontend 
 
 ## Contributors
 
--   Ricky Woodruff
+- Ricky Woodruff 
+- Xirui (Emma) Peng 
+
+# Students of Spring 2023
+
+Yinglei Fang <yingleifang@utexas.edu>
+Nils A Collins <nils.collins@utexas.edu>
+Jamisen Ma <jamisen.ma@gmail.com>
+
 
 ## Important Links (Development)
 
