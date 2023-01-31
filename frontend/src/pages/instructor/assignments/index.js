@@ -30,7 +30,8 @@ export default function InstructorAssignments() {
 
   const finishForm = () => {
     const values = form.getFieldsValue();
-    createAssignment({ name: values.name, course_Id: courseId }).then(res => {
+    console.log(courseId);
+    createAssignment({ name: values.name, course_id: courseId }).then(res => {
       toggleIsCreate();
     });
   };
