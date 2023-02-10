@@ -1,4 +1,4 @@
-import { Button, Card, Progress, Table } from "antd";
+import { Button, Card, Progress, Table, PageHeader } from "antd";
 import moment from "moment";
 import { useCallback } from "react";
 import { useEffect } from "react";
@@ -64,6 +64,7 @@ export default ({ isCreate }) => {
   const { courseId } = useParams();
 
   const getAssignments = useCallback(() => {
+    console.log(courseId);
     getCourseAssignments({ course_id: courseId }).then(res => {
       setAssignments(res.data);
     });
@@ -75,8 +76,12 @@ export default ({ isCreate }) => {
     }
   }, [getAssignments, isCreate]);
 
+  console.log(assignments.length);
+
   return (
     <>
+      <PageHeader title={`Total Assignments: ${assignments?.length}`}>
+      </PageHeader>
       <Card bordered={false}>
         <Table rowKey='id' columns={columns} dataSource={assignments} />
       </Card>
