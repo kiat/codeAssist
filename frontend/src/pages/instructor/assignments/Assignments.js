@@ -64,7 +64,6 @@ export default ({ isCreate }) => {
   const { courseId } = useParams();
 
   const getAssignments = useCallback(() => {
-    console.log(courseId);
     getCourseAssignments({ course_id: courseId }).then(res => {
       setAssignments(res.data);
     });
@@ -75,8 +74,6 @@ export default ({ isCreate }) => {
       getAssignments();
     }
   }, [getAssignments, isCreate]);
-
-  console.log(assignments.length);
 
   return (
     <>
