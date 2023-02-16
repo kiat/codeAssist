@@ -4,9 +4,14 @@ CREATE TABLE students (
     id uuid primary key,
     password varchar(60) not null,
     name varchar(30) not null,
-    email_address varchar(30) not null,
+    email_address varchar(30) not null UNIQUE,
     sis_user_id varchar(50)
 );
+
+
+CREATE TABLE instructors(
+    
+)INHERITS (students);
 
 /* Create Courses table */
 create table courses (
