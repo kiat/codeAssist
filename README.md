@@ -67,6 +67,18 @@
 
 ## Done!
 
+# Note: Network Problem on Linux
+https://docs.docker.com/network/bridge/ 
+
+Configure the Linux kernel to allow IP forwarding.
+   ```sudo  sysctl net.ipv4.conf.all.forwarding=1```
+
+net.ipv4.conf.all.forwarding = 1
+
+Change the policy for the iptables FORWARD policy from DROP to ACCEPT.
+
+```sudo iptables -P FORWARD ACCEPT````
+
 Your backend should now be running on `http://localhost:5000` and your frontend on `http://localhost:3000`.
 
 ---
