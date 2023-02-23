@@ -11,7 +11,7 @@ import {
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
-import { useCallback, useState } from "react";
+import { useCallback, useState,useContext } from "react";
 import {
   createEnrollment,
   createEnrollmentBulk,
@@ -20,7 +20,7 @@ import {
 import { useParams } from "react-router-dom";
 import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
-
+import { GlobalContext } from "../../../App";
 const columns = [
   { title: "FIRST & LAST NAME", dataIndex: "name" },
   { title: "EMAIL", dataIndex: "email" },
@@ -39,7 +39,9 @@ export default () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
   const [enrollment, setEnrollment] = useState([]);
-  const { courseId } = useParams();
+  const urlParams = useParams();
+  const {courseInfo,updateCourseInfo } = useContext(GlobalContext);
+  const { courseId } =urlParams.courseId;
 
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen(t => !t);

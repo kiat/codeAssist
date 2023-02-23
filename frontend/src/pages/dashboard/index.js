@@ -71,7 +71,7 @@ export default function Dashboard() {
       const { courseName } = values;
       console.log("values", values);
       // createCourse({ id: userInfo.id, courseName, ...restValues }).then(res => {
-      createCourse({ name: courseName, instruct_id: userInfo.id }).then(res => {
+      createCourse({ name: courseName, instructor_id: userInfo.id }).then(res => {
         getCourses();
         toggleModalOpen();
       });
