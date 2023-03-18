@@ -43,7 +43,7 @@ def send_grades_from_codeassist_to_canvas(cursor):
 def connect_to_database():
     try:
         connection = psycopg2.connect(user="postgres",
-                                      password="Asiangoat343623",
+                                      password="Type your own",
                                       host="127.0.0.1",
                                       port="5432",
                                       database="CodeAssist_Database")
