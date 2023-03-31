@@ -2,6 +2,7 @@ import requests
 from canvasapi import Canvas
 import psycopg2
 import uuid
+import os
 
 """
 This script synchronizes grades between the CodeAssist database and Canvas. It connects to the local
@@ -10,11 +11,13 @@ using the Canvas API.
 """
 
 # Configuration for Canvas API and base URL
-HOST = "canvas.instructure.com"
+HOST=os.getenv("HOST")
+access_token = os.getenv("ACCESS_TOKEN")
+
+
 base_url = 'https://{}/api/v1/courses'.format(HOST)
 
 
-access_token = "7~LtosN8jbYTcfAqkdIxQitgO0lXQJ0s4d7xzqqmXFb00aVPfXgRTeM0oHdWvq3og4"
 header = {'Authorization': 'Bearer ' + access_token}
 
 def post_grade_to_canvas(base_url, header, user_id, grade, comment, verbose=False):
