@@ -3,13 +3,33 @@ from canvasapi import Canvas
 import psycopg2
 import uuid
 
+"""
+This script synchronizes grades between the CodeAssist database and Canvas. It connects to the local
+PostgreSQL database and retrieves grades from the CodeAssist database, then sends the grades to Canvas
+using the Canvas API.
+"""
+
+# Configuration for Canvas API and base URL
 HOST = "canvas.instructure.com"
 base_url = 'https://{}/api/v1/courses'.format(HOST)
 
 
 access_token = "7~LtosN8jbYTcfAqkdIxQitgO0lXQJ0s4d7xzqqmXFb00aVPfXgRTeM0oHdWvq3og4"
 header = {'Authorization': 'Bearer ' + access_token}
+
 def post_grade_to_canvas(base_url, header, user_id, grade, comment, verbose=False):
+    """
+    Post a grade and optional comment to Canvas API for a specific user.
+
+    Args:
+        base_url (str): The base URL for the Canvas API.
+        header (dict): The header containing the access token.
+        user_id (int): The user ID of the student.
+        grade (float): The grade to be posted.
+        comment (str): An optional comment to be posted along with the grade.
+        verbose (bool, optional): If True, print additional debug information. Defaults to False.
+    """
+
     url = '{}/submissions/{}'.format(base_url, user_id)
     if verbose:
         print('url: ' + url)
@@ -28,6 +48,12 @@ def post_grade_to_canvas(base_url, header, user_id, grade, comment, verbose=Fals
         return True
 
 def send_grades_from_codeassist_to_canvas(cursor):
+    """
+        Retrieve grades from CodeAssist database and send them to Canvas.
+
+        Args:
+            cursor (psycopg2.extensions.cursor): The database cursor.
+    """
     cursor.execute('''SELECT * from submissions''')
     result = cursor.fetchall()
     for assignment in result:
@@ -41,9 +67,12 @@ def send_grades_from_codeassist_to_canvas(cursor):
 
 
 def connect_to_database():
+    """
+     Connect to the CodeAssist database, retrieve grades and send them to Canvas, then close the connection.
+    """
     try:
         connection = psycopg2.connect(user="postgres",
-                                      password="Type your own",
+                                      password="Asiangoat343623",
                                       host="127.0.0.1",
                                       port="5432",
                                       database="CodeAssist_Database")
