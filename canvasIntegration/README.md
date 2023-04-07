@@ -30,7 +30,7 @@ pip install canvasapi psycopg2
 
 3. Update the database credentials and Canvas API access token in `sync_roster.py` and `send_grades_from_codeassist_canvas.py` scripts.
 
-### How to get access token
+### How to get Access Token
 <img width="442" alt="Screen Shot 2023-04-07 at 4 08 06 PM" src="https://user-images.githubusercontent.com/100271213/230679168-3d271847-b8ce-4d6b-ae6d-23d323da69ae.png">
 <img width="819" alt="Screen Shot 2023-04-07 at 4 08 42 PM" src="https://user-images.githubusercontent.com/100271213/230679228-d3a00962-f6bc-43e2-8fc4-1806fcd327df.png">
 
