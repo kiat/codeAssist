@@ -6,7 +6,7 @@ In any area of education, the ability to efficiently grade assignments and provi
 
 # Summary
 
-CodeAssist aims to be a free open-source feedback system for programming courses that can be used in different computer science courses to provide automated rapid feedback about students' programming assignment submissions. CodeAssist provides feedback on students' code in a variety of forms regarding different aspects of their program code, for example, code debugging, code efficiency, code style, and object-oriented design patterns. 
+CodeAssist is a free and open-source feedback system designed for programming courses. It can be used in various computer science classes to provide automated and rapid feedback on students' programming assignment submissions. CodeAssist offers feedback on various aspects of students' code, including debugging, efficiency, style, and object-oriented design patterns, in various formats.
 
 
 
