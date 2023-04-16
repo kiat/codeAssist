@@ -6,7 +6,12 @@ In any area of education, the ability to efficiently grade assignments and provi
 
 # Summary
 
-CodeAssist aims to be a free open-source alternative to tools like Gradescope. To start, we will offer some basic functionality for both instructors and students:
+CodeAssist aims to be a free open-source feedback system for programming courses that can be used in different computer science courses to provide automated rapid feedback about students' programming assignment submissions. CodeAssist provides feedback on students' code in a variety of forms regarding different aspects of their program code, for example, code debugging, code efficiency, code style, and object-oriented design patterns. 
+
+
+
+
+To start, we will offer some basic functionality for both instructors and students:
 
 **Instructors**
 
