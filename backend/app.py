@@ -333,7 +333,7 @@ def upload_assignment_autograder():
 
         file.seek(0)
 
-        assignment = db.session.query(Assignment).filter_by(assignment_id=assignment_id).update(assignment_data)
+        assignment = db.session.query(Assignment).filter_by(id=assignment_id).update(assignment_data)
         db.session.commit()
 
         assignment = AssignmentSchema().dump(assignment, many=True)[0]
