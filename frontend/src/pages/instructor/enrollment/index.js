@@ -41,7 +41,7 @@ export default () => {
   const [enrollment, setEnrollment] = useState([]);
   const urlParams = useParams();
   const {courseInfo,updateCourseInfo } = useContext(GlobalContext);
-  const { courseId } =urlParams.courseId;
+  const { courseId } =urlParams;
 
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen(t => !t);
