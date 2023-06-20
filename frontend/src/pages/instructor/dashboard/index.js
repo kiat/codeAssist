@@ -174,7 +174,7 @@ export default function InstructorDashboard() {
           <span>Course ID: 394120</span>
         </Space>
       </div> */}
-      <PageHeader title='CS 313E' subTitle='Summer 2022'>
+      <PageHeader title={courseInfo.name} subTitle='Summer 2022'>
         <Descriptions>
           <Descriptions.Item label='Course ID'>394120</Descriptions.Item>
         </Descriptions>
