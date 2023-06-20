@@ -10,6 +10,7 @@ from api import app, db
 from api.models import *
 from api.schemas import *
 
+CORS(app)
 ALLOWED_EXTENSIONS = {'py','zip'}
 UPLOAD_FOLDER = '/usr/app/files'
 

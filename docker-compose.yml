@@ -9,7 +9,8 @@ services:
         volumes:
             - ./frontend:/app
             - /app/node_modules
-        command: nodemon -L index.js
+        stdin_open: true
+        command: npm start
     frontend-test:
         build:
             context: ./frontend/

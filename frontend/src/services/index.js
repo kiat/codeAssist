@@ -16,6 +16,14 @@ instance.interceptors.response.use(
   }
 );
 
+/**
+ * service is the only way for axios to communicate with the backend (for now)
+ * @param {*} url the url extension to the URL_PREFIX
+ * @param {*} params the params
+ * @param {*} method the method
+ * @param {*} options the additional options for axios
+ * @returns 
+ */
 const service = (url, params, method = "get", options) =>
   instance({
     method: method,
