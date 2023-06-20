@@ -1,11 +1,11 @@
 FROM node:17 as base
 
-WORKDIR /app
+WORKDIR /src
 
 COPY package*.json ./
 
 # Add new node_modules to path
-ENV PATH /app/node_modules/.bin:$PATH
+ENV PATH /node_modules/.bin:$PATH
 
 
 # Test stage

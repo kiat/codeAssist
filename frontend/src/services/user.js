@@ -10,6 +10,11 @@ export async function signUpStudent(params) {
   // };
 }
 
+/**
+ * signUpInstructor POSTs a new instructor to the database
+ * @param {*} params the data for the new instructor
+ * @returns 
+ */
 export async function signUpInstructor(params) {
   return service("create_instructor", params, "post");
   // return {
