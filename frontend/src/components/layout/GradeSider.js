@@ -18,7 +18,10 @@ export default () => {
   const pathname = window.location.pathname;
 
   useEffect(() => {
-    const res = /\/assignment\/\w+\/(\d+)/i.exec(pathname);
+
+    //uses regex, matches /assignment/(alphanumeric)/(decimal)/
+    const res = /\/assignment\/\w+\/([A-Za-z0-9\-]+)/.exec(pathname);
+
     if (res && res[1]) {
       updateAssignmentInfo({
         id: res[1],
