@@ -73,6 +73,8 @@ export default function InstructorDashboard() {
   const [data, setData] = useState(null);
   const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const user_id = useContext(GlobalContext).userInfo.id;
+
+
   //   async function get(url, params){
   //     let response = await fetch(url + '?' + new URLSearchParams(params))
   //     let data = await response.json()
@@ -131,7 +133,9 @@ export default function InstructorDashboard() {
         }
         return response.json();
       })
-      .then((json) => setData(json))
+      .then((json) => {
+        setData(json)
+      })
       .catch((error) => {});
   };
 
@@ -143,12 +147,12 @@ export default function InstructorDashboard() {
 
   useEffect(() => {
     if (!courseInfo.id) {
-      updateCourseInfo({
-        id: courseId,
-        name: courseInfo.name,
-      });
+      updateCourseInfo((prevCourseInfo) => ({
+        ...prevCourseInfo,
+        id: courseId
+      }));
     }
-    if (!courseInfo.name) {
+    if (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode) {
       fetch(
         "http://localhost:5000/get_instructor_courses?" +
           new URLSearchParams({
@@ -162,12 +166,21 @@ export default function InstructorDashboard() {
               updateCourseInfo({
                 id: courseId,
                 name: element.name,
+                year: element.year,
+                semester: element.semester,
+                entryCode: element.entryCode
               });
             }
           })
         );
     }
-  });
+  }, [courseInfo.id, courseInfo.name, courseInfo.semester, courseId, updateCourseInfo, user_id]);
+
+  const isCourseInfoLoaded = courseInfo.semester && courseInfo.year && courseInfo.entryCode;
+
+  if (!isCourseInfoLoaded) {
+    return null;
+  }
 
   return (
     <>
@@ -178,7 +191,7 @@ export default function InstructorDashboard() {
           <span>Course ID: 394120</span>
         </Space>
       </div> */}
-      <PageHeader title={courseInfo.name} subTitle="Summer 2022">
+      <PageHeader title={courseInfo.name} subTitle={`${courseInfo.semester} ${courseInfo.year}`}>
         <Descriptions>
           <Descriptions.Item label="Course ID">{courseId}</Descriptions.Item>
         </Descriptions>

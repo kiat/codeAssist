@@ -149,7 +149,8 @@ export default function RootSider({
                         {courseInfo.name}
                       </Typography.Title>
                       <div style={{ whiteSpace: "normal" }}>
-                        Su22 - ELEMENTS OF SOFTWARE DESIGN-WB(86439)
+                        {courseInfo.semester} {courseInfo.year} - {courseInfo.entryCode}
+                        {/* Su22 - ELEMENTS OF SOFTWARE DESIGN-WB(86439) */}
                       </div>
                     </>
                   }

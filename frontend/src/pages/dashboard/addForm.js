@@ -2,6 +2,8 @@ import { Button, Form, Input, Select } from "antd";
 // import { formItemList } from "./constant";
 
 export default function AddForm({ onFinish, onCancel }) {
+
+
   return (
     <Form layout='vertical' onFinish={onFinish}>
       {/* {formItemList.map(item => (

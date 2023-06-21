@@ -17,7 +17,10 @@ CREATE TABLE instructors(
 create table courses (
     id uuid primary key,
     name varchar(50),
-    sis_course_id varchar(50)
+    sis_course_id varchar(50),
+    semester varchar(50),
+    year varchar(50),
+    entryCode varchar(50)
 );
 
 /* Create Enrollments table */

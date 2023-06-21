@@ -104,11 +104,17 @@ def create_course():
     course_id = str(uuid.uuid4())
     name = request.json['name']
     instructor_id = request.json['instructor_id']
+    semester = request.json['semester']
+    year = request.json['year']
+    entryCode = request.json["entryCode"]
 
     course_data = {
         "id": course_id,
         "name": name,
         "instructor_id": instructor_id,
+        "semester": semester,
+        "year": year,
+        "entryCode": entryCode
     }
 
     db.session.add(Course(**course_data))
@@ -245,7 +251,7 @@ def get_instructor_courses():
 
     courses = db.session.query(Course).filter_by(instructor_id=instructor_id)
     courses = CourseSchema().dump(courses, many=True)
-
+   
     return jsonify(courses)
 
 @app.route('/get_submissions', methods=["GET"])

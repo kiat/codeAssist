@@ -25,7 +25,7 @@ const { Content } = Layout;
 
 export const GlobalContext = createContext({
   userInfo: { name: "", isStudent: 1 },
-  curseInfo: { id: "", name: "", code: "" },
+  courseInfo: { id: "", name: "", code: "", semester: "", year: "" },
   assignmentInfo: { id: "", name: "" },
   updateCourseInfo: () => {},
   updateUserInfo: () => {},
@@ -33,7 +33,7 @@ export const GlobalContext = createContext({
 });
 
 function App() {
-  const [courseInfo, setCourseInfo] = useState({ code: "", name: "" });
+  const [courseInfo, setCourseInfo] = useState({ code: "", name: "", semester: "", year: "" });
   const [assignmentInfo, setAssignmentInfo] = useState({ name: "" });
   const [userInfo, setUserInfo] = useState(
     JSON.parse(localStorage.getItem("userInfo"))
@@ -43,6 +43,7 @@ function App() {
   const updateCourseInfo = useCallback(info => {
     setCourseInfo(info);
   }, []);
+
 
   const updateUserInfo = useCallback(info => {
     setUserInfo(info);

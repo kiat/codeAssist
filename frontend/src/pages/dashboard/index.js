@@ -68,10 +68,10 @@ export default function Dashboard() {
   // action after successfully adding courses
   const afterAddCourse = useCallback(
     values => {
-      const { courseName } = values;
+      const { courseName, semester, year, entryCode } = values;
       console.log("values", values);
       // createCourse({ id: userInfo.id, courseName, ...restValues }).then(res => {
-      createCourse({ name: courseName, instructor_id: userInfo.id }).then(res => {
+      createCourse({ name: courseName, instructor_id: userInfo.id, semester: semester, year: year, entryCode: entryCode}).then(res => {
         getCourses();
         toggleModalOpen();
       });

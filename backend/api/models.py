@@ -25,6 +25,9 @@ class Course(db.Model):
     name = db.Column(db.String, nullable=False)
     instructor_id = db.Column(UUID(as_uuid=False), db.ForeignKey("instructors.id"), nullable=False)
     sis_course_id = db.Column(db.String, nullable=True)
+    semester = db.Column(db.String, nullable=False)
+    year = db.Column(db.String, nullable = False)
+    entryCode = db.Column(db.String, nullable = False)
 
 
 class Enrollment(db.Model):
