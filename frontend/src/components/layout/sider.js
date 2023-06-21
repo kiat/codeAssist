@@ -145,7 +145,8 @@ export default function RootSider({
                         level={4}
                         style={{ fontWeight: "bold" }}
                       >
-                        C S N313E
+                        {/* possibly change this to courseInfo.name */}
+                        {courseInfo.name}
                       </Typography.Title>
                       <div style={{ whiteSpace: "normal" }}>
                         Su22 - ELEMENTS OF SOFTWARE DESIGN-WB(86439)
