@@ -205,9 +205,12 @@ def get_student_enrollments():
     student_id = request.args.get("student_id")
 
     enrollments = db.session.query(Enrollment).filter_by(student_id=student_id)
-    enrollments = EnrollmentSchema().dump(enrollments, many=True)
-
-    return jsonify(enrollments)
+    #enrollments = EnrollmentSchema().dump(enrollments, many=True)
+    enrolled_list = [student_course.course_id for student_course in enrollments]
+    student_courses = db.session.query(Course).filter(Course.id.in_(enrolled_list))
+    student_courses = CourseSchema().dump(student_courses, many=True)
+    #return jsonify(enrollments)
+    return jsonify(student_courses)
 
 @app.route('/get_course_assignments', methods=["GET"])
 @cross_origin()
