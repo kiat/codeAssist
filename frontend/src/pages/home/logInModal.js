@@ -13,7 +13,7 @@ export default function LogInModal({ open, onCancel, logIn }) {
   const { updateUserInfo } = useContext(GlobalContext);
 
   // login action
-  const onSubmit = async values => {
+  const onSubmit = async (values) => {
     // const isStudent = values.isStudent;
     const { isStudent, ...restValue } = values;
     let res;
@@ -49,12 +49,12 @@ export default function LogInModal({ open, onCancel, logIn }) {
     // return;
   };
   return (
-    <Modal title='LOG IN' open={open} footer={null} onCancel={onCancel}>
-      <Form layout='vertical' onFinish={onSubmit}>
-        <Form.Item name='isStudent' initialValue={1}>
+    <Modal title="LOG IN" open={open} footer={null} onCancel={onCancel}>
+      <Form layout="vertical" onFinish={onSubmit}>
+        <Form.Item name="isStudent" initialValue={1}>
           <Radio.Group
-            optionType='button'
-            buttonStyle='solid'
+            optionType="button"
+            buttonStyle="solid"
             style={{ width: "100%" }}
           >
             <Radio.Button
@@ -71,14 +71,14 @@ export default function LogInModal({ open, onCancel, logIn }) {
             </Radio.Button>
           </Radio.Group>
         </Form.Item>
-        <Form.Item label='Email' name='email'>
-          <Input />
+        <Form.Item label="EID" name="eid">
+          <Input placeholder="Your EID" />
         </Form.Item>
-        <Form.Item label='Password' name='password'>
-          <Input />
+        <Form.Item label="Password" name="password">
+          <Input.Password placeholder="Your Password" />
         </Form.Item>
         <Form.Item>
-          <Button type='primary' htmlType='submit'>
+          <Button type="primary" htmlType="submit">
             Log In
           </Button>
         </Form.Item>

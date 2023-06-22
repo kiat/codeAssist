@@ -14,7 +14,7 @@ export default function SignUpModal({ open, onCancel }) {
   const { updateUserInfo } = useContext(GlobalContext);
 
   // action after successfully signup
-  const finishSignUp = async values => {
+  const finishSignUp = async (values) => {
     const { isStudent, ...restValue } = values;
     // const isStudent = values.isStudent;
     let res;
@@ -53,12 +53,12 @@ export default function SignUpModal({ open, onCancel }) {
   };
 
   return (
-    <Modal title='SIGN UP' open={open} footer={null} onCancel={onCancel}>
-      <Form layout='vertical' onFinish={finishSignUp}>
-        <Form.Item name='isStudent' initialValue={1}>
+    <Modal title="SIGN UP" open={open} footer={null} onCancel={onCancel}>
+      <Form layout="vertical" onFinish={finishSignUp}>
+        <Form.Item name="isStudent" initialValue={1}>
           <Radio.Group
-            optionType='button'
-            buttonStyle='solid'
+            optionType="button"
+            buttonStyle="solid"
             style={{ width: "100%" }}
           >
             <Radio.Button
@@ -75,17 +75,20 @@ export default function SignUpModal({ open, onCancel }) {
             </Radio.Button>
           </Radio.Group>
         </Form.Item>
-        <Form.Item label='Name' name='name'>
-          <Input placeholder='Your Name' />
+        <Form.Item label="EID" name="eid">
+          <Input placeholder="Your EID" />
         </Form.Item>
-        <Form.Item label='Email' name='email'>
-          <Input placeholder='email@example.com' />
+        <Form.Item label="Name" name="name">
+          <Input placeholder="Your Name" />
         </Form.Item>
-        <Form.Item label='Password' name='password'>
-          <Input.Password placeholder='Your Password' />
+        <Form.Item label="Email" name="email">
+          <Input placeholder="email@example.com" />
+        </Form.Item>
+        <Form.Item label="Password" name="password">
+          <Input.Password placeholder="Your Password" />
         </Form.Item>
         <Form.Item>
-          <Button style={{ width: "100%" }} type='primary' htmlType='submit'>
+          <Button style={{ width: "100%" }} type="primary" htmlType="submit">
             Sign Up
           </Button>
         </Form.Item>

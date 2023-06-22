@@ -34,12 +34,14 @@ def create_student():
     name = request.json['name']
     password = request.json['password']
     email_address = request.json['email']
+    sis_user_id = request.json['eid']
 
     user_data = {
         "id": user_id,
         "name": name,
         "email_address": email_address,
         "password": password,
+        "sis_user_id": sis_user_id,
     }
 
     db.session.add(Student(**user_data))
@@ -53,10 +55,10 @@ def create_student():
 @app.route('/student_login', methods=["POST", "GET"])
 @cross_origin()
 def student_login():
-    email = request.json['email']
+    eid = request.json['eid']
     password = request.json['password']
 
-    res = db.session.query(Student).filter_by(email_address=email, password=password)
+    res = db.session.query(Student).filter_by(sis_user_id=eid, password=password)
     res = StudentSchema().dump(res, many=True)
 
     if len(res) == 0:
@@ -71,12 +73,14 @@ def create_instructor():
     name = request.json['name']
     password = request.json['password']
     email_address = request.json['email']
+    sis_user_id = request.json['eid']
 
     user_data = {
         "id": user_id,
         "name": name,
         "email_address": email_address,
         "password": password,
+        "sis_user_id": sis_user_id,
     }
 
     db.session.add(Instructor(**user_data))
@@ -90,10 +94,10 @@ def create_instructor():
 @app.route('/instructor_login', methods=["POST", "GET"])
 @cross_origin()
 def instructor_login():
-    email = request.json['email']
+    eid = request.json['eid']
     password = request.json['password']
 
-    res = db.session.query(Instructor).filter_by(email_address=email, password=password)
+    res = db.session.query(Instructor).filter_by(sis_user_id=eid, password=password)
     res = InstructorSchema().dump(res, many=True)[0]
 
     return jsonify(res)

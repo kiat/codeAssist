@@ -5,7 +5,7 @@ CREATE TABLE students (
     password varchar(60) not null,
     name varchar(30) not null,
     email_address varchar(30) not null UNIQUE,
-    sis_user_id varchar(50)
+    sis_user_id varchar(50) not null UNIQUE,
 );
 
 
