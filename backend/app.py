@@ -1,4 +1,4 @@
-from flask import Flask, flash, request, jsonify
+from flask import Flask, flash, request, jsonify, redirect
 from flask_cors import CORS, cross_origin
 from werkzeug.utils import secure_filename
 import docker_client
@@ -124,6 +124,21 @@ def create_course():
     newCourse = CourseSchema().dump(newCourse, many=True)[0]
 
     return jsonify(newCourse)
+
+@app.route('/delete_course', methods=["DELETE", "OPTIONS"])
+@cross_origin()
+def delete_course():
+    print(request)
+    if request.method == "OPTIONS":
+        return "", 200
+    if request.method == "DELETE":
+        course_id = request.args.get("course_id")
+        course_to_delete = db.session.get(Course, course_id)
+        try:
+            db.session.delete(course_to_delete)
+            db.session.commit()
+        except:
+            return "Error removing course"
 
 @app.route('/update_assignment', methods=["POST", "GET"])
 @cross_origin()

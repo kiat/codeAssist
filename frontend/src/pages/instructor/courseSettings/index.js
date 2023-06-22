@@ -16,7 +16,7 @@ import {
 } from "antd";
 import { useEffect, useState, useCallback } from "react";
 import { useContext } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../../App";
 import { getCourseAssignments } from "../../../services/course";
 
@@ -41,7 +41,24 @@ export default () => {
     getAssignments();
   }, [getAssignments]);
 
-  console.log(assignments.length)
+  const navigate = useNavigate();
+
+  const handleDeleteCourse = () => {
+    if (assignments.length === 0) {
+      fetch(
+        "http://localhost:5000/delete_course?" +
+          new URLSearchParams({
+            course_id: courseId,
+          }), {
+            method: "DELETE"
+          })
+    }
+  }
+
+  const navigateHome = () => {
+    navigate("/dashboard")
+  }
+
 
   return (
     <Form
@@ -181,7 +198,14 @@ export default () => {
                 )
               }
             >
-              <Button type='primary' icon={<DeleteOutlined />} danger>
+              <Button 
+              type='primary' 
+              icon={<DeleteOutlined />} 
+              danger 
+              onClick = {() => {
+                handleDeleteCourse();
+                navigateHome();
+              }}>
                 Delete Course
               </Button>
             </Popover>
