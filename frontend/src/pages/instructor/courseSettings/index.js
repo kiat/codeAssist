@@ -14,20 +14,34 @@ import {
   Space,
   Typography,
 } from "antd";
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useContext } from "react";
 import { useParams } from "react-router-dom";
 import { GlobalContext } from "../../../App";
+import { getCourseAssignments } from "../../../services/course";
 
 export default () => {
   const { courseId } = useParams();
   const { updateCourseInfo, courseInfo } = useContext(GlobalContext);
+  const [assignments, setAssignments] = useState([])
 
   useEffect(() => {
     if (!courseInfo.id) {
       updateCourseInfo({ id: courseId });
     }
   }, [courseId, courseInfo.id, updateCourseInfo]);
+
+  const getAssignments = useCallback(() => {
+    getCourseAssignments({ course_id: courseId }).then(res => {
+      setAssignments(res.data);
+    });
+  }, [courseId]);
+
+  useEffect(() => {
+    getAssignments();
+  }, [getAssignments]);
+
+  console.log(assignments.length)
 
   return (
     <Form
@@ -159,10 +173,12 @@ export default () => {
               // title='sf'
               trigger='click'
               content={
-                <div style={{ width: "300px" }}>
-                  This course cannot be deelted, as it contains assignments.
-                  Delete the assignments and try again.
-                </div>
+                assignments.length !== 0 && (
+                  <div style={{ width: "300px" }}>
+                    This course cannot be deleted, as it contains assignments.
+                    Delete the assignments and try again.
+                  </div>
+                )
               }
             >
               <Button type='primary' icon={<DeleteOutlined />} danger>
