@@ -73,6 +73,7 @@ export default function InstructorDashboard() {
   const [data, setData] = useState(null);
   const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const user_id = useContext(GlobalContext).userInfo.id;
+  const [description, setDescription] = useState("");
 
 
   //   async function get(url, params){
@@ -170,6 +171,7 @@ export default function InstructorDashboard() {
                 semester: element.semester,
                 entryCode: element.entryCode
               });
+              setDescription(element.description)
             }
           })
         );
@@ -200,10 +202,15 @@ export default function InstructorDashboard() {
         <h3>DESCRIPTION</h3>
         <Divider style={{ marginTop: 0, marginBottom: "5px" }} />
         <div>
-          <span>Edit your course descrption on the </span>
-          {/* <Typography.Link>Course Settings</Typography.Link> */}
-          <Link to={`/courseSettings/${courseId}`}>Course Settings</Link>
-          <span> page.</span>
+          {{description} === "" ? (
+            <div>
+            <span>Edit your course description on the </span>
+            <Link to={`/courseSettings/${courseId}`}>Course Settings</Link>
+            <span> page.</span>
+          </div>
+          ) : (
+            <span>{description}</span>
+          )}
         </div>
       </Card>
       <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>

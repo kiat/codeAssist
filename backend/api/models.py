@@ -28,6 +28,8 @@ class Course(db.Model):
     semester = db.Column(db.String, nullable=False)
     year = db.Column(db.String, nullable = False)
     entryCode = db.Column(db.String, nullable = False)
+    allowEntryCode = db.Column(db.Boolean, default = False)
+    description = db.Column(db.String, nullable = True)
 
 
 class Enrollment(db.Model):

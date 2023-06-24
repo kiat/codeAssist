@@ -19,11 +19,13 @@ import { useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../../App";
 import { getCourseAssignments } from "../../../services/course";
+import axios from "axios";
 
 export default () => {
   const { courseId } = useParams();
   const { updateCourseInfo, courseInfo } = useContext(GlobalContext);
   const [assignments, setAssignments] = useState([])
+  const [formData, setFormData] = useState({})
 
   useEffect(() => {
     if (!courseInfo.id) {
@@ -59,7 +61,38 @@ export default () => {
     navigate("/dashboard")
   }
 
+  const navigateMainPage = () => {
+    navigate(`/instructorDashboard/${courseId}`)
+  }
 
+  const handleCheckboxChange = (e) => {
+    const { name, checked } = e.target;
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      [name]: checked
+    }));
+  };
+
+  console.log(formData)
+  
+  const onFinish = () => {
+    const dataToSend = {
+      course_id: courseId,
+      ...Object.fromEntries(
+      Object.entries(formData).filter(([_, value]) => value !== undefined))
+    };
+    fetch("http://localhost:5000/update_course", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(dataToSend),
+    })
+    .then((response) => {response.json()})
+    .then((data) => {console.log(data)})
+    .catch((error) => {console.log(error)})
+  }
+  
   return (
     <Form
       layout='vertical'
@@ -68,6 +101,9 @@ export default () => {
       }}
       style={{
         marginLeft: "20px",
+      }}
+      onValuesChange={(changedValues, allValues) => {
+        setFormData(allValues)
       }}
     >
       <Space direction='vertical' style={{ width: "100%" }}>
@@ -79,20 +115,21 @@ export default () => {
             width: "100%",
           }}
         >
-          <Form.Item label='ENTRY CODE' name='entryCode'>
+          <Form.Item label='ENTRY CODE' name = "entryCode">
             <Input />
           </Form.Item>
           <Form.Item
             label='ALLOW ENTRY CODE'
-            name='allowEntryCode'
             wrapperCol={24}
           >
-            <Checkbox>Allow students to enroll via course entry code</Checkbox>
+            <Checkbox name="allowEntryCode" onChange = {handleCheckboxChange}>
+              Allow students to enroll via course entry code
+            </Checkbox>
           </Form.Item>
-          <Form.Item label='COURSE NAME' name='courseName'>
+          <Form.Item label='COURSE NAME' name='name'>
             <Input />
           </Form.Item>
-          <Form.Item label='COURSE DESCRIPTION' name='courseDescription'>
+          <Form.Item label='COURSE DESCRIPTION' name='description'>
             <Input.TextArea />
           </Form.Item>
           {/* <Space>
@@ -185,7 +222,12 @@ export default () => {
         >
           <Typography.Title level={5}>COURSE ACTIONS</Typography.Title>
           <Space>
-            <Button type='primary'>Update Course</Button>
+            <Button 
+            type='primary' 
+            onClick = {() => {
+              onFinish();
+              navigateMainPage();
+            }}>Update Course</Button>
             <Popover
               // title='sf'
               trigger='click'

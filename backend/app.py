@@ -181,6 +181,21 @@ def create_course():
 
     return jsonify(newCourse)
 
+@app.route('/update_course', methods = ["POST"])
+@cross_origin()
+def update_course():
+    course_id = request.json["course_id"]
+    data = request.json
+    del data["course_id"]
+
+    name, val = list(data.keys()), list(data.values())
+    updated_course_info = {getattr(Course, name): val for name, val in zip(name, val)}
+
+    course = db.session.query(Course).filter_by(id=course_id).update(updated_course_info)
+    db.session.commit()
+
+    return jsonify({"message": "Success"}), 200
+
 @app.route('/delete_course', methods=["DELETE", "OPTIONS"])
 @cross_origin()
 def delete_course():
@@ -203,7 +218,7 @@ def delete_course():
 
 @app.route('/update_assignment', methods=["POST", "GET"])
 @cross_origin()
-def update_course():
+def update_assignment():
     # TODO this method name does not match the extension
     '''
     /update_assignment updates an assignment in the database

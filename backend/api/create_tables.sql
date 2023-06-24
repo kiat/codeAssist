@@ -20,7 +20,9 @@ create table courses (
     sis_course_id varchar(50),
     semester varchar(50),
     year varchar(50),
-    entryCode varchar(50)
+    entryCode varchar(50),
+    allowEntryCode boolean,
+    description varchar(100)
 );
 
 /* Create Enrollments table */
