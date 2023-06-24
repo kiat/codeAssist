@@ -10,7 +10,12 @@ from api import app, db
 from api.models import *
 from api.schemas import *
 
-CORS(app)
+'''
+app.py is (currently) the gateway for ALL backend endpoints
+This was created using Flask. 
+Documentation for Flask can be found here: https://flask.palletsprojects.com/en/2.3.x/quickstart/
+'''
+
 ALLOWED_EXTENSIONS = {'py','zip'}
 UPLOAD_FOLDER = '/usr/app/files'
 
@@ -19,6 +24,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 @app.route('/', methods=["GET", "POST"])
 @cross_origin()
 def hello_world():
+    '''
+    This is the default response with no methods and extensions - '/'
+    If you host the backend locally at localhost:5000 it should display "Hello World"
+    '''
     return 'Hello World'
 
 def allowed_file(filename):
@@ -28,6 +37,16 @@ def allowed_file(filename):
 @app.route('/create_student', methods=["GET", "POST"])
 @cross_origin()
 def create_student():
+    '''
+    /create_student creates a student and generates a sis_user_id
+    in the database
+    Requires from the frontend a JSON containing:
+    @param name         name of the student
+    @param password     password for the student
+    @param email        email of the student
+    @param eid          eid of the student
+    '''
+    # TODO: Remove below - /create_student should only be POST
     if request.method != "POST":
         return "all good"
     user_id = str(uuid.uuid4())
@@ -55,6 +74,12 @@ def create_student():
 @app.route('/student_login', methods=["POST", "GET"])
 @cross_origin()
 def student_login():
+    '''
+    /student_login logs in a student that exists in the database
+    Requires from the frontend a JSON containing:
+    @param eid          eid of the student
+    @param password     password for the student
+    '''
     eid = request.json['eid']
     password = request.json['password']
 
@@ -69,6 +94,15 @@ def student_login():
 @app.route('/create_instructor', methods=["POST", "GET"])
 @cross_origin()
 def create_instructor():
+    '''
+    /create_instructor creates an instructor and generates a
+    sis_user_id in the database
+    Requires from the frontend a JSON containing:
+    @param name         name of the instructor
+    @param password     password for the instructor
+    @param email        email of the instructor
+    @param eid          eid of the instructor
+    '''
     user_id = str(uuid.uuid4())
     name = request.json['name']
     password = request.json['password']
@@ -94,17 +128,35 @@ def create_instructor():
 @app.route('/instructor_login', methods=["POST", "GET"])
 @cross_origin()
 def instructor_login():
+    '''
+    /instructor_login logs in an instructor that exists in
+    the database
+    Requires from the frontend a JSON containing:
+    @param eid          eid of the instructor
+    @param password     password for the instructor
+    '''
     eid = request.json['eid']
     password = request.json['password']
 
     res = db.session.query(Instructor).filter_by(sis_user_id=eid, password=password)
     res = InstructorSchema().dump(res, many=True)[0]
 
+    # TODO: What if an instructor does not exist in the database?
+    # See: /student_login
     return jsonify(res)
 
 @app.route('/create_course', methods=["POST", "GET"])
 @cross_origin()
 def create_course():
+    '''
+    /create_course creates a course in the database
+    Requires from the frontend a JSON containing:
+    @param name             name of the course
+    @param instructor_id    TODO: What does this map to? @
+    @param semester         semester of the course
+    @param year             year of the course
+    @param entryCode        entryCode of the course
+    '''
     course_id = str(uuid.uuid4())
     name = request.json['name']
     instructor_id = request.json['instructor_id']
@@ -132,6 +184,11 @@ def create_course():
 @app.route('/delete_course', methods=["DELETE", "OPTIONS"])
 @cross_origin()
 def delete_course():
+    '''
+    /delete_course deletes a course from the database
+    Requires from the frontend a JSON containing:
+    @param course_id        the id of the course
+    '''
     print(request)
     if request.method == "OPTIONS":
         return "", 200
@@ -147,6 +204,12 @@ def delete_course():
 @app.route('/update_assignment', methods=["POST", "GET"])
 @cross_origin()
 def update_course():
+    # TODO this method name does not match the extension
+    '''
+    /update_assignment updates an assignment in the database
+    Requires from the frontend a JSON containing:
+    @param assignment_id    the id of the assignment
+    '''
     assignment_id = request.json["assignment_id"]
 
     data = request.json
@@ -160,6 +223,11 @@ def update_course():
 @app.route('/get_assignment', methods=["GET"])
 @cross_origin()
 def get_assignment():
+    '''
+    /get_assignment gets the assignment from the database
+    Requires from the frontend a JSON containing:
+    @param assignment_id    the id of the assignment
+    '''
     assignment_id = request.args.get("assignment_id")
 
     assignment = db.session.query(Assignment).filter_by(id=assignment_id)
@@ -171,6 +239,13 @@ def get_assignment():
 @app.route('/create_assignment', methods=["POST", "GET"])
 @cross_origin()
 def create_assignment():
+    '''
+    /create_assignment creates an assignment and generates an assignment
+    id in the database
+    Requires from the frontend a JSON containing:
+    @param name             the name of the assignment
+    @parma course_id        the course_id of the assignment
+    '''
     assignment_id = str(uuid.uuid4())
     name = request.json['name']
     course_id = request.json['course_id']
@@ -192,6 +267,13 @@ def create_assignment():
 @app.route('/create_enrollment', methods=["POST", "GET"])
 @cross_origin()
 def create_new_assignment():
+    # TODO this method name does not match the extension
+    '''
+    /create_enrollment enrolls a student in a course
+    Requires from the frontend a JSON containing:
+    @param student_id       the id of the student
+    @param course_id        the id of the course
+    '''
     student_id = request.json["student_id"]
     course_id = request.json["course_id"]
 
@@ -211,6 +293,13 @@ def create_new_assignment():
 @app.route('/create_enrollment_bulk', methods=["POST", "GET"])
 @cross_origin()
 def create_bulk_enrollments():
+    # TODO this method name does not match the extension
+    '''
+    /create_enrollment_bulk mass enrolls students in a course
+    Requires from the frontend a JSON containing:
+    @param course_id        the id of the course
+    @parma student_ids      a list of student ids
+    '''
     course_id = request.json["course_id"]
     students = request.json["student_ids"]
 
@@ -227,6 +316,11 @@ def create_bulk_enrollments():
 @app.route('/get_student_enrollments', methods=["GET"])
 @cross_origin()
 def get_student_enrollments():
+    '''
+    /get_student_enrollments gets all enrollments for a single student
+    Requires from the frontend a JSON containing:
+    @param student_id       the id of the student
+    '''
     student_id = request.args.get("student_id")
 
     enrollments = db.session.query(Enrollment).filter_by(student_id=student_id)
@@ -240,6 +334,11 @@ def get_student_enrollments():
 @app.route('/get_course_assignments', methods=["GET"])
 @cross_origin()
 def get_course_assignments():
+    '''
+    /get_course_assignments gets all assignments for a course
+    Requires from the frontend a JSON containing:
+    @param course_id        the id of a course
+    '''
     course_id = request.args.get("course_id")
 
     assignments = db.session.query(Assignment).filter_by(course_id=course_id)
@@ -250,6 +349,11 @@ def get_course_assignments():
 @app.route('/get_course_enrollment', methods=["GET"])
 @cross_origin()
 def get_course_enrollment():
+    '''
+    /get_course_enrollment gets all students enrolled in a course
+    Requires from the frontend a JSON containing:
+    @param course_id        the id of a course
+    '''
     course_id = request.args.get("course_id")
 
     students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id)
@@ -266,6 +370,11 @@ def get_course_enrollment():
 @app.route('/get_instructor_courses', methods=["GET"])
 @cross_origin()
 def get_instructor_courses():
+    '''
+    /get_instructor_courses gets all the courses created by an instructor
+    Requires from the frontend a JSON containing:
+    @param instructor_id    the id of an instructor
+    '''
     instructor_id = request.args.get("instructor_id")
 
     courses = db.session.query(Course).filter_by(instructor_id=instructor_id)
@@ -276,6 +385,12 @@ def get_instructor_courses():
 @app.route('/get_submissions', methods=["GET"])
 @cross_origin()
 def get_submission():
+    '''
+    /get_submissions gets all submissions by a student for an assignment
+    Requires from the frontend a JSON containing:
+    @param student_id       the id of a student
+    @param assignment_id    the id of an assignment
+    '''
     student_id = request.args.get("student_id")
     assignment_id = request.args.get("assignment_id")
 
@@ -287,6 +402,15 @@ def get_submission():
 @app.route('/upload_submission', methods=["POST", "GET"])
 @cross_origin()
 def upload_file():
+    # TODO the method name does not match the extension
+    '''
+    /upload_submission uploads a submission by a student for an assignment into
+    the database
+    Requires from the frontend a JSON containing:
+    @param assignment       assignment #TODO whoever knows better, document
+    @param student_id       the id of a student
+    @param assignment_id    the id of an assignment
+    '''
     if "file" not in request.files:
         flash("No file part")
         return "no file\n"
@@ -342,6 +466,11 @@ def upload_file():
 @app.route('/upload_assignment_autograder', methods=["POST", "GET"])
 @cross_origin()
 def upload_assignment_autograder():
+    '''
+    /upload_assignment_autograder uploads an autograder to the database
+    @param file             the autograder
+    @param assignment_id    the id of an assignment
+    '''
     if "file" not in request.files:
         flash("No file part")
         return "no file\n"
