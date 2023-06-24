@@ -264,6 +264,19 @@ def create_assignment():
 
     return jsonify(newAssignment)
 
+@app.route('/delete_assignment', methods = ["DELETE", "OPTIONS"])
+@cross_origin()
+def delete_assignment():
+    if request.method == "OPTIONS":
+        return "", 200
+    if request.method == "DELETE":
+        assignment_id = request.args.get("assignment_id")
+        assignment_to_delete = db.session.get(Assignment, assignment_id)
+        db.session.delete(assignment_to_delete)
+        db.session.commit()
+
+    return jsonify("Assignment deleted successfully")
+
 @app.route('/create_enrollment', methods=["POST", "GET"])
 @cross_origin()
 def create_new_assignment():

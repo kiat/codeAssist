@@ -13,18 +13,20 @@ import {
   Row,
   Space,
 } from "antd";
-import { useCallback, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { getAssignment, updateAssignment } from "../../services/assignment";
 import moment from "moment";
 
 export default () => {
   const { assignmentId } = useParams();
   const [form] = Form.useForm();
+  const [courseId, setCourseId] = useState("");
 
   const getAssignmentInfo = useCallback(() => {
     getAssignment({ assignment_id: assignmentId }).then(res => {
-      const { name, published, due_date, autograder_points } = res.data || {};
+      const { name, published, due_date, autograder_points, course_id } = res.data || {};
+      setCourseId(course_id)
       form.setFieldsValue({
         name,
         published,
@@ -37,6 +39,22 @@ export default () => {
   useEffect(() => {
     getAssignmentInfo();
   }, [getAssignmentInfo]);
+
+  const handleDeleteAssignment = () => {
+    fetch (
+      "http://localhost:5000/delete_assignment?" + 
+        new URLSearchParams({
+          assignment_id: assignmentId,
+        }), {
+          method: "DELETE"
+        }
+    )
+  }
+
+  const navigate = useNavigate();
+  const navigateMainPage = () => {
+    navigate(`/instructorDashboard/${courseId}`)
+  }
 
   return (
     <>
@@ -178,7 +196,13 @@ export default () => {
               <Button type='primary' htmlType='submit'>
                 Save
               </Button>
-              <Button danger type='primary' icon={<DeleteOutlined />}>
+              <Button 
+              danger type='primary' 
+              icon={<DeleteOutlined />}
+              onClick = {() => {
+                handleDeleteAssignment();
+                navigateMainPage();
+              }}>
                 Delete assignment
               </Button>
             </Space>
