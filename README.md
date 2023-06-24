@@ -1,28 +1,30 @@
 # Code Assist
 
-## How to install
+README.md by [Allen Wu](mailto:allen.wu@utexas.edu)
+
+## Quickstart: Local Development
+
+### Requirements:
+
+- python ([Install](https://www.python.org/downloads/))
+- postgresql ([Install](https://www.postgresql.org/download/))
+- npm ([Install](https://nodejs.org/en/download))
+
+### Setup:
 
 1. Clone the repository
-
     ```bash
     git clone git@github.com:kiat/codeAssist.git
     ```
-
-2. Install Dependencies
-
-    - `python` ([Install](https://www.python.org/downloads/))
-    - `docker` ([Install](https://docs.docker.com/get-docker/))
-    - `postgresql` ([Install](https://www.postgresql.org/download/))
-    - `pip3 install -r ./backend/requirements.txt`
-    - `docker-compose`
-
-        ```bash
-        pip install docker-compose
-        ```
-
-3. Create database  
-   After you have successfully installed postgres, use it to create the database that you will use for this project.
-
+2. Run the following:
+    ```bash
+    pip3 install -r ./backend/requirements.txt
+    ```
+    ```bash
+    cd frontend;npm install; cd ..
+    ```
+3. Create the database  
+    After you have successfully installed postgres, use it to create the database that you will use for this project.
 4. Create a `.env` file in the backend directory and add your DB connection string
 
     ```bash
@@ -34,70 +36,27 @@
     ```bash
     DB_CONNECTION_STRING="postgresql://{username}:{password}@localhost:5432/{database}"
     ```
-
-5. Start Docker and Postgres
-
-    ```bash
-    sudo systemctl start docker
-    sudo systemctl start postgresql
-    ```
-
-    (Optional) Enable Docker and Postgres to start on boot
-
-    ```bash
-    sudo systemctl enable docker
-    sudo systemctl enable postgresql
-    ```
-
-6. Create the required tables
+5. Create the required tables
     ```bash
     python3 ./backend/init_db.py
     ```
-7. Start the backend service
-
+6. Start the backend service  
+    Within the backend folder run:
     ```bash
-    docker-compose up backend
+    python3 app.py
     ```
-
-8. Start the frontend service
-
+7. Start the frontend service  
+    In a NEW terminal  
+    cd into the frontend folder and run:
     ```bash
-    docker-compose up frontend
+    npm run start
     ```
+8. Test end to end functionality by creating a new instructor
 
-## Done!
-
-# Note: Network Problem on Linux
-https://docs.docker.com/network/bridge/ 
-
-Configure the Linux kernel to allow IP forwarding.
-   ```bash
-   sudo  sysctl net.ipv4.conf.all.forwarding=1
-   ```
-
-net.ipv4.conf.all.forwarding = 1
-
-Change the policy for the iptables FORWARD policy from DROP to ACCEPT.
-
-  ```bash
-   sudo iptables -P FORWARD ACCEPT
-   ```
-
-Your backend should now be running on `http://localhost:5000` and your frontend on `http://localhost:3000`.
-
----
-
-## Contributors
-
-- Ricky Woodruff 
-- Xirui (Emma) Peng 
-
-# Students of Spring 2023
-
-* Yinglei Fang <yingleifang@utexas.edu>
-* Nils A Collins <nils.collins@utexas.edu>
-* Jamisen Ma <jamisen.ma@gmail.com>
-
+### Important ports:
+Frontend is hosted at `localhost:3000`  
+Backend is hosted at `localhost:5000`  
+Server is hosted at `localhost:5432`
 
 ## Important Links (Development)
 
