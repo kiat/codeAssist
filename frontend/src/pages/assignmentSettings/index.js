@@ -71,7 +71,7 @@ export default () => {
             autograder_points: autograderPoints,
             assignment_id: assignmentId,
           }).then(res => {
-            message.success("操作成功！");
+            message.success("Operation successful");
             getAssignment();
           });
         }}

@@ -58,7 +58,7 @@ export default () => {
               formData.append("file", values.uploadFile.file);
               uploadAssignmentAutograder(formData)
                 .then(() => {
-                  message.success("操作成功");
+                  message.success("Operation successful");
                 })
                 .finally(() => {
                   setSaveLoading(false);
