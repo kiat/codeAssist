@@ -202,7 +202,7 @@ export default function InstructorDashboard() {
         <h3>DESCRIPTION</h3>
         <Divider style={{ marginTop: 0, marginBottom: "5px" }} />
         <div>
-          {{description} === "" ? (
+          {description === "" ? (
             <div>
             <span>Edit your course description on the </span>
             <Link to={`/courseSettings/${courseId}`}>Course Settings</Link>

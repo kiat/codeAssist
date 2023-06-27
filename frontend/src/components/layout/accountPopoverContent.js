@@ -5,9 +5,13 @@ import {
 } from "@ant-design/icons";
 import { useContext } from "react";
 import { GlobalContext } from "../../App";
+import { Link } from "react-router-dom";
 
 export default function AccountPopoverContent() {
   const { updateUserInfo } = useContext(GlobalContext);
+
+  const userId = JSON.parse(localStorage.getItem("userInfo"))?.id;
+  
   return (
     <div
       style={{
@@ -20,8 +24,10 @@ export default function AccountPopoverContent() {
       </div>
       <hr />
       <div>
-        <UserOutlined />
-        <span> Edit Account</span>
+        <Link to={`/editAccount/${userId}`}>
+          <UserOutlined />
+          <span> Edit Account</span>
+        </Link>
       </div>
       <hr />
       <div

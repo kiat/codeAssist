@@ -20,6 +20,7 @@ import ManageSubmissions from "./pages/manageSubmissions";
 import GradeSubmissions from "./pages/gradeSubmissions";
 import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
+import EditAccount from "./pages/editAccount";
 
 const { Content } = Layout;
 
@@ -142,6 +143,10 @@ function App() {
               <Route
                 path='/assignment/assignmentSettings/:assignmentId'
                 element={<AssignmentSettings />}
+              />
+              <Route
+                path = '/editAccount/:userId'
+                element={<EditAccount />} 
               />
             </Routes>
           </Content>

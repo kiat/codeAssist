@@ -19,7 +19,6 @@ import { useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../../App";
 import { getCourseAssignments } from "../../../services/course";
-import axios from "axios";
 
 export default () => {
   const { courseId } = useParams();

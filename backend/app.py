@@ -1,4 +1,5 @@
 from flask import Flask, flash, request, jsonify, redirect
+from sqlalchemy import update, or_
 from flask_cors import CORS, cross_origin
 from werkzeug.utils import secure_filename
 import docker_client
@@ -145,6 +146,30 @@ def instructor_login():
     # See: /student_login
     return jsonify(res)
 
+@app.route('/update_account', methods = ["POST"])
+@cross_origin()
+def update_account():
+    '''
+    /update_account updates account details in the database
+    Requires from the frontend a JSON containing:
+    @param id       id of user (can be either instructor or student)
+    '''
+    user_id = request.json["id"]
+    data = request.json
+    del data["id"]
+
+    student = db.session.query(Student).filter(Student.id == user_id).first()
+    instructor = db.session.query(Instructor).filter(Instructor.id == user_id).first()
+    if not student:
+        instructor_update = db.session.query(Instructor).filter_by(id = user_id).update(data)
+        db.session.commit()
+    if not instructor:
+        student_update = db.session.query(Student).filter_by(id = user_id).update(data)
+        db.session.commit()
+
+    return jsonify({"message": "Success"}), 200
+    
+
 @app.route('/create_course', methods=["POST", "GET"])
 @cross_origin()
 def create_course():
@@ -184,6 +209,11 @@ def create_course():
 @app.route('/update_course', methods = ["POST"])
 @cross_origin()
 def update_course():
+    '''
+    /update_course updates a course in the database
+    Requires from the frontend a JSON containing
+    @param id               id of the course in database
+    '''
     course_id = request.json["course_id"]
     data = request.json
     del data["course_id"]

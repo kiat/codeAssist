@@ -29,7 +29,7 @@ class Course(db.Model):
     year = db.Column(db.String, nullable = False)
     entryCode = db.Column(db.String, nullable = False)
     allowEntryCode = db.Column(db.Boolean, default = False)
-    description = db.Column(db.String, nullable = True)
+    description = db.Column(db.String, default = "")
 
 
 class Enrollment(db.Model):
