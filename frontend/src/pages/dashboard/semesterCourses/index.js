@@ -15,29 +15,36 @@ export default function SemesterCourses({
 }) {
   const { userInfo } = useContext(GlobalContext);
   // const { semester, courses } = semesterInfo;
-  const matches = /(\d{4})(\d)/.exec(yearInfo);
+  // const matches = /(\d{4})(\d)/.exec(yearInfo);
+  const matches = yearInfo ? yearInfo : null;
   let year,
     semester = undefined;
-  if (matches) {
-    year = matches[1];
-    // let semester = undefined;
-    switch (matches[2]) {
-      case "1":
-        semester = "Spring";
-        break;
-      case "2":
-        semester = "Summer";
-        break;
-      case "3":
-        semester = "Fall";
-        break;
-      case "4":
-        semester = "Winetr";
-        break;
-      default:
-        break;
+  if (typeof(matches) === "string") {
+    if (matches.length > 5) {
+      year = matches.substring(0, 4);
+      semester = matches.substring(4);
     }
   }
+  // if (matches) {
+  //   year = matches[1];
+  //   // let semester = undefined;
+  //   switch (matches[2]) {
+  //     case "1":
+  //       semester = "Spring";
+  //       break;
+  //     case "2":
+  //       semester = "Summer";
+  //       break;
+  //     case "3":
+  //       semester = "Fall";
+  //       break;
+  //     case "4":
+  //       semester = "Winetr";
+  //       break;
+  //     default:
+  //       break;
+  //   }
+  // }
   // const semester = matches[2] === 1 ? 'Spring' : ();
   return (
     <div
