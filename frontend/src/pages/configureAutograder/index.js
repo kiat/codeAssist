@@ -55,7 +55,7 @@ export default () => {
               setSaveLoading(true);
               const formData = new FormData();
               formData.append("assignment_id", assignmentId);
-              formData.append("file", values.uploadFile.file);
+              formData.append("file", values.uploadFile?.file);
               uploadAssignmentAutograder(formData)
                 .then(() => {
                   message.success("Operation successful");

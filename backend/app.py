@@ -501,32 +501,35 @@ def upload_assignment_autograder():
     '''
     if "file" not in request.files:
         flash("No file part")
-        return "no file\n"
+        return "no file", 400
     file = request.files["file"]
     assignment_id = request.form["assignment_id"]
 
     if file.filename == "":
         flash("No selected file")
-        return "no selected file"
+        return "no selected file", 400
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
 
+        # File stored in the filepath given by assignment_dir (currently usr/app/assignments), 
+        # file saved locally in backend/assignments as well
         docker_client.saveFile(file, filename, docker_client.assignment_dir, False)
 
+        file.seek(0)
         assignment_data = {
-            'autograder_file': file.read(),
+            'autograder_file': None, #file.read(),
         }
 
-        file.seek(0)
-
-        assignment = db.session.query(Assignment).filter_by(id=assignment_id).update(assignment_data)
+        db.session.query(Assignment).filter_by(id=assignment_id).update(assignment_data)
+        assignment = db.session.query(Assignment).filter_by(id=assignment_id)
         db.session.commit()
 
         assignment = AssignmentSchema().dump(assignment, many=True)[0]
 
         return jsonify(assignment)
     else:
-        return "something went wrong", 400
+        flash("Something went wrong")
+        return "something went wrong (probably bad file)", 400
 
  
 if __name__ == '__main__':
