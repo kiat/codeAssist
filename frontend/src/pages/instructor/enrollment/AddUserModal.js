@@ -15,49 +15,21 @@ export default ({ open, toggleAddModalOpen, onFinish }) => {
   return (
     <Modal
       open={open}
-      title='Add a User'
+      title="Add a User"
       footer={null}
       onCancel={toggleAddModalOpen}
     >
-      <Form layout='vertical' onFinish={onFinish}>
-        <Form.Item label='STUDENT ID' name='studentId'>
+      <Form layout="vertical" onFinish={onFinish}>
+        <Form.Item label="EID" name="studentId">
           <Input />
         </Form.Item>
-        <Form.Item noStyle>
-          <Row gutter={20}>
-            <Col span={12}>
-              <Form.Item label='FIRST NAME' name='firstName'>
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              {" "}
-              <Form.Item label='LAST NAME' name='lastName'>
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form.Item>
-        <Form.Item label='EMAIL ADDRESS' name='emailAddress'>
-          <Input />
-        </Form.Item>
-
-        <Form.Item label='SECTIONS' name='sections'>
-          <Select
-            options={[
-              { label: "c-test123456", value: "1" },
-              { label: "c-test123457", value: "2" },
-              { label: "c-test123458", value: "3" },
-            ]}
-          />
-        </Form.Item>
-        <Form.Item label='ROLE' name='role'>
+        <Form.Item label="ROLE" name="role">
           <Radio.Group options={["Student", "Instructor", "TA"]} />
         </Form.Item>
         <Form.Item
-          label='EMAIL NOTIFICATION'
-          name='emailNotification'
-          valuePropName='checked'
+          label="EMAIL NOTIFICATION"
+          name="emailNotification"
+          valuePropName="checked"
         >
           <Checkbox>
             Let this user know that they were added to the course
@@ -65,10 +37,10 @@ export default ({ open, toggleAddModalOpen, onFinish }) => {
         </Form.Item>
         <Form.Item>
           <Space>
-            <Button type='primary' htmlType='submit'>
+            <Button type="primary" htmlType="submit">
               Submit
             </Button>
-            <Button type='primary' danger onClick={toggleAddModalOpen}>
+            <Button type="primary" danger onClick={toggleAddModalOpen}>
               Cancel
             </Button>
           </Space>

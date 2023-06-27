@@ -27,10 +27,10 @@ create table courses (
 
 /* Create Enrollments table */
 create table enrollments (
-    student_id uuid not null,
+    student_id varchar(50) not null UNIQUE,
     course_id uuid not null,
     primary key (student_id, course_id),
-    foreign key (student_id) references students (id),
+    foreign key (student_id) references students (sis_user_id),
     foreign key (course_id) references courses (id)
 );
 

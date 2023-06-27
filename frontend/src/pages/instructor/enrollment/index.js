@@ -11,7 +11,7 @@ import {
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
-import { useCallback, useState,useContext } from "react";
+import { useCallback, useState, useContext } from "react";
 import {
   createEnrollment,
   createEnrollmentBulk,
@@ -22,8 +22,8 @@ import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
 import { GlobalContext } from "../../../App";
 const columns = [
-  { title: "FIRST & LAST NAME", dataIndex: "name" },
-  { title: "EMAIL", dataIndex: "email" },
+  { title: "NAME", dataIndex: "name" },
+  { title: "EMAIL", dataIndex: "email_address" },
   // { title: "ROLE", dataIndex: "role" },
   // { title: "SECTIONS", dataIndex: "sections" },
   // { title: "SUBMISSIONS", dataIndex: "submissions" },
@@ -40,28 +40,28 @@ export default () => {
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
   const [enrollment, setEnrollment] = useState([]);
   const urlParams = useParams();
-  const {courseInfo,updateCourseInfo } = useContext(GlobalContext);
-  const { courseId } =urlParams;
+  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+  const { courseId } = urlParams;
 
   const toggleAddModalOpen = useCallback(() => {
-    setAddModalOpen(t => !t);
+    setAddModalOpen((t) => !t);
   }, []);
 
   const toggleAddMoreUsersModalOpen = useCallback(() => {
-    setAddMoreUsersModalOpen(t => !t);
+    setAddMoreUsersModalOpen((t) => !t);
   }, []);
 
   const getEnrollment = useCallback(() => {
-    getCourseEnrollment({ course_id: courseId }).then(res => {
+    getCourseEnrollment({ course_id: courseId }).then((res) => {
       setEnrollment(res.data);
     });
   }, [courseId]);
 
   const finishForm = useCallback(
-    values => {
+    (values) => {
       const { studentId } = values;
       createEnrollment({ student_id: studentId, course_id: courseId }).then(
-        res => {
+        (res) => {
           toggleAddModalOpen();
           getEnrollment();
         }
@@ -71,7 +71,7 @@ export default () => {
   );
 
   const finishMoreUsers = useCallback(
-    values => {
+    (values) => {
       createEnrollmentBulk({
         course_id: courseId,
         student_ids: values,
@@ -90,14 +90,14 @@ export default () => {
   return (
     <>
       <PageHeader
-        title='Course Roster'
+        title="Course Roster"
         style={{ borderBottom: "1px solid #f0f0f0" }}
       />
       <Card bordered={false}>
-        <Form layout='inline' style={{ marginBottom: "20px" }}>
-          <Form.Item name='role'>
+        <Form layout="inline" style={{ marginBottom: "20px" }}>
+          <Form.Item name="role">
             <Select
-              placeholder='view by role'
+              placeholder="view by role"
               style={{ width: "180px" }}
               options={[
                 { label: "All", value: "0" },
@@ -108,17 +108,17 @@ export default () => {
               ]}
             />
           </Form.Item>
-          <Form.Item name='section'>
-            <Input placeholder='view by section' />
+          <Form.Item name="section">
+            <Input placeholder="view by section" />
           </Form.Item>
-          <Form.Item name='username'>
-            <Input placeholder='view by name' />
+          <Form.Item name="username">
+            <Input placeholder="view by name" />
           </Form.Item>
           <Form.Item>
-            <Button type='primary'>search</Button>
+            <Button type="primary">search</Button>
           </Form.Item>
         </Form>
-        <Table columns={columns} dataSource={enrollment} rowKey='id' />
+        <Table columns={columns} dataSource={enrollment} rowKey="id" />
       </Card>
       <div
         style={{
@@ -132,7 +132,7 @@ export default () => {
           marginLeft: "-1px",
         }}
       >
-        <Space size='large'>
+        <Space size="large">
           <Typography.Title level={5}>50 students</Typography.Title>
           <Typography.Title level={5}>2 instructors</Typography.Title>
           <Typography.Title level={5}>2 TAs</Typography.Title>

@@ -294,8 +294,8 @@ def delete_assignment():
 
 @app.route('/create_enrollment', methods=["POST", "GET"])
 @cross_origin()
-def create_new_assignment():
-    # TODO this method name does not match the extension
+def create_enrollment():
+    
     '''
     /create_enrollment enrolls a student in a course
     Requires from the frontend a JSON containing:
@@ -320,8 +320,8 @@ def create_new_assignment():
 
 @app.route('/create_enrollment_bulk', methods=["POST", "GET"])
 @cross_origin()
-def create_bulk_enrollments():
-    # TODO this method name does not match the extension
+def create_enrollment_bulk():
+    
     '''
     /create_enrollment_bulk mass enrolls students in a course
     Requires from the frontend a JSON containing:
@@ -389,7 +389,7 @@ def get_course_enrollment():
 
     list_of_students = [x["student_id"] for x in students]
 
-    students = db.session.query(Student.name, Student.email_address).filter(Student.id.in_(list_of_students))
+    students = db.session.query(Student.name, Student.email_address).filter(Student.sis_user_id.in_(list_of_students))
     students = StudentSchema().dump(students, many=True)
 
     return jsonify(students)

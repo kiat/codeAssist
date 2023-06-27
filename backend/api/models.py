@@ -9,7 +9,7 @@ class Student(db.Model):
     password = db.Column(db.String, nullable=False)
     name = db.Column(db.String, nullable=False)
     email_address = db.Column(db.String, nullable=False)
-    sis_user_id = db.Column(db.String, nullable=False)
+    sis_user_id = db.Column(db.String, nullable=False, unique = True)
 
 class Instructor(db.Model):
     __tablename__ = "instructors"
@@ -34,8 +34,9 @@ class Course(db.Model):
 
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
-    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), primary_key=True, nullable=False)
-    course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key=True, nullable=False)
+    student_id = db.Column(db.String, db.ForeignKey("students.sis_user_id"), primary_key = True, nullable=False)
+    #student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), primary_key=True, nullable=False)
+    course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key = True,  nullable=False)
 
 
 class Assignment(db.Model):
