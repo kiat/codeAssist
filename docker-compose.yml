@@ -25,6 +25,7 @@ services:
         environment:
             FLASK_APP: app.py
             FLASK_DEBUG: 1
+            PYTHONUNBUFFERED: 1
         ports:
             - "5000:5000"
         volumes:
