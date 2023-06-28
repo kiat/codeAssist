@@ -20,7 +20,7 @@ export default ({ open, toggleAddModalOpen, onFinish }) => {
       onCancel={toggleAddModalOpen}
     >
       <Form layout="vertical" onFinish={onFinish}>
-        <Form.Item label="EID" name="studentId">
+        <Form.Item label="EMAIL" name="email">
           <Input />
         </Form.Item>
         <Form.Item label="ROLE" name="role">

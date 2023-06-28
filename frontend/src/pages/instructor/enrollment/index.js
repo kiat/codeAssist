@@ -59,13 +59,24 @@ export default () => {
 
   const finishForm = useCallback(
     (values) => {
-      const { studentId } = values;
-      createEnrollment({ student_id: studentId, course_id: courseId }).then(
-        (res) => {
-          toggleAddModalOpen();
-          getEnrollment();
-        }
-      );
+      const { email } = values;
+
+      fetch(
+        "http://localhost:5000/get_student?" +
+          new URLSearchParams({
+            email: email,
+          })
+      )
+        .then((res) => res.json())
+        .then((student) =>
+          createEnrollment({
+            student_id: student.id,
+            course_id: courseId,
+          }).then((res) => {
+            toggleAddModalOpen();
+            getEnrollment();
+          })
+        );
     },
     [courseId, getEnrollment, toggleAddModalOpen]
   );

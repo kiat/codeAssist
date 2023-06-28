@@ -78,13 +78,13 @@ def student_login():
     '''
     /student_login logs in a student that exists in the database
     Requires from the frontend a JSON containing:
-    @param eid          eid of the student
+    @param email          email of the student
     @param password     password for the student
     '''
-    eid = request.json['eid']
+    email = request.json['email']
     password = request.json['password']
 
-    res = db.session.query(Student).filter_by(sis_user_id=eid, password=password)
+    res = db.session.query(Student).filter_by(email_address=email, password=password)
     res = StudentSchema().dump(res, many=True)
 
     if len(res) == 0:
@@ -133,13 +133,13 @@ def instructor_login():
     /instructor_login logs in an instructor that exists in
     the database
     Requires from the frontend a JSON containing:
-    @param eid          eid of the instructor
+    @param email          email of the instructor
     @param password     password for the instructor
     '''
-    eid = request.json['eid']
+    email = request.json['email']
     password = request.json['password']
 
-    res = db.session.query(Instructor).filter_by(sis_user_id=eid, password=password)
+    res = db.session.query(Instructor).filter_by(email_address=email, password=password)
     res = InstructorSchema().dump(res, many=True)[0]
 
     # TODO: What if an instructor does not exist in the database?
@@ -322,6 +322,21 @@ def delete_assignment():
 
     return jsonify("Assignment deleted successfully")
 
+@app.route('/get_student', methods=["GET"])
+@cross_origin()
+def get_student():
+    '''
+    /get_student gets the student from the database
+    Requires from the frontend a JSON containing:
+    @param email    the student email
+    '''
+    email = request.args.get("email")
+
+    student = db.session.query(Student).filter_by(email_address=email)
+    student = StudentSchema().dump(student, many=True)[0]
+
+    return jsonify(student)
+
 @app.route('/create_enrollment', methods=["POST", "GET"])
 @cross_origin()
 def create_enrollment():
@@ -419,7 +434,7 @@ def get_course_enrollment():
 
     list_of_students = [x["student_id"] for x in students]
 
-    students = db.session.query(Student.name, Student.email_address).filter(Student.sis_user_id.in_(list_of_students))
+    students = db.session.query(Student.name, Student.email_address).filter(Student.id.in_(list_of_students))
     students = StudentSchema().dump(students, many=True)
 
     return jsonify(students)

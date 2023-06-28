@@ -34,8 +34,7 @@ class Course(db.Model):
 
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
-    student_id = db.Column(db.String, db.ForeignKey("students.sis_user_id"), primary_key = True, nullable=False)
-    #student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), primary_key=True, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key = True,  nullable=False)
 
 

@@ -71,8 +71,8 @@ export default function LogInModal({ open, onCancel, logIn }) {
             </Radio.Button>
           </Radio.Group>
         </Form.Item>
-        <Form.Item label="EID" name="eid">
-          <Input placeholder="Your EID" />
+        <Form.Item label="Email" name="email">
+          <Input placeholder="Your Email" />
         </Form.Item>
         <Form.Item label="Password" name="password">
           <Input.Password placeholder="Your Password" />
