@@ -75,6 +75,7 @@ export default function InstructorDashboard() {
   const user_id = useContext(GlobalContext).userInfo.id;
   const [description, setDescription] = useState("");
 
+  
 
   //   async function get(url, params){
   //     let response = await fetch(url + '?' + new URLSearchParams(params))
@@ -155,9 +156,9 @@ export default function InstructorDashboard() {
     }
     if (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode) {
       fetch(
-        "http://localhost:5000/get_instructor_courses?" +
+        "http://localhost:5000/get_course_info?" +
           new URLSearchParams({
-            instructor_id: user_id,
+            course_id: courseId,
           })
       )
         .then((res) => res.json())
@@ -165,7 +166,6 @@ export default function InstructorDashboard() {
           data.forEach((element) => {
             if (element.id === courseId) {
               updateCourseInfo({
-                id: courseId,
                 name: element.name,
                 year: element.year,
                 semester: element.semester,

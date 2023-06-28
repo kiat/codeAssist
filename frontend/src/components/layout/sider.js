@@ -18,6 +18,8 @@ import { useNavigate } from "react-router-dom";
 import AccountPopoverContent from "./accountPopoverContent";
 import GradeSider from "./GradeSider";
 import styles from "./styles.module.css";
+import { useContext, useEffect } from "react";
+import { GlobalContext } from "../../App";
 
 export default function RootSider({
   pathname,
@@ -27,6 +29,36 @@ export default function RootSider({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const { updateCourseInfo } = useContext(GlobalContext);
+  const [description, setDescription] = useState([""])
+
+  const courseId = courseInfo.id
+
+  useEffect(() => {
+    if (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode) {
+      fetch(
+        "http://localhost:5000/get_course_info?" +
+          new URLSearchParams({
+            course_id: courseId,
+          })
+      )
+        .then((res) => res.json())
+        .then((data) =>
+          data.forEach((element) => {
+            if (element.id === courseId) {
+              updateCourseInfo({
+                name: element.name,
+                year: element.year,
+                semester: element.semester,
+                entryCode: element.entryCode
+              });
+              setDescription(element.description)
+            }
+          })
+        );
+    }
+  }, [courseInfo.id, courseInfo.name, courseInfo.semester, updateCourseInfo]);
+  
 
   const toggleCollapsed = () => {
     setCollapsed(!collapsed);

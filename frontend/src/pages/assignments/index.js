@@ -73,8 +73,8 @@ export default function Assignments() {
   return (
     <>
       <PageHeader
-        title={courseInfo.code}
-        subTitle={courseInfo.semester}
+        title={courseInfo.name}
+        subTitle={`${courseInfo.semester} ${courseInfo.year}`}
         style={{ borderBottom: "1px solid #f0f0f0" }}
       >
         <Descriptions>

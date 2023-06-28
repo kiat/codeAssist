@@ -455,6 +455,16 @@ def get_instructor_courses():
    
     return jsonify(courses)
 
+@app.route('/get_course_info', methods=["GET"])
+@cross_origin()
+def get_course_info():
+    course_id = request.args.get("course_id")
+    course = db.session.query(Course).filter_by(id=course_id)
+    course = CourseSchema().dump(course, many=True)
+    
+    return jsonify(course)
+
+
 @app.route('/get_submissions', methods=["GET"])
 @cross_origin()
 def get_submission():
