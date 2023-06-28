@@ -87,7 +87,7 @@ export default function Dashboard() {
     },
     [getCourses, toggleModalOpen, userInfo?.id]
   );
-
+  
   // find if the user is an instructor or a student
   return (
     <>
@@ -112,7 +112,9 @@ export default function Dashboard() {
               key={item}
               yearInfo={item}
               semesterInfo={courses[item]}
-              isFirst={index === 0 ? true : false}
+              /*isFirst={index === 0 ? true : false}*/
+              courseGroup={index}
+              numCourses={Object.keys(courses).length - 1}
               toggleRelationModalOpen={toggleModalOpen}
             />
           ))}

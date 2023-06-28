@@ -10,8 +10,10 @@ import Course from "./course";
 export default function SemesterCourses({
   semesterInfo,
   toggleRelationModalOpen,
-  isFirst,
+  //isFirst,
   yearInfo,
+  courseGroup,
+  numCourses
 }) {
   const { userInfo } = useContext(GlobalContext);
   // const { semester, courses } = semesterInfo;
@@ -64,7 +66,7 @@ export default function SemesterCourses({
         {semesterInfo?.map(item => (
           <Course key={item.name} courseInfo={item} />
         ))}
-        {isFirst && !userInfo?.isStudent ? (
+        {(numCourses === 0) || (numCourses > 0 && courseGroup === 1) ? (
           <div
             style={{
               border: "1px dashed green",
