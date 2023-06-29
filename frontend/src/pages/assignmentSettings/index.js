@@ -26,6 +26,7 @@ export default () => {
   const getAssignmentInfo = useCallback(() => {
     getAssignment({ assignment_id: assignmentId }).then(res => {
       const { name, published, due_date, autograder_points, course_id } = res.data || {};
+      console.log(course_id)
       setCourseId(course_id)
       form.setFieldsValue({
         name,
@@ -50,6 +51,29 @@ export default () => {
         }
     )
   }
+  const finishForm = () => {
+    const values = form.getFieldsValue();
+    const newAssignmentData = {
+      assignment_id: assignmentId,
+      name: values.name, 
+      course_id: courseId, 
+      due_date: values.dueDate._d, 
+      autograder_points: values.autograderPoints, 
+      anonymous_grading: values.submissionAnonymization,
+      manual_grading: values.manualGrading,
+      late_submission: values.allowLateSubmissions,
+      late_due_date: values.lateDueDate,
+      enable_group: values.groupSubmission,
+      group_size: values.limitGroupSize,
+      leaderboard: values.leaderBoard
+    };
+    const validData = Object.fromEntries(
+      Object.entries(newAssignmentData).filter(([_, value]) => value !== undefined)
+    );
+    updateAssignment(validData).then(res =>{
+      message.success("Successfully updated assignment");
+    })
+  } 
 
   const navigate = useNavigate();
   const navigateMainPage = () => {
@@ -62,18 +86,9 @@ export default () => {
       <Form
         layout='vertical'
         form={form}
-        onFinish={values => {
-          const { name, published, dueDate, autograderPoints } = values;
-          updateAssignment({
-            name,
-            published,
-            due_date: dueDate.format("YYYY-MM-DD"),
-            autograder_points: autograderPoints,
-            assignment_id: assignmentId,
-          }).then(res => {
-            message.success("Operation successful");
-            getAssignment();
-          });
+        onFinish={() => {
+          finishForm();
+          navigateMainPage();
         }}
       >
         <Card bordered={false} title='Basic Settings'>
@@ -108,7 +123,7 @@ export default () => {
           <Form.Item>
             <Row gutter={20}>
               <Col>
-                <Form.Item label='RELEASE DATE (CST)'>
+                <Form.Item label='RELEASE DATE (CST)' name='releaseDate'>
                   <DatePicker />
                 </Form.Item>
                 <Form.Item>
@@ -119,7 +134,7 @@ export default () => {
                 <Form.Item label='DUE DATE (CST)' name='dueDate'>
                   <DatePicker />
                 </Form.Item>
-                <Form.Item label='LATE DUE DATE (CST)'>
+                <Form.Item label='LATE DUE DATE (CST)' name='lateDueDate'>
                   <DatePicker />
                 </Form.Item>
               </Col>
@@ -137,7 +152,7 @@ export default () => {
           <Form.Item label='LEADERBOARD'>
             <Checkbox>Enable Leaderboard</Checkbox>
           </Form.Item>
-          <Form.Item label='DEFAULT NUMBER OF ENTRIES SHOWN'>
+          <Form.Item label='DEFAULT NUMBER OF ENTRIES SHOWN' name="leaderBoard">
             <Input placeholder='No Max' />
           </Form.Item>
           <Form.Item label='SUBMISSION METHODS ENABLED'>

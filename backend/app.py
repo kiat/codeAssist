@@ -287,21 +287,13 @@ def create_assignment():
     '''
     /create_assignment creates an assignment and generates an assignment
     id in the database
-    Requires from the frontend a JSON containing:
-    @param name             the name of the assignment
-    @parma course_id        the course_id of the assignment
     '''
+    assignment_data = request.json
     assignment_id = str(uuid.uuid4())
-    name = request.json['name']
-    course_id = request.json['course_id']
+    assignment_data["id"] = assignment_id
+    valid_assignment_data = {k: v for k,v in assignment_data.items() if v is not None}
 
-    assignment_data = {
-        "id": assignment_id,
-        "name": name,
-        "course_id": course_id,
-    }
-
-    db.session.add(Assignment(**assignment_data))
+    db.session.add(Assignment(**valid_assignment_data))
     db.session.commit()
 
     newAssignment = db.session.query(Assignment).filter_by(id=assignment_id)

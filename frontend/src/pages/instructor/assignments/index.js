@@ -30,9 +30,27 @@ export default function InstructorAssignments() {
 
   const finishForm = () => {
     const values = form.getFieldsValue();
-    createAssignment({ name: values.name, course_id: courseId }).then(res => {
+    const assignmentData = {
+      name: values.name, 
+      course_id: courseId, 
+      due_date: values.dueDate._d, 
+      autograder_points: values.autograderPoints, 
+      anonymous_grading: values.submissionAnonymization,
+      manual_grading: values.manualGrading,
+      late_submission: values.allowLateSubmissions,
+      late_due_date: values.lateDueDate,
+      enable_group: values.groupSubmission,
+      group_size: values.limitGroupSize,
+      leaderboard: values.leaderBoard
+    };
+    const validData = Object.fromEntries(
+      Object.entries(assignmentData).filter(([_, value]) => value !== undefined)
+    );
+    createAssignment(validData).then(res => {
       toggleIsCreate();
     });
+   
+  
   };
 
   return (

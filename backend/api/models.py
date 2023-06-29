@@ -44,9 +44,18 @@ class Assignment(db.Model):
     name = db.Column(db.String, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), nullable=False)
     due_date = db.Column(DATE, nullable=True)
+    anonymous_grading = db.Column(db.Boolean, default=False)
+    enable_group = db.Column(db.Boolean, default=False)
+    group_size = db.Column(db.Integer, nullable=True)
+    leaderboard = db.Column(db.Integer, nullable=True)
+    late_submission = db.Column(db.Boolean, default=False)
+    late_due_date = db.Column(DATE, nullable=True)
+    manual_grading = db.Column(db.Boolean, default=False)
     autograder_points = db.Column(db.Float, nullable=True)
     published = db.Column(db.Boolean, default=False)
     autograder_file = db.Column(LargeBinary, nullable=True)
+    
+
 
 class Submission(db.Model):
     __tablename__ = "submissions"
