@@ -1,6 +1,7 @@
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import Course from "./course";
+import { ConsoleSqlOutlined } from "@ant-design/icons";
 
 /**
  * semester course modal

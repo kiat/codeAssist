@@ -9,6 +9,7 @@ import RelationForm from "./relationForm";
 import AddForm from "./addForm";
 import {
   createCourse,
+  enrollCourse,
   getInstructorCourses,
   getStudentCourses,
 } from "../../services/dashboard";
@@ -70,11 +71,18 @@ export default function Dashboard() {
     values => {
       const { courseName, semester, year, entryCode } = values;
       console.log("values", values);
-      // createCourse({ id: userInfo.id, courseName, ...restValues }).then(res => {
-      createCourse({ name: courseName, instructor_id: userInfo.id, semester: semester, year: year, entryCode: entryCode}).then(res => {
-        getCourses();
-        toggleModalOpen();
-      });
+      if (userInfo?.isStudent && Object.keys(values).length === 1) {
+        enrollCourse({student_id: userInfo.id, entryCode: entryCode}).then(res => {
+          getCourses();
+          toggleModalOpen();
+        });
+      } else {
+        // createCourse({ id: userInfo.id, courseName, ...restValues }).then(res => {
+        createCourse({ name: courseName, instructor_id: userInfo.id, semester: semester, year: year, entryCode: entryCode}).then(res => {
+          getCourses();
+          toggleModalOpen();
+        });
+      }
       // axios
       //   .post("/api/addCourse", {
       //     isStudent: userInfo?.isStudent,
@@ -87,7 +95,7 @@ export default function Dashboard() {
     },
     [getCourses, toggleModalOpen, userInfo?.id]
   );
-  
+
   // find if the user is an instructor or a student
   return (
     <>
@@ -97,6 +105,24 @@ export default function Dashboard() {
           marginLeft: "25px",
         }}
       >
+      {userInfo?.isStudent && Object.keys(courses).length === 1 ? (
+        <div
+          style={{
+            border: "1px dashed green",
+            width: "230px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            color: "green",
+            fontSize: "bold",
+            cursor: "pointer",
+            height: "125px",
+          }}
+          onClick={toggleModalOpen}
+        >
+          + Add a course
+        </div>
+      ) : null}
         {/* {courses?.map((item, index) => (
           <SemesterCourses
             key={item.semester}

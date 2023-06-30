@@ -22,6 +22,7 @@ UPLOAD_FOLDER = '/usr/app/files'
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+
 @app.route('/', methods=["GET", "POST"])
 @cross_origin()
 def hello_world():
@@ -205,6 +206,31 @@ def create_course():
     newCourse = CourseSchema().dump(newCourse, many=True)[0]
 
     return jsonify(newCourse)
+
+@app.route('/enroll_course', methods=["POST", "GET"])
+@cross_origin()
+def enroll_course():
+    '''
+    /enroll_course enrolls a student in a course using entryCode
+    Requires from the frontend a JSON containing:
+    @param entryCode        entryCode of the course
+    @param student_id       id of the student
+    '''
+    student_id = request.json['student_id']
+    entryCode = request.json['entryCode']
+    enrolledCourse = db.session.query(Course).filter_by(entryCode=entryCode)
+    enrolled_list = [enroll.id for enroll in enrolledCourse]
+
+    enrollment_data = {
+        "student_id": student_id,
+        "course_id": enrolled_list[0],
+    }
+    db.session.add(Enrollment(**enrollment_data))
+    db.session.commit()
+
+    enrolledCourse = CourseSchema().dump(enrolledCourse, many=True)[0]
+
+    return jsonify(enrolledCourse)
 
 @app.route('/update_course', methods = ["POST"])
 @cross_origin()
