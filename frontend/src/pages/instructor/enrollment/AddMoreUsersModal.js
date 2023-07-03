@@ -1,20 +1,25 @@
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Form, Input, Modal } from "antd";
 
-export default function AddMoreUsersModal({ finishMoreUsers, open }) {
+export default function AddMoreUsersModal({
+  toggleAddMoreUsersModalOpen,
+  finishMoreUsers,
+  open,
+}) {
   const [form] = Form.useForm();
   return (
     <Modal
-      title='Add more Users'
+      title="Add more Users"
       open={open}
       onOk={() => {
         const values = form.getFieldsValue();
         // console.log("values", values);
-        finishMoreUsers(values.studentIds);
+        finishMoreUsers(values.Email);
       }}
+      onCancel={toggleAddMoreUsersModalOpen}
     >
       <Form form={form}>
-        <Form.List name='studentIds' initialValue={[""]}>
+        <Form.List name="Email" initialValue={[""]}>
           {(fields, { add, remove }) => (
             <>
               {/* <Form.Item>
@@ -40,7 +45,7 @@ export default function AddMoreUsersModal({ finishMoreUsers, open }) {
                         name={field.name}
                         key={field.key}
                       >
-                        <Input placeholder='student_id' />
+                        <Input placeholder="Your Email" />
                       </Form.Item>
                       {index === 0 ? (
                         <Button icon={<PlusOutlined />} onClick={() => add()} />

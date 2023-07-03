@@ -83,13 +83,34 @@ export default () => {
 
   const finishMoreUsers = useCallback(
     (values) => {
-      createEnrollmentBulk({
-        course_id: courseId,
-        student_ids: values,
-      }).then(() => {
-        toggleAddMoreUsersModalOpen();
-        getEnrollment();
-      });
+      console.log(values);
+      values.forEach(enrollmentBulk);
+
+      function enrollmentBulk(item) {
+        fetch(
+          "http://localhost:5000/get_student?" +
+            new URLSearchParams({
+              email: item,
+            })
+        )
+          .then((res) => res.json())
+          .then((student) =>
+            createEnrollment({
+              student_id: student.id,
+              course_id: courseId,
+            }).then((res) => {
+              toggleAddMoreUsersModalOpen();
+              getEnrollment();
+            })
+          );
+      }
+      // createEnrollmentBulk({
+      //   course_id: courseId,
+      //   student_ids: values,
+      // }).then(() => {
+      //   toggleAddMoreUsersModalOpen();
+      //   getEnrollment();
+      // });
     },
     [courseId, getEnrollment, toggleAddMoreUsersModalOpen]
   );
@@ -174,6 +195,7 @@ export default () => {
         onFinish={finishForm}
       />
       <AddMoreUsersModal
+        toggleAddMoreUsersModalOpen={toggleAddMoreUsersModalOpen}
         open={addMoreUsersModalOpen}
         finishMoreUsers={finishMoreUsers}
       />
