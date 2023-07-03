@@ -12,33 +12,47 @@ import styles from "./styles.module.css";
 
 export default () => {
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
-
+  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const [assignmentInfoCurrent, setAssignmentInfoCurrent] = useState();
 
   const pathname = window.location.pathname;
-
+  const res = /\/assignment\/\w+\/([A-Za-z0-9\-]+)/.exec(pathname);
+  const assignmentId = res ? res[1] : null;
   useEffect(() => {
-
-    //uses regex, matches /assignment/(alphanumeric)/(decimal)/
-    const res = /\/assignment\/\w+\/([A-Za-z0-9\-]+)/.exec(pathname);
-
-    if (res && res[1]) {
-      updateAssignmentInfo({
-        id: res[1],
-        name: "Training-Test-2-Question-1 - Gift Card",
-      });
-    }
     setAssignmentInfoCurrent({
-      courseName: "C S N313E",
-      courseId: 21,
-      assignmentName: "Training-Test-2-Question-1 - Gift Card",
+      courseName: courseInfo.name,
+      courseId: courseInfo.id,
     });
   }, [pathname, updateAssignmentInfo]);
+
+  useEffect(() => {
+    if (!assignmentInfo.id) {
+      updateAssignmentInfo((prevAssignmentInfo) => ({
+        ...prevAssignmentInfo,
+        id: assignmentId
+      }));
+    }
+    fetch("http://localhost:5000/get_course_assignments?" +
+    new URLSearchParams({
+      course_id: courseInfo.id,
+    })
+    )
+    .then((res) => res.json())
+        .then((data) =>
+          data.forEach((element) => {
+            if (element.id === assignmentId) {
+              updateAssignmentInfo({
+                id: element.id,
+                name: element.name,
+              });
+            }
+          })
+        );
+    }, [assignmentInfo.id, assignmentInfo.name, updateAssignmentInfo])
 
   return (
     <>
       <Card
-        // title='Assignment-11'
         title={
           <>
             <Link
@@ -53,7 +67,7 @@ export default () => {
               style={{ fontWeight: "bold" }}
               ellipsis={true}
             >
-              {assignmentInfoCurrent?.assignmentName}
+              {assignmentInfo?.name}
             </Typography.Title>
           </>
         }
