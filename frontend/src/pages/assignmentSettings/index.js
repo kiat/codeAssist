@@ -26,7 +26,6 @@ export default () => {
   const getAssignmentInfo = useCallback(() => {
     getAssignment({ assignment_id: assignmentId }).then(res => {
       const { name, published, due_date, autograder_points, course_id } = res.data || {};
-      console.log(course_id)
       setCourseId(course_id)
       form.setFieldsValue({
         name,
@@ -51,8 +50,20 @@ export default () => {
         }
     )
   }
+
+  const currentDate = () => {
+    const current = new Date();
+    const formatDate = current.toISOString().slice(0,10);
+    return formatDate
+  }
+  
   const finishForm = () => {
     const values = form.getFieldsValue();
+    let publishedDate = undefined;
+    if (values.published === true) {
+      publishedDate = currentDate();
+    }
+
     const newAssignmentData = {
       assignment_id: assignmentId,
       name: values.name, 
@@ -65,7 +76,9 @@ export default () => {
       late_due_date: values.lateDueDate,
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
-      leaderboard: values.leaderBoard
+      leaderboard: values.leaderBoard,
+      published: values.published,
+      published_date: publishedDate
     };
     const validData = Object.fromEntries(
       Object.entries(newAssignmentData).filter(([_, value]) => value !== undefined)

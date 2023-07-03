@@ -28,6 +28,8 @@ export default function InstructorAssignments() {
     setIsCreate(t => !t);
   }, []);
 
+  
+
   const finishForm = () => {
     const values = form.getFieldsValue();
     const assignmentData = {
@@ -41,7 +43,7 @@ export default function InstructorAssignments() {
       late_due_date: values.lateDueDate,
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
-      leaderboard: values.leaderBoard
+      leaderboard: values.leaderBoard,
     };
     const validData = Object.fromEntries(
       Object.entries(assignmentData).filter(([_, value]) => value !== undefined)

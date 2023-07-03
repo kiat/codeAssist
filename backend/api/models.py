@@ -53,6 +53,7 @@ class Assignment(db.Model):
     manual_grading = db.Column(db.Boolean, default=False)
     autograder_points = db.Column(db.Float, nullable=True)
     published = db.Column(db.Boolean, default=False)
+    published_date = db.Column (DATE, nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
     
 

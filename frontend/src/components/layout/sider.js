@@ -13,7 +13,7 @@ import {
 } from "@ant-design/icons";
 import { Card, Layout, Popover, Space, Typography } from "antd";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import AccountPopoverContent from "./accountPopoverContent";
 import GradeSider from "./GradeSider";
@@ -34,8 +34,9 @@ export default function RootSider({
 
   const courseId = courseInfo.id
 
+
   useEffect(() => {
-    if (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode) {
+    if (courseInfo.id && (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode)) {
       fetch(
         "http://localhost:5000/get_course_info?" +
           new URLSearchParams({
