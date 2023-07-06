@@ -63,7 +63,7 @@ export default function InstructorAssignments() {
           overflow: "auto",
         }}
       >
-        <PageHeader title={isCreate ? "Create Assignment" : "38 Assignments"} />
+        {/* <PageHeader title={isCreate ? "Create Assignment" : "38 Assignments"} /> */}
         <div style={{ display: isCreate ? "none" : "inline" }}>
           {/* <Assignments toggleIsCreate={toggleIsCreate} /> */}
           <Assignments isCreate={isCreate} />

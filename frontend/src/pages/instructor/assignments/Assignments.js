@@ -25,14 +25,14 @@ const columns = [
     title: "RELEASED",
     dataIndex: "released",
     render: text =>
-      text ? moment(text).format("MMM DD [AT] h:mmA").toUpperCase() : null,
+      text ? moment(new Date(text)).format("MMM DD [AT] h:mmA").toUpperCase() : null,
     sorter: (a, b) => a.released - b.released,
   },
   {
     title: "DUE(CDT)",
     dataIndex: "due",
     render: text =>
-      text ? moment(text).format("MMM DD [AT] h:mmA").toUpperCase() : null,
+      text ? moment(new Date(text)).format("MMM DD [AT] h:mmA").toUpperCase() : null,
     sorter: (a, b) => a.due - b.due,
   },
   {
@@ -75,9 +75,10 @@ export default ({ isCreate }) => {
     }
   }, [getAssignments, isCreate]);
 
+  const assignmentString = assignments.length === 1 ? "Assignment" : "Assignments";
   return (
     <>
-      <PageHeader title={`Total Assignments: ${assignments?.length}`}>
+      <PageHeader title={`${assignments?.length} ${assignmentString}`}>
       </PageHeader>
       <Card bordered={false}>
         <Table rowKey='id' columns={columns} dataSource={assignments} />
