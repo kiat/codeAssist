@@ -1,24 +1,22 @@
-from flask import Flask
-from flask_cors import CORS
-from flask_marshmallow import Marshmallow
-from flask_sqlalchemy import SQLAlchemy
-from dotenv import load_dotenv
-import os
+from flask_cors import cross_origin
+from api import app
+from routes.assignment import assignment
+from routes.course import course
+from routes.submission import submission
+from routes.user import user
 
-def create_app():
-    app = Flask(__name__)
-    app.secret_key('codeassist')
-    CORS(app)
-    load_dotenv()
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_CONNECTION_STRING")
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    ma = Marshmallow(app)
-    db = SQLAlchemy(app)
+@app.route('/', methods=["GET", "POST"])
+@cross_origin()
+def hello_world():
+    '''
+    This is the default response with no methods and extensions - '/'
+    If you host the backend locally at localhost:5000 it should display "Hello World"
+    '''
+    return 'Hello World'
 
-    # attach blueprints here!
+app.register_blueprint(assignment)
+app.register_blueprint(course)
+app.register_blueprint(submission)
+app.register_blueprint(user)
 
-
-    return app
-
-if __name__ == "__main__":
-    create_app().run()
+app.run()
