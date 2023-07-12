@@ -12,8 +12,9 @@ import "../../mock/assignment";
  * @returns
  */
 export default function Assignments() {
-  const [assignments, setAssignments] = useState([]);
+  const [courseAssignment, setCourseAssignment] = useState([]);
   const urlParams = useParams();
+  const {courseId} = urlParams;
   const navigate = useNavigate();
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const location = useLocation();
@@ -38,37 +39,40 @@ export default function Assignments() {
     },
     {
       title: "RELEASED",
-      dataIndex: "released",
-      render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+      dataIndex: "published_date",
+      render: text => {
+        const publishedDate = moment(text).valueOf();
+        const formattedDate = moment(text).format("MMM DD [AT] h:mmA").toUpperCase();
+        return <span data-timestamp={publishedDate}>{formattedDate}</span>
+      },
       sorter: (a, b) => a.released - b.released,
     },
     {
       title: "DUE(CDT)",
-      dataIndex: "due",
-      render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+      dataIndex: "due_date",
+      render: text => {
+        const dueDate = moment(text).valueOf();
+        const formattedDate = moment(text).format("MMM DD [AT] h:mmA").toUpperCase();
+        return <span data-timestamp={dueDate}>{formattedDate}</span>;
+      },
       sorter: (a, b) => a.due - b.due,
     },
   ];
 
-  const getAssignments = useCallback(() => {
-    axios.post("/api/getCourse", userInfo).then(res => {
-      // updateCourseInfo({
-      //   code: res.data.course.code,
-      //   name: res.data.course.name,
-      //   semester: res.data.course.semester,
-      // });
-      setAssignments(res.data.course.assignments);
-    });
-  }, [userInfo]);
-
-  // // update assignment
-  // const updateTableData = useCallback(() => {
-  //   getAssignments();
-  // }, [getAssignments]);
-
   useEffect(() => {
-    getAssignments();
-  }, [getAssignments, location.key]);
+    fetch("http://localhost:5000/get_course_assignments?" +
+      new URLSearchParams({
+        course_id: courseId
+      })
+    )
+    .then(res => res.json()) // Extract JSON data from the response
+    .then(data => {
+      setCourseAssignment(data); // Set the retrieved data in the state
+  })
+    .catch(error => {
+      console.error("Error fetching course assignments:", error);
+  });
+}, []);
 
   return (
     <>
@@ -107,6 +111,7 @@ export default function Assignments() {
         )}
       </div> */}
       <Card bordered={false}>
+        {courseAssignment.some(assignment => assignment.published) ? (
         <Table
           columns={
             columns
@@ -114,16 +119,18 @@ export default function Assignments() {
             //   ? columns
             //   : columns.filter(item => item.dataIndex !== "status")
           }
-          dataSource={assignments}
+          dataSource={courseAssignment}
           rowKey='id'
           onRow={record => {
-            const { released, id, status, due } = record;
+            const { published_date, id, status, due_date } = record;
+            const publishedDate = moment(published_date).valueOf();
+            const dueDate = moment(due_date).valueOf();
             return {
               onClick: event => {
                 const now = Date.now();
                 if (
-                  (released <= now && now <= due) ||
-                  (due <= now && status === 1)
+                  (publishedDate <= now && now <= dueDate) ||
+                  (dueDate <= now && status === 1)
                 ) {
                   navigate(`/assignmentresult/${id}`);
                 }
@@ -131,6 +138,9 @@ export default function Assignments() {
             };
           }}
         />
+        ) : (
+          <div>No assignments yet</div>
+        )}
       </Card>
     </>
   );
