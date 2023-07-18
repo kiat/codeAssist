@@ -46,14 +46,14 @@ def create_user():
 
     res = None
 
-    if role is 0:
+    if role == 0:
         db.session.add(Instructor(**user_data))
         db.session.commit()
 
         res = db.session.query(Instructor).filter_by(id=user_id)
         res = InstructorSchema().dump(res, many=True)[0]
 
-    elif role is 2:
+    elif role == 2:
         db.session.add(Student(**user_data))
         db.session.commit()
         res = db.session.query(Student).filter_by(id=user_id)
