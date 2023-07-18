@@ -119,7 +119,7 @@ export default function Assignments() {
             //   ? columns
             //   : columns.filter(item => item.dataIndex !== "status")
           }
-          dataSource={courseAssignment}
+          dataSource={courseAssignment.filter(assignment => assignment.published)}
           rowKey='id'
           onRow={record => {
             const { published_date, id, status, due_date } = record;
