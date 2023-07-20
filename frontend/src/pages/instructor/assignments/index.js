@@ -44,6 +44,7 @@ export default function InstructorAssignments() {
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
+      published_date: values.releaseDate._d,
     };
     const validData = Object.fromEntries(
       Object.entries(assignmentData).filter(([_, value]) => value !== undefined)

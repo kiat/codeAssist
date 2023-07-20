@@ -30,15 +30,15 @@ const columns = [
   },
   {
     title: "RELEASED",
-    dataIndex: "released",
+    dataIndex: "published_date",
     sorter: (a, b) => a.released - b.released,
-    render: (text) => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+    render: (text) => moment(text + "Z").format("MMM DD [AT] h:mmA").toUpperCase(),
   },
   {
     title: "DUE(CDT)",
-    dataIndex: "due",
+    dataIndex: "due_date",
     sorter: (a, b) => a.due - b.due,
-    render: (text) => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+    render: (text) => moment(text + "Z").format("MMM DD [AT] h:mmA").toUpperCase(),
   },
   {
     title: "SUBMISSIONS",
@@ -230,6 +230,7 @@ export default function InstructorDashboard() {
       </Card>
       <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>
         <Table rowKey="id" columns={columns} dataSource={data} />
+        {/*console.log(data)*/}
       </Card>
     </>
   );

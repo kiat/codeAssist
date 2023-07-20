@@ -1,5 +1,5 @@
 from marshmallow import Schema, fields
-from sqlalchemy.dialects.postgresql import DATE, UUID
+from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
 
@@ -43,17 +43,17 @@ class Assignment(db.Model):
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     name = db.Column(db.String, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), nullable=False)
-    due_date = db.Column(DATE, nullable=True)
+    due_date = db.Column(TIMESTAMP, nullable=True)
     anonymous_grading = db.Column(db.Boolean, default=False)
     enable_group = db.Column(db.Boolean, default=False)
     group_size = db.Column(db.Integer, nullable=True)
     leaderboard = db.Column(db.Integer, nullable=True)
     late_submission = db.Column(db.Boolean, default=False)
-    late_due_date = db.Column(DATE, nullable=True)
+    late_due_date = db.Column(TIMESTAMP, nullable=True)
     manual_grading = db.Column(db.Boolean, default=False)
     autograder_points = db.Column(db.Float, nullable=True)
     published = db.Column(db.Boolean, default=False)
-    published_date = db.Column (DATE, nullable=True)
+    published_date = db.Column (TIMESTAMP, nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
     
 

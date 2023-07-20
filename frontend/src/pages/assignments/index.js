@@ -67,7 +67,15 @@ export default function Assignments() {
     )
     .then(res => res.json()) // Extract JSON data from the response
     .then(data => {
-      setCourseAssignment(data); // Set the retrieved data in the state
+      //console.log(new Date("" + data[0].published_date + "Z"));
+      const convertedData = data;
+      for (let i = 0; i < data.length; i++) {
+        let thisPublishedDate = convertedData[i].published_date;
+        let thisDueDate = convertedData[i].due_date;
+        convertedData[i].published_date = (thisPublishedDate) ? thisPublishedDate + "Z" : null;
+        convertedData[i].due_date = (thisDueDate) ? thisDueDate + "Z" : null;
+      }
+      setCourseAssignment(convertedData); // Set the retrieved data in the state
   })
     .catch(error => {
       console.error("Error fetching course assignments:", error);
@@ -111,7 +119,7 @@ export default function Assignments() {
         )}
       </div> */}
       <Card bordered={false}>
-        {courseAssignment.some(assignment => assignment.published) ? (
+        {courseAssignment/*.some(assignment => assignment.published)*/ ? (
         <Table
           columns={
             columns
@@ -119,7 +127,7 @@ export default function Assignments() {
             //   ? columns
             //   : columns.filter(item => item.dataIndex !== "status")
           }
-          dataSource={courseAssignment.filter(assignment => assignment.published)}
+          dataSource={courseAssignment/*.filter(assignment => assignment.published)*/}
           rowKey='id'
           onRow={record => {
             const { published_date, id, status, due_date } = record;
