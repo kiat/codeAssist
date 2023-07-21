@@ -47,6 +47,8 @@ def upload_file():
     @param student_id       the id of a student
     @param assignment_id    the id of an assignment
     '''
+    print(request.files)
+    print(request.form)
     if "file" not in request.files:
         flash("No file part")
         return "no file\n"
@@ -74,7 +76,7 @@ def upload_file():
 
         db.session.add(Submission(**submission_data))
         db.session.commit()
-
+       
         logs, results = docker_client.run_container(assignment, file, filename, new_uuid)
 
         submission_data["results"] = results.encode('utf8')

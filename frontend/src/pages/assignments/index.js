@@ -21,7 +21,6 @@ export default function Assignments() {
   const location = useLocation();
   const [isModalOpen, setModalOpen] = useState(false);
   const [file, setFile] = useState(null);
-  const [submissionData, setSubmissionData] = useState({});
   const [assignmentID, setAssignmentID] = useState("")
   const [assignmentTitle, setAssignmentTitle] = useState("")
 
@@ -82,24 +81,6 @@ export default function Assignments() {
     setModalOpen(false);
   }
 
-  const submitAssignment = () => {
-
-    console.log("File:", file);
-    
-    const formData = new FormData();
-    formData.append('student_id', userInfo.id);
-    formData.append("file", file);
-    formData.append("assignment_id", assignmentID);
-    formData.append("assignment", assignmentTitle);    
-
-    fetch("http://localhost:5000/upload_submission", {
-      method: "POST",
-      body: formData
-    })
-    .then((response) => console.log(response))
-    .then((data) => console.log(data))
-  }
-
   useEffect(() => {
     fetch("http://localhost:5000/get_course_assignments?" +
       new URLSearchParams({
@@ -122,8 +103,6 @@ export default function Assignments() {
       console.error("Error fetching course assignments:", error);
   });
 }, []);
-
-  
 
   return (
     <>
@@ -193,7 +172,7 @@ export default function Assignments() {
           <div>No assignments yet</div>
         )}
       </Card>
-      <AssignmentModal open={isModalOpen} onCancel={closeModal} submit = {submitAssignment} setFile = {setFile}/>
+      <AssignmentModal open={isModalOpen} onCancel={closeModal} assignmentID = {assignmentID} assignmentTitle = {assignmentTitle}/>
     </>
   );
 }

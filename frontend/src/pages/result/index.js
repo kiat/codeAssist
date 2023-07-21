@@ -45,7 +45,7 @@ export default function AssignmentResult() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const { assignmentId } = useParams();
   const location = useLocation();
-  const { userInfo, assignmentInfo } = useContext(GlobalContext);
+  const { userInfo, assignmentInfo} = useContext(GlobalContext);
   const [formattingModalOpen, setFormattingOpen] = useState(false);
   const [formattingSelected, setFormattingSelected] = useState([1, 3]);
   const [autoGraderPoints, setAutograderPoints] = useState(0);

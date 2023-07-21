@@ -20,6 +20,7 @@ import moment from "moment";
 
 export default () => {
   const { assignmentId } = useParams();
+  console.log(assignmentId)
   const [form] = Form.useForm();
   const [courseId, setCourseId] = useState("");
 

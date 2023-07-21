@@ -1,9 +1,10 @@
 import { ClockCircleOutlined, DownloadOutlined } from "@ant-design/icons";
 import { Button, Card, Collapse, PageHeader, Radio } from "antd";
 import axios from "axios";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useContext } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import UploadModal from "../../../components/UploadModal";
+import { GlobalContext } from "../../App";
 
 import "./index.css";
 import SubmissionHistoryModal from "./submissionHistoryModal";
@@ -15,10 +16,11 @@ import SubmissionHistoryModal from "./submissionHistoryModal";
 export default function AssignmentResult() {
   const [pageHeaderTitle, setPageHeaderTitle] = useState("Autograder Results");
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [assignmentInfo, setAssignmentInfo] = useState({});
+  const [assignmentInfo, setAssignmentInfo, userInfo] = useContext(GlobalContext);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const { assignmentId } = useParams();
   const location = useLocation();
+
 
   // control assignment history window modal
   const toggleHistoryModalOpen = useCallback(() => {
@@ -44,6 +46,7 @@ export default function AssignmentResult() {
     });
   };
 
+
   // update assignment information
   const updateAssignment = useCallback(() => {
     getAssignmentResult();
@@ -61,6 +64,7 @@ export default function AssignmentResult() {
     pageHeaderTitle === "Autograder Results"
       ? assignmentInfo.results
       : assignmentInfo.codes;
+
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap" }}>
