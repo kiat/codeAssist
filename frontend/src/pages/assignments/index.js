@@ -82,6 +82,8 @@ export default function Assignments() {
   });
 }, []);
 
+  console.log(courseAssignment)
+
   return (
     <>
       <PageHeader
@@ -119,7 +121,7 @@ export default function Assignments() {
         )}
       </div> */}
       <Card bordered={false}>
-        {courseAssignment/*.some(assignment => assignment.published)*/ ? (
+        {courseAssignment ? (
         <Table
           columns={
             columns
@@ -127,7 +129,7 @@ export default function Assignments() {
             //   ? columns
             //   : columns.filter(item => item.dataIndex !== "status")
           }
-          dataSource={courseAssignment/*.filter(assignment => assignment.published)*/}
+          dataSource={courseAssignment.filter(assignment => assignment.published)}
           rowKey='id'
           onRow={record => {
             const { published_date, id, status, due_date } = record;
