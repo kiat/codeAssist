@@ -1,4 +1,4 @@
-import { Card, Descriptions, PageHeader, Table } from "antd";
+import { Card, Descriptions, PageHeader, Table, Button } from "antd";
 import axios from "axios";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -6,6 +6,7 @@ import { GlobalContext } from "../../App";
 import moment from "moment";
 
 import "../../mock/assignment";
+import AssignmentModal from "./assignment_modal";
 
 /**
  * course assignment modal
@@ -18,12 +19,22 @@ export default function Assignments() {
   const navigate = useNavigate();
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const location = useLocation();
+  const [isModalOpen, setModalOpen] = useState(false);
+  const [file, setFile] = useState(null);
+  const [submissionData, setSubmissionData] = useState({});
+  const [assignmentID, setAssignmentID] = useState("")
+  const [assignmentTitle, setAssignmentTitle] = useState("")
 
   const columns = [
     {
       title: "NAME",
       dataIndex: "name",
       sorter: (a, b) => a.name > b.name,
+      render: (text, record) => (
+        <Button type="link" onClick={() => {openModal(text)}}>
+          {text}
+        </Button>
+      )
     },
     {
       title: "STATUS",
@@ -59,6 +70,36 @@ export default function Assignments() {
     },
   ];
 
+  const openModal = (text) => {
+    setModalOpen(true);
+    setAssignmentTitle(text)
+    const curr_assignment = courseAssignment.find((assignment) => assignment.name === text);
+    setAssignmentID(curr_assignment.id)
+  }
+
+
+  const closeModal = () => {
+    setModalOpen(false);
+  }
+
+  const submitAssignment = () => {
+
+    console.log("File:", file);
+    
+    const formData = new FormData();
+    formData.append('student_id', userInfo.id);
+    formData.append("file", file);
+    formData.append("assignment_id", assignmentID);
+    formData.append("assignment", assignmentTitle);    
+
+    fetch("http://localhost:5000/upload_submission", {
+      method: "POST",
+      body: formData
+    })
+    .then((response) => console.log(response))
+    .then((data) => console.log(data))
+  }
+
   useEffect(() => {
     fetch("http://localhost:5000/get_course_assignments?" +
       new URLSearchParams({
@@ -82,7 +123,7 @@ export default function Assignments() {
   });
 }, []);
 
-  console.log(courseAssignment)
+  
 
   return (
     <>
@@ -152,6 +193,7 @@ export default function Assignments() {
           <div>No assignments yet</div>
         )}
       </Card>
+      <AssignmentModal open={isModalOpen} onCancel={closeModal} submit = {submitAssignment} setFile = {setFile}/>
     </>
   );
 }
