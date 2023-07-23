@@ -20,19 +20,23 @@ import moment from "moment";
 
 export default () => {
   const { assignmentId } = useParams();
-  console.log(assignmentId)
   const [form] = Form.useForm();
   const [courseId, setCourseId] = useState("");
+  const [publishedBefore, setPubBefore] = useState(undefined);
+  const [originalPublish, setOGPub] = useState(undefined);
 
   const getAssignmentInfo = useCallback(() => {
     getAssignment({ assignment_id: assignmentId }).then(res => {
-      const { name, published, due_date, autograder_points, course_id } = res.data || {};
+      const { name, published, due_date, autograder_points, course_id, published_date } = res.data || {};
+      setPubBefore(published);
+      setOGPub(published_date);
       setCourseId(course_id)
       form.setFieldsValue({
         name,
         published,
         autograderPoints: autograder_points,
-        dueDate: moment(due_date, "YYYY-MM-DD"),
+        dueDate: moment.utc(due_date).local(),
+        releaseDate: moment.utc(published_date).local()
       });
     });
   }, [assignmentId, form]);
@@ -54,17 +58,19 @@ export default () => {
 
   const currentDate = () => {
     const current = new Date();
-    const formatDate = current.toISOString().slice(0,10);
+    const formatDate = current.toISOString();
     return formatDate
   }
-  
+
   const finishForm = () => {
     const values = form.getFieldsValue();
     let publishedDate = undefined;
     if (values.published === true) {
-      publishedDate = currentDate();
+      publishedDate = (publishedBefore && originalPublish) ? originalPublish : currentDate();
+    } else {
+      publishedDate = values.releaseDate._d;
     }
-
+    
     const newAssignmentData = {
       assignment_id: assignmentId,
       name: values.name, 
@@ -86,8 +92,8 @@ export default () => {
     );
     updateAssignment(validData).then(res =>{
       message.success("Successfully updated assignment");
-    })
-  } 
+    });
+  }
 
   const navigate = useNavigate();
   const navigateMainPage = () => {
@@ -138,7 +144,7 @@ export default () => {
             <Row gutter={20}>
               <Col>
                 <Form.Item label='RELEASE DATE (CST)' name='releaseDate'>
-                  <DatePicker />
+                  <DatePicker showTime style={{ width: "100%" }} />
                 </Form.Item>
                 <Form.Item>
                   <Checkbox>Allow Late Submissions</Checkbox>
@@ -146,10 +152,10 @@ export default () => {
               </Col>
               <Col>
                 <Form.Item label='DUE DATE (CST)' name='dueDate'>
-                  <DatePicker />
+                  <DatePicker showTime style={{ width: "100%" }} />
                 </Form.Item>
                 <Form.Item label='LATE DUE DATE (CST)' name='lateDueDate'>
-                  <DatePicker />
+                  <DatePicker showTime style={{ width: "100%" }} />
                 </Form.Item>
               </Col>
             </Row>
