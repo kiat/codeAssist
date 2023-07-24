@@ -21,6 +21,7 @@ import { useParams } from "react-router-dom";
 import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
 import { GlobalContext } from "../../../App";
+import AddCSVModal from "./AddCSVModal";
 const columns = [
   { title: "NAME", dataIndex: "name" },
   { title: "EMAIL", dataIndex: "email_address" },
@@ -37,6 +38,7 @@ const columns = [
 
 export default () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addCSVModalOpen, setAddCSVModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
   const [enrollment, setEnrollment] = useState([]);
   const urlParams = useParams();
@@ -45,6 +47,9 @@ export default () => {
 
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen((t) => !t);
+  }, []);
+  const toggleAddCSVModalOpen = useCallback(() => {
+    setAddCSVModalOpen((t) => !t);
   }, []);
 
   const toggleAddMoreUsersModalOpen = useCallback(() => {
@@ -80,6 +85,9 @@ export default () => {
     },
     [courseId, getEnrollment, toggleAddModalOpen]
   );
+  const finishCSVForm =
+    useCallback();
+    //toggleAddCSVModalOpen()
 
   const finishMoreUsers = useCallback(
     (values) => {
@@ -180,6 +188,9 @@ export default () => {
             <Button icon={<PlusOutlined />} onClick={toggleAddModalOpen}>
               Add Students or Staff
             </Button>
+            <Button icon={<PlusOutlined />} onClick={toggleAddCSVModalOpen}>
+              Add With CSV
+            </Button>
             <Button
               icon={<PlusOutlined />}
               onClick={toggleAddMoreUsersModalOpen}
@@ -193,6 +204,11 @@ export default () => {
         open={addModalOpen}
         toggleAddModalOpen={toggleAddModalOpen}
         onFinish={finishForm}
+      />
+      <AddCSVModal
+        open={addCSVModalOpen}
+        toggleAddModalOpen={toggleAddCSVModalOpen}
+        finishCSVForm={finishCSVForm}
       />
       <AddMoreUsersModal
         toggleAddMoreUsersModalOpen={toggleAddMoreUsersModalOpen}
