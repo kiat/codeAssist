@@ -9,6 +9,8 @@ from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, Submission
 from api.schemas import AssignmentSchema, SubmissionSchema
+from datetime import datetime 
+from time import time 
 
 submission = Blueprint('submission', __name__)
 
@@ -76,11 +78,29 @@ def upload_file():
 
         db.session.add(Submission(**submission_data))
         db.session.commit()
+        
+        # We time the execution of user submission. 
+        before = time()
        
         logs, results = docker_client.run_container(assignment, file, filename, new_uuid)
 
+        after = time()
+        elapsed_time = after - before 
+        # Elapsed time in Milliseconds. 
+        submission_data["execution_time"] = elapsed_time
+
+        # Adding the timestamp of this submission, executed_at in database 
+        timestamp = datetime.fromtimestamp(after).strftime('%Y-%m-%d %H:%M:%S')
+        submission_data["executed_at"] = timestamp
+
+
+
+
         submission_data["results"] = results.encode('utf8')
         submission_data["completed"] = True
+
+
+
 
         print(results, file=sys.stderr)
         tests = json.loads(results)["tests"]
