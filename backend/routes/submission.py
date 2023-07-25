@@ -81,6 +81,10 @@ def upload_file():
         
         # We time the execution of user submission. 
         before = time()
+        
+        # Adding the timestamp of this submission, executed_at in database 
+        timestamp = datetime.fromtimestamp(before).strftime('%Y-%m-%d %H:%M:%S')
+        submission_data["executed_at"] = timestamp
        
         logs, results = docker_client.run_container(assignment, file, filename, new_uuid)
 
@@ -89,9 +93,7 @@ def upload_file():
         # Elapsed time in Milliseconds. 
         submission_data["execution_time"] = elapsed_time
 
-        # Adding the timestamp of this submission, executed_at in database 
-        timestamp = datetime.fromtimestamp(after).strftime('%Y-%m-%d %H:%M:%S')
-        submission_data["executed_at"] = timestamp
+
 
 
 
