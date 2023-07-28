@@ -75,8 +75,6 @@ export default function InstructorDashboard() {
   const user_id = useContext(GlobalContext).userInfo.id;
   const [description, setDescription] = useState("");
 
-  
-
   //   async function get(url, params){
   //     let response = await fetch(url + '?' + new URLSearchParams(params))
   //     let data = await response.json()
@@ -169,7 +167,8 @@ export default function InstructorDashboard() {
                 name: element.name,
                 year: element.year,
                 semester: element.semester,
-                entryCode: element.entryCode
+                entryCode: element.entryCode,
+                id: courseId
               });
               setDescription(element.description)
             }

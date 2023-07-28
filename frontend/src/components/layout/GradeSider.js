@@ -49,7 +49,7 @@ export default () => {
           })
         );
     }, [assignmentInfo.id, assignmentInfo.name, updateAssignmentInfo])
-
+  
   return (
     <>
       <Card

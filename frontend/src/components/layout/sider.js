@@ -30,10 +30,9 @@ export default function RootSider({
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const { updateCourseInfo } = useContext(GlobalContext);
-  const [description, setDescription] = useState([""])
-
+  const [description, setDescription] = useState([""]);
+  
   const courseId = courseInfo.id
-
 
   useEffect(() => {
     if (courseInfo.id && (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode)) {
