@@ -29,7 +29,7 @@ export default function Assignments() {
       title: "NAME",
       dataIndex: "name",
       sorter: (a, b) => a.name > b.name,
-      render: (text, record) => (
+      render: (text) => (
         <Button type="link" onClick={() => {openModal(text)}}>
           {text}
         </Button>
@@ -38,7 +38,7 @@ export default function Assignments() {
     {
       title: "STATUS",
       dataIndex: "status",
-      render: text => (text === 1 ? "Submitted" : "No Submission"),
+      render: text => (text === 1 ? "Submitted" : "Not Submitted"),
       sorter: (a, b) => a.status - b.status,
     },
     {
@@ -69,6 +69,7 @@ export default function Assignments() {
     },
   ];
 
+
   const openModal = (text) => {
     setModalOpen(true);
     setAssignmentTitle(text)
@@ -77,9 +78,12 @@ export default function Assignments() {
   }
 
 
+
+
   const closeModal = () => {
     setModalOpen(false);
   }
+
 
   useEffect(() => {
     fetch("http://localhost:5000/get_course_assignments?" +
@@ -103,6 +107,7 @@ export default function Assignments() {
       console.error("Error fetching course assignments:", error);
   });
 }, []);
+
 
   return (
     <>
@@ -156,14 +161,18 @@ export default function Assignments() {
             const publishedDate = moment(published_date).valueOf();
             const dueDate = moment(due_date).valueOf();
             return {
-              onClick: event => {
+              onClick: () => {
                 const now = Date.now();
-                if (
-                  (publishedDate <= now && now <= dueDate) ||
-                  (dueDate <= now && status === 1)
+                // console.log((
+                //   (publishedDate <= now && now <= dueDate) + " " + (dueDate <= now && status === 1)
+                //   ));
+                if (!(
+                  (publishedDate <= now && now <= dueDate) || (dueDate <= now && status === 1)
+                  )
                 ) {
                   navigate(`/assignmentresult/${id}`);
                 }
+
               },
             };
           }}
