@@ -89,6 +89,7 @@ def upload_file():
 
         submission_data = {
             "id": new_uuid,
+            "name": name,
             "student_id": student_id,
             "assignment_id": assignment_id,
             "student_code_file": file.read(),
