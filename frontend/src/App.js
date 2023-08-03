@@ -27,24 +27,35 @@ const { Content } = Layout;
 export const GlobalContext = createContext({
   userInfo: { name: "", isStudent: 1 },
   courseInfo: { id: "", name: "", code: "", semester: "", year: "" },
-  assignmentInfo: { id: "", score: "", code: null},
+  assignmentInfo: { id: "", score: "", code: null },
   updateCourseInfo: () => {},
   updateUserInfo: () => {},
   updateAssignmentInfo: () => {},
 });
 
 function App() {
-  const [courseInfo, setCourseInfo] = useState({ code: "", name: "", semester: "", year: "" });
+  // const [courseInfo, setCourseInfo] = useState({ code: "", name: "", semester: "", year: "" });
+  const [courseInfo, setCourseInfo] = useState(
+    JSON.parse(localStorage.getItem("courseInfo")) || []
+  );
   const [assignmentInfo, setAssignmentInfo] = useState({ name: "" });
   const [userInfo, setUserInfo] = useState(
     JSON.parse(localStorage.getItem("userInfo"))
   );
   const navigate = useNavigate();
+  
+  useEffect(() => {
+    const courseInfoData = window.localStorage.getItem("courseInfo");
+    if (!courseInfoData) setCourseInfo(JSON.parse(courseInfoData));
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("courseInfo", JSON.stringify(courseInfo));
+  }, [courseInfo]);
 
   const updateCourseInfo = useCallback(info => {
     setCourseInfo(info);
   }, []);
-
 
   const updateUserInfo = useCallback(info => {
     setUserInfo(info);
@@ -53,7 +64,7 @@ function App() {
   const updateAssignmentInfo = useCallback(info => {
     setAssignmentInfo(info);
   }, []);
-
+  
   const pathname = window.location.pathname;
 
   useEffect(() => {

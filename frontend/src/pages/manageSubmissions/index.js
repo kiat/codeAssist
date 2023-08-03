@@ -9,24 +9,29 @@ import {
 } from "antd";
 import { formatDayTimeEn } from "../../common/format";
 import PageContent from "../../components/layout/pageContent";
-import { tableData } from "./mock";
+// import { tableData } from "./mock";
 import {
   CloseOutlined,
+  ConsoleSqlOutlined,
   ReloadOutlined,
   RightOutlined,
 } from "@ant-design/icons";
 import PageBottom from "../../components/layout/pageBottom";
 import RerunAutograderModal from "./RerunAutograderModal";
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { useCallback } from "react";
 import { GlobalContext } from "../../App";
 import { useNavigate } from "react-router-dom";
+import moment from "moment";
 
 export default () => {
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
+  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+  const [students, setStudents] = useState({});
   const navigate = useNavigate();
-
+  const [tableData, setTableData] = useState([]);
+  
   const toggleRerunModalOpen = useCallback(() => {
     setRerunModalOpen(t => !t);
   }, []);
@@ -70,6 +75,47 @@ export default () => {
       ),
     },
   ];
+
+  useEffect(() => {
+    fetch("http://localhost:5000/get_course_enrollment?" + 
+      new URLSearchParams({
+        course_id: courseInfo.id
+      })
+    )
+    .then(res => res.json())
+    .then(data => {
+      setStudents(data);
+    })
+  }, []);
+
+  useEffect(() => {
+    if (Object.keys(students).length > 0 && assignmentInfo.id && Object.keys(tableData).length < 1) {
+      students.forEach(student => {
+        fetch("http://localhost:5000/get_latest_submission?" +
+          new URLSearchParams({
+            student_id: student.id,
+            assignment_id: assignmentInfo.id
+          })
+        )
+        .then(res => res.json())
+        .then(data => {
+          if (Object.keys(data).length > 0) {
+            const submission = {
+              name: data[0].name,
+              submissionTime: moment(data[0].executed_at).valueOf(),
+              score: data[0].score,
+              id: data[0].student_id
+            };
+            setTableData(prevData => {
+              if (prevData.findIndex(obj => obj.id === submission.id) !== -1) return prevData;
+              return [...prevData, submission];
+            })
+          }
+        })
+      });
+    }
+  }, [students]);
+
   return (
     <>
       <PageContent>

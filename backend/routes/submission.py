@@ -11,6 +11,7 @@ from api.models import Assignment, Submission
 from api.schemas import AssignmentSchema, SubmissionSchema
 from datetime import datetime 
 from time import time 
+from sqlalchemy import desc
 
 submission = Blueprint('submission', __name__)
 
@@ -36,6 +37,24 @@ def get_submission():
     submissions = SubmissionSchema().dump(submissions, many=True)
 
     return jsonify(submissions)
+
+@submission.route('/get_latest_submission', methods=["GET"])
+@cross_origin()
+def get_latest_submission():
+    '''
+    /get_latest_submission gets the latest submission by a student for an assignment
+    Requires from the frontend a JSON containing:
+    @param student_id       the id of a student
+    @param assignment_id    the id of an assignment
+    '''
+    student_id = request.args.get("student_id")
+    assignment_id = request.args.get("assignment_id")
+    
+    submission = (db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
+                    .order_by(desc(Submission.executed_at)).limit(1))
+    submission = SubmissionSchema().dump(submission, many=True)
+
+    return jsonify(submission)
     
 @submission.route('/upload_submission', methods=["POST", "GET"])
 @cross_origin()
@@ -48,6 +67,7 @@ def upload_file():
     @param assignment       assignment #TODO whoever knows better, document
     @param student_id       the id of a student
     @param assignment_id    the id of an assignment
+    @param name             the name of a student
     '''
     print(request.files)
     print(request.form)
@@ -58,6 +78,7 @@ def upload_file():
     assignment = request.form["assignment"].lower()
     student_id = request.form["student_id"]
     assignment_id = request.form["assignment_id"]
+    name = request.form["name"]
 
     if file.filename == "":
         flash("No selected file")
@@ -68,6 +89,7 @@ def upload_file():
 
         submission_data = {
             "id": new_uuid,
+            "name": name,
             "student_id": student_id,
             "assignment_id": assignment_id,
             "student_code_file": file.read(),

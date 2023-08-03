@@ -190,7 +190,7 @@ def get_course_enrollment():
 
     list_of_students = [x["student_id"] for x in students]
 
-    students = db.session.query(Student.name, Student.email_address).filter(Student.id.in_(list_of_students))
+    students = db.session.query(Student.name, Student.email_address, Student.id).filter(Student.id.in_(list_of_students))
     students = StudentSchema().dump(students, many=True)
 
     return jsonify(students)

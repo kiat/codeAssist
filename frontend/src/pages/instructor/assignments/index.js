@@ -28,8 +28,6 @@ export default function InstructorAssignments() {
     setIsCreate(t => !t);
   }, []);
 
-  
-
   const finishForm = () => {
     const values = form.getFieldsValue();
     const assignmentData = {

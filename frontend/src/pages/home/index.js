@@ -77,7 +77,7 @@ export default function Home() {
                 fontSize: "40px",
               }}
             >
-              Deliver and Grade Your Assessments Anywhere
+              Get Automated Feedback about Your Assignments!
             </div>
             <div
               style={{
