@@ -7,8 +7,8 @@ from functools import reduce
 from flask import Blueprint, request, jsonify, flash
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission
-from api.schemas import AssignmentSchema, SubmissionSchema
+from api.models import Assignment, Submission, Student
+from api.schemas import AssignmentSchema, SubmissionSchema, StudentSchema
 from datetime import datetime 
 from time import time 
 from sqlalchemy import desc
@@ -69,6 +69,7 @@ def upload_file():
     @param assignment_id    the id of an assignment
     @param name             the name of a student
     '''
+    
     print(request.files)
     print(request.form)
     if "file" not in request.files:
@@ -78,7 +79,16 @@ def upload_file():
     assignment = request.form["assignment"].lower()
     student_id = request.form["student_id"]
     assignment_id = request.form["assignment_id"]
-    name = request.form["name"]
+
+
+    # Exception handling is needed. 
+    student_name = db.session.query(Student).filter_by(id=student_id)
+    student_name = StudentSchema().dump(student_name, many=True)
+
+    # There should be only one Student coming back. 
+    name = student_name[0]["name"]
+    print("Student Name is: ", name)
+
 
     if file.filename == "":
         flash("No selected file")
@@ -100,14 +110,17 @@ def upload_file():
 
         db.session.add(Submission(**submission_data))
         db.session.commit()
-        
+
+
         # We time the execution of user submission. 
         before = time()
-        
+            
         # Adding the timestamp of this submission, executed_at in database 
         timestamp = datetime.fromtimestamp(before).strftime('%Y-%m-%d %H:%M:%S')
+        # We add the executed time even if this run fails. 
         submission_data["executed_at"] = timestamp
-       
+        
+
         logs, results = docker_client.run_container(assignment, file, filename, new_uuid)
 
         after = time()
@@ -115,15 +128,8 @@ def upload_file():
         # Elapsed time in Milliseconds. 
         submission_data["execution_time"] = elapsed_time
 
-
-
-
-
-
         submission_data["results"] = results.encode('utf8')
         submission_data["completed"] = True
-
-
 
 
         print(results, file=sys.stderr)
