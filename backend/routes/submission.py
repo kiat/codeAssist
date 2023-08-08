@@ -7,7 +7,7 @@ from functools import reduce
 from flask import Blueprint, request, jsonify, flash
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission
+from api.models import Assignment, Submission, Student
 from api.schemas import AssignmentSchema, SubmissionSchema
 from datetime import datetime 
 from time import time 
@@ -67,7 +67,6 @@ def upload_file():
     @param assignment       assignment #TODO whoever knows better, document
     @param student_id       the id of a student
     @param assignment_id    the id of an assignment
-    @param name             the name of a student
     '''
     print(request.files)
     print(request.form)
@@ -78,7 +77,8 @@ def upload_file():
     assignment = request.form["assignment"].lower()
     student_id = request.form["student_id"]
     assignment_id = request.form["assignment_id"]
-    name = request.form["name"]
+
+    name = db.session.query(Student.name).filter_by(id=student_id).as_scalar()
 
     if file.filename == "":
         flash("No selected file")
@@ -89,11 +89,11 @@ def upload_file():
 
         submission_data = {
             "id": new_uuid,
-            "name": name,
             "student_id": student_id,
             "assignment_id": assignment_id,
             "student_code_file": file.read(),
-            "completed": False
+            "completed": False,
+            "name": name
         }
 
         file.seek(0)
