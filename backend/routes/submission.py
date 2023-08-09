@@ -116,19 +116,38 @@ def upload_file():
         before = time()
             
         # Adding the timestamp of this submission, executed_at in database 
-        timestamp = datetime.fromtimestamp(before).strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.utcfromtimestamp(before).strftime('%Y-%m-%d %H:%M:%S')
         # We add the executed time even if this run fails. 
         submission_data["executed_at"] = timestamp
+        submission_data["completed"] = False
         
+        try:
+            logs, results = docker_client.run_container(assignment, file, filename, new_uuid)
 
-        logs, results = docker_client.run_container(assignment, file, filename, new_uuid)
+        except Exception as my_exception:
+            # This should be refactored later for better exception handling.
+            print("Could not run this because of some error regarding submitted file or our execution of it!")
+            print(my_exception)
+            # submission_data["execution_time"] = elapsed_time
 
+            db.session.query(Submission).filter_by(id=new_uuid).update(submission_data)
+            db.session.commit()
+
+            submission_data["results"] = None
+
+            new_submission = db.session.query(Submission).filter_by(id=new_uuid)
+            new_submission = SubmissionSchema().dump(new_submission, many=True)[0]
+            return jsonify(new_submission)
+
+                
         after = time()
         elapsed_time = after - before 
+        
         # Elapsed time in Milliseconds. 
         submission_data["execution_time"] = elapsed_time
-
         submission_data["results"] = results.encode('utf8')
+        
+        # When is this false!?
         submission_data["completed"] = True
 
 
