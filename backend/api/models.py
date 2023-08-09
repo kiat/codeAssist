@@ -61,7 +61,6 @@ class Assignment(db.Model):
 class Submission(db.Model):
     __tablename__ = "submissions"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
-    name = db.Column(db.String, nullable=False)
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), nullable=False, index=True)
     assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False, index=True)
     student_code_file = db.Column(LargeBinary, nullable=False)
