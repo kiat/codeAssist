@@ -101,7 +101,7 @@ export default () => {
         .then(data => {
           if (Object.keys(data).length > 0) {
             const submission = {
-              name: data[0].name,
+              name: student.name,
               submissionTime: moment(data[0].executed_at).valueOf(),
               score: data[0].score,
               id: data[0].student_id

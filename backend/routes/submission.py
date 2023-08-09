@@ -49,11 +49,12 @@ def get_latest_submission():
     '''
     student_id = request.args.get("student_id")
     assignment_id = request.args.get("assignment_id")
-    
+
     submission = (db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
                     .order_by(desc(Submission.executed_at)).limit(1))
+    
     submission = SubmissionSchema().dump(submission, many=True)
-
+    
     return jsonify(submission)
     
 @submission.route('/upload_submission', methods=["POST", "GET"])
@@ -67,7 +68,6 @@ def upload_file():
     @param assignment       assignment #TODO whoever knows better, document
     @param student_id       the id of a student
     @param assignment_id    the id of an assignment
-    @param name             the name of a student
     '''
     
     print(request.files)
@@ -81,13 +81,13 @@ def upload_file():
     assignment_id = request.form["assignment_id"]
 
 
-    # Exception handling is needed. 
-    student_name = db.session.query(Student).filter_by(id=student_id)
-    student_name = StudentSchema().dump(student_name, many=True)
+    # # Exception handling is needed. 
+    # student_name = db.session.query(Student).filter_by(id=student_id)
+    # student_name = StudentSchema().dump(student_name, many=True)
 
-    # There should be only one Student coming back. 
-    name = student_name[0]["name"]
-    print("Student Name is: ", name)
+    # # There should be only one Student coming back. 
+    # name = student_name[0]["name"]
+    # print("Student Name is: ", name)
 
 
     if file.filename == "":
@@ -99,7 +99,7 @@ def upload_file():
 
         submission_data = {
             "id": new_uuid,
-            "name": name,
+            # "name": name,
             "student_id": student_id,
             "assignment_id": assignment_id,
             "student_code_file": file.read(),
