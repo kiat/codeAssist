@@ -1,0 +1,43 @@
+version: '3.8'
+services:
+  db:
+    container_name: pg_container
+    image: postgres:15.3-alpine3.18
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+    volumes: 
+      - db:/var/lib/postgresql/data
+
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4:7.5
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: 12345
+    ports:
+      - "5050:80"
+
+  backend:
+    container_name: flask
+    build: ./backend/
+    environment:
+      FLASK_APP: autograder_app.py
+      FLASK_DEBUG: 1
+      PYTHONUNBUFFERED: 1
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/:/usr/app
+      - /var/run/docker.sock:/var/run/docker.sock
+  
+volumes:
+  db:
+    driver: local
+
+  
