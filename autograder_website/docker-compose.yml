@@ -35,6 +35,17 @@ services:
     volumes:
       - ./backend/:/usr/app
       - /var/run/docker.sock:/var/run/docker.sock
+
+  frontend:
+    container_name: vite-react
+    build:
+      context: "./frontend"
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - "./frontend:/node/app:delegated"
+      - "/node/app/node_modules"
   
 volumes:
   db:

@@ -9,13 +9,7 @@ const baseURL = "http://localhost:5000"
 
 function App() {
   const [count, setCount] = useState(0)
-  const [message, setMessage] = useState("Waiting for Message")
-
-  // useEffect(() => {
-  //   axios.get(baseURL).then((response) => {
-  //     setMessage(response.data);
-  //   });
-  // });
+  const [message, setMessage] = useState("Waiting for message")
 
   return (
     <>
@@ -44,7 +38,7 @@ function App() {
           type="primary" 
           onClick={() => axios.get(baseURL).then((response) => {
             setMessage(response.data);
-          })}>Hey Allen</Button>
+          })}>Hello Allen</Button>
         <p>{message}</p>
       </div>
     </>
