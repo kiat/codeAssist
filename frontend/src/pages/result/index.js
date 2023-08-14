@@ -45,44 +45,55 @@ export default function AssignmentResult() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const { assignmentId } = useParams();
   const location = useLocation();
-  const { userInfo, assignmentInfo} = useContext(GlobalContext);
+  const { userInfo, assignmentInfo } = useContext(GlobalContext);
   const [formattingModalOpen, setFormattingOpen] = useState(false);
   const [formattingSelected, setFormattingSelected] = useState([1, 3]);
   const [autoGraderPoints, setAutograderPoints] = useState(0);
   const [results, setResults] = useState([]);
   const [code, setCode] = useState("");
 
-  const formattingSelectedUpdate = useCallback(value => {
+  const formattingSelectedUpdate = useCallback((value) => {
     setFormattingSelected(value);
   }, []);
 
   const toggleFormattingModalOpen = useCallback(() => {
-    setFormattingOpen(t => !t);
+    setFormattingOpen((t) => !t);
   }, []);
 
   // control assignment history window modal
   const toggleHistoryModalOpen = useCallback(() => {
-    setHistoryModalOpen(bool => !bool);
+    setHistoryModalOpen((bool) => !bool);
   }, []);
 
   // control assignment upload window modal
   const toggleUploadModalOpen = useCallback(() => {
-    setUploadModalOpen(bool => !bool);
+    setUploadModalOpen((bool) => !bool);
   }, []);
 
   const getAssignmentResult = () => {
-    axios.post("/api/getAssignmentResult").then(res => {
-      const { assignmentName, codes, results, score, due, released } = res.data;
-      const now = Date.now();
-      setAssignment({
-        assignmentName,
-        codes,
-        results,
-        score,
-        isUpdate: now >= released && now <= due ? 1 : 0,
-        formattingData: formattingData,
-      });
-    });
+    fetch(
+      "http://localhost:5000/get_submissions?" +
+        new URLSearchParams({
+          student_id: userInfo.id,
+          assignment_id: assignmentId,
+        })
+    )
+      .then((response) => response.json())
+      .then((data) => setResults((prev) => [...prev, data[0]]));
+
+    // the following sets the assignment to a hardcoded assignment from constant.js
+    // axios.post("/api/getAssignmentResult").then((res) => {
+    //   const { assignmentName, codes, results, score, due, released } = res.data;
+    //   const now = Date.now();
+    //   setAssignment({
+    //     assignmentName,
+    //     codes,
+    //     results,
+    //     score,
+    //     isUpdate: now >= released && now <= due ? 1 : 0,
+    //     formattingData: formattingData,
+    //   });
+    // });
   };
 
   // update assignment information
@@ -94,7 +105,7 @@ export default function AssignmentResult() {
       formData.append("student_id", userInfo?.id);
       formData.append("assignment_id", assignmentId);
       uploadSubmission(formData)
-        .then(res => {
+        .then((res) => {
           setCode(res?.data?.student_code_file);
           // setResults(JSON.parse(res?.data?.results));
           setResults(JSON.parse(JSON.parse(res?.data?.results)));
@@ -106,13 +117,13 @@ export default function AssignmentResult() {
     [assignmentId, toggleUploadModalOpen, userInfo?.id]
   );
 
-  const radioChange = useCallback(e => {
+  const radioChange = useCallback((e) => {
     setPageHeaderTitle(e.target.value);
   }, []);
 
   useEffect(() => {
     const getAutoGraderPoints = async () => {
-      getAssignment({ assignment_id: assignmentId }).then(res => {
+      getAssignment({ assignment_id: assignmentId }).then((res) => {
         setAutograderPoints(res.data.autograder_points);
       });
     };
@@ -124,7 +135,7 @@ export default function AssignmentResult() {
     {
       title: "",
       dataIndex: "id",
-      render: text =>
+      render: (text) =>
         formattingSelected.includes(text) ? <CheckOutlined /> : null,
     },
     { title: "points", dataIndex: "points" },
@@ -165,14 +176,14 @@ export default function AssignmentResult() {
                 </Button>,
                 <Radio.Group
                   key={2}
-                  buttonStyle='solid'
-                  defaultValue='Autograder Results'
+                  buttonStyle="solid"
+                  defaultValue="Autograder Results"
                   onChange={radioChange}
                 >
-                  <Radio.Button value='Autograder Results'>
+                  <Radio.Button value="Autograder Results">
                     Results
                   </Radio.Button>
-                  <Radio.Button value='Submitted Files'>Code</Radio.Button>
+                  <Radio.Button value="Submitted Files">Code</Radio.Button>
                 </Radio.Group>,
               ]}
             />
@@ -206,7 +217,7 @@ export default function AssignmentResult() {
                   ))
                 ) : (
                   <Collapse.Panel
-                    header='file'
+                    header="file"
                     showArrow={false}
                     style={{
                       marginBottom: "20px",
@@ -238,7 +249,7 @@ export default function AssignmentResult() {
               height: "100vh",
             }}
           >
-            <Space direction='vertical' size='middle'>
+            <Space direction="vertical" size="middle">
               <div>
                 <Typography.Title level={5}>STUDENT</Typography.Title>
                 <Typography.Text>
@@ -252,7 +263,7 @@ export default function AssignmentResult() {
                   style={{ marginTop: "-15px", fontWeight: "700" }}
                 >
                   {/* {assignment.score} */}
-                  <span>{results?.score ?? 0}</span>
+                  <span>{results[results.length - 1]?.score ?? "null"}</span>
                   <span>/</span>
                   <span>{autoGraderPoints}</span>
                 </Typography.Title>
@@ -260,7 +271,7 @@ export default function AssignmentResult() {
               <div>
                 <Typography.Title level={5}>FAILED TESTS</Typography.Title>
                 {results?.tests
-                  ?.filter(item => item.score === 0)
+                  ?.filter((item) => item.score === 0)
                   ?.map((item, index) => (
                     <div style={{ color: "red" }} key={index}>
                       {/* test_1 (tester.TestDiffs) (0.0/5.0) */}
@@ -275,7 +286,7 @@ export default function AssignmentResult() {
               <div>
                 <Typography.Title level={5}>PASSED TESTS</Typography.Title>
                 {results?.tests
-                  ?.filter(item => item.score !== 0)
+                  ?.filter((item) => item.score !== 0)
                   ?.map((item, index) => (
                     <div key={index} style={{ color: "#20716a" }}>
                       <span>{item.name}</span>
@@ -299,11 +310,11 @@ export default function AssignmentResult() {
                   <span style={{ float: "right" }}>10.0/10.0 pts</span>
                 </div>
                 <Table
-                  rowKey='id'
+                  rowKey="id"
                   columns={formattingColumns}
                   // dataSource={formattingData}
                   dataSource={assignment.formattingData}
-                  size='small'
+                  size="small"
                   showHeader={false}
                   // rowSelection={{}}
                   pagination={false}
@@ -349,7 +360,7 @@ export default function AssignmentResult() {
             </div> */}
           </div>
           <UploadModal
-            title='UPLOAD'
+            title="UPLOAD"
             // url='/api/uploadFile'
             // data={{ assignmentId }}
             open={uploadModalOpen}
@@ -383,8 +394,8 @@ export default function AssignmentResult() {
           <Button
             icon={<DownloadOutlined />}
             // className='right-bottom-but'
-            download='submission'
-            href='http://localhost:3000/static/js/bundle.js'
+            download="submission"
+            href="http://localhost:3000/static/js/bundle.js"
           >
             Download Submission
           </Button>
