@@ -6,6 +6,12 @@
 
 **Accepts JSON data**
 
+**Description:**
+
+<p>Creates a user, which can be a student or instructor based on input, and
+generates an id in the database. Currently this route isn't in use and in the
+future will be used instead of the create_student and create_instructor routes.</p>
+
 Example input:
 
     {
@@ -30,6 +36,11 @@ Example Output(instructor):
 
 **Accepts JSON data**
 
+**Description:**
+
+<p>Updates account details in the database based on what fields are inputted to
+change</p>
+
 Example input:
 
     {
@@ -52,6 +63,10 @@ Example Output:
 ## POST /create_student
 
 **Accepts JSON data**
+
+**Description:**
+
+<p>Creates a student and generates an id in the database</p>
 
 Example input:
 
@@ -76,6 +91,10 @@ Example Output:
 
 **Accepts JSON data**
 
+**Description:**
+
+<p>Logs in a student that exists in the database into their account</p>
+
 Example input:
 
     {
@@ -96,6 +115,10 @@ Example Output:
 ## GET /get_student
 
 **Accepts Query String**
+
+**Description:**
+
+<p>Gets the student from the database based on the email put in</p>
 
 Example input:
 
@@ -118,6 +141,10 @@ Example Output:
 ## POST /create_instructor
 
 **Accepts JSON data**
+
+**Description:**
+
+<p>Creates an instructor and generates an id in the database</p>
 
 Example input:
 
@@ -142,6 +169,10 @@ Example Output:
 
 **Accepts JSON data**
 
+**Description:**
+
+<p>Logs in an instructor that exists in the database to their account</p>
+
 Example input:
 
     {
@@ -164,6 +195,11 @@ Example Output:
 ## POST /create_course
 
 **Accepts JSON data**
+
+**Description:**
+
+<p>Creates a course in the database based on the data input and creates an id 
+for the course</p>
 
 Example input:
 
@@ -190,6 +226,12 @@ Example output:
 
 **Accepts JSON data**
 
+**Description:**
+
+<p>Enrolls a student in a course using entry code. This is used on the student 
+side where they can enroll into a course without a instructor adding them
+if they have the entry code.</p>
+
 Example input:
 
     {
@@ -207,6 +249,10 @@ Example Output(enrollment):
 ## POST /update_course
 
 **Accepts JSON data**
+
+**Description:**
+
+<p>Updates a course in the database based on the fields inputted to be updated.</p>
 
 Example input:
 
@@ -231,6 +277,10 @@ Example Output:
 
 **Accepts Query String**
 
+**Description:**
+
+<p>Deletes a course from the database</p>
+
 Example input:
 
     {
@@ -240,6 +290,11 @@ Example input:
 ## GET /get_course_info
 
 **Accepts Query String**
+
+**Description:**
+
+<p>Gets the information about the course stored in the database and returns it 
+to the user.</p>
 
 Example Input:
 
@@ -264,6 +319,10 @@ Example Output:
 
 **Accepts JSON data**
 
+**Description:**
+
+<p>Creates an assignment for the course and generates an assignment id for it in the database</p>
+
 Example input:
 
     {
@@ -286,6 +345,10 @@ Example output:
 ## POST /update_assignment
 
 **Accepts JSON data**
+
+**Description:**
+
+<p>Updates an assignment in the database based on the fields inputted to update</p>
 
 Example input:
 
@@ -314,6 +377,10 @@ Example output:
 
 **Accepts Query String**
 
+**Description:**
+
+<p>Deletes the assignment from the database.</p>
+
 Example Input:
 
     {
@@ -329,6 +396,10 @@ Example Output:
 ## GET /get_assignment
 
 **Accepts Query String**
+
+**Description:**
+
+<p>Gets the assignment from the database and returns it</p>
 
 Example input:
 
@@ -352,6 +423,12 @@ Example output:
 
 **Accepts JSON data**
 
+**Description:**
+
+<p>Enrolls a student in a course by creating an enrollment in the database. 
+Enrollments in the database hold a student id and the matched id of the course
+they were enrolled into.</p>
+
 Example input:
 
     {
@@ -369,6 +446,11 @@ Example output:
 ## POST /create_enrollment_bulk
 
 **Accepts JSON data**
+
+**Description:**
+
+<p>Mass enrolls multiple students in a course at once and creates enrollments in
+ the database for all of them.</p>
 
 Example input:
 
@@ -391,6 +473,10 @@ Example output:
 
 **Accepts Query String**
 
+**Description:**
+
+<p>Gets all enrollments for a single student from the enrollments in the database.</p>
+
 Example input:
 
     "student_id=a6888457-475a-47ab-8455-441cdd8b9744"
@@ -409,6 +495,10 @@ Example output:
 ## GET /get_submissions
 
 **Accepts Query String**
+
+**Description:**
+
+<p>Gets all submissions by a student for an assignment and returns it in an array.</p>
 
 Example Input:
 
@@ -437,6 +527,11 @@ Example Output:
 
 **Accepts Query String**
 
+**Description:**
+
+<p>Gets the latest submission by a student for an assignment based on the time 
+it was executed at.</p>
+
 Example Input:
 
     {
@@ -461,6 +556,11 @@ Example Output:
 ## POST /upload_submission
 
 **Accepts JSON data and a file**
+
+**Description:**
+
+<p>Uploads a submission by a student for an assignment into the database. A id 
+for the submission is generated.</p>
 
 Example Input:
 
@@ -488,6 +588,11 @@ Example Output:
 
 **Accepts JSON data and a file**
 
+**Description:**
+
+<p>Uploads an autograder for an assignment into the database. It is saved as one 
+of the parts of the assignment it is for in the database.</p>
+
 Example Input:
 
     {
@@ -513,6 +618,10 @@ Example Output:
 
 **Accepts Query String**
 
+**Description:**
+
+<p>Gets all of the assignments for a course and returns them to the user in an array.</p>
+
 Example input:
 
     "course_id"="fc8beca8-48b5-41ce-b89c-9b2b31103b72"
@@ -532,6 +641,10 @@ Example output:
 
 **Accepts Query String**
 
+**Description:**
+
+<p>Gets all the courses created by a certain instructor and returns it in an array</p>
+
 Example input:
 
     "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
@@ -550,6 +663,10 @@ Example output:
 ## GET /get_course_enrollment
 
 **Accepts Query String**
+
+**Description:**
+
+<p>Gets all students enrolled in a specific course and returns it in an array.</p>
 
 Example input:
 
