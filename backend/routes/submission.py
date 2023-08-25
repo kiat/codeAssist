@@ -59,8 +59,7 @@ def get_latest_submission():
     
 @submission.route('/upload_submission', methods=["POST", "GET"])
 @cross_origin()
-def upload_file():
-    # TODO the method name does not match the extension
+def upload_submission():
     '''
     /upload_submission uploads a submission by a student for an assignment into
     the database

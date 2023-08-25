@@ -72,14 +72,18 @@ export default function AssignmentResult() {
 
   const getAssignmentResult = () => {
     fetch(
-      "http://localhost:5000/get_submissions?" +
+      "http://localhost:5000/get_latest_submission?" +
         new URLSearchParams({
           student_id: userInfo.id,
           assignment_id: assignmentId,
         })
     )
       .then((response) => response.json())
-      .then((data) => setResults((prev) => [...prev, data[0]]));
+      .then((data) => {
+        if (data[0].completed) {
+          setResults((prev) => [...prev, data[0]]);
+        }
+      });
 
     // the following sets the assignment to a hardcoded assignment from constant.js
     // axios.post("/api/getAssignmentResult").then((res) => {
@@ -263,7 +267,7 @@ export default function AssignmentResult() {
                   style={{ marginTop: "-15px", fontWeight: "700" }}
                 >
                   {/* {assignment.score} */}
-                  <span>{results[results.length - 1]?.score ?? "null"}</span>
+                  <span>{results[results.length - 1]?.score ?? "..."}</span>
                   <span>/</span>
                   <span>{autoGraderPoints}</span>
                 </Typography.Title>
