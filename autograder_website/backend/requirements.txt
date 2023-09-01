@@ -1,5 +1,6 @@
 flask
 flask_cors
+docker
 psycopg2-binary
 python-dotenv
 flask-sqlalchemy

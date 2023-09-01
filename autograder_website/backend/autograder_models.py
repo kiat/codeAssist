@@ -13,6 +13,11 @@ class Submission(db.Model):
     execution_time = db.Column(db.Float, nullable=True)
     executed_at = db.Column(TIMESTAMP, nullable=True)
 
+class SubmissionSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Submission
+        include_fk = True
+
 @dataclass
 class Message(db.Model):
     __tablename__ = "messages"
