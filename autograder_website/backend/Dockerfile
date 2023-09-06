@@ -10,9 +10,15 @@ RUN pip install --upgrade pip
 WORKDIR /usr/app
 COPY ./requirements.txt .
 RUN pip --no-cache-dir install -r requirements.txt
+RUN echo "Hi Allen"
 
 # Copy app
 COPY . .
+
+# Create autograder directory
+RUN mkdir assignments
+# Create runs directory
+RUN mkdir runs
 
 EXPOSE 5000
 

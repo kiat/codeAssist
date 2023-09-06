@@ -72,6 +72,7 @@ def upload_submission():
     '''
     # currently only accepts a single file
     file = request.files["file"]
+    
     new_uuid = str(uuid.uuid4())
     timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
     submission_data = {
@@ -88,6 +89,20 @@ def upload_submission():
     new_submission = db.session.query(Submission).filter_by(id=new_uuid)
     new_submission = SubmissionSchema().dump(new_submission, many=True)[0]
     return jsonify(new_submission)
+
+@app.route('/upload_autograder', methods=["POST"])
+@cross_origin()
+def upload_autograder():
+    '''
+    /upload_autograder uploads an autograder to the database
+    @param file         the autograder
+    '''
+    
+    # TODO: add security features to check that the autograder is safe to run
+
+    
+
+
 
 @app.route('/message', methods=["POST"])
 @cross_origin()

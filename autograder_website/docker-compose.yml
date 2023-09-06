@@ -25,7 +25,9 @@ services:
 
   backend:
     container_name: flask
-    build: ./backend/
+    build:
+      context: "./backend/"
+      dockerfile: Dockerfile
     environment:
       FLASK_APP: autograder_app.py
       FLASK_DEBUG: 1
@@ -50,5 +52,6 @@ services:
 volumes:
   db:
     driver: local
+    name: mini_db
 
   
