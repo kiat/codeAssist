@@ -1,6 +1,6 @@
 from autograder_models import *
 from datetime import datetime
-# import docker_client
+import docker_client
 from flask import Flask, url_for, request, jsonify, flash
 from flask_cors import CORS, cross_origin
 from flask_sqlalchemy import SQLAlchemy

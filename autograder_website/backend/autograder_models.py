@@ -1,4 +1,5 @@
-from autograder_app import db, ma
+# poor design decision to import from autograder_app - this is a circular import. Can be fixed, but does not *really* matter
+from autograder_app import db, ma, app
 from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from dataclasses import dataclass

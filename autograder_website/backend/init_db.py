@@ -1,5 +1,4 @@
-from autograder_app import app, db
-from autograder_models import *
+from autograder_models import db, app
 
 # Create Postgres tables
 def create_tables():

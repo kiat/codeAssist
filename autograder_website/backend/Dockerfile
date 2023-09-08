@@ -10,7 +10,6 @@ RUN pip install --upgrade pip
 WORKDIR /usr/app
 COPY ./requirements.txt .
 RUN pip --no-cache-dir install -r requirements.txt
-RUN echo "Hi Allen"
 
 # Copy app
 COPY . .
