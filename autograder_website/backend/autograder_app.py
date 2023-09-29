@@ -12,6 +12,13 @@ from time import time
 import uuid
 from werkzeug.utils import secure_filename
 
+
+ALLOWED_EXTENSIONS = {'py','zip'}
+
+def allowed_file(filename):
+    return "." in filename and \
+        filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def create_app(config_filename: str):
     app = Flask(__name__)
     app.config.from_pyfile(config_filename)
@@ -98,10 +105,26 @@ def upload_autograder():
     @param file         the autograder
     '''
     
+    if "file" not in request.files:
+        flash("No file in /upload_autograder")
+        return "no file", 400
+    file = request.files["file"]
+    
+    if file.filename == "":
+        flash("No selected file in /upload_autograder")
+        return "no selected file", 401
+
     # TODO: add security features to check that the autograder is safe to run
 
-    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
 
+        # File stored in the filepath given by assignment_dir (currently usr/app/assignments), 
+        # file saved locally in backend/assignments as well if you chose to mount it.
+        docker_client.saveFile(file, filename, docker_client.assignment_dir, False)
+    else:
+        flash("Invalid file type")
+        return "Something went wrong (probably bad file)", 402
 
 
 @app.route('/message', methods=["POST"])

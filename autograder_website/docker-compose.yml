@@ -35,7 +35,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./backend/:/usr/app
+      # - ./backend/:/usr/app # I keep this here in case anyone wants to keep backend folder data between runs. YOU WILL HAVE TO CREATE THE FOLDERS IN YOUR BACKEND FOLDER TO MAKE THIS WORK. THIS MOUNTS THE BACKEND FOLDER TO YOUR CONTAINER.
       - /var/run/docker.sock:/var/run/docker.sock
 
   frontend:

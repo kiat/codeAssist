@@ -15,9 +15,9 @@ RUN pip --no-cache-dir install -r requirements.txt
 COPY . .
 
 # Create autograder directory
-RUN mkdir assignments
+RUN mkdir -v assignments
 # Create runs directory
-RUN mkdir runs
+RUN mkdir -v runs
 
 EXPOSE 5000
 
