@@ -27,20 +27,23 @@ export default function AssignmentResult() {
   const getAssignmentResult = useCallback(() => {
     const studentId = userInfo?.id;
 
-    axios
-      .get(`http://localhost:5000/get_results?student_id=${studentId}&assignment_id=${assignmentId}`)
-      .then((res) => {
-        const { results, student_code_file } = res.data[0]; // Assuming you get a list and you want the first item.
+    const endpointURL = `http://localhost:5000/get_results?student_id=${studentId}&assignment_id=${assignmentId}`;
 
-        setAssignmentInfo((prevState) => ({
+    axios.get(endpointURL)
+    .then(res => {
+      if (res.data && res.data.length > 0) {
+        const { results, student_code_file } = res.data[0]; 
+
+        setAssignmentInfo(prevState => ({
           ...prevState,
           results: [{ name: "Results", text: results }],
           codes: [{ name: "Code", text: student_code_file }],
         }));
-      })
-      .catch((error) => {
-        console.error("Failed to fetch assignment results:", error);
-      });
+      }
+    })
+    .catch(error => {
+      console.error("Failed to fetch assignment results:", error);
+    });
   }, [assignmentId, userInfo, setAssignmentInfo]);
 
   useEffect(() => {
