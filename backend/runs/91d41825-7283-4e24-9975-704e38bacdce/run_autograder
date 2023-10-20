@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Set up autograder files
+
+cp /autograder/submission/spiral.py /autograder/source/spiral.py
+
+cd /autograder/source
+
+FILENAME="/autograder/source/spiral.py" python3 run_tests.py

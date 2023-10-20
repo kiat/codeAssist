@@ -5,14 +5,9 @@ import { useCallback, useEffect, useState, useContext } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import UploadModal from "../../../components/UploadModal";
 import { GlobalContext } from "../../App";
-
 import "./index.css";
 import SubmissionHistoryModal from "./submissionHistoryModal";
 
-/**
- * assignment result modal
- * @returns
- */
 export default function AssignmentResult() {
   const [pageHeaderTitle, setPageHeaderTitle] = useState("Autograder Results");
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -21,50 +16,48 @@ export default function AssignmentResult() {
   const { assignmentId } = useParams();
   const location = useLocation();
 
-
-  // control assignment history window modal
   const toggleHistoryModalOpen = useCallback(() => {
-    setHistoryModalOpen(bool => !bool);
+    setHistoryModalOpen((bool) => !bool);
   }, []);
 
-  // control assignment upload modal
   const toggleUploadModalOpen = useCallback(() => {
-    setUploadModalOpen(bool => !bool);
+    setUploadModalOpen((bool) => !bool);
   }, []);
 
-  const getAssignmentResult = () => {
-    axios.post("/api/getAssignmentResult").then(res => {
-      const { assignmentName, codes, results, score, due, released } = res.data;
-      const now = Date.now();
-      setAssignmentInfo({
-        assignmentName,
-        codes,
-        results,
-        score,
-        isUpdate: now >= released && now <= due ? 1 : 0,
+  const getAssignmentResult = useCallback(() => {
+    const studentId = userInfo?.id;
+
+    axios
+      .get(`http://localhost:5000/get_results?student_id=${studentId}&assignment_id=${assignmentId}`)
+      .then((res) => {
+        const { results, student_code_file } = res.data[0]; // Assuming you get a list and you want the first item.
+
+        setAssignmentInfo((prevState) => ({
+          ...prevState,
+          results: [{ name: "Results", text: results }],
+          codes: [{ name: "Code", text: student_code_file }],
+        }));
+      })
+      .catch((error) => {
+        console.error("Failed to fetch assignment results:", error);
       });
-    });
-  };
-
-
-  // update assignment information
-  const updateAssignment = useCallback(() => {
-    getAssignmentResult();
-  }, []);
-
-  const radioChange = useCallback(e => {
-    setPageHeaderTitle(e.target.value);
-  }, []);
+  }, [assignmentId, userInfo, setAssignmentInfo]);
 
   useEffect(() => {
     getAssignmentResult();
-  }, [location.key]);
+  }, [location.key, getAssignmentResult]);
 
-  const items =
-    pageHeaderTitle === "Autograder Results"
-      ? assignmentInfo.results
+  const radioChange = useCallback(
+    (e) => {
+      setPageHeaderTitle(e.target.value);
+    },
+    []
+  );
+
+  const items = 
+    pageHeaderTitle === "Autograder Results" 
+      ? assignmentInfo.results 
       : assignmentInfo.codes;
-
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap" }}>
@@ -116,7 +109,17 @@ export default function AssignmentResult() {
                   backgroundColor: "#f9f9fb",
                 }}
               >
-                {item.text}
+                {pageHeaderTitle === "Autograder Results" ? (
+                <div>
+                  <h2>Results</h2>
+                  <p>{item.text}</p>
+                </div>
+              ) : (
+                <div>
+                  <h2>Code</h2>
+                  <pre>{item.text}</pre>
+                </div>
+              )}
               </Collapse.Panel>
             ))}
           </Collapse>
