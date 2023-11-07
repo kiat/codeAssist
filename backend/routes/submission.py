@@ -227,7 +227,7 @@ def get_results():
 
     # Query the database for results and code file
     submissions = db.session.query(Submission.results, Submission.student_code_file).filter_by(student_id=student_id, assignment_id=assignment_id).all()
-    
+
     # Convert the query results to a list of dictionaries
     results_list = [{'results': result[0], 'student_code_file': result[1]} for result in submissions]
 
