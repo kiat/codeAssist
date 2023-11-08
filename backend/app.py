@@ -1,10 +1,11 @@
-from flask_cors import cross_origin
+from flask_cors import CORS
 from api import app
 from routes.assignment import assignment
 from routes.course import course
 from routes.submission import submission
 from routes.user import user
 
+CORS(app)
 # @app.route('/', methods=["GET", "POST"])
 # @cross_origin()
 # def hello_world():
