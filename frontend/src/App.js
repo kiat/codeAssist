@@ -27,7 +27,7 @@ const { Content } = Layout;
 export const GlobalContext = createContext({
   userInfo: { name: "", isStudent: 1 },
   courseInfo: { id: "", name: "", code: "", semester: "", year: "" },
-  assignmentInfo: { id: "", score: "", code: null },
+  assignmentInfo: { id: "", score: "", results: null, code: null },
   updateCourseInfo: () => {},
   updateUserInfo: () => {},
   updateAssignmentInfo: () => {},

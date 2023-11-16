@@ -7,11 +7,13 @@ from functools import reduce
 from flask import Blueprint, request, jsonify, flash
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission, Student
-from api.schemas import AssignmentSchema, SubmissionSchema, StudentSchema
+from api.models import Assignment, Submission, Student, Enrollment
+from api.schemas import AssignmentSchema, SubmissionSchema, StudentSchema, EnrollmentSchema
 from datetime import datetime 
 from time import time 
 from sqlalchemy import desc
+import base64
+
 
 submission = Blueprint('submission', __name__)
 
@@ -35,6 +37,8 @@ def get_submission():
 
     submissions = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
     submissions = SubmissionSchema().dump(submissions, many=True)
+
+    
 
     return jsonify(submissions)
 
@@ -210,7 +214,7 @@ def upload_assignment_autograder():
         return "something went wrong (probably bad file)", 400
     
 @submission.route('/get_results', methods=["GET"])
-@cross_origin()
+@cross_origin(origins='*')
 def get_results():
     '''
     /get_results gets reseults of a student's submission
@@ -224,10 +228,34 @@ def get_results():
     submissions = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
     submissions = SubmissionSchema().dump(submissions, many=True)
 
-    # Query for results and code file
     submissions = db.session.query(Submission.results, Submission.student_code_file).filter_by(student_id=student_id, assignment_id=assignment_id).all()
-    results_list = [{'results': result[0], 'student_code_file': result[1]} for result in submissions]
+    results_list = []
 
+    for result, code_file in submissions:
+        # Encode the binary data into base64 string if it's not None
+        result_decoded = base64.b64encode(result).decode('utf-8') if result else None
+        code_file_decoded = base64.b64encode(code_file).decode('utf-8') if code_file else None
+        results_list.append({'results': result_decoded, 'student_code_file': code_file_decoded})
 
     return jsonify(results_list)
+
+@submission.route('/get_course_assignment_latest_submissions', methods=["GET"])
+@cross_origin()
+def get_course_assignment_latest_submissions():
+    course_id = request.args.get("course_id")
+    assignment_id = request.args.get("assignment_id")
+    # process of creating the table on front end: using enrollments table, 
+    # get latest submissions for each student of the assignment or display they haven't submitted, 
+    # get student name (make it a link to their submission), get student email, get score of that submission, 
+    # graded or not, viewed, time of submission
+
+
+    # 1) we find all students enrolled in the course
+    enrolled_students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id).all()
+
+    # 2) we find the latest submission for each student for the given assignment
+    submissions = db.session.query()
+
+    return jsonify()
+
 

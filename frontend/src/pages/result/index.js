@@ -51,6 +51,9 @@ export default function AssignmentResult() {
   const [autoGraderPoints, setAutograderPoints] = useState(0);
   const [results, setResults] = useState([]);
   const [code, setCode] = useState("");
+  const [latestSubmission, getLatestSubmission] = useState(null);
+  const [latestCode, getLatestCode] = useState(null);
+
 
   const formattingSelectedUpdate = useCallback((value) => {
     setFormattingSelected(value);
@@ -73,31 +76,20 @@ export default function AssignmentResult() {
   const getAssignmentResult = () => {
     fetch(
       "http://localhost:5000/get_latest_submission?" +
-        new URLSearchParams({
-          student_id: userInfo.id,
-          assignment_id: assignmentId,
-        })
+      new URLSearchParams({
+        student_id: userInfo.id,
+        assignment_id: assignmentId,
+      })
     )
       .then((response) => response.json())
       .then((data) => {
         if (data[0].completed) {
           setResults((prev) => [...prev, data[0]]);
+          getLatestSubmission(data[0].results); // Store the entire object
+          getLatestCode(data[0].student_code_file);
         }
       });
 
-    // the following sets the assignment to a hardcoded assignment from constant.js
-    // axios.post("/api/getAssignmentResult").then((res) => {
-    //   const { assignmentName, codes, results, score, due, released } = res.data;
-    //   const now = Date.now();
-    //   setAssignment({
-    //     assignmentName,
-    //     codes,
-    //     results,
-    //     score,
-    //     isUpdate: now >= released && now <= due ? 1 : 0,
-    //     formattingData: formattingData,
-    //   });
-    // });
   };
 
   // update assignment information
@@ -151,6 +143,19 @@ export default function AssignmentResult() {
   //     ? assignment.results
   //     : assignment.codes;
 
+  const FormattedJson = ({ jsonString }) => {
+    try {
+      // Unescaping and parsing the JSON string
+      const parsedJson = JSON.parse(JSON.parse(`"${jsonString}"`));
+  
+      // Returning the formatted JSON
+      return <pre>{JSON.stringify(parsedJson, null, 2)}</pre>;
+    } catch (error) {
+      console.error("Error parsing JSON:", error);
+      return <p>Error displaying results</p>;
+    }
+  };
+
   return (
     <>
       <PageContent>
@@ -198,27 +203,20 @@ export default function AssignmentResult() {
                   backgroundColor: "white",
                 }}
               >
-                {pageHeaderTitle === "Autograder Results" ? (
-                  results?.tests?.map((item, index) => (
-                    <Collapse.Panel
-                      key={index}
-                      header={
-                        <span
-                          style={{
-                            color: item?.score === 0 ? "red" : "#20716a",
-                          }}
-                        >{`${item.name} (${item.score}/${item.max_score})`}</span>
-                      }
-                      showArrow={false}
-                      style={{
-                        marginBottom: "20px",
-                        border: "1px solid #d9d9d9",
-                        backgroundColor: "#f9f9fb",
-                      }}
-                    >
-                      {item.output}
-                    </Collapse.Panel>
-                  ))
+                {pageHeaderTitle === "Autograder Results" && latestSubmission ? (
+                  <Collapse.Panel
+                    header="Latest Result"
+                    key="1"
+                    showArrow={false}
+                    style={{
+                      marginBottom: "20px",
+                      border: "1px solid #d9d9d9",
+                      backgroundColor: "#f9f9fb",
+                    }}
+                  >
+                    <pre>{JSON.stringify(latestSubmission, null, 2)}</pre>
+                { /* <FormattedJson jsonString={JSON.stringify(latestSubmission, null, 2)}/>*/}
+                  </Collapse.Panel>
                 ) : (
                   <Collapse.Panel
                     header="file"
@@ -229,7 +227,8 @@ export default function AssignmentResult() {
                       backgroundColor: "#f9f9fb",
                     }}
                   >
-                    {code}
+                    <pre>{JSON.stringify(latestCode, null, 2)}</pre>
+                   {/* <FormattedJson jsonString={JSON.stringify(latestCode, null, 2)}/>*/} 
                   </Collapse.Panel>
                 )}
               </Collapse>
