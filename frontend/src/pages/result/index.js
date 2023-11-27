@@ -85,7 +85,7 @@ export default function AssignmentResult() {
       .then((data) => {
         if (data[0].completed) {
           setResults((prev) => [...prev, data[0]]);
-          getLatestSubmission(data[0].results); // Store the entire object
+          getLatestSubmission(JSON.parse(data[0].results)); // Store the entire object
           getLatestCode(data[0].student_code_file);
         }
       });
@@ -138,23 +138,43 @@ export default function AssignmentResult() {
     { title: "description", dataIndex: "description" },
   ];
 
-  // const items =
-  //   pageHeaderTitle === "Autograder Results"
-  //     ? assignment.results
-  //     : assignment.codes;
 
-  const FormattedJson = ({ jsonString }) => {
-    try {
-      // Unescaping and parsing the JSON string
-      const parsedJson = JSON.parse(JSON.parse(`"${jsonString}"`));
-  
-      // Returning the formatted JSON
-      return <pre>{JSON.stringify(parsedJson, null, 2)}</pre>;
-    } catch (error) {
-      console.error("Error parsing JSON:", error);
-      return <p>Error displaying results</p>;
+  /**
+   * Used to display the results json on the results tab
+   *
+   */
+  function DisplayJsonResults({ jsonData }) {
+    // Check if jsonData is undefined or if tests is not an array
+    if (!jsonData || !Array.isArray(jsonData.tests)) {
+      console.log('jsonData:', jsonData);
+      return <p>Data is loading or not available...</p>;
     }
-  };
+
+    return (
+      <div>
+        <h2>Tests</h2>
+        {/* Since we checked above, we can safely use map on jsonData.tests */}
+        {jsonData.tests.map((test, index) => (
+          <div key={index}>
+            <p>Name: {test.name}</p>
+            <p>Score: {test.score}/{test.max_score}</p>
+            <p>Status: {test.status}</p>
+            {/* Render output if it exists */}
+            {test.output && <pre>{test.output}</pre>}
+          </div>
+        ))}
+
+        {/* Display Other Details with safe access using optional chaining */}
+        <h2>Other Details</h2>
+        <p>Visibility: {jsonData.visibility}</p>
+        <p>Execution Time: {jsonData.execution_time}</p>
+        <p>Total Score: {jsonData.score}</p>
+      </div>
+    );
+  }
+
+  const passedTests = latestSubmission.tests.filter(test => test.status === 'passed');
+  const failedTests = latestSubmission.tests.filter(test => test.status !== 'passed');
 
   return (
     <>
@@ -214,8 +234,11 @@ export default function AssignmentResult() {
                       backgroundColor: "#f9f9fb",
                     }}
                   >
-                    <pre>{JSON.stringify(latestSubmission, null, 2)}</pre>
-                { /* <FormattedJson jsonString={JSON.stringify(latestSubmission, null, 2)}/>*/}
+
+                    <div>
+                      <DisplayJsonResults jsonData={latestSubmission} />
+                    </div>
+
                   </Collapse.Panel>
                 ) : (
                   <Collapse.Panel
@@ -227,8 +250,8 @@ export default function AssignmentResult() {
                       backgroundColor: "#f9f9fb",
                     }}
                   >
-                    <pre>{JSON.stringify(latestCode, null, 2)}</pre>
-                   {/* <FormattedJson jsonString={JSON.stringify(latestCode, null, 2)}/>*/} 
+
+                    <pre>{latestCode}</pre>
                   </Collapse.Panel>
                 )}
               </Collapse>
@@ -272,38 +295,23 @@ export default function AssignmentResult() {
                 </Typography.Title>
               </div>
               <div>
+                {/* I did not test if the failed tests works yet */}
                 <Typography.Title level={5}>FAILED TESTS</Typography.Title>
-                {results?.tests
-                  ?.filter((item) => item.score === 0)
-                  ?.map((item, index) => (
-                    <div style={{ color: "red" }} key={index}>
-                      {/* test_1 (tester.TestDiffs) (0.0/5.0) */}
-                      <span>{item.name}</span>
-                      <span>{` (${item.score}/${item.max_score})`}</span>
-                    </div>
-                  ))}
-                {/* <Typography.Text style={{ color: "red" }}>
-                  test_1 (tester.TestDiffs) (0.0/5.0)
-                </Typography.Text> */}
+                {failedTests.map((test, index) => (
+                  <div key={index} style={{ color: "red" }}>
+                    <span>{test.name}</span>
+                    <span>{` (${test.score}/${test.max_score})`}</span>
+                  </div>
+                ))}
               </div>
               <div>
                 <Typography.Title level={5}>PASSED TESTS</Typography.Title>
-                {results?.tests
-                  ?.filter((item) => item.score !== 0)
-                  ?.map((item, index) => (
-                    <div key={index} style={{ color: "#20716a" }}>
-                      <span>{item.name}</span>
-                      <span>{` (${item.score}/${item.max_score})`}</span>
-                    </div>
-                  ))}
-                {/* {assignment.results?.map(item => (
-                  <Typography.Paragraph
-                    key={item.id}
-                    style={{ color: "#20716a" }}
-                  >
-                    {item.name}
-                  </Typography.Paragraph>
-                ))} */}
+                {passedTests.map((test, index) => (
+                  <div key={index} style={{ color: "#20716a" }}>
+                    <span>{test.name}</span>
+                    <span>{` (${test.score}/${test.max_score})`}</span>
+                  </div>
+                ))}
               </div>
               <div>
                 <div style={{ lineHeight: "30px" }}>
