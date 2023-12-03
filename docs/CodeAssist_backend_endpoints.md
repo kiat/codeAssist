@@ -612,6 +612,19 @@ Example Output:
       "published": false
     }
 
+# GET /get_course_assignment_latest_submissions
+**Accepts Query String**
+
+**Description:**
+<p>Gets all latest submissions for an assignments based on course enrollement and assignment </p>
+
+Example Input:
+{
+  
+}
+Example Output:
+
+
 # Other
 
 ## GET /get_course_assignments
