@@ -31,7 +31,7 @@ export default () => {
             ...Object.fromEntries(
             Object.entries(formData).filter(([_, value]) => value !== undefined))
         };
-        fetch("http://localhost:5000/update_account", {
+        fetch(process.env.REACT_APP_API_URL + "/update_account", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
