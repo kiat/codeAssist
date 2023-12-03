@@ -76,7 +76,7 @@ export default function AssignmentResult() {
   // TODO: remove hardcoded
   const getAssignmentResult = () => {
     fetch(
-      "http://localhost:5000/get_latest_submission?" +
+      process.env.REACT_APP_API_URL + '/get_latest_submission?' +
       new URLSearchParams({
         student_id: userInfo.id,
         assignment_id: assignmentId,
@@ -242,7 +242,7 @@ export default function AssignmentResult() {
                 position: "fixed",
                 bottom: 0,
                 width: "100%",
-                marginLeft: "-1px",
+                marginLeft: "10px",
               }}
             />
           </div>

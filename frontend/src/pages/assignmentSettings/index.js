@@ -39,7 +39,7 @@ export default () => {
       return Promise.reject(new Error('Assignment ID is undefined'));
     }
 
-    return fetch(`http://localhost:5000/delete_assignment?assignment_id=${assignmentId}`, {
+    return fetch(process.env.REACT_APP_API_URL + `/delete_assignment?assignment_id=${assignmentId}`, {
       method: "DELETE",
       mode: 'cors',
     })
