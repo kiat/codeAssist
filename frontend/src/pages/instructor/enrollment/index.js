@@ -67,7 +67,7 @@ export default () => {
       const { email } = values;
 
       fetch(
-        process.env.REACT_APP_API_URL + "/get_student?" +
+        "http://localhost:5000/get_student?" +
           new URLSearchParams({
             email: email,
           })
@@ -96,7 +96,7 @@ export default () => {
 
       function enrollmentBulk(item) {
         fetch(
-          process.env.REACT_APP_API_URL +  "/get_student?" +
+          "http://localhost:5000/get_student?" +
             new URLSearchParams({
               email: item,
             })

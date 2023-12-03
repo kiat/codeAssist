@@ -1,2 +1,0 @@
-# CodeAssist submission results info
-

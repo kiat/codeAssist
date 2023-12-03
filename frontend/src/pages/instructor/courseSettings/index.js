@@ -47,7 +47,7 @@ export default () => {
   const handleDeleteCourse = () => {
     if (assignments.length === 0) {
       fetch(
-        process.env.REACT_APP_API_URL + "/delete_course?" +
+        "http://localhost:5000/delete_course?" +
           new URLSearchParams({
             course_id: courseId,
           }), {
@@ -80,7 +80,7 @@ export default () => {
       ...Object.fromEntries(
       Object.entries(formData).filter(([_, value]) => value !== undefined))
     };
-    fetch(process.env.REACT_APP_API_URL + "/update_course", {
+    fetch("http://localhost:5000/update_course", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
