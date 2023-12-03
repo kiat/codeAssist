@@ -118,7 +118,7 @@ export default function Assignments() {
 
 
   useEffect(() => {
-    fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
+    fetch("http://localhost:5000/get_course_assignments?" +
       new URLSearchParams({ course_id: courseId }))
       .then(res => res.json())
       .then(async assignmentsData => {
@@ -128,7 +128,7 @@ export default function Assignments() {
 
           try {
             const response = await fetch(
-              process.env.REACT_APP_API_URL + "/get_latest_submission?" +
+              "http://localhost:5000/get_latest_submission?" +
               new URLSearchParams({
                 student_id: userInfo.id,
                 assignment_id: assignment.id,

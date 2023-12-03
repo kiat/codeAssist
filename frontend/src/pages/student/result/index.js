@@ -27,7 +27,7 @@ export default function AssignmentResult() {
   const getAssignmentResult = useCallback(() => {
     const studentId = userInfo?.id;
 
-    const endpointURL = process.env.REACT_APP_API_URL + `/get_results?student_id=${studentId}&assignment_id=${assignmentId}`;
+    const endpointURL = `http://localhost:5000/get_results?student_id=${studentId}&assignment_id=${assignmentId}`;
 
     axios.get(endpointURL)
     .then(res => {
