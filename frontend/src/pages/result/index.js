@@ -51,7 +51,7 @@ export default function AssignmentResult() {
   const [autoGraderPoints, setAutograderPoints] = useState(0);
   const [results, setResults] = useState([]);
   const [code, setCode] = useState("");
-  const [latestSubmission, getLatestSubmission] = useState(null);
+  const [latestSubmission, getLatestSubmission] = useState({ tests: [] });
   const [latestCode, getLatestCode] = useState(null);
 
 
@@ -73,6 +73,7 @@ export default function AssignmentResult() {
     setUploadModalOpen((bool) => !bool);
   }, []);
 
+  // TODO: remove hardcoded
   const getAssignmentResult = () => {
     fetch(
       "http://localhost:5000/get_latest_submission?" +
@@ -217,44 +218,22 @@ export default function AssignmentResult() {
               ]}
             />
             <Card bordered={false}>
-              <Collapse
-                style={{
-                  border: "0px",
-                  backgroundColor: "white",
-                }}
-              >
+              
                 {pageHeaderTitle === "Autograder Results" && latestSubmission ? (
-                  <Collapse.Panel
-                    header="Latest Result"
-                    key="1"
-                    showArrow={false}
-                    style={{
-                      marginBottom: "20px",
-                      border: "1px solid #d9d9d9",
-                      backgroundColor: "#f9f9fb",
-                    }}
-                  >
+                  <div>
 
                     <div>
                       <DisplayJsonResults jsonData={latestSubmission} />
                     </div>
 
-                  </Collapse.Panel>
+                  </div>
                 ) : (
-                  <Collapse.Panel
-                    header="file"
-                    showArrow={false}
-                    style={{
-                      marginBottom: "20px",
-                      border: "1px solid #d9d9d9",
-                      backgroundColor: "#f9f9fb",
-                    }}
-                  >
+                  <div>
 
                     <pre>{latestCode}</pre>
-                  </Collapse.Panel>
+                  </div>
                 )}
-              </Collapse>
+    
             </Card>
             <div
               style={{
