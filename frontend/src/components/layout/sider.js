@@ -37,7 +37,7 @@ export default function RootSider({
   useEffect(() => {
     if (courseInfo.id && (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode)) {
       fetch(
-        "http://localhost:5000/get_course_info?" +
+        process.env.REACT_APP_API_URL + "/get_course_info?" +
           new URLSearchParams({
             course_id: courseId,
           })
