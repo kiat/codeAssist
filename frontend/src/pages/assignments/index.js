@@ -119,7 +119,6 @@ export default function Assignments() {
 
   useEffect(() => {
     if (!userInfo || !userInfo.id) {
-      // If there is no user, redirect to login or do not perform the fetch.
       navigate('/');
       return;
     }
