@@ -23,9 +23,18 @@ README.md by [Allen Wu](mailto:allen.wu@utexas.edu)
     ```bash
     cd frontend;npm install; cd ..
     ```
-3. Create the database  
+3. Create a `.env` file in the frontend directory
+    ```bash
+    touch ./frontend/.env
+    ```
+    In your `.env` file, add this React environment variable:
+
+    ```bash
+    REACT_APP_API_URL={where your backend is hosted}
+    ```
+4. Create the database  
     After you have successfully installed postgres, use it to create the database that you will use for this project.
-4. Create a `.env` file in the backend directory and add your DB connection string
+5. Create a `.env` file in the backend directory and add your DB connection string
 
     ```bash
     touch ./backend/.env
@@ -36,22 +45,22 @@ README.md by [Allen Wu](mailto:allen.wu@utexas.edu)
     ```bash
     DB_CONNECTION_STRING="postgresql://{username}:{password}@localhost:5432/{database}"
     ```
-5. Create the required tables
+6. Create the required tables
     ```bash
     python3 ./backend/init_db.py
     ```
-6. Start the backend service  
+7. Start the backend service  
     Within the backend folder run:
     ```bash
     python3 app.py
     ```
-7. Start the frontend service  
+8. Start the frontend service  
     In a NEW terminal  
     cd into the frontend folder and run:
     ```bash
     npm run start
     ```
-8. Test end to end functionality by creating a new instructor
+9. Test end to end functionality by creating a new instructor
 
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
