@@ -92,9 +92,9 @@ export default function Assignments() {
   //   // If the assignment is not submitted and the due date has passed, do nothing
   // };
 
-/**
- * TODO: this may be deleted later once testing is fully done on the new nameColLinkAction
- */
+  /**
+   * TODO: this may be deleted later once testing is fully done on the new nameColLinkAction
+   */
   const closeModal = () => {
     setModalOpen(false);
   }
@@ -118,6 +118,11 @@ export default function Assignments() {
 
 
   useEffect(() => {
+    if (!userInfo || !userInfo.id) {
+      // If there is no user, redirect to login or do not perform the fetch.
+      navigate('/');
+      return;
+    }
     fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
       new URLSearchParams({ course_id: courseId }))
       .then(res => res.json())
@@ -138,7 +143,7 @@ export default function Assignments() {
 
             if (submissionData.length > 0 && submissionData[0].completed) {
               submissionStatus = 1; // submitted
-              grade = submissionData[0].score; 
+              grade = submissionData[0].score;
             }
           } catch (error) {
             console.error("Error fetching submission data:", error);
@@ -173,42 +178,42 @@ export default function Assignments() {
           </Descriptions.Item>
         </Descriptions>
       </PageHeader>
-  
+
       <Card bordered={false}>
         {courseAssignment ? (
-        <Table
-          columns={
-            columns
-          }
-          dataSource={courseAssignment.filter(assignment => assignment.published)}
-          rowKey='id'
-          onRow={(record) => {
-            return {
-              onClick: () => {
-                const now = Date.now();
-                const publishedDate = moment(record.published_date).valueOf();
-                const dueDate = moment(record.due_date).valueOf();
-                const isSubmitted = record.status
-          
-                if (isSubmitted) {
-                  navigate(`/assignmentresult/${record.id}`);
-                } else if (now <= dueDate) {
-                  // Open modal to submit assignment since the due date has not passed and it's not submitted
-                  setModalOpen(true);
-                  setAssignmentTitle(record.name);
-                  setAssignmentID(record.id);
-                }
-                // If not submitted and the due date has passed, do nothing.
-              },
-            };
-          }}
-          
-        />
+          <Table
+            columns={
+              columns
+            }
+            dataSource={courseAssignment.filter(assignment => assignment.published)}
+            rowKey='id'
+            onRow={(record) => {
+              return {
+                onClick: () => {
+                  const now = Date.now();
+                  const publishedDate = moment(record.published_date).valueOf();
+                  const dueDate = moment(record.due_date).valueOf();
+                  const isSubmitted = record.status
+
+                  if (isSubmitted) {
+                    navigate(`/assignmentresult/${record.id}`);
+                  } else if (now <= dueDate) {
+                    // Open modal to submit assignment since the due date has not passed and it's not submitted
+                    setModalOpen(true);
+                    setAssignmentTitle(record.name);
+                    setAssignmentID(record.id);
+                  }
+                  // If not submitted and the due date has passed, do nothing.
+                },
+              };
+            }}
+
+          />
         ) : (
           <div>No assignments yet</div>
         )}
       </Card>
-      <AssignmentModal open={isModalOpen} onCancel={closeModal} assignmentID = {assignmentID} assignmentTitle = {assignmentTitle}/>
+      <AssignmentModal open={isModalOpen} onCancel={closeModal} assignmentID={assignmentID} assignmentTitle={assignmentTitle} />
     </>
   );
 
