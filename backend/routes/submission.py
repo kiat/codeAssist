@@ -11,7 +11,7 @@ from api.models import Assignment, Submission, Student, Enrollment
 from api.schemas import AssignmentSchema, SubmissionSchema, StudentSchema, EnrollmentSchema
 from datetime import datetime 
 from time import time 
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 import base64
 
 
@@ -232,7 +232,6 @@ def get_results():
     results_list = []
 
     for result, code_file in submissions:
-        # Encode the binary data into base64 string if it's not None
         result_decoded = base64.b64encode(result).decode('utf-8') if result else None
         code_file_decoded = base64.b64encode(code_file).decode('utf-8') if code_file else None
         results_list.append({'results': result_decoded, 'student_code_file': code_file_decoded})
@@ -258,50 +257,88 @@ def get_results():
 
 #     return jsonify()
 
+# @submission.route('/get_course_assignment_latest_submissions', methods=["GET"])
+# @cross_origin()
+# def get_course_assignment_latest_submissions():
+#     course_id = request.args.get("course_id")
+#     assignment_id = request.args.get("assignment_id")
+
+#     # 1) Find all students enrolled in the course
+#     enrolled_students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id).all()
+
+#     submission_data = []
+#     for student in enrolled_students:
+#         student_id = student.student_id
+
+#         # 2) Find the latest submission for each student for the given assignment
+#         latest_submission = db.session.query(Submission).filter_by(
+#             student_id=student_id, assignment_id=assignment_id
+#         ).order_by(desc(Submission.executed_at)).first()
+
+#         # 3) Get student details
+#         student_details = db.session.query(Student).filter_by(id=student_id).first()
+
+#         # Constructing response data
+#         if latest_submission:
+#             submission_info = {
+#                 "student_name": student_details.name,
+#                 "email": student_details.email_address,
+#                 "score": latest_submission.score,
+#                 "executed_at": latest_submission.executed_at
+#             }
+#         else:
+#             # Handling case where the student hasn't submitted the assignment
+#             submission_info = {
+#                 "student_name": student_details.name,
+#                 "email": student_details.email_address
+#             }
+
+#         submission_data.append(submission_info)
+
+#     return jsonify(submission_data)
+
+
 @submission.route('/get_course_assignment_latest_submissions', methods=["GET"])
 @cross_origin()
 def get_course_assignment_latest_submissions():
     course_id = request.args.get("course_id")
     assignment_id = request.args.get("assignment_id")
 
-    # 1) Find all students enrolled in the course
-    enrolled_students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id).all()
+    # for each student, find the latest submission executed_at time 
+    latest_submissions_time = db.session.query(
+        Submission.student_id,
+        func.max(Submission.executed_at).label('latest_executed_at')
+    ).filter(
+        Submission.assignment_id == assignment_id
+    ).group_by(
+        Submission.student_id
+    ).subquery()
+
+    # find latest submission for each student
+    latest_submissions = db.session.query(Submission, Student).join(
+        Student, Student.id == Submission.student_id
+    ).join(
+        latest_submissions_time, 
+        (Submission.student_id == latest_submissions_time.c.student_id) &
+        (Submission.executed_at == latest_submissions_time.c.latest_executed_at)
+    ).filter(
+        Enrollment.student_id == Student.id,
+        Enrollment.course_id == course_id
+    ).all()
 
     submission_data = []
-    for student in enrolled_students:
-        student_id = student.student_id
-
-        # 2) Find the latest submission for each student for the given assignment
-        latest_submission = db.session.query(Submission).filter_by(
-            student_id=student_id, assignment_id=assignment_id
-        ).order_by(desc(Submission.submission_time)).first()
-
-        # 3) Get student details
-        student_details = db.session.query(Student).filter_by(id=student_id).first()
-
-        # Constructing response data
-        if latest_submission:
-            submission_info = {
-                "student_name": student_details.name,
-                "email": student_details.email,
-                "score": latest_submission.score,
-                "graded": latest_submission.graded,
-                "viewed": latest_submission.viewed,
-                "submission_time": latest_submission.submission_time
-            }
-        else:
-            # Handling case where the student hasn't submitted the assignment
-            submission_info = {
-                "student_name": student_details.name,
-                "email": student_details.email,
-                "score": None,
-                "graded": False,
-                "viewed": False,
-                "submission_time": None
-            }
-
+    for submission, student in latest_submissions:
+        submission_info = {
+            "student_name": student.name,
+            "email_address": student.email_address,
+            "score": submission.score,
+            "executed_at": submission.executed_at,
+        }
         submission_data.append(submission_info)
 
     return jsonify(submission_data)
+
+
+
 
 
