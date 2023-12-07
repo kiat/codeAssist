@@ -16,7 +16,6 @@ import { useCallback } from "react";
 import { useContext } from "react";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
-// import { useParams } from "react-router-dom";
 
 
 export default () => {
@@ -27,10 +26,6 @@ export default () => {
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
   const { assignmentId } = useParams();
-
-  // const {} = useParams();
-  // const { assignmentId } = useParams();
-  // const [searchParams] = useSearchParams();
 
   const toggleDownloadModalOpen = useCallback(() => {
     setDownloadModalOpen(t => !t);
@@ -150,8 +145,8 @@ export default () => {
         <PageHeader title={`Review Grades for ${assignmentInfo?.name}`} />
         <Table
           columns={columns}
-          dataSource={submissions} // This is updated to use the fetched data
-          rowKey="id" // Ensure that each record has a unique 'id' property
+          dataSource={submissions}
+          rowKey="id"
           style={{ marginLeft: "10px" }}
         />
       </PageContent>
