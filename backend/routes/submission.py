@@ -38,8 +38,6 @@ def get_submission():
     submissions = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
     submissions = SubmissionSchema().dump(submissions, many=True)
 
-    
-
     return jsonify(submissions)
 
 @submission.route('/get_latest_submission', methods=["GET"])
@@ -238,66 +236,6 @@ def get_results():
 
     return jsonify(results_list)
 
-# @submission.route('/get_course_assignment_latest_submissions', methods=["GET"])
-# @cross_origin()
-# def get_course_assignment_latest_submissions():
-#     course_id = request.args.get("course_id")
-#     assignment_id = request.args.get("assignment_id")
-#     # process of creating the table on front end: using enrollments table, 
-#     # get latest submissions for each student of the assignment or display they haven't submitted, 
-#     # get student name (make it a link to their submission), get student email, get score of that submission, 
-#     # graded or not, viewed, time of submission
-
-
-#     # 1) we find all students enrolled in the course
-#     enrolled_students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id).all()
-
-#     # 2) we find the latest submission for each student for the given assignment
-#     submissions = db.session.query()
-
-#     return jsonify()
-
-# @submission.route('/get_course_assignment_latest_submissions', methods=["GET"])
-# @cross_origin()
-# def get_course_assignment_latest_submissions():
-#     course_id = request.args.get("course_id")
-#     assignment_id = request.args.get("assignment_id")
-
-#     # 1) Find all students enrolled in the course
-#     enrolled_students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id).all()
-
-#     submission_data = []
-#     for student in enrolled_students:
-#         student_id = student.student_id
-
-#         # 2) Find the latest submission for each student for the given assignment
-#         latest_submission = db.session.query(Submission).filter_by(
-#             student_id=student_id, assignment_id=assignment_id
-#         ).order_by(desc(Submission.executed_at)).first()
-
-#         # 3) Get student details
-#         student_details = db.session.query(Student).filter_by(id=student_id).first()
-
-#         # Constructing response data
-#         if latest_submission:
-#             submission_info = {
-#                 "student_name": student_details.name,
-#                 "email": student_details.email_address,
-#                 "score": latest_submission.score,
-#                 "executed_at": latest_submission.executed_at
-#             }
-#         else:
-#             # Handling case where the student hasn't submitted the assignment
-#             submission_info = {
-#                 "student_name": student_details.name,
-#                 "email": student_details.email_address
-#             }
-
-#         submission_data.append(submission_info)
-
-#     return jsonify(submission_data)
-
-
 @submission.route('/get_course_assignment_latest_submissions', methods=["GET"])
 @cross_origin()
 def get_course_assignment_latest_submissions():
@@ -337,8 +275,3 @@ def get_course_assignment_latest_submissions():
         submission_data.append(submission_info)
 
     return jsonify(submission_data)
-
-
-
-
-
