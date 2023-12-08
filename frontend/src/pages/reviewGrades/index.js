@@ -48,13 +48,14 @@ export default () => {
     });
     navigate(`/assignmentResult/${assignmentInfo.id}`);
   };
-
+  
+// TODO: clicking students name shouldn't link to the same page as a student view
   const columns = [
     {
       title: "FIRST & LAST NAME",
       dataIndex: "student_name",
       render: text => (
-        <Typography.Link onClick={() => goAssignmentResult(text)}>
+        <Typography.Link onClick={() => goAssignmentResult(text)}> 
           {text}
         </Typography.Link>
       ),
@@ -62,7 +63,7 @@ export default () => {
     },
     {
       title: "EMAIL",
-      dataIndex: "email",
+      dataIndex: "email_address",
       render: text => <Typography.Link>{text}</Typography.Link>,
       sorter: (a, b) => a.email > b.email,
     },
