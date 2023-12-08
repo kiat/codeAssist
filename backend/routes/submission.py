@@ -216,25 +216,23 @@ def upload_assignment_autograder():
 def get_results():
     '''
     /get_results gets reseults of a student's submission
+    useful for instructor side view to view student's results
     Requires from the frontend a JSON containing:
-    @param student_id       the id of a student
+    @param email       the email_address of a student
     @param assignment_id    the id of an assignment
     '''
-    student_id = request.args.get("student_id")
+    email = request.args.get("email")
     assignment_id = request.args.get("assignment_id")
 
-    submissions = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
-    submissions = SubmissionSchema().dump(submissions, many=True)
+    student = db.session.query(Student).filter_by(email_address=email).first()
+    if student:
+        student_id = student.id
 
-    submissions = db.session.query(Submission.results, Submission.student_code_file).filter_by(student_id=student_id, assignment_id=assignment_id).all()
-    results_list = []
-
-    for result, code_file in submissions:
-        result_decoded = base64.b64encode(result).decode('utf-8') if result else None
-        code_file_decoded = base64.b64encode(code_file).decode('utf-8') if code_file else None
-        results_list.append({'results': result_decoded, 'student_code_file': code_file_decoded})
-
-    return jsonify(results_list)
+    submission = (db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
+                    .order_by(desc(Submission.executed_at)).limit(1))
+    submission = SubmissionSchema().dump(submission, many=True)
+    
+    return jsonify(submission)
 
 @submission.route('/get_course_assignment_latest_submissions', methods=["GET"])
 @cross_origin()

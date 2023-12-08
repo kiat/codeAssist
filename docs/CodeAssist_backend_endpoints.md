@@ -612,6 +612,37 @@ Example Output:
       "published": false
     }
 
+# GET /get_results
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets the results of the latest submission by a student for an assignment for
+instructor use.</p>
+
+Example Input:
+
+    {
+      "email":"tester123@example.com",
+      "assignment_id: "dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
+    }
+
+Example Output:
+
+    {
+      "id": "176fafed-0a61-41fd-abf9-e055d58b950c",
+      "student_id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "assignment_id: "dfbd967d-8951-4052-82aa-ce55b1d3d0e7",
+      "student_code_file": [binary data],
+      "results": [binary data],
+      "score": "90",
+      "execution_time": "11.015512943267822",
+      "executed_at": "2023-08-09 04:39:27",
+      "completed": "true"
+    }
+
+
+
 # GET /get_course_assignment_latest_submissions
 **Accepts Query String**
 
@@ -620,9 +651,24 @@ Example Output:
 
 Example Input:
 {
-  
+  "course_id"="fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+  "assignment_id"="dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
 }
 Example Output:
+  [
+  {
+    "email_address": "test2@example.com",
+    "executed_at": "Thu, 30 Nov 2023 20:02:55 GMT",
+    "score": 90.0,
+    "student_name": "test 2"
+  },
+  {
+    "email_address": "tester123@example.com",
+    "executed_at": "Thu, 30 Nov 2023 19:48:13 GMT",
+    "score": 90.0,
+    "student_name": "Test"
+  }
+]
 
 
 # Other
