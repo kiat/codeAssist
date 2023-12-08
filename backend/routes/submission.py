@@ -234,42 +234,82 @@ def get_results():
     
     return jsonify(submission)
 
+# This is simpler, but fails to get the students who did not submit
+# @submission.route('/get_course_assignment_latest_submissions', methods=["GET"])
+# @cross_origin()
+# def get_course_assignment_latest_submissions():
+#     course_id = request.args.get("course_id")
+#     assignment_id = request.args.get("assignment_id")
+
+#     # for each student, find the latest submission executed_at time 
+#     latest_submissions_time = db.session.query(
+#         Submission.student_id,
+#         func.max(Submission.executed_at).label('latest_executed_at')
+#     ).filter(
+#         Submission.assignment_id == assignment_id
+#     ).group_by(
+#         Submission.student_id
+#     ).subquery()
+
+#     # find latest submission for each student
+#     latest_submissions = db.session.query(Submission, Student).join(
+#         Student, Student.id == Submission.student_id
+#     ).join(
+#         latest_submissions_time, 
+#         (Submission.student_id == latest_submissions_time.c.student_id) &
+#         (Submission.executed_at == latest_submissions_time.c.latest_executed_at)
+#     ).filter(
+#         Enrollment.student_id == Student.id,
+#         Enrollment.course_id == course_id
+#     ).all()
+
+#     submission_data = []
+#     for submission, student in latest_submissions:
+#         submission_info = {
+#             "student_name": student.name,
+#             "email_address": student.email_address,
+#             "score": submission.score,
+#             "executed_at": submission.executed_at,
+#         }
+#         submission_data.append(submission_info)
+
+#     return jsonify(submission_data)
+
 @submission.route('/get_course_assignment_latest_submissions', methods=["GET"])
 @cross_origin()
 def get_course_assignment_latest_submissions():
     course_id = request.args.get("course_id")
     assignment_id = request.args.get("assignment_id")
 
-    # for each student, find the latest submission executed_at time 
-    latest_submissions_time = db.session.query(
-        Submission.student_id,
-        func.max(Submission.executed_at).label('latest_executed_at')
-    ).filter(
-        Submission.assignment_id == assignment_id
-    ).group_by(
-        Submission.student_id
-    ).subquery()
-
-    # find latest submission for each student
-    latest_submissions = db.session.query(Submission, Student).join(
-        Student, Student.id == Submission.student_id
-    ).join(
-        latest_submissions_time, 
-        (Submission.student_id == latest_submissions_time.c.student_id) &
-        (Submission.executed_at == latest_submissions_time.c.latest_executed_at)
-    ).filter(
-        Enrollment.student_id == Student.id,
-        Enrollment.course_id == course_id
-    ).all()
+    # 1) Find all students enrolled in the course
+    enrolled_students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id).all()
 
     submission_data = []
-    for submission, student in latest_submissions:
-        submission_info = {
-            "student_name": student.name,
-            "email_address": student.email_address,
-            "score": submission.score,
-            "executed_at": submission.executed_at,
-        }
+    for student in enrolled_students:
+        student_id = student.student_id
+
+        # 2) Find the latest submission for each student for the given assignment
+        latest_submission = db.session.query(Submission).filter_by(
+            student_id=student_id, assignment_id=assignment_id
+        ).order_by(desc(Submission.executed_at)).first()
+
+        # 3) Get student details
+        student_details = db.session.query(Student).filter_by(id=student_id).first()
+
+        if latest_submission:
+            submission_info = {
+                "student_name": student_details.name,
+                "email_address": student_details.email_address,
+                "score": latest_submission.score,
+                "executed_at": latest_submission.executed_at
+            }
+        else:
+            # if a student hasn't submitted the assignment
+            submission_info = {
+                "student_name": student_details.name,
+                "email_address": student_details.email_address,
+            }
+
         submission_data.append(submission_info)
 
     return jsonify(submission_data)
