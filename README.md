@@ -45,6 +45,14 @@ README.md by [Allen Wu](mailto:allen.wu@utexas.edu)
     ```bash
     DB_CONNECTION_STRING="postgresql://{username}:{password}@localhost:5432/{database}"
     ```
+
+If you run backend in a docker container then do the following. 
+    
+    ```bash
+   DB_CONNECTION_STRING="postgresql://{username}:{password}@host.docker.internal:5432/codeassist"
+    ```
+
+    
 6. Create the required tables
     ```bash
     python3 ./backend/init_db.py
