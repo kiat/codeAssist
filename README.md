@@ -51,28 +51,57 @@
     DB_CONNECTION_STRING="postgresql://{username}:{password}@localhost:5432/{database}"
     ```
 
+
+
+    
+6. Start Postgres DB and Create the required tables
+   
+    ```bash
+    sudo systemctl start postgresql
+    ```
+    
+    ```bash
+    python3 ./backend/init_db.py
+    ```
+7.  Start Docker and run backend
+   
+
+
+    ```bash
+    sudo systemctl start docker
+
+    ```
+    (Optional) Enable Docker and Postgres to start on boot
+
+    ```bash
+    sudo systemctl enable docker
+    ```
+
 If you run backend in a docker container, then the backend inside the container needs to connect to the localhost databases. 
 To enable this you need to make the following change in your .env file. 
 ```
    DB_CONNECTION_STRING="postgresql://{username}:{password}@host.docker.internal:5432/codeassist"
 ```
 
-    
-6. Create the required tables
+
+8. Start the backend service using  docker-compose
+
     ```bash
-    python3 ./backend/init_db.py
+    docker-compose up backend
     ```
-7. Start the backend service  
-    Within the backend folder run:
-    ```bash
-    python3 app.py
-    ```
-8. Start the frontend service  
+
+8. Start the frontend service
     In a NEW terminal  
     cd into the frontend folder and run:
     ```bash
-    npm run start
+    cd frontned
     ```
+
+    ```bash
+
+    npm start 
+    ```
+
 9. Test end to end functionality by creating a new instructor
 
 ### Important ports:
