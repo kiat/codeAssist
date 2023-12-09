@@ -4,9 +4,16 @@
 
 ### Requirements:
 
-- python ([Install](https://www.python.org/downloads/))
-- postgresql ([Install](https://www.postgresql.org/download/))
+- `python` ([Install](https://www.python.org/downloads/))
+- `docker` ([Install](https://docs.docker.com/get-docker/))
 - npm ([Install](https://nodejs.org/en/download))
+- `postgresql` ([Install](https://www.postgresql.org/download/))
+- `pip3 install -r ./backend/requirements.txt`
+- `docker-compose`
+
+    ```bash
+    pip install docker-compose
+        ```
 
 ### Setup:
 
