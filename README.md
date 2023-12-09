@@ -1,7 +1,5 @@
 # Code Assist
 
-README.md by [Allen Wu](mailto:allen.wu@utexas.edu)
-
 ## Quickstart: Local Development
 
 ### Requirements:
@@ -46,11 +44,11 @@ README.md by [Allen Wu](mailto:allen.wu@utexas.edu)
     DB_CONNECTION_STRING="postgresql://{username}:{password}@localhost:5432/{database}"
     ```
 
-If you run backend in a docker container then do the following. 
-    
-    ```bash
+If you run backend in a docker container, then the backend inside the container needs to connect to the localhost databases. 
+To enable this you need to make the following change in your .env file. 
+```
    DB_CONNECTION_STRING="postgresql://{username}:{password}@host.docker.internal:5432/codeassist"
-    ```
+```
 
     
 6. Create the required tables
