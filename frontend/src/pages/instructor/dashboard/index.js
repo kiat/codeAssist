@@ -16,7 +16,7 @@ import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
-const api_url = "http://localhost:5000/get_course_assignments";
+const api_url = process.env.REACT_APP_API_URL + "/get_course_assignments";
 const course_id = "577031b8-ac04-4c33-84bf-32a82c2ce5ba"; //need to figure out how to find global course_id,
 //for now change this to a course_id you have in the database
 const columns = [
@@ -154,7 +154,7 @@ export default function InstructorDashboard() {
     }
     if (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode) {
       fetch(
-        "http://localhost:5000/get_course_info?" +
+        process.env.REACT_APP_API_URL + "/get_course_info?" +
           new URLSearchParams({
             course_id: courseId,
           })

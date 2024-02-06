@@ -5,11 +5,11 @@ import {
 } from "@ant-design/icons";
 import { useContext } from "react";
 import { GlobalContext } from "../../App";
-import { Link } from "react-router-dom";
+import { Link, useNavigate} from "react-router-dom";
 
 export default function AccountPopoverContent() {
   const { updateUserInfo } = useContext(GlobalContext);
-
+  const navigate = useNavigate();
   const userId = JSON.parse(localStorage.getItem("userInfo"))?.id;
   
   return (
@@ -37,6 +37,7 @@ export default function AccountPopoverContent() {
         onClick={() => {
           localStorage.removeItem("userInfo");
           updateUserInfo(null);
+          navigate('/');
         }}
       >
         <PoweroffOutlined />

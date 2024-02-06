@@ -1,14 +1,19 @@
 # Code Assist
 
-README.md by [Allen Wu](mailto:allen.wu@utexas.edu)
-
 ## Quickstart: Local Development
 
 ### Requirements:
 
-- python ([Install](https://www.python.org/downloads/))
-- postgresql ([Install](https://www.postgresql.org/download/))
+- `python` ([Install](https://www.python.org/downloads/))
+- `docker` ([Install](https://docs.docker.com/get-docker/))
 - npm ([Install](https://nodejs.org/en/download))
+- `postgresql` ([Install](https://www.postgresql.org/download/))
+- `pip3 install -r ./backend/requirements.txt`
+- `docker-compose`
+
+    ```bash
+    pip install docker-compose
+        ```
 
 ### Setup:
 
@@ -23,9 +28,18 @@ README.md by [Allen Wu](mailto:allen.wu@utexas.edu)
     ```bash
     cd frontend;npm install; cd ..
     ```
-3. Create the database  
+3. Create a `.env` file in the frontend directory
+    ```bash
+    touch ./frontend/.env
+    ```
+    In your `.env` file, add this React environment variable:
+
+    ```bash
+    REACT_APP_API_URL={where your backend is hosted}
+    ```
+4. Create the database  
     After you have successfully installed postgres, use it to create the database that you will use for this project.
-4. Create a `.env` file in the backend directory and add your DB connection string
+5. Create a `.env` file in the backend directory and add your DB connection string
 
     ```bash
     touch ./backend/.env
@@ -36,22 +50,59 @@ README.md by [Allen Wu](mailto:allen.wu@utexas.edu)
     ```bash
     DB_CONNECTION_STRING="postgresql://{username}:{password}@localhost:5432/{database}"
     ```
-5. Create the required tables
+
+
+
+    
+6. Start Postgres DB and Create the required tables
+   
+    ```bash
+    sudo systemctl start postgresql
+    ```
+    
     ```bash
     python3 ./backend/init_db.py
     ```
-6. Start the backend service  
-    Within the backend folder run:
+7.  Start Docker and run backend
+   
+
+
     ```bash
-    python3 app.py
+    sudo systemctl start docker
+
     ```
-7. Start the frontend service  
+    (Optional) Enable Docker and Postgres to start on boot
+
+    ```bash
+    sudo systemctl enable docker
+    ```
+
+If you run backend in a docker container, then the backend inside the container needs to connect to the localhost databases. 
+To enable this you need to make the following change in your .env file. 
+```
+   DB_CONNECTION_STRING="postgresql://{username}:{password}@host.docker.internal:5432/codeassist"
+```
+
+
+8. Start the backend service using  docker-compose
+
+    ```bash
+    docker-compose up backend
+    ```
+
+8. Start the frontend service
     In a NEW terminal  
     cd into the frontend folder and run:
     ```bash
-    npm run start
+    cd frontned
     ```
-8. Test end to end functionality by creating a new instructor
+
+    ```bash
+
+    npm start 
+    ```
+
+9. Test end to end functionality by creating a new instructor
 
 ### Important ports:
 Frontend is hosted at `localhost:3000`  

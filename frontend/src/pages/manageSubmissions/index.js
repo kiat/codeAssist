@@ -77,7 +77,7 @@ export default () => {
   ];
 
   useEffect(() => {
-    fetch("http://localhost:5000/get_course_enrollment?" + 
+    fetch(process.env.REACT_APP_API_URL + "/get_course_enrollment?" + 
       new URLSearchParams({
         course_id: courseInfo.id
       })
@@ -91,7 +91,7 @@ export default () => {
   useEffect(() => {
     if (Object.keys(students).length > 0 && assignmentInfo.id && Object.keys(tableData).length < 1) {
       students.forEach(student => {
-        fetch("http://localhost:5000/get_latest_submission?" +
+        fetch(process.env.REACT_APP_API_URL + "/get_latest_submission?" +
           new URLSearchParams({
             student_id: student.id,
             assignment_id: assignmentInfo.id

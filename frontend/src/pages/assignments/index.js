@@ -15,7 +15,7 @@ import AssignmentModal from "./assignment_modal";
 export default function Assignments() {
   const [courseAssignment, setCourseAssignment] = useState([]);
   const urlParams = useParams();
-  const {courseId} = urlParams;
+  const { courseId } = urlParams;
   const navigate = useNavigate();
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const location = useLocation();
@@ -29,9 +29,10 @@ export default function Assignments() {
     {
       title: "NAME",
       dataIndex: "name",
-      sorter: (a, b) => a.name > b.name,
-      render: (text) => (
-        <Button type="link" onClick={() => {openModal(text)}}>
+      key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name),
+      render: (text, record) => (
+        <Button type="link" onClick={() => nameColLinkAction(record)}>
           {text}
         </Button>
       )
@@ -70,42 +71,97 @@ export default function Assignments() {
     },
   ];
 
-  const openModal = (text) => {
-    setModalOpen(true);
-    setAssignmentTitle(text)
-    const curr_assignment = courseAssignment.find((assignment) => assignment.name === text);
-    setAssignmentID(curr_assignment.id)
-  }
+  /**
+   * This is how it was originally done, so I have left it here just in case
+   * This functionality is now done through handleAssignmentAction
+   */
+  // const openModal = (assignment) => {
+  //   const now = moment();
+  //   const dueDateHasPassed = now.isAfter(moment(assignment.due_date));
+  //   const isSubmitted = assignment.status === 1;
 
+  //   if (isSubmitted) {
+  //     // If the assignment has been submitted, navigate to the assignment results
+  //     navigate(`/assignmentresult/${assignment.id}`);
+  //   } else if (!dueDateHasPassed) {
+  //     // If the assignment is not submitted and the due date has not passed, open the upload modal
+  //     setModalOpen(true);
+  //     setAssignmentTitle(assignment.name);
+  //     setAssignmentID(assignment.id);
+  //   }
+  //   // If the assignment is not submitted and the due date has passed, do nothing
+  // };
 
-
+  /**
+   * TODO: this may be deleted later once testing is fully done on the new nameColLinkAction
+   */
   const closeModal = () => {
     setModalOpen(false);
   }
+  // Function to handle the opening of the modal or navigation based on the assignment's state
+  const nameColLinkAction = (assignment) => {
+    const now = moment();
+    const dueDateTime = moment(assignment.due_date).valueOf();
+
+    const isSubmitted = assignment.status;
+    const dueDateHasPassed = now.isAfter(dueDateTime);
+
+    if (isSubmitted) {
+      navigate(`/assignmentresult/${assignment.id}`);
+    } else if (!dueDateHasPassed) {
+      setModalOpen(true);
+      setAssignmentTitle(assignment.name);
+      setAssignmentID(assignment.id);
+    }
+    // If the due date has passed and it's not submitted, do nothing.
+  };
 
 
   useEffect(() => {
-    fetch("http://localhost:5000/get_course_assignments?" +
-      new URLSearchParams({
-        course_id: courseId
+    if (!userInfo || !userInfo.id) {
+      navigate('/');
+      return;
+    }
+    fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
+      new URLSearchParams({ course_id: courseId }))
+      .then(res => res.json())
+      .then(async assignmentsData => {
+        const updatedAssignments = await Promise.all(assignmentsData.map(async assignment => {
+          let submissionStatus = 0; // default status (not submitted)
+          let grade = "-"; // default grade
+
+          try {
+            const response = await fetch(
+              process.env.REACT_APP_API_URL + "/get_latest_submission?" +
+              new URLSearchParams({
+                student_id: userInfo.id,
+                assignment_id: assignment.id,
+              })
+            );
+            const submissionData = await response.json();
+
+            if (submissionData.length > 0 && submissionData[0].completed) {
+              submissionStatus = 1; // submitted
+              grade = submissionData[0].score;
+            }
+          } catch (error) {
+            console.error("Error fetching submission data:", error);
+          }
+
+          return {
+            ...assignment,
+            status: submissionStatus,
+            grades: grade,
+          };
+        }));
+
+        setCourseAssignment(updatedAssignments);
       })
-    )
-    .then(res => res.json()) // Extract JSON data from the response
-    .then(data => {
-      //console.log(new Date("" + data[0].published_date + "Z"));
-      const convertedData = data;
-      for (let i = 0; i < data.length; i++) {
-        let thisPublishedDate = convertedData[i].published_date;
-        let thisDueDate = convertedData[i].due_date;
-        convertedData[i].published_date = (thisPublishedDate) ? thisPublishedDate + "Z" : null;
-        convertedData[i].due_date = (thisDueDate) ? thisDueDate + "Z" : null;
-      }
-      setCourseAssignment(convertedData); // Set the retrieved data in the state
-  })
-    .catch(error => {
-      console.error("Error fetching course assignments:", error);
-  });
-}, []);
+      .catch(error => {
+        console.error("Error fetching course assignments:", error);
+      });
+  }, [courseId, userInfo.id]);
+
 
 
   return (
@@ -121,65 +177,43 @@ export default function Assignments() {
           </Descriptions.Item>
         </Descriptions>
       </PageHeader>
-      {/* <div
-        style={{
-          display: "flex",
-          marginTop: "7px",
-        }}
-      >
-        <div style={{ flex: "1" }}>
-          <h3>{courseInfo.code}</h3>
-          <h4>{courseInfo.semester}</h4>
-          <p>Course ID: {urlParams.courseId}</p>
-        </div>
-        {userInfo?.isStudent ? null : (
-          <div
-            style={{
-              flexBasis: "150px",
-            }}
-          >
-            <Button icon={<UploadOutlined />} onClick={toggleUploadModalOpen}>
-              upload
-            </Button>
-          </div>
-        )}
-      </div> */}
+
       <Card bordered={false}>
         {courseAssignment ? (
-        <Table
-          columns={
-            columns
-            // userInfo?.isStudent
-            //   ? columns
-            //   : columns.filter(item => item.dataIndex !== "status")
-          }
-          dataSource={courseAssignment.filter(assignment => assignment.published)}
-          rowKey='id'
-          onRow={record => {
-            const { published_date, id, status, due_date } = record;
-            const publishedDate = moment(published_date).valueOf();
-            const dueDate = moment(due_date).valueOf();
-            return {
-              onClick: () => {
-                const now = Date.now();
-                // console.log((
-                //   (publishedDate <= now && now <= dueDate) + " " + (dueDate <= now && status === 1)
-                //   ));
-                if (!(
-                  (publishedDate <= now && now <= dueDate) || (dueDate <= now && status === 1)
-                  )
-                ) {
-                  navigate(`/assignmentresult/${id}`);
-                }
-              },
-            };
-          }}
-        />
+          <Table
+            columns={
+              columns
+            }
+            dataSource={courseAssignment.filter(assignment => assignment.published)}
+            rowKey='id'
+            onRow={(record) => {
+              return {
+                onClick: () => {
+                  const now = Date.now();
+                  const publishedDate = moment(record.published_date).valueOf();
+                  const dueDate = moment(record.due_date).valueOf();
+                  const isSubmitted = record.status
+
+                  if (isSubmitted) {
+                    navigate(`/assignmentresult/${record.id}`);
+                  } else if (now <= dueDate) {
+                    // Open modal to submit assignment since the due date has not passed and it's not submitted
+                    setModalOpen(true);
+                    setAssignmentTitle(record.name);
+                    setAssignmentID(record.id);
+                  }
+                  // If not submitted and the due date has passed, do nothing.
+                },
+              };
+            }}
+
+          />
         ) : (
           <div>No assignments yet</div>
         )}
       </Card>
-      <AssignmentModal open={isModalOpen} onCancel={closeModal} assignmentID = {assignmentID} assignmentTitle = {assignmentTitle}/>
+      <AssignmentModal open={isModalOpen} onCancel={closeModal} assignmentID={assignmentID} assignmentTitle={assignmentTitle} />
     </>
   );
+
 }

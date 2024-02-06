@@ -12,7 +12,7 @@ instance.interceptors.response.use(
   },
   err => {
     message.error("operation failed");
-    return Promise.reject(err);
+    return Promise.reject(err); // TODO: put real error reason
   }
 );
 
