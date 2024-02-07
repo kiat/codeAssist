@@ -16,7 +16,7 @@ const FileUpload = () => {
 
 		data.append("file", file);
 		data.append("assignment", assignment);
-		const url = process.env.REACT_APP_API_URL + "/upload";
+		const url = "http://localhost:5000/upload";
 		const response = await axios.post(url, data, {});
 		setResponse(JSON.parse(response.data["results"]));
 		setLogs(response.data["logs"]);

@@ -51,9 +51,6 @@ export default function AssignmentResult() {
   const [autoGraderPoints, setAutograderPoints] = useState(0);
   const [results, setResults] = useState([]);
   const [code, setCode] = useState("");
-  const [latestSubmission, getLatestSubmission] = useState({ tests: [] });
-  const [latestCode, getLatestCode] = useState(null);
-
 
   const formattingSelectedUpdate = useCallback((value) => {
     setFormattingSelected(value);
@@ -73,24 +70,30 @@ export default function AssignmentResult() {
     setUploadModalOpen((bool) => !bool);
   }, []);
 
-  // TODO: remove hardcoded
   const getAssignmentResult = () => {
     fetch(
-      process.env.REACT_APP_API_URL + "/get_latest_submission?" +
-      new URLSearchParams({
-        student_id: userInfo.id,
-        assignment_id: assignmentId,
-      })
+      "http://localhost:5000/get_submissions?" +
+        new URLSearchParams({
+          student_id: userInfo.id,
+          assignment_id: assignmentId,
+        })
     )
       .then((response) => response.json())
-      .then((data) => {
-        if (data[0].completed) {
-          setResults((prev) => [...prev, data[0]]);
-          getLatestSubmission(JSON.parse(data[0].results)); // Store the entire object
-          getLatestCode(data[0].student_code_file);
-        }
-      });
+      .then((data) => setResults((prev) => [...prev, data[0]]));
 
+    // the following sets the assignment to a hardcoded assignment from constant.js
+    // axios.post("/api/getAssignmentResult").then((res) => {
+    //   const { assignmentName, codes, results, score, due, released } = res.data;
+    //   const now = Date.now();
+    //   setAssignment({
+    //     assignmentName,
+    //     codes,
+    //     results,
+    //     score,
+    //     isUpdate: now >= released && now <= due ? 1 : 0,
+    //     formattingData: formattingData,
+    //   });
+    // });
   };
 
   // update assignment information
@@ -139,43 +142,10 @@ export default function AssignmentResult() {
     { title: "description", dataIndex: "description" },
   ];
 
-
-  /**
-   * Used to display the results json on the results tab
-   *
-   */
-  function DisplayJsonResults({ jsonData }) {
-    // Check if jsonData is undefined or if tests is not an array
-    if (!jsonData || !Array.isArray(jsonData.tests)) {
-      console.log('jsonData:', jsonData);
-      return <p>Data is loading or not available...</p>;
-    }
-
-    return (
-      <div>
-        <h2>Tests</h2>
-        {/* Since we checked above, we can safely use map on jsonData.tests */}
-        {jsonData.tests.map((test, index) => (
-          <div key={index}>
-            <p>Name: {test.name}</p>
-            <p>Score: {test.score}/{test.max_score}</p>
-            <p>Status: {test.status}</p>
-            {/* Render output if it exists */}
-            {test.output && <pre>{test.output}</pre>}
-          </div>
-        ))}
-
-        {/* Display Other Details with safe access using optional chaining */}
-        <h2>Other Details</h2>
-        <p>Visibility: {jsonData.visibility}</p>
-        <p>Execution Time: {jsonData.execution_time}</p>
-        <p>Total Score: {jsonData.score}</p>
-      </div>
-    );
-  }
-
-  const passedTests = latestSubmission.tests.filter(test => test.status === 'passed');
-  const failedTests = latestSubmission.tests.filter(test => test.status !== 'passed');
+  // const items =
+  //   pageHeaderTitle === "Autograder Results"
+  //     ? assignment.results
+  //     : assignment.codes;
 
   return (
     <>
@@ -218,22 +188,47 @@ export default function AssignmentResult() {
               ]}
             />
             <Card bordered={false}>
-              
-                {pageHeaderTitle === "Autograder Results" && latestSubmission ? (
-                  <div>
-
-                    <div>
-                      <DisplayJsonResults jsonData={latestSubmission} />
-                    </div>
-
-                  </div>
+              <Collapse
+                style={{
+                  border: "0px",
+                  backgroundColor: "white",
+                }}
+              >
+                {pageHeaderTitle === "Autograder Results" ? (
+                  results?.tests?.map((item, index) => (
+                    <Collapse.Panel
+                      key={index}
+                      header={
+                        <span
+                          style={{
+                            color: item?.score === 0 ? "red" : "#20716a",
+                          }}
+                        >{`${item.name} (${item.score}/${item.max_score})`}</span>
+                      }
+                      showArrow={false}
+                      style={{
+                        marginBottom: "20px",
+                        border: "1px solid #d9d9d9",
+                        backgroundColor: "#f9f9fb",
+                      }}
+                    >
+                      {item.output}
+                    </Collapse.Panel>
+                  ))
                 ) : (
-                  <div>
-
-                    <pre>{latestCode}</pre>
-                  </div>
+                  <Collapse.Panel
+                    header="file"
+                    showArrow={false}
+                    style={{
+                      marginBottom: "20px",
+                      border: "1px solid #d9d9d9",
+                      backgroundColor: "#f9f9fb",
+                    }}
+                  >
+                    {code}
+                  </Collapse.Panel>
                 )}
-    
+              </Collapse>
             </Card>
             <div
               style={{
@@ -268,29 +263,44 @@ export default function AssignmentResult() {
                   style={{ marginTop: "-15px", fontWeight: "700" }}
                 >
                   {/* {assignment.score} */}
-                  <span>{results[results.length - 1]?.score ?? "..."}</span>
+                  <span>{results[results.length - 1]?.score ?? "null"}</span>
                   <span>/</span>
                   <span>{autoGraderPoints}</span>
                 </Typography.Title>
               </div>
               <div>
-                {/* I did not test if the failed tests works yet */}
                 <Typography.Title level={5}>FAILED TESTS</Typography.Title>
-                {failedTests.map((test, index) => (
-                  <div key={index} style={{ color: "red" }}>
-                    <span>{test.name}</span>
-                    <span>{` (${test.score}/${test.max_score})`}</span>
-                  </div>
-                ))}
+                {results?.tests
+                  ?.filter((item) => item.score === 0)
+                  ?.map((item, index) => (
+                    <div style={{ color: "red" }} key={index}>
+                      {/* test_1 (tester.TestDiffs) (0.0/5.0) */}
+                      <span>{item.name}</span>
+                      <span>{` (${item.score}/${item.max_score})`}</span>
+                    </div>
+                  ))}
+                {/* <Typography.Text style={{ color: "red" }}>
+                  test_1 (tester.TestDiffs) (0.0/5.0)
+                </Typography.Text> */}
               </div>
               <div>
                 <Typography.Title level={5}>PASSED TESTS</Typography.Title>
-                {passedTests.map((test, index) => (
-                  <div key={index} style={{ color: "#20716a" }}>
-                    <span>{test.name}</span>
-                    <span>{` (${test.score}/${test.max_score})`}</span>
-                  </div>
-                ))}
+                {results?.tests
+                  ?.filter((item) => item.score !== 0)
+                  ?.map((item, index) => (
+                    <div key={index} style={{ color: "#20716a" }}>
+                      <span>{item.name}</span>
+                      <span>{` (${item.score}/${item.max_score})`}</span>
+                    </div>
+                  ))}
+                {/* {assignment.results?.map(item => (
+                  <Typography.Paragraph
+                    key={item.id}
+                    style={{ color: "#20716a" }}
+                  >
+                    {item.name}
+                  </Typography.Paragraph>
+                ))} */}
               </div>
               <div>
                 <div style={{ lineHeight: "30px" }}>

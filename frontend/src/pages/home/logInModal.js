@@ -17,29 +17,20 @@ export default function LogInModal({ open, onCancel, logIn }) {
     // const isStudent = values.isStudent;
     const { isStudent, ...restValue } = values;
     let res;
-    try {
-
-      if (isStudent) {
-        res = await studentLogin(restValue);
-      } else {
-        res = await instructorLogin(restValue);
-      }
-
-      if (res) {
-        const userInfo = {
-          name: res.data?.name,
-          id: res.data?.id,
-          isStudent,
-        };
-        localStorage.setItem("userInfo", JSON.stringify(userInfo));
-        updateUserInfo(userInfo);
-      } 
-    } catch (error) {
-      if (error.response) {
-        alert('User authentication failed. Invalid Username/Password combination');
-      }
+    if (isStudent) {
+      res = await studentLogin(restValue);
+    } else {
+      res = await instructorLogin(restValue);
     }
-    
+    if (res) {
+      const userInfo = {
+        name: res.data?.name,
+        id: res.data?.id,
+        isStudent,
+      };
+      localStorage.setItem("userInfo", JSON.stringify(userInfo));
+      updateUserInfo(userInfo);
+    }
     // axios
     //   .post("/logIn", values)
     //   .then(res => {

@@ -27,7 +27,7 @@ export default function AssignmentModal({ open, onCancel, submit, assignmentID, 
     formData.append('assignment_id', assignmentID);
     // formData.append('name', userInfo.name);
    
-    fetch(process.env.REACT_APP_API_URL + "/upload_submission", {
+    fetch("http://localhost:5000/upload_submission", {
       method: "POST",
       body: formData
     })
@@ -56,7 +56,7 @@ export default function AssignmentModal({ open, onCancel, submit, assignmentID, 
           <Upload.Dragger
             name="file"
             multiple={false}
-            action={`${process.env.REACT_APP_API_URL}/upload_submission`}
+            action="http://localhost:5000/upload_submission"
             onChange={handleFileChange}
             beforeUpload={handleBeforeUpload}
             onDrop={e => console.log('Dropped files', e.dataTransfer.files)}

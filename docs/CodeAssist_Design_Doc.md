@@ -1,16 +1,12 @@
 # CodeAssist Design Doc
 
 # Motivation
-In any area of education, the ability to efficiently grade assignments and provide meaningful feedback to students is essential. In computer science education specifically, instructors can utilize auto-grading systems like Gradescope to auto-grade their assignments, manage course enrollments and grades, and give meaningful feedback to students. 
-CodeAssit is a system that can provide personalized detailed feedback about students' programming assignments including debugging, efficiency, style, and object-oriented design patterns, in various formats. 
+
+In any area of education, the ability to efficiently grade assignments and provide meaningful feedback to students is essential. In computer science education specifically, instructors can utilize tools like Gradescope to auto-grade their assignments, manage course enrollments and grades, and give meaningful feedback to students. However, convenient tools like Gradescrope aren’t free and not all universities can afford to pay for these nice-to-have technologies. This is where CodeAssist comes in. 
 
 # Summary
-CodeAssist is a free and open-source feedback system designed for programming courses. It can be used in computer science courses to provide automated and rapid feedback on students' programming assignment submissions. CodeAssist offers feedback on various aspects of students' code, including debugging, efficiency, style, and object-oriented design patterns, in various formats. While offering students static feedback on their code, as current systems do, proves helpful in addressing specific coding problems within particular tasks, it might fall short of enabling students to develop transferable strategies for other coding challenges. 
 
-Thus, our study focuses on the following research questions:
-  1. How can an adaptive AI-assisted feedback system support students’ development of metacognition?
-  2. How can AI-assisted feedback systems support the reinforcement of students’ metacognition?
-  3. How AI-assisted feedback systems should generate personalized feedback for CS education?
+CodeAssist is a free and open-source feedback system designed for programming courses. It can be used in various computer science classes to provide automated and rapid feedback on students' programming assignment submissions. CodeAssist offers feedback on various aspects of students' code, including debugging, efficiency, style, and object-oriented design patterns, in various formats.
 
 
 
@@ -27,7 +23,6 @@ To start, we will offer some basic functionality for both instructors and studen
 
 - View their registered courses and associated assignments
 - Receive their assignment grade immediately after submission 
-
 
 We plan to make CodeAssist simple to install so that universities or even university professors can easily install our software. 
 
@@ -76,7 +71,6 @@ Our Python/Flask backend provides a suite of REST API endpoints to the frontend.
 The CodeAssist backend takes advantage of Docker to ensure that all student code is executed in a sandboxed environment. This ensures that we protect against malicious code or code with unintended consequences. When a student submits code for their assignment, we save the file to the database, copy the file and the assignment autograder into a new docker image, execute the docker image in a container, and finally, store the result in our database and return it to the frontend. 
 
 
-
 # Data Model
 ## SQL Database Model 
 
@@ -109,16 +103,11 @@ After exploring SQL and NoSQL options for our database, I recommended we use a S
 
 **Course Table**
 
-| id              | uuid (primary key)            |
-| --------------- | ----------------------------- |
-| name            | varchar                       |
-| instructor_id   | Instructor Foreign Key (uuid) |
-| sis_course_id   | varchar                       |
-| semester        | varchar                       |
-| year            | varchar                       |
-| entryCode       | varchar                       |
-| allowEntryCode  | boolean                       |
-| description     | varchar                       |
+| id            | uuid (primary key)            |
+| ------------- | ----------------------------- |
+| name          | varchar                       |
+| instructor_id | Instructor Foreign Key (uuid) |
+| sis_course_id | varchar                       |
 
 **Assignment Table**
 
@@ -127,16 +116,8 @@ After exploring SQL and NoSQL options for our database, I recommended we use a S
 | name              | varchar            |
 | course_id         | Course Foreign Key |
 | due_date          | date               |
-| anonymous_grading | boolean            |
-| enable_group      | boolean            |
-| group_size        | int                |
-| leaderboard       | int                |
-| late_submission   | boolean            |
-| late_due_date     | date               |
-| manual_grading    | boolean            |
 | autograder_points | float              |
 | published         | boolean            |
-| published_date    | date               |
 | autograder_file   | bytea              |
 
 
@@ -157,13 +138,13 @@ After exploring SQL and NoSQL options for our database, I recommended we use a S
 
 ## UML Diagram
 
+
 ![](https://paper-attachments.dropboxusercontent.com/s_09C2C6457685AED4FCCA9A0FADFF67EF8DD44ED32ADBC94D9A4DCA550765B697_1670559611334_CodeAssist_UML.png)
 
 
 
 # Installation Instructions
 ## How to install
-
 1. Clone the repository
     `git clone git@github.com:kiat/codeAssist.git`
 2. Install Dependencies
@@ -206,7 +187,6 @@ Your backend should now be running on `http://localhost:5000` and your frontend 
 [ ] Integrate with Canvas
 [ ] Add caching layer
 [ ] Use ML to learn about common student mistakes and how they solve them + use this information to help suggest fixes for future students
-
 # Important Links
 
 [CodeAssist Github Repository](https://github.com/kiat/codeAssist)

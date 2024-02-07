@@ -77,7 +77,7 @@ def setup_directory(container, file, filename, run_dir):
 
     # Copy over autograder zip
     copyAndDecompressZip(os.path.join(assignment_dir, container, "Dockerfile.zip"), run_dir)
-# todo: get rid of hard coded Dockerfile.zip
+
 
 def clean_directory(run_dir):
     shutil.rmtree(run_dir)

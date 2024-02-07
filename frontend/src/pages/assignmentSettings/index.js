@@ -1,5 +1,18 @@
 import { DeleteOutlined } from "@ant-design/icons";
-import { Button, Card, Checkbox, Col, DatePicker, Form, Input, message, PageHeader, Radio, Row, Space, } from "antd";
+import {
+  Button,
+  Card,
+  Checkbox,
+  Col,
+  DatePicker,
+  Form,
+  Input,
+  message,
+  PageHeader,
+  Radio,
+  Row,
+  Space,
+} from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getAssignment, updateAssignment } from "../../services/assignment";
@@ -32,30 +45,16 @@ export default () => {
     getAssignmentInfo();
   }, [getAssignmentInfo]);
 
-  const handleDeleteAssignment = (assignmentId) => {
-    if (!assignmentId) {
-      console.error('Assignment ID is undefined');
-      message.error('Cannot delete assignment without an ID');
-      return Promise.reject(new Error('Assignment ID is undefined'));
-    }
-
-    return fetch(`${process.env.REACT_APP_API_URL}/delete_assignment?assignment_id=${assignmentId}`, {
-      method: "DELETE",
-      mode: 'cors',
-    })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Network response was not ok, status: ${response.status}`);
+  const handleDeleteAssignment = () => {
+    fetch (
+      "http://localhost:5000/delete_assignment?" + 
+        new URLSearchParams({
+          assignment_id: assignmentId,
+        }), {
+          method: "DELETE"
         }
-        return response.json();
-      })
-      .catch(error => {
-        console.error('There has been a problem with the fetch operation:', error);
-        message.error('Failed to delete assignment');
-        return Promise.reject(error);
-      });
-  };
-
+    )
+  }
 
   const currentDate = () => {
     const current = new Date();
@@ -71,13 +70,13 @@ export default () => {
     } else {
       publishedDate = values.releaseDate._d;
     }
-
+    
     const newAssignmentData = {
       assignment_id: assignmentId,
-      name: values.name,
-      course_id: courseId,
-      due_date: values.dueDate._d,
-      autograder_points: values.autograderPoints,
+      name: values.name, 
+      course_id: courseId, 
+      due_date: values.dueDate._d, 
+      autograder_points: values.autograderPoints, 
       anonymous_grading: values.submissionAnonymization,
       manual_grading: values.manualGrading,
       late_submission: values.allowLateSubmissions,
@@ -91,7 +90,7 @@ export default () => {
     const validData = Object.fromEntries(
       Object.entries(newAssignmentData).filter(([_, value]) => value !== undefined)
     );
-    updateAssignment(validData).then(res => {
+    updateAssignment(validData).then(res =>{
       message.success("Successfully updated assignment");
     });
   }
@@ -232,19 +231,13 @@ export default () => {
               <Button type='primary' htmlType='submit'>
                 Save
               </Button>
-              <Button
-                danger type='primary'
-                icon={<DeleteOutlined />}
-                onClick={() => {
-                  handleDeleteAssignment(assignmentId)
-                    .then(() => {
-                      // Only navigate away if deletion was successful
-                      navigateMainPage();
-                    })
-                    .catch((error) => {
-                      message.error('Failed to delete assignment');
-                    });
-                }}>
+              <Button 
+              danger type='primary' 
+              icon={<DeleteOutlined />}
+              onClick = {() => {
+                handleDeleteAssignment();
+                navigateMainPage();
+              }}>
                 Delete assignment
               </Button>
             </Space>

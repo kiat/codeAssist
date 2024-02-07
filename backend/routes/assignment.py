@@ -2,8 +2,8 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission
-from api.schemas import AssignmentSchema, SubmissionSchema
+from api.models import Assignment
+from api.schemas import AssignmentSchema
 
 assignment = Blueprint('assignment', __name__)
 
@@ -62,25 +62,15 @@ def create_assignment():
 
     return jsonify(newAssignment)
 
-@assignment.route('/delete_assignment', methods=["DELETE"])
+@assignment.route('/delete_assignment', methods = ["DELETE", "OPTIONS"])
 @cross_origin()
 def delete_assignment():
-    assignment_id = request.args.get("assignment_id")
-
-    # Check if there are any submissions for this assignment
-    related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment_id).all()
-    if related_submissions:
-        for submission in related_submissions:
-            db.session.delete(submission)
-        db.session.commit()
-
-    # actually delete assignment
-    assignment_to_delete = db.session.query(Assignment).get(assignment_id)
-    if assignment_to_delete:
+    if request.method == "OPTIONS":
+        return "", 200
+    if request.method == "DELETE":
+        assignment_id = request.args.get("assignment_id")
+        assignment_to_delete = db.session.get(Assignment, assignment_id)
         db.session.delete(assignment_to_delete)
         db.session.commit()
-        return jsonify("Assignment deleted successfully"), 200
-    else:
-        return jsonify("Assignment not found"), 404
 
-
+    return jsonify("Assignment deleted successfully")
