@@ -80,19 +80,15 @@ export default function AssignmentResult() {
       new URLSearchParams({
         student_id: userInfo.id,
         assignment_id: assignmentId,
-      })
+      }) 
     )
       .then((response) => response.json())
       .then((data) => {
-        if (data[0].completed) {
-          setResults((prev) => [...prev, data[0]]);
-          getLatestSubmission(JSON.parse(data[0].results)); // Store the entire object
-          getLatestCode(data[0].student_code_file);
-        }
+        // setResults((prev) => [...prev, data[0]]);
+        // getLatestSubmission(JSON.parse(data[0].results)); // Store the entire object
+        getLatestCode(data[0].student_code_file);
       });
-
   };
-
   // update assignment information
   const updateAssignment = useCallback(
     (file, onError, onSuccess) => {
@@ -147,25 +143,32 @@ export default function AssignmentResult() {
   function DisplayJsonResults({ jsonData }) {
     // Check if jsonData is undefined or if tests is not an array
     if (!jsonData || !Array.isArray(jsonData.tests)) {
-      console.log('jsonData:', jsonData);
       return <p>Data is loading or not available...</p>;
     }
-
+  
+    const passedTests = jsonData.tests.filter(test => test.status === 'passed');
+    const failedTests = jsonData.tests.filter(test => test.status !== 'passed');
+  
     return (
       <div>
-        <h2>Tests</h2>
-        {/* Since we checked above, we can safely use map on jsonData.tests */}
-        {jsonData.tests.map((test, index) => (
+        <h2>Passed Tests</h2>
+        {passedTests.map((test, index) => (
           <div key={index}>
             <p>Name: {test.name}</p>
             <p>Score: {test.score}/{test.max_score}</p>
-            <p>Status: {test.status}</p>
-            {/* Render output if it exists */}
             {test.output && <pre>{test.output}</pre>}
           </div>
         ))}
-
-        {/* Display Other Details with safe access using optional chaining */}
+  
+        <h2>Failed Tests</h2>
+        {failedTests.map((test, index) => (
+          <div key={index}>
+            <p>Name: {test.name}</p>
+            <p>Score: {test.score}/{test.max_score}</p>
+            {test.output && <pre>{test.output}</pre>}
+          </div>
+        ))}
+  
         <h2>Other Details</h2>
         <p>Visibility: {jsonData.visibility}</p>
         <p>Execution Time: {jsonData.execution_time}</p>
@@ -173,7 +176,6 @@ export default function AssignmentResult() {
       </div>
     );
   }
-
   const passedTests = latestSubmission.tests.filter(test => test.status === 'passed');
   const failedTests = latestSubmission.tests.filter(test => test.status !== 'passed');
 

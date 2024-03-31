@@ -139,11 +139,15 @@ export default function Assignments() {
               })
             );
             const submissionData = await response.json();
-
-            if (submissionData.length > 0 && submissionData[0].completed) {
-              submissionStatus = 1; // submitted
+              // console.log(submissionData[0]);
+            if (submissionData[0]) {
+              submissionStatus = 1;
               grade = submissionData[0].score;
-            }
+            }  
+            // if (submissionData.length > 0 && submissionData[0].completed) {
+            //   submissionStatus = 1; // submitted
+            //   grade = submissionData[0].score;
+            // }
           } catch (error) {
             console.error("Error fetching submission data:", error);
           }
