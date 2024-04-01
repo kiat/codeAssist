@@ -20,3 +20,6 @@ ENV PYTHONPATH /usr/app
 
 # Start app
 CMD [ "flask", "run", "--host=0.0.0.0" ]
+
+
+# 'assignments/assignment1/Dockerfile.zip'
