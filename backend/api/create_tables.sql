@@ -1,62 +1,97 @@
-
 /* Create Students table */
 CREATE TABLE students (
-    id uuid primary key,
-    password varchar(60) not null,
-    name varchar(30) not null,
-    email_address varchar(30) not null UNIQUE,
-    sis_user_id varchar(50) not null UNIQUE,
+    id uuid PRIMARY KEY,
+    password varchar(60) NOT NULL,
+    name varchar(30) NOT NULL,
+    email_address varchar(30) NOT NULL UNIQUE,
+    sis_user_id varchar(50) NOT NULL UNIQUE
 );
 
-
-CREATE TABLE instructors(
-    
-)INHERITS (students);
+/* Create Instructors table (Inherits Students table) */
+CREATE TABLE instructors (
+    id uuid PRIMARY KEY INHERITS (students)
+);
 
 /* Create Courses table */
-create table courses (
-    id uuid primary key,
+CREATE TABLE courses (
+    id uuid PRIMARY KEY,
     name varchar(50),
+    instructor_id uuid NOT NULL,
     sis_course_id varchar(50),
     semester varchar(50),
     year varchar(50),
     entryCode varchar(50),
-    allowEntryCode boolean,
-    description varchar(100)
+    allowEntryCode boolean DEFAULT FALSE,
+    description varchar(100),
+    FOREIGN KEY (instructor_id) REFERENCES instructors (id)
 );
 
 /* Create Enrollments table */
-create table enrollments (
-    student_id uuid not null UNIQUE,
-    course_id uuid not null,
-    primary key (student_id, course_id),
-    foreign key (student_id) references students (id),
-    foreign key (course_id) references courses (id)
+CREATE TABLE enrollments (
+    student_id uuid NOT NULL,
+    course_id uuid NOT NULL,
+    PRIMARY KEY (student_id, course_id),
+    FOREIGN KEY (student_id) REFERENCES students (id),
+    FOREIGN KEY (course_id) REFERENCES courses (id)
 );
 
 /* Create Assignments table */
-create table assignments (
-    id uuid primary key,
-    name varchar(50) not null,
-    course_id uuid not null,
+CREATE TABLE assignments (
+    id uuid PRIMARY KEY,
+    name varchar(50) NOT NULL,
+    course_id uuid NOT NULL,
+    due_date timestamp,
+    anonymous_grading boolean DEFAULT FALSE,
+    enable_group boolean DEFAULT FALSE,
+    group_size integer,
+    leaderboard integer,
+    late_submission boolean DEFAULT FALSE,
+    late_due_date timestamp,
+    manual_grading boolean DEFAULT FALSE,
+    autograder_points float,
+    published boolean DEFAULT FALSE,
+    published_date timestamp,
     autograder_file bytea,
-    foreign key (course_id) references courses (id)
+    FOREIGN KEY (course_id) REFERENCES courses (id)
 );
 
 /* Create Submissions table */
-create table submissions (
-    id uuid primary key,
-    student_id uuid not null,
-    assignment_id uuid not null,
-    student_code_file bytea not null,
+CREATE TABLE submissions (
+    id uuid PRIMARY KEY,
+    student_id uuid NOT NULL,
+    assignment_id uuid NOT NULL,
+    student_code_file bytea NOT NULL,
     results bytea,
     score float,
     execution_time float,
     executed_at timestamp,
-    completed boolean default false,
-    foreign key (student_id) references students (id),
-    foreign key (assignment_id) references assignments (id)
+    completed boolean DEFAULT FALSE,
+    FOREIGN KEY (student_id) REFERENCES students (id),
+    FOREIGN KEY (assignment_id) REFERENCES assignments (id)
+);
+
+/* Create TestCases table */
+CREATE TABLE test_cases (
+    id uuid PRIMARY KEY,
+    assignment_id uuid NOT NULL,
+    test_case_name varchar(255) NOT NULL,
+    expected_output text NOT NULL,
+    FOREIGN KEY (assignment_id) REFERENCES assignments (id)
+);
+
+/* Update TestCaseResults table to include reference to TestCases */
+CREATE TABLE test_case_results (
+    id uuid PRIMARY KEY,
+    submission_id uuid NOT NULL,
+    test_case_id uuid NOT NULL,
+    student_output text,
+    passed boolean,
+    FOREIGN KEY (submission_id) REFERENCES submissions (id),
+    FOREIGN KEY (test_case_id) REFERENCES test_cases (id)
 );
 
 /* Submissions table index */
-create index submissions_idx on submissions (student_id, assignment_id);
+CREATE INDEX submissions_idx ON submissions (student_id, assignment_id);
+
+
+-- Create a new submission type for assignments that allows professors to have more freedom for manual grading

@@ -31,5 +31,5 @@ services:
         extra_hosts:
               - "host.docker.internal:host-gateway"
         volumes:
-            - ./backend/:/usr/app
+            - ./backend/:/usr/src/app
             - /var/run/docker.sock:/var/run/docker.sock

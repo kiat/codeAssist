@@ -9,7 +9,7 @@ class Student(db.Model):
     password = db.Column(db.String, nullable=False)
     name = db.Column(db.String, nullable=False)
     email_address = db.Column(db.String, nullable=False)
-    sis_user_id = db.Column(db.String, nullable=False, unique = True)
+    sis_user_id = db.Column(db.String, nullable=False, unique=True)
 
 class Instructor(db.Model):
     __tablename__ = "instructors"
@@ -26,17 +26,15 @@ class Course(db.Model):
     instructor_id = db.Column(UUID(as_uuid=False), db.ForeignKey("instructors.id"), nullable=False)
     sis_course_id = db.Column(db.String, nullable=True)
     semester = db.Column(db.String, nullable=False)
-    year = db.Column(db.String, nullable = False)
-    entryCode = db.Column(db.String, nullable = False)
-    allowEntryCode = db.Column(db.Boolean, default = False)
-    description = db.Column(db.String, default = "")
-
+    year = db.Column(db.String, nullable=False)
+    entryCode = db.Column(db.String, nullable=False)
+    allowEntryCode = db.Column(db.Boolean, default=False)
+    description = db.Column(db.String, default="")
 
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), primary_key=True, nullable=False)
-    course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key = True,  nullable=False)
-
+    course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key=True, nullable=False)
 
 class Assignment(db.Model):
     __tablename__ = "assignments"
@@ -53,10 +51,8 @@ class Assignment(db.Model):
     manual_grading = db.Column(db.Boolean, default=False)
     autograder_points = db.Column(db.Float, nullable=True)
     published = db.Column(db.Boolean, default=False)
-    published_date = db.Column (TIMESTAMP, nullable=True)
+    published_date = db.Column(TIMESTAMP, nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
-    
-
 
 class Submission(db.Model):
     __tablename__ = "submissions"
@@ -69,3 +65,24 @@ class Submission(db.Model):
     execution_time = db.Column(db.Float, nullable=True)
     executed_at = db.Column(TIMESTAMP, nullable=True)
     completed = db.Column(db.Boolean, nullable=False)
+
+class TestCase(db.Model):
+    __tablename__ = "test_cases"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False)
+    test_case_name = db.Column(db.String, nullable=False)
+    expected_output = db.Column(db.Text, nullable=False)
+    input_data = db.Column(db.Text, nullable=False)  
+
+    assignment = db.relationship("Assignment", backref=db.backref("test_cases", lazy="dynamic"))
+
+class TestCaseResult(db.Model):
+    __tablename__ = "test_case_results"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    submission_id = db.Column(UUID(as_uuid=False), db.ForeignKey("submissions.id"), nullable=False)
+    test_case_id = db.Column(UUID(as_uuid=False), db.ForeignKey("test_cases.id"), nullable=False)
+    student_output = db.Column(db.Text, nullable=True)
+    passed = db.Column(db.Boolean, nullable=True)
+
+    submission = db.relationship("Submission", backref=db.backref("test_case_results", lazy="dynamic"))
+    test_case = db.relationship("TestCase", backref="results")
