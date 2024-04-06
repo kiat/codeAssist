@@ -70,6 +70,14 @@ CREATE TABLE submissions (
     FOREIGN KEY (assignment_id) REFERENCES assignments (id)
 );
 
+CREATE TABLE submission_submitters (
+    submission_id uuid NOT NULL,
+    submitter_id uuid NOT NULL,
+    PRIMARY KEY (submission_id, submitter_id),
+    FOREIGN KEY (submission_id) REFERENCES submissions (id),
+    FOREIGN KEY (submitter_id) REFERENCES students (id)
+);
+
 /* Create TestCases table */
 CREATE TABLE test_cases (
     id uuid PRIMARY KEY,
@@ -90,8 +98,10 @@ CREATE TABLE test_case_results (
     FOREIGN KEY (test_case_id) REFERENCES test_cases (id)
 );
 
+
+
 /* Submissions table index */
 CREATE INDEX submissions_idx ON submissions (student_id, assignment_id);
 
 
--- Create a new submission type for assignments that allows professors to have more freedom for manual grading
+- Create a new submission type for assignments that allows professors to have more freedom for manual grading

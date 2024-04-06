@@ -57,15 +57,23 @@ class Assignment(db.Model):
 class Submission(db.Model):
     __tablename__ = "submissions"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    submission_number = db.Column(db.Integer, nullable=False)
+    submitted_at = db.Column(TIMESTAMP, nullable=True)
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), nullable=False, index=True)
     assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False, index=True)
     student_code_file = db.Column(LargeBinary, nullable=False)
     results = db.Column(LargeBinary, nullable=True)
-    score = db.Column(db.Float, nullable=True)
+    score = db.Column(db.Numeric(5, 3), nullable=True)  
     execution_time = db.Column(db.Float, nullable=True)
-    executed_at = db.Column(TIMESTAMP, nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=False)
     completed = db.Column(db.Boolean, nullable=False)
-
+    
+# Handling multiple submitters for a single submission
+class SubmissionSubmitter(db.Model):
+    __tablename__ = "submission_submitters"
+    submission_id = db.Column(UUID(as_uuid=False), db.ForeignKey("submissions.id"), primary_key=True, nullable=False)
+    submitter_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), primary_key=True, nullable=False)
+    
 class TestCase(db.Model):
     __tablename__ = "test_cases"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
