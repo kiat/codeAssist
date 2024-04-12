@@ -1,7 +1,7 @@
 import { Modal, Table, message } from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
-import { columns } from "./constants"; // assuming columns are defined in this constants file
+// import { columns } from "./constants"; 
 
 export default function SubmissionHistoryModal({ open, onCancel, studentId, assignmentId }) {
   const [submissions, setSubmissions] = useState([]);
@@ -32,7 +32,7 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
       width={600}
     >
       <Table
-        columns={columns}
+        // columns={columns}
         dataSource={submissions}
         rowKey="id"
         pagination={false}
