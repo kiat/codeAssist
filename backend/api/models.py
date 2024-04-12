@@ -57,6 +57,7 @@ class Assignment(db.Model):
 class Submission(db.Model):
     __tablename__ = "submissions"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    file_name = db.Column(db.String, nullable=False)
     submission_number = db.Column(db.Integer, nullable=False)
     submitted_at = db.Column(TIMESTAMP, nullable=True)
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), nullable=False, index=True)

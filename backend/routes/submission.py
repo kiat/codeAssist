@@ -119,6 +119,7 @@ def upload_submission():
     # Create a new submission record
     new_submission = Submission(
         id=uuid.uuid4(),
+        file_name=filename,
         student_id=uuid.UUID(student_id),
         assignment_id=uuid.UUID(assignment_id),
         student_code_file=open(file_path, 'rb').read(),
