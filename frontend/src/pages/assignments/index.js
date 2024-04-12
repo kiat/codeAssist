@@ -139,15 +139,11 @@ export default function Assignments() {
               })
             );
             const submissionData = await response.json();
-              // console.log(submissionData[0]);
-            if (submissionData[0]) {
-              submissionStatus = 1;
+
+            if (submissionData.length > 0 && submissionData[0].completed) {
+              submissionStatus = 1; // submitted
               grade = submissionData[0].score;
-            }  
-            // if (submissionData.length > 0 && submissionData[0].completed) {
-            //   submissionStatus = 1; // submitted
-            //   grade = submissionData[0].score;
-            // }
+            }
           } catch (error) {
             console.error("Error fetching submission data:", error);
           }
@@ -193,19 +189,19 @@ export default function Assignments() {
             onRow={(record) => {
               return {
                 onClick: () => {
-                  const now = Date.now();
-                  const publishedDate = moment(record.published_date).valueOf();
-                  const dueDate = moment(record.due_date).valueOf();
-                  const isSubmitted = record.status
+                  // const now = Date.now();
+                  // const publishedDate = moment(record.published_date).valueOf();
+                  // const dueDate = moment(record.due_date).valueOf();
+                  // const isSubmitted = record.status
 
-                  if (isSubmitted) {
-                    navigate(`/assignmentresult/${record.id}`);
-                  } else if (now <= dueDate) {
+                  // if (isSubmitted) {
+                  //   navigate(`/assignmentresult/${record.id}`);
+                  // } else if (now <= dueDate) {
                     // Open modal to submit assignment since the due date has not passed and it's not submitted
                     setModalOpen(true);
                     setAssignmentTitle(record.name);
                     setAssignmentID(record.id);
-                  }
+                  // }
                   // If not submitted and the due date has passed, do nothing.
                 },
               };

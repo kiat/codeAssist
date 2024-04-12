@@ -64,7 +64,7 @@ class Submission(db.Model):
     assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False, index=True)
     student_code_file = db.Column(LargeBinary, nullable=False)
     results = db.Column(LargeBinary, nullable=True)
-    score = db.Column(db.Numeric(5, 3), nullable=True)  
+    score = db.Column(db.Float, nullable=True)
     execution_time = db.Column(db.Float, nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=False)
     completed = db.Column(db.Boolean, nullable=False)

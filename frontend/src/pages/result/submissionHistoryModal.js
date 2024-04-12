@@ -1,27 +1,59 @@
 import { Modal, Table, message } from "antd";
-import axios from "axios";
 import { useEffect, useState } from "react";
-// import { columns } from "./constants"; 
+import axios from "axios";
 
-export default function SubmissionHistoryModal({ open, onCancel, studentId, assignmentId }) {
+export default function SubmissionHistoryModal({ open, onCancel, studentId, assignmentId, studentName }) {
   const [submissions, setSubmissions] = useState([]);
 
   useEffect(() => {
     if (open) {
       getSubmissions();
     }
-  }, [open]);
+  }, [open, studentId, assignmentId]);
 
   const getSubmissions = async () => {
     try {
       const response = await axios.get(`${process.env.REACT_APP_API_URL}/get_submissions`, {
         params: { student_id: studentId, assignment_id: assignmentId },
       });
-      setSubmissions(response.data);
+      // If you need to show the highest scored submission as active, sort the data here
+      // Sort by score descending and submission time ascending to get the latest highest score on top
+      const sortedSubmissions = response.data.sort((a, b) => b.score - a.score || new Date(a.submitted_at) - new Date(b.submitted_at));
+      setSubmissions(sortedSubmissions);
     } catch (error) {
       message.error("Failed to fetch submission history");
     }
   };
+
+  const columns = [
+    {
+      title: '#',
+      dataIndex: 'submission_number',
+      key: 'submission_number',
+    },
+    {
+      title: 'Submitted On',
+      dataIndex: 'submitted_at',
+      key: 'submitted_at',
+      render: text => new Date(text).toLocaleString()
+    },
+    {
+      title: 'Submitters',
+      key: 'submitters',
+      // Using a function for render method to inject the studentName
+      render: () => studentName
+    },
+    {
+      title: 'Score',
+      dataIndex: 'score',
+      key: 'score',
+    },
+    {
+      title: 'Active',
+      key: 'active',
+      render: (text, record, index) => submissions.length && index === 0 ? "✓" : "" // Check if there are submissions and mark the first one as active
+    },
+  ];
 
   return (
     <Modal
@@ -32,7 +64,7 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
       width={600}
     >
       <Table
-        // columns={columns}
+        columns={columns}
         dataSource={submissions}
         rowKey="id"
         pagination={false}

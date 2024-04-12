@@ -135,7 +135,7 @@ def upload_submission():
         assignment_id=uuid.UUID(assignment_id),
         student_code_file=open(file_path, 'rb').read(),
         results=open(host_results_json_path, 'rb').read(),
-        score=sum(test['score'] for test in json.loads(results_json_content)['tests']),
+        score=json.loads(results_json_content)['score'],
         execution_time=float(json.loads(results_json_content).get('execution_time', 0)),
         submitted_at=datetime.now(),
         completed=True,

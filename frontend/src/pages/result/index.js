@@ -90,7 +90,12 @@ export default function AssignmentResult() {
         />
       </PageBottom>
       <UploadModal open={uploadModalOpen} onCancel={() => toggleModal('upload')} />
-      <SubmissionHistoryModal open={historyModalOpen} onCancel={() => toggleModal('history')} />
+      <SubmissionHistoryModal
+        open={historyModalOpen}
+        onCancel={() => toggleModal('history')}
+        studentId={userInfo?.id} 
+        assignmentId={assignmentId}
+        studentName={userInfo?.name}/>
       <FormattingModal open={formattingModalOpen} onCancel={() => toggleModal('formatting')} />
     </>
   );
