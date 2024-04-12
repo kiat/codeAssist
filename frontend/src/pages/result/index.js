@@ -8,8 +8,8 @@ import PageBottom from "../../components/layout/pageBottom";
 import TestResultsDisplay from "./TestResultsDisplay";
 import StudentInfoPanel from "./StudentInfoPanel";
 import ActionButtons from "./ActionButtons";
-import UploadModal from "../../components/UploadModal";
 
+import UploadModal from "../../components/UploadModal";
 import SubmissionHistoryModal from "./submissionHistoryModal";
 import FormattingModal from "./FormattingModal";
 
@@ -21,6 +21,7 @@ export default function AssignmentResult() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [formattingModalOpen, setFormattingOpen] = useState(false);
   const [autoGraderPoints, setAutograderPoints] = useState(0);
+  const [assignmentName, setAssignmentName] = useState(""); // Placeholder value
 
   const { assignmentId } = useParams();
   const location = useLocation();
@@ -29,7 +30,10 @@ export default function AssignmentResult() {
   useEffect(() => {
     const fetchAssignmentDetails = async () => {
       const res = await getAssignment({ assignment_id: assignmentId });
-      setAutograderPoints(res.data.autograder_points);
+      if (res?.data) {
+        setAutograderPoints(res.data.autograder_points);
+        setAssignmentName(res.data.name); // Assuming the API provides this
+      }
     };
     fetchAssignmentDetails();
   }, [assignmentId, location.key]);
@@ -69,8 +73,9 @@ export default function AssignmentResult() {
             </Card>
           </div>
           <StudentInfoPanel
+            assignmentName={assignmentName}
             studentName={assignmentInfo?.studentName ?? userInfo?.name}
-            score={"Unknown"} // Replace with actual data as needed
+            score={assignmentInfo?.score ?? "Unknown"} // Replace with actual score data as needed
             totalPoints={autoGraderPoints}
           />
         </div>
