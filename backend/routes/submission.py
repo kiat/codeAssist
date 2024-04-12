@@ -47,131 +47,128 @@ def get_submission():
 
     return jsonify(submissions)
 
+
+    
 @submission.route('/upload_submission', methods=["POST"])
 @cross_origin()
 def upload_submission():
-    dockerfile_content = """
-FROM python:3.9
-RUN apt-get update && apt-get install -y python3-pip python3-dev && rm -rf /var/lib/apt/lists/*
-
-COPY source /autograder/source
-COPY submission /autograder/submission
-
-RUN chmod +x /autograder/source/setup.sh && \\
-    /autograder/source/setup.sh
-
-RUN chmod +x /autograder/source/run_autograder
-
-RUN mkdir -p /autograder/results
-
-WORKDIR /autograder
-CMD ["/bin/bash", "/autograder/source/run_autograder"]
-"""
-
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
-    
     file = request.files["file"]
     assignment_id = request.form.get("assignment_id")
     student_id = request.form.get("student_id")
-    
-    if not assignment_id or not student_id or file.filename == "":
-        return jsonify({"error": "Missing assignment ID, student ID, or file"}), 400
-    
+    if not assignment_id or not student_id or not file.filename:
+        return jsonify({"error": "Missing required parameters or file"}), 400
+
     filename = secure_filename(file.filename)
-    
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    assignment_dir = os.path.join(current_dir, 'upload_autograderSCOPE', 'runs', assignment_id)
+    assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
     submissions_dir = os.path.join(assignment_dir, "submission")
     results_dir = os.path.join(assignment_dir, student_id, 'results')
-    
-    os.makedirs(results_dir, exist_ok=True)
-    os.makedirs(submissions_dir, exist_ok=True)
-    
+    for directory in [submissions_dir, results_dir]:
+        os.makedirs(directory, exist_ok=True)
     file_path = os.path.join(submissions_dir, filename)
     file.save(file_path)
-    
+
+
+    # Write the Dockerfile
+    dockerfile_content = """
+    FROM python:3.9
+    RUN apt-get update && apt-get install -y python3-pip python3-dev && rm -rf /var/lib/apt/lists/*
+    COPY source /autograder/source
+    COPY submission /autograder/submission
+    RUN chmod +x /autograder/source/setup.sh && /autograder/source/setup.sh
+    RUN chmod +x /autograder/source/run_autograder
+    RUN mkdir -p /autograder/results
+    WORKDIR /autograder
+    CMD ["/bin/bash", "/autograder/source/run_autograder"]
+    """
     with open(os.path.join(assignment_dir, 'Dockerfile'), 'w') as dockerfile:
         dockerfile.write(dockerfile_content)
-    
+
     os.chdir(assignment_dir)
-    
-    docker_build_cmd = f"docker build -t autograder-{assignment_id} ."
-    build_proc = subprocess.run(docker_build_cmd.split(), capture_output=True)
+    build_proc = subprocess.run(f"docker build -t autograder-{assignment_id} .".split(), capture_output=True)
     if build_proc.returncode != 0:
         os.chdir(current_dir)
         return jsonify({"error": "Failed to build Docker image", "details": build_proc.stderr.decode()}), 500
-    
+
     container_name = f"ag_{assignment_id}_{student_id}"
-    # Start the container with an entry point that keeps it alive
-    docker_run_cmd = f"docker run -d --name {container_name} -e FILENAME={filename} autograder-{assignment_id} tail -f /dev/null"
-    run_proc = subprocess.run(docker_run_cmd.split(), capture_output=True)
+    run_proc = subprocess.run(f"docker run -d --name {container_name} autograder-{assignment_id} tail -f /dev/null".split(), capture_output=True)
     if run_proc.returncode != 0:
         os.chdir(current_dir)
         return jsonify({"error": "Failed to start Docker container", "details": run_proc.stderr.decode()}), 500
 
-    # Execute the autograder script within the running container
-    docker_exec_cmd = f"docker exec {container_name} /bin/bash /autograder/source/run_autograder"
-    exec_proc = subprocess.run(docker_exec_cmd.split(), capture_output=True)
+    exec_proc = subprocess.run(f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(), capture_output=True)
     if exec_proc.returncode != 0:
         os.chdir(current_dir)
         return jsonify({"error": "Autograder execution failed", "details": exec_proc.stderr.decode()}), 500
 
-    # Now, capture the output of results.json
-    cat_cmd = ["docker", "exec", container_name, "cat", "/autograder/results/results.json"]
-    cat_proc = subprocess.run(cat_cmd, capture_output=True)
+    cat_proc = subprocess.run(f"docker exec {container_name} cat /autograder/results/results.json".split(), capture_output=True)
     if cat_proc.returncode != 0:
         os.chdir(current_dir)
         return jsonify({"error": "Failed to read results.json", "details": cat_proc.stderr.decode()}), 500
-    
-    results_json_content = cat_proc.stdout.decode()
-    
-    host_results_json_path = os.path.join(results_dir, 'results.json')
-    with open(host_results_json_path, 'w') as host_results_file:
-        host_results_file.write(results_json_content)
 
-    # Optionally stop and remove the container if no longer needed
+    results_json_content = cat_proc.stdout.decode()
+    host_results_json_path = os.path.join(results_dir, 'results.json')
+    with open(host_results_json_path, 'w') as file:
+        file.write(results_json_content)
+
+    # Query the database for the number of previous submissions
+    submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
+
+    # Create a new submission record
+    new_submission = Submission(
+        id=uuid.uuid4(),
+        student_id=uuid.UUID(student_id),
+        assignment_id=uuid.UUID(assignment_id),
+        student_code_file=open(file_path, 'rb').read(),
+        results=open(host_results_json_path, 'rb').read(),
+        score=sum(test['score'] for test in json.loads(results_json_content)['tests']),
+        execution_time=float(json.loads(results_json_content).get('execution_time', 0)),
+        submitted_at=datetime.now(),
+        completed=True,
+        submission_number=submission_count + 1
+    )
+    db.session.add(new_submission)
+    db.session.commit()
+
     subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
     subprocess.run(f"docker rm {container_name}".split(), capture_output=True)
-
     os.chdir(current_dir)
     
     return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path}), 200
 
 
+
 @submission.route('/upload_assignment_autograder', methods=["POST"])
 @cross_origin()
 def upload_assignment_autograder():
+    # Validate input file and parameters
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
-
     file = request.files["file"]
     assignment_id = request.form.get("assignment_id")
-
-    if not assignment_id or file.filename == "":
+    if not assignment_id or not file.filename:
         return jsonify({"error": "Missing assignment ID or no selected file"}), 400
 
-    filename = secure_filename(file.filename)
+    # Set up paths
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    assignment_dir = os.path.join(current_dir, 'upload_autograderSCOPE', 'runs', assignment_id)    
+    assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
     os.makedirs(assignment_dir, exist_ok=True)
-    filepath = os.path.join(assignment_dir, filename)
-    submission_dir = os.path.join(assignment_dir, 'submission')
-    os.makedirs(submission_dir, exist_ok=True)
 
+    # Save the uploaded file
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(assignment_dir, filename)
     file.save(filepath)
 
-    # Unzip the autograder file
+    # Extract the contents of the uploaded ZIP file
     try:
         with zipfile.ZipFile(filepath, 'r') as zip_ref:
             zip_ref.extractall(os.path.join(assignment_dir, "source"))
     except zipfile.BadZipFile:
         return jsonify({"error": "Uploaded file is not a valid zip file"}), 400
 
-   
-
     return jsonify({"message": "Autograder uploaded and Docker image generated successfully", "image_name": f"autograder-{assignment_id}"}), 200
-
     
 @submission.route('/get_results', methods=["GET"])
 @cross_origin(origins='*')
