@@ -1,37 +1,35 @@
-import { useContext, useCallback, useEffect, useState } from "react";
+import React, { useContext, useCallback, useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
-import { Card, PageHeader, Button, Radio} from "antd";
+import { Card, PageHeader, Radio } from "antd";
 
 import { GlobalContext } from "../../App";
-import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
-
-import UploadModal from "../../components/UploadModal";
-import SubmissionHistoryModal from "./submissionHistoryModal";
-import FormattingModal from "./FormattingModal";
+import PageBottom from "../../components/layout/pageBottom";
 import TestResultsDisplay from "./TestResultsDisplay";
 import StudentInfoPanel from "./StudentInfoPanel";
 import ActionButtons from "./ActionButtons";
+import UploadModal from "../../components/UploadModal";
 
-import { uploadSubmission } from "../../services/assignmentResult";
+import SubmissionHistoryModal from "./submissionHistoryModal";
+import FormattingModal from "./FormattingModal";
+
 import { getAssignment } from "../../services/assignment";
 
 export default function AssignmentResult() {
-  const [pageHeaderTitle, setPageHeaderTitle] = useState("Autograder Results");
+  const [viewMode, setViewMode] = useState("Results");
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [formattingModalOpen, setFormattingOpen] = useState(false);
-  const [autoGraderPoints, setAutograderPoints] = useState(0); // Assuming this is fetched and used
-  const [latestSubmission, setLatestSubmission] = useState({ tests: [] });
+  const [autoGraderPoints, setAutograderPoints] = useState(0);
 
   const { assignmentId } = useParams();
   const location = useLocation();
-  const { userInfo, assignmentInfo } = useContext(GlobalContext); // Assuming assignmentInfo is used
+  const { userInfo, assignmentInfo } = useContext(GlobalContext);
 
   useEffect(() => {
     const fetchAssignmentDetails = async () => {
       const res = await getAssignment({ assignment_id: assignmentId });
-      setAutograderPoints(res.data.autograder_points); // Example of setting autograder points
+      setAutograderPoints(res.data.autograder_points);
     };
     fetchAssignmentDetails();
   }, [assignmentId, location.key]);
@@ -43,7 +41,7 @@ export default function AssignmentResult() {
   }, []);
 
   const handleRadioChange = useCallback((e) => {
-    setPageHeaderTitle(e.target.value);
+    setViewMode(e.target.value);
   }, []);
 
   return (
@@ -53,33 +51,35 @@ export default function AssignmentResult() {
           <div style={{ flex: "1", height: "calc(100vh - 40px)" }}>
             <PageHeader
               style={{ borderBottom: "1px solid #f0f0f0" }}
-              title={pageHeaderTitle}
+              title={viewMode}
               extra={[
-                <Button key="upload" onClick={() => toggleModal('upload')}>Upload</Button>,
-                <Radio.Group key="resultsType" buttonStyle="solid" defaultValue="Autograder Results" onChange={handleRadioChange}>
-                  <Radio.Button value="Autograder Results">Results</Radio.Button>
-                  <Radio.Button value="Submitted Files">Code</Radio.Button>
+                <Radio.Group
+                  key="viewMode"
+                  buttonStyle="solid"
+                  defaultValue="Results"
+                  onChange={handleRadioChange}
+                >
+                  <Radio.Button value="Results">Results</Radio.Button>
+                  <Radio.Button value="Code">Code</Radio.Button>
                 </Radio.Group>
               ]}
             />
             <Card bordered={false}>
-              {pageHeaderTitle === "Autograder Results" ?
-                <TestResultsDisplay jsonData={latestSubmission} /> :
-                <pre>Hi</pre>}
+              <TestResultsDisplay viewMode={viewMode} />
             </Card>
           </div>
           <StudentInfoPanel
             studentName={assignmentInfo?.studentName ?? userInfo?.name}
-            score={latestSubmission.score} // Assuming score is part of latestSubmission
+            score={"Unknown"} // Replace with actual data as needed
             totalPoints={autoGraderPoints}
           />
         </div>
       </PageContent>
       <PageBottom>
         <ActionButtons
-          onRerun={() => {}}
+          onRerun={() => {}} // Implement or replace with actual function
           onUpload={() => toggleModal('upload')}
-          onDownload={() => {}}
+          onDownload={() => {}} // Implement or replace with actual function
           onHistoryOpen={() => toggleModal('history')}
           isStudent={userInfo?.isStudent}
         />
