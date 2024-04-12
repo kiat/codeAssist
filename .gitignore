@@ -129,3 +129,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# No need to upload loads of zip files
+backend/routes/upload_autograder/runs/
