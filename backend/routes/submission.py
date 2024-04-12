@@ -32,7 +32,7 @@ def allowed_file(filename):
 
 @submission.route('/get_submissions', methods=["GET"])
 @cross_origin()
-def get_submission():
+def get_submissions():
     '''
     /get_submissions gets all submissions by a student for an assignment
     Requires from the frontend a JSON containing:
@@ -42,10 +42,21 @@ def get_submission():
     student_id = request.args.get("student_id")
     assignment_id = request.args.get("assignment_id")
 
-    submissions = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
-    submissions = SubmissionSchema().dump(submissions, many=True)
+    if not student_id or not assignment_id:
+        return jsonify({"error": "Missing student_id or assignment_id"}), 400
 
-    return jsonify(submissions)
+    submissions = db.session.query(Submission).filter_by(
+        student_id=student_id, 
+        assignment_id=assignment_id
+    ).all()  
+
+    if not submissions:
+        return jsonify({"message": "No submissions found for the provided student and assignment"}), 404
+
+    submission_schema = SubmissionSchema(many=True)
+    result = submission_schema.dump(submissions)
+
+    return jsonify(result)
 
 
     
