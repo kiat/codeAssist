@@ -1,27 +1,21 @@
-FROM alpine:latest
+# Use the official Python image as the base
+FROM python:3.9-slim
 
-# Add pip and python
-RUN apk update
-RUN apk add py-pip
-RUN apk add --no-cache python3-dev
-RUN pip install --upgrade pip
+# Set the working directory in the container
+WORKDIR /usr/src/app
 
-# Copy and install requirements
-WORKDIR /usr/app
-COPY ./requirements.txt .
-RUN pip --no-cache-dir install -r requirements.txt
+# Copy the Python requirements file and install dependencies
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app
+# Copy the rest of the application
 COPY . .
 
-# Create autograder directory
-RUN mkdir -v assignments
-# Create runs directory
-RUN mkdir -v runs
-
+# Expose the port the app runs on
 EXPOSE 5000
 
-ENV PYTHONPATH /usr/app
+# Set environment variables
+ENV PYTHONPATH /usr/src/app
 
-# Start app
-CMD ["flask", "run", "--host=0.0.0.0"]
+# Command to run the application
+CMD [ "flask", "run", "--host=0.0.0.0" ]
