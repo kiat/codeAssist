@@ -118,7 +118,7 @@ def student_login():
     if len(res) == 0:
         return "No user found", 404
 
-    return jsonify(res[0])
+    return jsonify({"message": "Success"}), 200
 
 @user.route('/create_instructor', methods=["POST", "GET"])
 @cross_origin()
