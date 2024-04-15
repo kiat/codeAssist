@@ -85,8 +85,9 @@ def upload_submission():
     # Write the Dockerfile
     dockerfile_content = """
     FROM python:3.9
-    RUN apt-get update && apt-get install -y python3-pip python3-dev && rm -rf /var/lib/apt/lists/*
-    COPY source /autograder/source
+    RUN apt-get update && apt-get install -y python3-pip python3-dev unzip && rm -rf /var/lib/apt/lists/*
+    COPY *.zip /autograder/
+    RUN unzip /autograder/*.zip -d /autograder/source
     COPY submission /autograder/submission
     RUN chmod +x /autograder/source/setup.sh && /autograder/source/setup.sh
     RUN chmod +x /autograder/source/run_autograder
@@ -174,11 +175,11 @@ def upload_assignment_autograder():
     file.save(filepath)
 
     # Extract the contents of the uploaded ZIP file
-    try:
-        with zipfile.ZipFile(filepath, 'r') as zip_ref:
-            zip_ref.extractall(os.path.join(assignment_dir, "source"))
-    except zipfile.BadZipFile:
-        return jsonify({"error": "Uploaded file is not a valid zip file"}), 400
+    # try:
+    #     with zipfile.ZipFile(filepath, 'r') as zip_ref:
+    #         zip_ref.extractall(os.path.join(assignment_dir, "source"))
+    # except zipfile.BadZipFile:
+    #     return jsonify({"error": "Uploaded file is not a valid zip file"}), 400
 
     return jsonify({"message": "Autograder uploaded and Docker image generated successfully", "image_name": f"autograder-{assignment_id}"}), 200
     
