@@ -99,12 +99,13 @@ export default () => {
         )
         .then(res => res.json())
         .then(data => {
+          console.log(data);
           if (Object.keys(data).length > 0) {
             const submission = {
               name: student.name,
-              submissionTime: moment(data[0].executed_at).valueOf(),
-              score: data[0].score,
-              id: data[0].student_id
+              submissionTime: moment(data.submitted_at).valueOf(),
+              score: data.score,
+              id: data.student_id
             };
             setTableData(prevData => {
               if (prevData.findIndex(obj => obj.id === submission.id) !== -1) return prevData;
