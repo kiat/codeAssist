@@ -200,7 +200,7 @@ def get_results():
         student_id = student.id
 
     submission = (db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
-                    .order_by(desc(Submission.executed_at)).limit(1))
+                    .order_by(desc(Submission.submitted_at)).limit(1))
     submission = SubmissionSchema().dump(submission, many=True)
     
     return jsonify(submission)

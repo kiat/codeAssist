@@ -64,7 +64,7 @@ CREATE TABLE submissions (
     results bytea,
     score float,
     execution_time float,
-    executed_at timestamp,
+    submitted_at timestamp,
     completed boolean DEFAULT FALSE,
     FOREIGN KEY (student_id) REFERENCES students (id),
     FOREIGN KEY (assignment_id) REFERENCES assignments (id)
