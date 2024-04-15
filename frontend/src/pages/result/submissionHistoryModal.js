@@ -40,7 +40,6 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
     {
       title: 'Submitters',
       key: 'submitters',
-      // Using a function for render method to inject the studentName
       render: () => studentName
     },
     {
@@ -51,7 +50,7 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
     {
       title: 'Active',
       key: 'active',
-      render: (text, record, index) => submissions.length && index === 0 ? "✓" : "" // Check if there are submissions and mark the first one as active
+      render: (text, record, index) => submissions.length && index === 0 ? "✓" : "" 
     },
   ];
 

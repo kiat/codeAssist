@@ -1,60 +1,61 @@
-import { useContext } from "react";
-import { useNavigate } from "react-router-dom";
-import { GlobalContext } from "../../../App";
+  import { useContext } from "react";
+  import { useNavigate } from "react-router-dom";
+  import { GlobalContext } from "../../../App";
 
-/**
- * course modal
- * @param {*} param0
- * @returns
- */
-export default function Course({ courseInfo }) {
-  const navigate = useNavigate();
-  const { code, name, assignments, id } = courseInfo;
-  const { userInfo, updateCourseInfo } = useContext(GlobalContext);
+  // Consider extracting styles for better maintainability and performance
+  const courseStyle = {
+      width: "230px",
+      marginRight: "15px",
+      marginBottom: "15px",
+      cursor: "pointer",
+  };
 
-  return (
-    <div
-      style={{
-        width: "230px",
-        marginRight: "15px",
-        marginBottom: "15px",
-        cursor: "pointer",
-      }}
-      onClick={() => {
-        updateCourseInfo({
-          id: id,
-          code: code,
-          name: name,
-          // semester: semester,
-        });
-        //click assignments and navigate to destination assignment page
-        if (userInfo.isStudent) {
-          navigate(`/assignments/${id}`);
-        } else {
-          navigate(`/instructorDashboard/${id}`);
-        }
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: "#f0f2f5",
-          height: "85px",
-          paddingLeft: "10px",
-        }}
-      >
-        <h3>{code}</h3>
-        <span>{name}</span>
-      </div>
-      <div
-        style={{
-          backgroundColor: "#1b807c",
-          paddingLeft: "10px",
-          lineHeight: "40px",
-          color: "white",
-        }}
-      >
-        {assignments} assignments
-      </div>
-    </div>
-  );
-}
+  const courseHeaderStyle = {
+      backgroundColor: "#f0f2f5",
+      height: "85px",
+      paddingLeft: "10px",
+  };
+
+  const courseFooterStyle = {
+      backgroundColor: "#1b807c",
+      paddingLeft: "10px",
+      lineHeight: "40px",
+      color: "white",
+  };
+
+  /**
+   * Displays a single course with navigation based on user role
+   * @param {Object} courseInfo Information about the course
+   */
+  export default function Course({ courseInfo }) {
+      const navigate = useNavigate();
+      const { userInfo, updateCourseInfo } = useContext(GlobalContext);
+      const { code, name, assignments, id, semester } = courseInfo;
+
+      function handleCourseClick() {
+          // Ensure all fields are updated correctly in context
+          updateCourseInfo({
+              id: id,
+              code: code,
+              name: name,
+              semester: semester,
+              year: courseInfo.year || ""  // Handle missing year if not provided
+          });
+
+          // Navigate based on user role
+          const destination = userInfo.isStudent ? `/assignments/${id}` : `/instructorDashboard/${id}`;
+          navigate(destination);
+      }
+
+      return (
+          <div style={courseStyle} onClick={handleCourseClick}>
+              <div style={courseHeaderStyle}>
+                  <h3>{code}</h3>
+                  <span>{name}</span>
+              </div>
+              <div style={courseFooterStyle}>
+                  {assignments} assignments
+              </div>
+          </div>
+      );
+  }
