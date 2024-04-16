@@ -1,64 +1,50 @@
-import {
-  Button,
-  Card,
-  Input,
-  PageHeader,
-  Space,
-  Table,
-  Typography,
-} from "antd";
-import { formatDayTimeEn } from "../../common/format";
+import { Button, Card, Input, PageHeader, Space, Table, Typography, message } from "antd";
+import { CloseOutlined, ReloadOutlined, RightOutlined } from "@ant-design/icons";
 import PageContent from "../../components/layout/pageContent";
-// import { tableData } from "./mock";
-import {
-  CloseOutlined,
-  ConsoleSqlOutlined,
-  ReloadOutlined,
-  RightOutlined,
-} from "@ant-design/icons";
 import PageBottom from "../../components/layout/pageBottom";
 import RerunAutograderModal from "./RerunAutograderModal";
 import { useContext, useState, useEffect } from "react";
-import { useCallback } from "react";
 import { GlobalContext } from "../../App";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
 
-export default () => {
+const SubmissionsManager = () => {
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
-  const [students, setStudents] = useState({});
-  const navigate = useNavigate();
+  const { courseInfo } = useContext(GlobalContext);
   const [tableData, setTableData] = useState([]);
-  
-  const toggleRerunModalOpen = useCallback(() => {
-    setRerunModalOpen(t => !t);
-  }, []);
+  const [forceUpdate, setForceUpdate] = useState(0); // State to trigger re-fetching
+  const navigate = useNavigate();
 
-  const goAssignmentResult = name => {
-    updateAssignmentInfo({
-      ...assignmentInfo,
-      studentName: name,
-    });
+  const toggleRerunModalOpen = () => setRerunModalOpen(!rerunModalOpen);
+
+  const goAssignmentResult = (name) => {
+    updateAssignmentInfo({ ...assignmentInfo, studentName: name });
     navigate(`/assignmentResult/${assignmentInfo.id}`);
+  };
+
+  const deleteSubmission = async (record) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/delete_submission?submission_id=${record.id}`, { method: 'DELETE' });
+    if (response.ok) {
+      // Increment forceUpdate to trigger a re-fetch of submissions
+      setForceUpdate(u => u + 1);
+      message.success('Submission deleted successfully');
+    } else {
+      message.error('Failed to delete submission');
+    }
   };
 
   const columns = [
     {
       title: "NAME",
       dataIndex: "name",
-      render: text => (
-        <Typography.Link onClick={() => goAssignmentResult(text)}>
-          {text}
-        </Typography.Link>
-      ),
-      sorter: (a, b) => a.name > b.name,
+      render: (text, record) => <Typography.Link onClick={() => goAssignmentResult(text)}>{text}</Typography.Link>,
+      sorter: (a, b) => a.name.localeCompare(b.name),
     },
     {
       title: "SUBMISSION TIME (CST)",
       dataIndex: "submissionTime",
-      render: text => formatDayTimeEn(text),
+      render: (text) => moment(text).format("MM/DD/YYYY HH:mm:ss"),
       sorter: (a, b) => a.submissionTime - b.submissionTime,
     },
     {
@@ -70,109 +56,68 @@ export default () => {
     {
       title: "DELETE",
       align: "center",
-      render: text => (
-        <Button danger type='primary' size='small' icon={<CloseOutlined />} />
-      ),
+      render: (_, record) => <Button danger type="primary" size="small" icon={<CloseOutlined />} onClick={() => deleteSubmission(record)} />,
     },
   ];
 
   useEffect(() => {
-    fetch(process.env.REACT_APP_API_URL + "/get_course_enrollment?" + 
-      new URLSearchParams({
-        course_id: courseInfo.id
-      })
-    )
-    .then(res => res.json())
-    .then(data => {
-      setStudents(data);
-    })
-  }, []);
+    const fetchStudents = async () => {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`);
+      const students = await response.json();
+      if (students && students.length > 0) {
+        await fetchSubmissions(students);
+      } else {
+        setTableData([]);
+      }
+    };
 
-  useEffect(() => {
-    if (Object.keys(students).length > 0 && assignmentInfo.id && Object.keys(tableData).length < 1) {
-      students.forEach(student => {
-        fetch(process.env.REACT_APP_API_URL + "/get_latest_submission?" +
-          new URLSearchParams({
-            student_id: student.id,
-            assignment_id: assignmentInfo.id
-          })
-        )
-        .then(res => res.json())
-        .then(data => {
-          console.log(data);
-          if (Object.keys(data).length > 0) {
-            const submission = {
-              name: student.name,
-              submissionTime: moment(data.submitted_at).valueOf(),
-              score: data.score,
-              id: data.student_id
-            };
-            setTableData(prevData => {
-              if (prevData.findIndex(obj => obj.id === submission.id) !== -1) return prevData;
-              return [...prevData, submission];
-            })
-          }
-        })
-      });
+    const fetchSubmissions = async (students) => {
+      const submissions = await Promise.all(students.map(async (student) => {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/get_latest_submission?student_id=${student.id}&assignment_id=${assignmentInfo.id}`);
+        const data = await response.json();
+        
+        // Ensure that each submission has a non-null score, a name, and a submission time
+        if (data && data.submitted_at && data.score !== undefined && student.name) {
+          return {
+            name: student.name, // You would need to adjust this if the name isn't in the 'students' variable
+            submissionTime: moment(data.submitted_at).valueOf(),
+            score: data.score,
+            id: data.id // This assumes that 'id' refers to the submission's unique identifier
+          };
+        }
+        return null;
+      }));
+    
+      // Filter out any null submissions and set the table data
+      const validSubmissions = submissions.filter(submission => submission !== null);
+      setTableData(validSubmissions);
+    };
+
+    if (assignmentInfo.id) {
+      fetchStudents();
     }
-  }, [students]);
+  }, [courseInfo.id, assignmentInfo.id, forceUpdate]); // Add forceUpdate as a dependency
 
   return (
     <>
       <PageContent>
-        <PageHeader
-          title='Manage Submissions'
-          extra={[
-            <Input.Search
-              // style={{ width: "300px", marginLeft: "24px" }}
-              placeholder='Search name'
-              // suffix={<SearchOutlined />}
-              enterButton
-              key={1}
-            />,
-          ]}
-        />
-        {/* <Input.Search
-          style={{ width: "300px", marginLeft: "24px" }}
-          placeholder='Search name'
-          // suffix={<SearchOutlined />}
-          enterButton
-        /> */}
-        <Card
-          bordered={false}
-          bodyStyle={{ paddingTop: 0 }}
-          // extra={<Input.Search placeholder='Search NAME' />}
-        >
-          <Table
-            rowKey='id'
-            columns={columns}
-            dataSource={tableData}
-            // title={() => (
-            //   <Input.Search
-            //     style={{ width: "300px" }}
-            //     placeholder='Search name'
-            //     // suffix={<SearchOutlined />}
-            //     enterButton
-            //   />
-            // )}
-          />
+        <PageHeader title="Manage Submissions" />
+        <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>
+          <Table columns={columns} dataSource={tableData} rowKey="id" />
         </Card>
       </PageContent>
       <PageBottom>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={toggleRerunModalOpen}>
-            Regrade All Submissions
-          </Button>
+          <Button icon={<ReloadOutlined />} onClick={toggleRerunModalOpen}>Regrade All Submissions</Button>
           <Button>
             <span>Grade Submissions</span>
             <RightOutlined />
           </Button>
         </Space>
       </PageBottom>
-      <RerunAutograderModal
-        open={rerunModalOpen}
-        onCancel={toggleRerunModalOpen}
-      />
+      <RerunAutograderModal open={rerunModalOpen} onCancel={toggleRerunModalOpen} />
     </>
   );
 };
+
+export default SubmissionsManager;
