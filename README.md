@@ -13,7 +13,7 @@
 
     ```bash
     pip install docker-compose
-        ```
+    ```
 
 ### Setup:
 
@@ -94,15 +94,38 @@ To enable this you need to make the following change in your .env file.
     In a NEW terminal  
     cd into the frontend folder and run:
     ```bash
-    cd frontned
+    cd frontend
     ```
 
     ```bash
-
     npm start 
     ```
 
 9. Test end to end functionality by creating a new instructor
+
+## New Backend stack completely on docker
+Prerequisites:
+- Postgres is not currently running on your system (otherwise you will get errors launching the postgres container because the port will conflict). Either uninstall postgres completely from your system or just kill it
+
+Steps
+1. Install docker with the steps above
+2. run `docker compose up`
+3. Visit the pgadmin website via the url in the container. login with the default login:  
+    `user: admin@admin.com`  
+    `password: 12345`
+4. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
+    `Host name/address: host.docker.internal`  
+    `Username: root`  
+    `Password: root`  
+5. In this newly created server, create a new database. Name it `codeassist`. This is important for init_db.py
+6. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
+7. Begin sending requests.
+
+## Using Hoppscotch
+Hoppscotch is open source postman, it can test endpoints pretty well
+1. Navigate to [Hoppscotch](https://hoppscotch.io/)
+2. Import the collections and environments located in the backend folder. They are named accordingly
+3. Make sure that when you are running the collection that the environment is loaded for the specific request you are running.
 
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
