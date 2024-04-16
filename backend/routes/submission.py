@@ -222,11 +222,57 @@ def get_latest_submission():
         assignment_id=assignment_id
     ).order_by(Submission.submitted_at.desc()).first()
 
-    if not latest_submission:
-        return jsonify({"error": "No submissions found"}), 404
-
     # Serialize the submission data
     submission_schema = SubmissionSchema()
-    submission_data = submission_schema.dump(latest_submission)
 
+    if not latest_submission:
+        # Return an empty object instead of an error
+        return jsonify({"message": "No submissions found", "data": submission_schema.dump(None)}), 200
+
+    submission_data = submission_schema.dump(latest_submission)
     return jsonify(submission_data), 200
+
+@submission.route('/get_all_assignment_submissions', methods=["GET"])
+@cross_origin()
+def get_all_assignment_submissions():
+    assignment_id = request.args.get("assignment_id")
+
+    if not assignment_id:
+        return jsonify({"error": "Missing assignment_id"}), 400
+
+    # Query for all submissions related to the assignment
+    all_submissions = Submission.query.filter_by(
+        assignment_id=assignment_id
+    ).order_by(Submission.submitted_at.desc()).all()
+
+    if not all_submissions:
+        return jsonify({"error": "No submissions found for this assignment"}), 404
+
+    # Serialize the submission data
+    submissions_schema = SubmissionSchema(many=True)  # Set 'many=True' to handle multiple objects
+    submissions_data = submissions_schema.dump(all_submissions)
+
+    return jsonify(submissions_data), 200
+
+
+@submission.route('/delete_submission', methods=["DELETE"])
+@cross_origin()
+def delete_submission():
+    submission_id = request.args.get("submission_id")
+
+    if not submission_id:
+        return jsonify({"error": "Missing submission_id"}), 400
+
+    # Query for the submission to be deleted by submission_id
+    submission_to_delete = Submission.query.get(submission_id)
+
+    if not submission_to_delete:
+        # If no submission is found, return an error message
+        return jsonify({"message": "No submission found to delete"}), 404
+
+    # If a submission is found, delete it from the database
+    db.session.delete(submission_to_delete)
+    db.session.commit()
+
+    # Return a success message
+    return jsonify({"message": "Submission successfully deleted"}), 200
