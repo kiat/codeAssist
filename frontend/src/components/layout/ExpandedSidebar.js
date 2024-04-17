@@ -7,8 +7,6 @@ import GradeSider from './GradeSider';
 import styles from './styles.module.css';
 
 function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed }) {
-//   console.log("Rendering ExpandedSidebar", { courseInfo, userInfo, pathname }); // Debug: log state
-  console.log(courseInfo.id);
   return (
     <>
       <div>

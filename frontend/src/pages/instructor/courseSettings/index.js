@@ -72,8 +72,6 @@ export default () => {
     }));
   };
 
-  console.log(formData)
-  
   const onFinish = () => {
     const dataToSend = {
       course_id: courseId,
