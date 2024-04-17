@@ -21,7 +21,7 @@ export default function Assignments() {
       key: "name",
       sorter: (a, b) => a.name.localeCompare(b.name),
       render: (text, record) => (
-        <Button type="link" onClick={() => navigate(`/assignmentresult/${record.id}`)}>
+        <Button type="link" onClick={() => handleAssignmentInteraction(record)}>
           {text}
         </Button>
       ),
@@ -109,6 +109,22 @@ export default function Assignments() {
 
     fetchCourseAssignments();
   }, [urlParams.courseId, userInfo, navigate]);
+
+  const handleAssignmentInteraction = (assignment) => {
+    const now = moment();
+    const dueDateTime = moment(assignment.due_date).valueOf();
+
+    const isSubmitted = assignment.submitted;
+    const dueDateHasPassed = now.isAfter(dueDateTime);
+
+    if (isSubmitted) {
+      navigate(`/assignmentresult/${assignment.id}`);
+    } else if (!dueDateHasPassed) {
+      setModalOpen(true);
+      setAssignmentTitle(assignment.name);
+      setAssignmentID(assignment.id);
+    }
+  };
 
   const closeModal = () => {
     setModalOpen(false);
