@@ -133,3 +133,5 @@ dmypy.json
 
 # No need to upload loads of zip files
 backend/routes/upload_autograder/runs/
+
+/backend/runs
