@@ -111,6 +111,7 @@ env.bak/
 venv.bak/
 .DS_Store
 backend/.env
+frontend/.env
 
 # Spyder project settings
 .spyderproject
@@ -130,5 +131,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# backend runs
+# No need to upload loads of zip files
+backend/routes/upload_autograder/runs/
+
 /backend/runs

@@ -103,7 +103,7 @@ export default () => {
     },
     {
       title: "TIME(CST)",
-      dataIndex: "executed_at",
+      dataIndex: "submitted_at",
       render: text => formatDayTimeEn(text),
       onCell: sharedCell,
       sorter: (a, b) => a.time - b.time,

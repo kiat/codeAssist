@@ -1,4 +1,4 @@
-from api.models import Student, Course, Enrollment, Assignment, Submission, Instructor
+from api.models import Student, Course, Enrollment, Assignment, Submission, Instructor, TestCaseResult, TestCase
 from api import ma
 
 
@@ -32,3 +32,14 @@ class SubmissionSchema(ma.SQLAlchemyAutoSchema):
         model = Submission
         include_fk = True
 
+
+class TestCaseSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = TestCase
+        include_fk = True
+
+class TestCaseResultSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = TestCaseResult
+        include_fk = True
+        include_relationships = True  # Add this if you want to include relationships in the serialized data

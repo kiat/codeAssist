@@ -2,158 +2,122 @@ import { PageHeader } from "antd";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { GlobalContext } from "../../App";
 import SemesterCourses from "./semesterCourses";
-
-import "../../mock/course";
 import CourseModal from "./courseModal";
 import RelationForm from "./relationForm";
 import AddForm from "./addForm";
-import {
-  createCourse,
-  enrollCourse,
-  getInstructorCourses,
-  getStudentCourses,
-} from "../../services/dashboard";
+import { createCourse, enrollCourse, getInstructorCourses, getStudentCourses } from "../../services/dashboard";
 
-/**
- * dashboard for both student and instructors
- * @returns
- */
 export default function Dashboard() {
-  const [modalOpen, setModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [courses, setCourses] = useState({});
   const { userInfo } = useContext(GlobalContext);
 
-  // control course adding modal
-  const toggleModalOpen = useCallback(() => {
-    setModalOpen(bool => !bool);
-  }, []);
-
-  const formatCourse = data => {
-    const coursesTemp = { 99999: [] };
-    data?.forEach(item => {
-      const { semester, year, name, assignments, id } = item;
-      if (!coursesTemp[`${year}${semester}`] && semester && year) {
-        coursesTemp[`${year}${semester}`] = [];
-      }
-      // if (!semester && !year && !coursesTemp["noTitle"]) {
-      //   coursesTemp["noTitle"] = [];
-      // }
-      if (semester && year) {
-        coursesTemp[`${year}${semester}`].push({ name, assignments, id });
-      } else {
-        coursesTemp[99999].push({ name, assignments, id });
-      }
-    });
-    return coursesTemp;
+  // Inline styles for the component
+  const addCourseButtonStyle = {
+    border: "1px dashed green",
+    width: "230px",
+    height: "125px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    color: "green",
+    fontSize: "bold",
+    cursor: "pointer",
+    boxSizing: "border-box",
+    padding: "10px",
+    margin: "0 10px 20px 0",
+    flex: "0 0 auto"
   };
 
-  // get course information
-  const getCourses = useCallback(() => {
-    const { isStudent, id } = userInfo || {};
-    if (isStudent) {
-      // getInstructorCourses({ id }).then(res => {
-      getStudentCourses({ student_id: id }).then(res => {
-        setCourses(formatCourse(res.data));
-      });
-    } else {
-      getInstructorCourses({ instructor_id: id }).then(res => {
-        setCourses(formatCourse(res.data));
-      });
-    }
+  const courseContainerStyle = {
+    paddingTop: "30px"
+  };
+
+  const courseHeaderStyle = {
+    marginLeft: "25px",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "20px",
+    alignItems: "flex-start"
+  };
+
+  // Toggle the visibility of the course modal
+  const toggleModal = useCallback(() => {
+    setIsModalOpen(prevState => !prevState);
+  }, []);
+
+  // Function to structure the courses data
+  const formatCourses = (coursesArray) => {
+    const formattedCourses = {};
+    coursesArray.forEach(course => {
+      const { semester, year, name, assignments, id } = course;
+      const key = `${year}${semester}`; // Assuming year and semester are always present
+      if (!formattedCourses[key]) {
+        formattedCourses[key] = [];
+      }
+      formattedCourses[key].push({ name, assignments, id });
+    });
+    return formattedCourses;
+  };
+
+  // Function to fetch courses based on the user's role
+  const fetchCourses = useCallback(() => {
+    const fetchFunction = userInfo?.isStudent ? getStudentCourses : getInstructorCourses;
+    const params = userInfo?.isStudent ? { student_id: userInfo.id } : { instructor_id: userInfo.id };
+    fetchFunction(params).then((response) => {
+      if (response && Array.isArray(response.data)) {
+        const formatted = formatCourses(response.data);
+        setCourses(formatted);
+      } else {
+        console.error('Expected an array, received:', response);
+        setCourses({});
+      }
+    }).catch(error => {
+      console.error('Error fetching courses:', error);
+    });
   }, [userInfo]);
 
+  // Fetch courses on mount and when userInfo changes
   useEffect(() => {
-    getCourses();
-  }, [getCourses]);
+    fetchCourses();
+  }, [fetchCourses, userInfo]);
 
-  // action after successfully adding courses
-  const afterAddCourse = useCallback(
-    values => {
-      const { courseName, semester, year, entryCode } = values;
-      console.log("values", values);
-      if (userInfo?.isStudent && Object.keys(values).length === 1) {
-        enrollCourse({student_id: userInfo.id, entryCode: entryCode}).then(res => {
-          getCourses();
-          toggleModalOpen();
-        });
-      } else {
-        // createCourse({ id: userInfo.id, courseName, ...restValues }).then(res => {
-        createCourse({ name: courseName, instructor_id: userInfo.id, semester: semester, year: year, entryCode: entryCode}).then(res => {
-          getCourses();
-          toggleModalOpen();
-        });
-      }
-      // axios
-      //   .post("/api/addCourse", {
-      //     isStudent: userInfo?.isStudent,
-      //     ...values,
-      //   })
-      //   .then(res => {
-      //     getCourses();
-      //     toggleModalOpen();
-      //   });
-    },
-    [getCourses, toggleModalOpen, userInfo?.id]
-  );
+  // Function to handle adding a new course
+  const handleAddCourse = useCallback(values => {
+    const addCourseFunction = userInfo?.isStudent ? enrollCourse : createCourse;
+    const params = userInfo?.isStudent
+      ? { student_id: userInfo.id, entryCode: values.entryCode }
+      : { name: values.courseName, instructor_id: userInfo.id, semester: values.semester, year: values.year, entryCode: values.entryCode };
+    addCourseFunction(params).then(() => {
+      toggleModal();
+      fetchCourses();
+    });
+  }, [fetchCourses, toggleModal, userInfo]);
 
-  // find if the user is an instructor or a student
-  return (
+   return (
     <>
-      <PageHeader title='Your Courses' />
-      <div
-        style={{
-          marginLeft: "25px",
-        }}
-      >
-      {userInfo?.isStudent && Object.keys(courses).length === 1 ? (
-        <div
-          style={{
-            border: "1px dashed green",
-            width: "230px",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            color: "green",
-            fontSize: "bold",
-            cursor: "pointer",
-            height: "125px",
-          }}
-          onClick={toggleModalOpen}
-        >
-          + Add a course
-        </div>
-      ) : null}
-        {/* {courses?.map((item, index) => (
+      <PageHeader title="Your Courses" />
+      <div style={courseHeaderStyle}>
+        {Object.keys(courses).sort((a, b) => b.localeCompare(a)).map((key, index) => (
           <SemesterCourses
-            key={item.semester}
-            semesterInfo={item}
-            isFirst={index === 0 ? true : false}
-            toggleRelationModalOpen={toggleModalOpen}
+            key={key}
+            yearInfo={key}
+            semesterInfo={courses[key]}
+            courseGroup={index}
+            numCourses={Object.keys(courses).length}
           />
-        ))} */}
-        {Object.keys(courses)
-          ?.sort((a, b) => b - a)
-          .map((item, index) => (
-            <SemesterCourses
-              key={item}
-              yearInfo={item}
-              semesterInfo={courses[item]}
-              /*isFirst={index === 0 ? true : false}*/
-              courseGroup={index}
-              numCourses={Object.keys(courses).length - 1}
-              toggleRelationModalOpen={toggleModalOpen}
-            />
-          ))}
+        ))}
+        <div style={courseContainerStyle}>
+          <div style={addCourseButtonStyle} onClick={toggleModal}>
+            + Add a course
+          </div>
+        </div>
       </div>
-      <CourseModal
-        title='ADD COURSE'
-        open={modalOpen}
-        onCancel={toggleModalOpen}
-      >
+      <CourseModal title="ADD COURSE" open={isModalOpen} onCancel={toggleModal}>
         {userInfo?.isStudent ? (
-          <RelationForm onFinish={afterAddCourse} onCancel={toggleModalOpen} />
+          <RelationForm onFinish={handleAddCourse} onCancel={toggleModal} />
         ) : (
-          <AddForm onFinish={afterAddCourse} onCancel={toggleModalOpen} />
+          <AddForm onFinish={handleAddCourse} onCancel={toggleModal} />
         )}
       </CourseModal>
     </>

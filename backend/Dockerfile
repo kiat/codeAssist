@@ -1,22 +1,26 @@
 FROM alpine:latest
 
-# Add pip and python
-RUN apk update
-RUN apk add py-pip
-RUN apk add --no-cache python3-dev 
-RUN pip install --upgrade pip --break-system-packages
+# Install Python, pip, and Docker
+RUN apk add --no-cache python3 py3-pip docker
 
-# Copy and install requirements
-WORKDIR /usr/app
-COPY ./requirements.txt .
-RUN pip --no-cache-dir install -r requirements.txt --break-system-packages
+# Set the working directory in the container
+WORKDIR /usr/src/app
 
-# Copy app
+# Copy the database migrations
+COPY migrations /usr/src/app/migrations
+
+# Copy the Python requirements file and install dependencies
+COPY requirements.txt ./
+RUN pip3 install --no-cache-dir -r requirements.txt --break-system-packages
+
+# Copy the rest of the application
 COPY . .
 
+# Expose the port the app runs on
 EXPOSE 5000
 
-ENV PYTHONPATH /usr/app
+# Set environment variables
+ENV PYTHONPATH /usr/src/app
 
-# Start app
-CMD [ "flask", "run", "--host=0.0.0.0" ]
+# Command to run the application
+CMD ["flask", "run", "--host=0.0.0.0"]

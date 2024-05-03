@@ -1,12 +1,12 @@
 import { Layout } from "antd";
-import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import Home from "./pages/home";
 import Dashboard from "./pages/dashboard";
 import { createContext, useCallback, useEffect, useState } from "react";
 import Assignments from "./pages/assignments";
 import AssignmentResult from "./pages/result";
 import RootSider from "./components/layout/sider";
-
+  
 import "./mock";
 import InstructorDashboard from "./pages/instructor/dashboard";
 import CourseSettings from "./pages/instructor/courseSettings";
@@ -24,70 +24,67 @@ import EditAccount from "./pages/editAccount";
 
 const { Content } = Layout;
 
+// Defining initial states as constants to avoid recreating objects on re-renders
+const initialUserInfo = { name: "", isStudent: 1 };
+const initialCourseInfo = { id: "", name: "", code: "", semester: "", year: "" };
+const initialAssignmentInfo = { id: "", score: "", results: null, code: null };
+
 export const GlobalContext = createContext({
-  userInfo: { name: "", isStudent: 1 },
-  courseInfo: { id: "", name: "", code: "", semester: "", year: "" },
-  assignmentInfo: { id: "", score: "", results: null, code: null },
+  userInfo: initialUserInfo,
+  courseInfo: initialCourseInfo,
+  assignmentInfo: initialAssignmentInfo,
   updateCourseInfo: () => {},
   updateUserInfo: () => {},
   updateAssignmentInfo: () => {},
 });
 
 function App() {
-  // const [courseInfo, setCourseInfo] = useState({ code: "", name: "", semester: "", year: "" });
-  const [courseInfo, setCourseInfo] = useState(
-    JSON.parse(localStorage.getItem("courseInfo")) || []
+  const [userInfo, setUserInfo] = useState(() => 
+    JSON.parse(localStorage.getItem("userInfo")) || initialUserInfo
   );
-  const [assignmentInfo, setAssignmentInfo] = useState({ name: "" });
-  const [userInfo, setUserInfo] = useState(
-    JSON.parse(localStorage.getItem("userInfo"))
+  const [courseInfo, setCourseInfo] = useState(() => 
+    JSON.parse(localStorage.getItem("courseInfo")) || initialCourseInfo
   );
+  const [assignmentInfo, setAssignmentInfo] = useState(initialAssignmentInfo);
   const navigate = useNavigate();
-  
+  const location = useLocation();
+
+  // Effect for initializing courseInfo from localStorage
   useEffect(() => {
-    const courseInfoData = window.localStorage.getItem("courseInfo");
-    if (!courseInfoData) setCourseInfo(JSON.parse(courseInfoData));
+    const storedCourseInfo = localStorage.getItem("courseInfo");
+    if (storedCourseInfo) {
+      setCourseInfo(JSON.parse(storedCourseInfo));
+    }
   }, []);
 
+  // Effect for saving courseInfo to localStorage when it changes
   useEffect(() => {
-    window.localStorage.setItem("courseInfo", JSON.stringify(courseInfo));
+    localStorage.setItem("courseInfo", JSON.stringify(courseInfo));
   }, [courseInfo]);
 
-  const updateCourseInfo = useCallback(info => {
-    setCourseInfo(info);
-  }, []);
+  // Callbacks for updating state, using empty dependencies to ensure they don't change
+  const updateCourseInfo = useCallback(info => setCourseInfo(info), []);
+  const updateUserInfo = useCallback(info => setUserInfo(info), []);
+  const updateAssignmentInfo = useCallback(info => setAssignmentInfo(info), []);
 
-  const updateUserInfo = useCallback(info => {
-    setUserInfo(info);
-  }, []);
-
-  const updateAssignmentInfo = useCallback(info => {
-    setAssignmentInfo(info);
-  }, []);
-  
-  const pathname = window.location.pathname;
-
+  // Redirect to home if not logged in and not on home page
   useEffect(() => {
-    if (pathname !== "/" && !userInfo?.name) {
+    if (location.pathname !== "/" && !userInfo.name) {
       navigate("/");
     }
-  }, [userInfo, courseInfo, pathname, navigate]);
+  }, [userInfo, location, navigate]);
 
   return (
-    <GlobalContext.Provider
-      value={{
-        courseInfo,
-        updateCourseInfo,
-        userInfo,
-        updateUserInfo,
-        assignmentInfo,
-        updateAssignmentInfo,
-      }}
-    >
+    <GlobalContext.Provider value={{
+      userInfo, updateUserInfo,
+      courseInfo, updateCourseInfo,
+      assignmentInfo, updateAssignmentInfo
+    }}>
+
       <Layout>
-        {pathname === "/" ? null : (
+        {location.pathname === "/" ? null : (
           <RootSider
-            pathname={pathname}
+            pathname={location.pathname}
             courseInfo={courseInfo}
             userInfo={userInfo}
             assignmentInfo={assignmentInfo}

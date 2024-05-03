@@ -4,50 +4,53 @@ import { useState, useContext } from "react";
 import { GlobalContext } from "../../App";
 import { useNavigate } from "react-router-dom";
 
-export default function AssignmentModal({ open, onCancel, submit, assignmentID, assignmentTitle}) {
+export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle }) {
   const [file, setFile] = useState(null);
   const { userInfo } = useContext(GlobalContext);
+  const navigate = useNavigate();
 
   const handleFileChange = (info) => {
-    const { status, response } = info.file;
-    if (status === 'done') {
-      setFile(info.file);
+    if (info.file.status === 'done') {
+      setFile(info.file.originFileObj);
       message.success(`${info.file.name} file uploaded successfully.`);
-    } else if (status === 'error') {
+    } else if (info.file.status === 'error') {
       message.error(`${info.file.name} file upload failed.`);
     }
   };
 
-  const handleBeforeUpload = (file) => {
-    const formData = new FormData();
+  const handleSubmit = async () => {
+    if (!file) {
+      message.error("No file uploaded");
+      return;
+    }
 
+    const formData = new FormData();
     formData.append('file', file);
     formData.append('assignment', assignmentTitle);
     formData.append('student_id', userInfo.id);
     formData.append('assignment_id', assignmentID);
-    // formData.append('name', userInfo.name);
-   
-    fetch(process.env.REACT_APP_API_URL + "/upload_submission", {
-      method: "POST",
-      body: formData
-    })
-    .then((response) => response.json())
-    .then((data) => {
-      console.log(data)
-      navigateToResults();
-    })
-    .catch((error) => {
-      console.error("Error uploading file:", error);
-    });
 
-    return false;
+    try {
+      const response = await fetch(process.env.REACT_APP_API_URL + "upload_submission", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+
+      // Proceed to results page after successful upload
+      navigateToResults();
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      message.error("Failed to upload file. Please try again.");
+    }
   };
 
-  const navigate = useNavigate();
-
   const navigateToResults = () => {
-    navigate(`/assignmentResult/${assignmentID}`)
-  }
+    navigate(`/assignmentResult/${assignmentID}`);
+  };
 
   return (
     <Modal title="Submit Assignment" open={open} onCancel={onCancel} footer={null}>
@@ -56,9 +59,11 @@ export default function AssignmentModal({ open, onCancel, submit, assignmentID, 
           <Upload.Dragger
             name="file"
             multiple={false}
-            action={`${process.env.REACT_APP_API_URL}/upload_submission`}
             onChange={handleFileChange}
-            beforeUpload={handleBeforeUpload}
+            beforeUpload={file => {
+              setFile(file); // Set file on beforeUpload instead of upload itself
+              return false; // Prevent default upload
+            }}
             onDrop={e => console.log('Dropped files', e.dataTransfer.files)}
           >
             <p className="ant-upload-drag-icon">
@@ -68,7 +73,7 @@ export default function AssignmentModal({ open, onCancel, submit, assignmentID, 
           </Upload.Dragger>
         </Form.Item>
         <Form.Item>
-          <Button style={{ width: "100%" }} type="primary" onClick={navigateToResults}>
+          <Button style={{ width: "100%" }} type="primary" onClick={handleSubmit}>
             Submit
           </Button>
         </Form.Item>
@@ -76,5 +81,3 @@ export default function AssignmentModal({ open, onCancel, submit, assignmentID, 
     </Modal>
   );
 }
-
-
