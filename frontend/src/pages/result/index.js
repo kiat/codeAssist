@@ -14,7 +14,6 @@ import SubmissionHistoryModal from "./submissionHistoryModal";
 import FormattingModal from "./FormattingModal";
 
 import { getAssignment } from "../../services/assignment";
-import { get_student_byid} from "../../services/user";
 
 export default function AssignmentResult() {
   const [viewMode, setViewMode] = useState("Results");
@@ -24,16 +23,11 @@ export default function AssignmentResult() {
   const [autoGraderPoints, setAutograderPoints] = useState(0);
   const [assignmentName, setAssignmentName] = useState(""); // Placeholder value
   const { assignmentId, studentId } = useParams();
-  const {studentName, setStudentName} = useState("");
-  // const { assignmentId } = useParams();
   const location = useLocation();
   const { userInfo, assignmentInfo } = useContext(GlobalContext);
 
   useEffect(() => {
     const fetchAssignmentDetails = async () => {
-      /*const res = await get_submissions({assignment_id: assignmnetId, student_id: {assignmentInfo?.studentName ?? userInfo?.name}});
-      if (res?.data) {
-        res.data.results*/
       const res = await getAssignment({ assignment_id: assignmentId });
       if (res?.data) {
         setAutograderPoints(res.data.autograder_points);
@@ -52,16 +46,6 @@ export default function AssignmentResult() {
   const handleRadioChange = useCallback((e) => {
     setViewMode(e.target.value);
   }, []);
-
-  const getStudentName = async () => {
-    console.log("hello");
-    console.log(studentId);
-    const res = await get_student_byid({id:studentId});
-    if(res?.data){
-      console.log(res.data.name);
-      setStudentName(res.data.name);
-    }
-  }
 
   return (
     <>
@@ -85,12 +69,10 @@ export default function AssignmentResult() {
             />
             <Card bordered={false}>
               <TestResultsDisplay viewMode={viewMode} studentId={studentId} />
-              {/* <TestResultsDisplay viewMode={viewMode} /> */}
             </Card>
           </div>
           <StudentInfoPanel
             assignmentName={assignmentName} 
-            //studentName={userInfo.isStudent? userInfo.name:{setStudentName}}
             studentName={assignmentInfo?.studentName ?? userInfo?.name}
             score={assignmentInfo?.score ?? "Unknown"} // Replace with actual score data as needed
             totalPoints={autoGraderPoints}

@@ -1,4 +1,4 @@
-import { Card, Descriptions, PageHeader, Table, Button, message, Alert } from "antd";
+import { Card, Descriptions, PageHeader, Table, Button, message} from "antd";
 import { useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../App";
@@ -119,13 +119,14 @@ export default function Assignments() {
 
     if (isSubmitted) {
       //navigate(`/assignmentresult/${assignment.id}`);
+      //using new route def
       navigate(`/assignmentresult/${assignment.id}/${userInfo.id}`);
     } else if (!dueDateHasPassed) {
       setModalOpen(true);
       setAssignmentTitle(assignment.name);
       setAssignmentID(assignment.id);
     } else if (dueDateHasPassed){
-      alert("Due Date Has Passed");
+      message.error("Due Date Has Passed");
     }
   };
 

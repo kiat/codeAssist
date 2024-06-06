@@ -20,36 +20,3 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
     </Space>
   );
 }
-//testing
-// import React, { useContext, useEffect, useState } from "react";
-// import { Typography, Space } from "antd";
-// import { CheckCircleOutlined } from '@ant-design/icons';
-// import { GlobalContext } from "../../App";
-
-// export default function StudentInfoPanel({ assignmentName, studentName, totalPoints }) {
-//   const { autograderScore } = useContext(GlobalContext);
-//   const [loading, setLoading] = useState(true);
-
-//   useEffect(() => {
-//     if (autograderScore !== null) {
-//       setLoading(false);
-//     }
-//   }, [autograderScore]);
-
-//   return (
-//     <Space direction="vertical" size="middle" style={{ paddingLeft: "20px", paddingTop: "20px" }}>
-//       <Typography.Title level={4}>{assignmentName}</Typography.Title>
-//       <Space direction="horizontal" size="middle">
-//         <CheckCircleOutlined style={{ color: 'green' }} />Graded
-//       </Space>
-//       <Space direction="vertical" size="middle" style={{ paddingTop: "20px" }}>
-//         <div>Select each question to review feedback and grading details.</div>
-//         <div><strong>Student</strong><br />{studentName}</div>
-//         <div><strong>Total Points</strong><br />{totalPoints}</div>
-//         <div><strong>Autograder Score</strong><br />
-//           {loading ? 'Loading...' : autograderScore}
-//         </div>
-//       </Space>
-//     </Space>
-//   );
-// }

@@ -54,6 +54,7 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
   };
 
   const navigateToResults = () => {
+    // using updated route def
     navigate(`/assignmentResult/${assignmentID}/${userInfo.id}`);
   };
 

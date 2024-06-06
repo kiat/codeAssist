@@ -39,6 +39,7 @@ const SubmissionsManager = () => {
       studentName: name,
       studentId: id,
     });
+    //use new route
     navigate(`/assignmentResult/${assignmentInfo.id}/${id}`) 
     // navigate(`/assignmentResult/${assignmentInfo.id}`);
   };

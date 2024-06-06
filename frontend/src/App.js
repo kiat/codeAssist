@@ -104,6 +104,7 @@ function App() {
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
                 path='/assignmentResult/:assignmentId/:studentId' 
+                //old route config
                 //path='/assignmentResult/:assignmentId'
                 element={<AssignmentResult />}
               />
@@ -171,30 +172,3 @@ export default function AppRoute() {
     </BrowserRouter>
   );
 }
-//test
-// import axios from 'axios';
-// import React, { useEffect, useState } from 'react';
-
-// const App = () => {
-//   const [message, setMessage] = useState('');
-
-//   useEffect(() => {
-//     axios.get(`${process.env.REACT_APP_API_URL}/test`)
-//       .then(response => {
-//         setMessage(response.data.message);
-//       })
-//       .catch(error => {
-//         console.error('Error fetching data:', error);
-//         setMessage('Error fetching data');
-//       });
-//   }, []);
-
-//   return (
-//     <div>
-//       <h1>Message from Backend:</h1>
-//       <p>{message}</p>
-//     </div>
-//   );
-// };
-
-// export default App;

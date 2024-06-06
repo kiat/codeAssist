@@ -31,15 +31,6 @@ const TestResultsDisplay = ({ viewMode, studentId }) => {
     const fetchResults = async () => {
       setIsLoading(true);
       try {
-        //need to change this to the student id (how to access this students id from the instructors end?)
-        // const tempid = userInfo.isStudent?0: await fetch(`${process.env.REACT_APP_API_URL}/get_student_byname?` +
-        // new URLSearchParams({
-        //   name:assignmentInfo.studentName
-        // }));
-        //whenever the user navigates to teh asignment results we need to provide te right student id
-        //if instructor, delivered by the assignmentInfo
-        //const send = userInfo.isStudent? userInfo.id: /*'bf245d76-9086-482e-9b04-60d7cddf6e1e'*/assignmentInfo.studentId;
-        //console.log(send)
         const send = userInfo.isStudent? userInfo.id: studentId;
         const response = await fetch(`${process.env.REACT_APP_API_URL}/get_latest_submission?` +
           new URLSearchParams({

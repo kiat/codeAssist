@@ -212,7 +212,6 @@ def get_student():
     # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
     return jsonify(student)
 
-#testing smth
 @user.route('/get_student_byid', methods=["GET"])
 @cross_origin()
 def get_student_byid():
@@ -243,7 +242,6 @@ def get_instructor():
     # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
     return jsonify(instructor)
 
-#testing smth
 @user.route('/get_instructor_byid', methods=["GET"])
 @cross_origin()
 def get_instructor_byid():

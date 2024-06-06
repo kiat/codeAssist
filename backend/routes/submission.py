@@ -167,6 +167,7 @@ def upload_submission():
     subprocess.run(f"docker rm {container_name}".split(), capture_output=True)
     os.chdir(current_dir)
 
+    #get openAI reponse
     completion = asyncio.run(get_completion("Say hi"))
     
     return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path, "openai_response": completion}), 200
