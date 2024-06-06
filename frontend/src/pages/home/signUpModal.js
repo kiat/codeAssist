@@ -50,7 +50,7 @@ export default function SignUpModal({ open, onCancel }) {
     //     message.error("connection failed");
     //   });
     // return;
-  };
+  };  
 
   return (
     <Modal title="SIGN UP" open={open} footer={null} onCancel={onCancel}>

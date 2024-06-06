@@ -212,6 +212,22 @@ def get_student():
     # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
     return jsonify(student)
 
+#testing smth
+@user.route('/get_student_byid', methods=["GET"])
+@cross_origin()
+def get_student_byid():
+    '''
+    /get_student_byid gets the student from the database
+    Requires from the frontend a JSON containing:
+    @param id    the student id
+    '''
+    studid = request.args.get("id")
+
+    student = db.session.query(Student).filter_by(id=studid)
+    student = StudentSchema().dump(student, many=True)[0]
+
+    return jsonify(student)
+
 @user.route('/get_instructor', methods=["GET"])
 @cross_origin()
 def get_instructor():
@@ -225,4 +241,20 @@ def get_instructor():
     instructor = db.session.query(Instructor).filter_by(email_address=email)
     instructor = StudentSchema().dump(instructor, many=True)[0]
     # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
+    return jsonify(instructor)
+
+#testing smth
+@user.route('/get_instructor_byid', methods=["GET"])
+@cross_origin()
+def get_instructor_byid():
+    '''
+    /get_instructor_byid gets the student from the database
+    Requires from the frontend a JSON containing:
+    @param id    the instructor id
+    '''
+    insid = request.args.get("id")
+
+    instructor = db.session.query(Instructor).filter_by(id=insid)
+    instructor = StudentSchema().dump(instructor, many=True)[0]
+
     return jsonify(instructor)
