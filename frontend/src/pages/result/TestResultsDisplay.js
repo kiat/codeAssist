@@ -5,18 +5,20 @@ import { Collapse, Button, Radio } from 'antd';
 import 'antd/dist/antd.css';
 
 const { Panel } = Collapse;
-
-const TestResultsDisplay = ({ viewMode }) => {
-  const { userInfo, courseInfo } = useContext(GlobalContext);
+const TestResultsDisplay = ({ viewMode, studentId }) => {
+//const TestResultsDisplay = ({ viewMode }) => {
+  const { userInfo, courseInfo, assignmentInfo} = useContext(GlobalContext);
   const { assignmentId } = useParams();
   const navigate = useNavigate();
-  const [testResults, setTestResults] = useState(null);
+  const [testResults, setTestResults] = useState(null); 
   const [studentCode, setStudentCode] = useState('');
   const [studentFileName, setStudentFileName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    //console.log('user_id: ', userInfo.id)
+    //console.log('isStudent?', userInfo.isStudent)
     if (!userInfo || !userInfo.id) {
       navigate('/');
       return;
@@ -29,9 +31,19 @@ const TestResultsDisplay = ({ viewMode }) => {
     const fetchResults = async () => {
       setIsLoading(true);
       try {
+        //need to change this to the student id (how to access this students id from the instructors end?)
+        // const tempid = userInfo.isStudent?0: await fetch(`${process.env.REACT_APP_API_URL}/get_student_byname?` +
+        // new URLSearchParams({
+        //   name:assignmentInfo.studentName
+        // }));
+        //whenever the user navigates to teh asignment results we need to provide te right student id
+        //if instructor, delivered by the assignmentInfo
+        //const send = userInfo.isStudent? userInfo.id: /*'bf245d76-9086-482e-9b04-60d7cddf6e1e'*/assignmentInfo.studentId;
+        //console.log(send)
+        const send = userInfo.isStudent? userInfo.id: studentId;
         const response = await fetch(`${process.env.REACT_APP_API_URL}/get_latest_submission?` +
           new URLSearchParams({
-            student_id: userInfo.id,
+            student_id: /*userInfo.id*/send,
             assignment_id: assignmentId
           }));
 
@@ -39,6 +51,7 @@ const TestResultsDisplay = ({ viewMode }) => {
           throw new Error('Network response was not ok');
         }
         const data = await response.json();
+        //console.log('API Response:', data);
         if (data.results) {
           const parsedResults = JSON.parse(data.results);
           setTestResults(parsedResults);

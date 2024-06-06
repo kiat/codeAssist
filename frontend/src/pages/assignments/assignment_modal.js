@@ -31,7 +31,7 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
     formData.append('assignment_id', assignmentID);
 
     try {
-      const response = await fetch(process.env.REACT_APP_API_URL + "upload_submission", {
+      const response = await fetch(process.env.REACT_APP_API_URL + "/upload_submission", {
         method: "POST",
         body: formData,
       });
@@ -39,6 +39,11 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
       if (!response.ok) {
         throw new Error("Network response was not ok");
       }
+
+      const responseData = await response.json();
+      console.log("response:", responseData.openai_response);
+
+      message.success(`OpenAI response: ${responseData.openai_response}`);
 
       // Proceed to results page after successful upload
       navigateToResults();
@@ -49,7 +54,7 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
   };
 
   const navigateToResults = () => {
-    navigate(`/assignmentResult/${assignmentID}`);
+    navigate(`/assignmentResult/${assignmentID}/${userInfo.id}`);
   };
 
   return (

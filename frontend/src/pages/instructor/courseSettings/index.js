@@ -23,14 +23,30 @@ import { getCourseAssignments } from "../../../services/course";
 export default () => {
   const { courseId } = useParams();
   const { updateCourseInfo, courseInfo } = useContext(GlobalContext);
-  const [assignments, setAssignments] = useState([])
-  const [formData, setFormData] = useState({})
+  const [assignments, setAssignments] = useState([]);
+  const [formData, setFormData] = useState({});
+  const [placeholders, setPlaceholders] = useState({});
 
   useEffect(() => {
     if (!courseInfo.id) {
       updateCourseInfo({ id: courseId });
     }
+    fetchCourseData(courseId);
   }, [courseId, courseInfo.id, updateCourseInfo]);
+
+  const fetchCourseData = async (id) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/get_course_info?course_id=${id}`);
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      const data = await response.json();
+      setFormData(data[0]);
+      setPlaceholders(data[0]);
+    } catch (error) {
+      console.error("Error fetching course data:", error);
+    }
+  };
 
   const getAssignments = useCallback(() => {
     getCourseAssignments({ course_id: courseId }).then(res => {
@@ -54,15 +70,15 @@ export default () => {
             method: "DELETE"
           })
     }
-  }
+  };
 
   const navigateHome = () => {
-    navigate("/dashboard")
-  }
+    navigate("/dashboard");
+  };
 
   const navigateMainPage = () => {
-    navigate(`/instructorDashboard/${courseId}`)
-  }
+    navigate(`/instructorDashboard/${courseId}`);
+  };
 
   const handleCheckboxChange = (e) => {
     const { name, checked } = e.target;
@@ -88,8 +104,8 @@ export default () => {
     .then((response) => {response.json()})
     .then((data) => {console.log(data)})
     .catch((error) => {console.log(error)})
-  }
-  
+  };
+
   return (
     <Form
       layout='vertical'
@@ -99,63 +115,41 @@ export default () => {
       style={{
         marginLeft: "20px",
       }}
+      initialValues={formData}
       onValuesChange={(changedValues, allValues) => {
-        setFormData(allValues)
+        setFormData(allValues);
       }}
     >
       <Space direction='vertical' style={{ width: "100%" }}>
         <PageHeader title='Edit Course' />
         <Card
           title='Basic Settings'
-          // bordered={false}
           bodyStyle={{
             width: "100%",
           }}
         >
-          <Form.Item label='ENTRY CODE' name = "entryCode">
-            <Input />
+          <Form.Item label='ENTRY CODE' name="entryCode">
+            <Input placeholder={placeholders.entryCode || "Enter Entry Code"} />
           </Form.Item>
           <Form.Item
             label='ALLOW ENTRY CODE'
             wrapperCol={24}
           >
-            <Checkbox name="allowEntryCode" onChange = {handleCheckboxChange}>
+            <Checkbox name="allowEntryCode" checked={formData.allowEntryCode} onChange={handleCheckboxChange}>
               Allow students to enroll via course entry code
             </Checkbox>
           </Form.Item>
           <Form.Item label='COURSE NAME' name='name'>
-            <Input />
+            <Input placeholder={placeholders.name || "Enter Course Name"} />
           </Form.Item>
           <Form.Item label='COURSE DESCRIPTION' name='description'>
-            <Input.TextArea />
+            <Input.TextArea placeholder={placeholders.description || "Enter Course Description"} />
           </Form.Item>
-          {/* <Space>
-            <Form.Item label='TERM' name='term' wrapperCol={24}>
-              <Select
-                options={[
-                  { value: "Spring" },
-                  { value: "Summer" },
-                  { value: "Autumn" },
-                  { value: "Winter" },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item label='YEAR' name='year' wrapperCol={24}>
-              <Select
-                options={[
-                  { value: 2022 },
-                  { value: 2021 },
-                  { value: 2020 },
-                  { value: 2019 },
-                ]}
-              />
-            </Form.Item>
-          </Space> */}
           <Form.Item>
             <Row gutter={20}>
               <Col span={12}>
                 <Form.Item label='SEMESTER' name='semester' wrapperCol={24}>
-                  <Select
+                  <Select placeholder={placeholders.semester || "Select Semester"}
                     options={[
                       { value: "Spring" },
                       { value: "Summer" },
@@ -167,15 +161,7 @@ export default () => {
               </Col>
               <Col span={12}>
                 <Form.Item label='YEAR' name='year' wrapperCol={24}>
-                  <Input />
-                  {/* <Select
-                    options={[
-                      { value: 2022 },
-                      { value: 2021 },
-                      { value: 2020 },
-                      { value: 2019 },
-                    ]}
-                  /> */}
+                  <Input placeholder={placeholders.year || "Enter Year"} />
                 </Form.Item>
               </Col>
             </Row>
@@ -183,7 +169,6 @@ export default () => {
         </Card>
         <Card
           title='Grading Defaults'
-          // bordered={false}
         >
           <p>
             Any newly created assignments will have these settings. Existing
@@ -195,6 +180,7 @@ export default () => {
                 { label: "Negative Scoring", value: 0 },
                 { label: "Positive Scoring", value: 1 },
               ]}
+              value={formData.defaultScoringMethod}
             />
           </Form.Item>
           <Form.Item
@@ -202,7 +188,7 @@ export default () => {
             name='DefaultScoreBounds'
             wrapperCol={24}
           >
-            <Checkbox.Group>
+            <Checkbox.Group value={formData.DefaultScoreBounds}>
               <Space direction='vertical'>
                 <Checkbox value='ceiling'>
                   Ceiling (maximum score is determined by the Assignment
@@ -215,7 +201,6 @@ export default () => {
         </Card>
         <Card
           title='Modify Course'
-          // bordered={false}
         >
           <Typography.Title level={5}>COURSE ACTIONS</Typography.Title>
           <Space>
@@ -226,7 +211,6 @@ export default () => {
               navigateMainPage();
             }}>Update Course</Button>
             <Popover
-              // title='sf'
               trigger='click'
               content={
                 assignments.length !== 0 && (
@@ -256,3 +240,262 @@ export default () => {
     </Form>
   );
 };
+
+// import { DeleteOutlined } from "@ant-design/icons";
+// import {
+//   Button,
+//   Card,
+//   Checkbox,
+//   Col,
+//   Form,
+//   Input,
+//   PageHeader,
+//   Popover,
+//   Radio,
+//   Row,
+//   Select,
+//   Space,
+//   Typography,
+// } from "antd";
+// import { useEffect, useState, useCallback } from "react";
+// import { useContext } from "react";
+// import { useNavigate, useParams } from "react-router-dom";
+// import { GlobalContext } from "../../../App";
+// import { getCourseAssignments } from "../../../services/course";
+
+// export default () => {
+//   const { courseId } = useParams();
+//   const { updateCourseInfo, courseInfo } = useContext(GlobalContext);
+//   const [assignments, setAssignments] = useState([])
+//   const [formData, setFormData] = useState({})
+
+//   useEffect(() => {
+//     if (!courseInfo.id) {
+//       updateCourseInfo({ id: courseId });
+//     }
+//   }, [courseId, courseInfo.id, updateCourseInfo]);
+
+//   const getAssignments = useCallback(() => {
+//     getCourseAssignments({ course_id: courseId }).then(res => {
+//       setAssignments(res.data);
+//     });
+//   }, [courseId]);
+
+//   useEffect(() => {
+//     getAssignments();
+//   }, [getAssignments]);
+
+//   const navigate = useNavigate();
+
+//   const handleDeleteCourse = () => {
+//     if (assignments.length === 0) {
+//       fetch(
+//         process.env.REACT_APP_API_URL + "/delete_course?" +
+//           new URLSearchParams({
+//             course_id: courseId,
+//           }), {
+//             method: "DELETE"
+//           })
+//     }
+//   }
+
+//   const navigateHome = () => {
+//     navigate("/dashboard")
+//   }
+
+//   const navigateMainPage = () => {
+//     navigate(`/instructorDashboard/${courseId}`)
+//   }
+
+//   const handleCheckboxChange = (e) => {
+//     const { name, checked } = e.target;
+//     setFormData((prevFormData) => ({
+//       ...prevFormData,
+//       [name]: checked
+//     }));
+//   };
+
+//   const onFinish = () => {
+//     const dataToSend = {
+//       course_id: courseId,
+//       ...Object.fromEntries(
+//       Object.entries(formData).filter(([_, value]) => value !== undefined))
+//     };
+//     fetch(process.env.REACT_APP_API_URL + "/update_course", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json"
+//       },
+//       body: JSON.stringify(dataToSend),
+//     })
+//     .then((response) => {response.json()})
+//     .then((data) => {console.log(data)})
+//     .catch((error) => {console.log(error)})
+//   }
+  
+//   return (
+//     <Form
+//       layout='vertical'
+//       wrapperCol={{
+//         lg: 12,
+//       }}
+//       style={{
+//         marginLeft: "20px",
+//       }}
+//       onValuesChange={(changedValues, allValues) => {
+//         setFormData(allValues)
+//       }}
+//     >
+//       <Space direction='vertical' style={{ width: "100%" }}>
+//         <PageHeader title='Edit Course' />
+//         <Card
+//           title='Basic Settings'
+//           // bordered={false}
+//           bodyStyle={{
+//             width: "100%",
+//           }}
+//         >
+//           <Form.Item label='ENTRY CODE' name = "entryCode">
+//             <Input />
+//           </Form.Item>
+//           <Form.Item
+//             label='ALLOW ENTRY CODE'
+//             wrapperCol={24}
+//           >
+//             <Checkbox name="allowEntryCode" onChange = {handleCheckboxChange}>
+//               Allow students to enroll via course entry code
+//             </Checkbox>
+//           </Form.Item>
+//           <Form.Item label='COURSE NAME' name='name'>
+//             <Input />
+//           </Form.Item>
+//           <Form.Item label='COURSE DESCRIPTION' name='description'>
+//             <Input.TextArea />
+//           </Form.Item>
+//           {/* <Space>
+//             <Form.Item label='TERM' name='term' wrapperCol={24}>
+//               <Select
+//                 options={[
+//                   { value: "Spring" },
+//                   { value: "Summer" },
+//                   { value: "Autumn" },
+//                   { value: "Winter" },
+//                 ]}
+//               />
+//             </Form.Item>
+//             <Form.Item label='YEAR' name='year' wrapperCol={24}>
+//               <Select
+//                 options={[
+//                   { value: 2022 },
+//                   { value: 2021 },
+//                   { value: 2020 },
+//                   { value: 2019 },
+//                 ]}
+//               />
+//             </Form.Item>
+//           </Space> */}
+//           <Form.Item>
+//             <Row gutter={20}>
+//               <Col span={12}>
+//                 <Form.Item label='SEMESTER' name='semester' wrapperCol={24}>
+//                   <Select
+//                     options={[
+//                       { value: "Spring" },
+//                       { value: "Summer" },
+//                       { value: "Fall" },
+//                       { value: "Winter" },
+//                     ]}
+//                   />
+//                 </Form.Item>
+//               </Col>
+//               <Col span={12}>
+//                 <Form.Item label='YEAR' name='year' wrapperCol={24}>
+//                   <Input />
+//                   {/* <Select
+//                     options={[
+//                       { value: 2022 },
+//                       { value: 2021 },
+//                       { value: 2020 },
+//                       { value: 2019 },
+//                     ]}
+//                   /> */}
+//                 </Form.Item>
+//               </Col>
+//             </Row>
+//           </Form.Item>
+//         </Card>
+//         <Card
+//           title='Grading Defaults'
+//           // bordered={false}
+//         >
+//           <p>
+//             Any newly created assignments will have these settings. Existing
+//             assignments won't be changed.
+//           </p>
+//           <Form.Item label='DEFAULT SCORING METHOD' name='defaultScoringMethod'>
+//             <Radio.Group
+//               options={[
+//                 { label: "Negative Scoring", value: 0 },
+//                 { label: "Positive Scoring", value: 1 },
+//               ]}
+//             />
+//           </Form.Item>
+//           <Form.Item
+//             label='DEFAULT SCORE BOUNDS'
+//             name='DefaultScoreBounds'
+//             wrapperCol={24}
+//           >
+//             <Checkbox.Group>
+//               <Space direction='vertical'>
+//                 <Checkbox value='ceiling'>
+//                   Ceiling (maximum score is determined by the Assignment
+//                   Outline)
+//                 </Checkbox>
+//                 <Checkbox value='floor'>Floor (minimum score is 0.0)</Checkbox>
+//               </Space>
+//             </Checkbox.Group>
+//           </Form.Item>
+//         </Card>
+//         <Card
+//           title='Modify Course'
+//           // bordered={false}
+//         >
+//           <Typography.Title level={5}>COURSE ACTIONS</Typography.Title>
+//           <Space>
+//             <Button 
+//             type='primary' 
+//             onClick = {() => {
+//               onFinish();
+//               navigateMainPage();
+//             }}>Update Course</Button>
+//             <Popover
+//               // title='sf'
+//               trigger='click'
+//               content={
+//                 assignments.length !== 0 && (
+//                   <div style={{ width: "300px" }}>
+//                     This course cannot be deleted, as it contains assignments.
+//                     Delete the assignments and try again.
+//                   </div>
+//                 )
+//               }
+//             >
+//               <Button 
+//               type='primary' 
+//               icon={<DeleteOutlined />} 
+//               danger 
+//               onClick = {() => {
+//                 handleDeleteCourse();
+//                 navigateHome();
+//               }}>
+//                 Delete Course
+//               </Button>
+//             </Popover>
+//             <Button type='primary'>Deactivate</Button>
+//             <Button type='primary'>Reactivate</Button>
+//           </Space>
+//         </Card>
+//       </Space>
+//     </Form>
+//   );
+// };

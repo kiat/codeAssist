@@ -11,7 +11,7 @@ class InstructorSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Instructor
         include_fk = True
-
+    
 class CourseSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Course
