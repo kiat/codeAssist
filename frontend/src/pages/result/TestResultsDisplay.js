@@ -5,18 +5,20 @@ import { Collapse, Button, Radio } from 'antd';
 import 'antd/dist/antd.css';
 
 const { Panel } = Collapse;
-
-const TestResultsDisplay = ({ viewMode }) => {
-  const { userInfo, courseInfo } = useContext(GlobalContext);
+const TestResultsDisplay = ({ viewMode, studentId }) => {
+//const TestResultsDisplay = ({ viewMode }) => {
+  const { userInfo, courseInfo, assignmentInfo} = useContext(GlobalContext);
   const { assignmentId } = useParams();
   const navigate = useNavigate();
-  const [testResults, setTestResults] = useState(null);
+  const [testResults, setTestResults] = useState(null); 
   const [studentCode, setStudentCode] = useState('');
   const [studentFileName, setStudentFileName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    //console.log('user_id: ', userInfo.id)
+    //console.log('isStudent?', userInfo.isStudent)
     if (!userInfo || !userInfo.id) {
       navigate('/');
       return;
@@ -29,9 +31,10 @@ const TestResultsDisplay = ({ viewMode }) => {
     const fetchResults = async () => {
       setIsLoading(true);
       try {
+        const send = userInfo.isStudent? userInfo.id: studentId;
         const response = await fetch(`${process.env.REACT_APP_API_URL}/get_latest_submission?` +
           new URLSearchParams({
-            student_id: userInfo.id,
+            student_id: /*userInfo.id*/send,
             assignment_id: assignmentId
           }));
 
@@ -39,6 +42,7 @@ const TestResultsDisplay = ({ viewMode }) => {
           throw new Error('Network response was not ok');
         }
         const data = await response.json();
+        //console.log('API Response:', data);
         if (data.results) {
           const parsedResults = JSON.parse(data.results);
           setTestResults(parsedResults);

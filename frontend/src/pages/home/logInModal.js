@@ -39,7 +39,6 @@ export default function LogInModal({ open, onCancel, logIn }) {
         alert('User authentication failed. Invalid Username/Password combination');
       }
     }
-    
     // axios
     //   .post("/logIn", values)
     //   .then(res => {

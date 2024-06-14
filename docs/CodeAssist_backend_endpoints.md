@@ -136,6 +136,29 @@ Example Output:
       "sis_user_id": "rick123"
     }
 
+### GET /get_student_by_id
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets the student from the database based on the student ID provided.</p>
+
+**Example Input:**
+
+    {
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744"
+    }
+
+**Example Output:**
+
+    {
+      "email_address": "woodruffr@utexas.edu",
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744",
+      "name": "Ricky Woodruff",
+      "sis_user_id": "rick123"
+    }
+
 # Instructor
 
 ## POST /create_instructor
@@ -187,6 +210,29 @@ Example Output:
       "id":"a6888457-475a-47ab-8455-441cdd8b9744",
       "name":"Ricky Woodruff",
       "password":"password",
+      "sis_user_id": "rick123"
+    }
+
+### GET /get_instructor_by_id
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets the instructor from the database based on the instructor ID provided.</p>
+
+**Example Input:**
+
+    {
+      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
+    }
+
+**Example Output:**
+
+    {
+      "email_address": "woodruffr@utexas.edu",
+      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
+      "name": "Ricky Woodruff",
       "sis_user_id": "rick123"
     }
 
