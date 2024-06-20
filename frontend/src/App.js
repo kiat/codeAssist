@@ -21,6 +21,7 @@ import GradeSubmissions from "./pages/gradeSubmissions";
 import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
+import RegradeRequests from './components/RegradeRequests';
 
 const { Content } = Layout;
 
@@ -157,6 +158,7 @@ function App() {
                 path = '/editAccount/:userId'
                 element={<EditAccount />} 
               />
+              <Route path="/regradeRequests" element={<RegradeRequests />} />
             </Routes>
           </Content>
         </Layout>

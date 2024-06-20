@@ -10,8 +10,8 @@ export async function signUpStudent(params) {
   // };
 }
 
-export async function get_student_byid(params) {
-  return service("get_student_byid", params, "get");
+export async function get_student_by_id(params) {
+  return service("get_student_by_id", params, "get");
 }
 
 /**

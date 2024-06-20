@@ -212,11 +212,11 @@ def get_student():
     # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
     return jsonify(student)
 
-@user.route('/get_student_byid', methods=["GET"])
+@user.route('/get_student_by_id', methods=["GET"])
 @cross_origin()
-def get_student_byid():
+def get_student_by_id():
     '''
-    /get_student_byid gets the student from the database
+    /get_student_by_id gets the student from the database
     Requires from the frontend a JSON containing:
     @param id    the student id
     '''
@@ -242,11 +242,11 @@ def get_instructor():
     # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
     return jsonify(instructor)
 
-@user.route('/get_instructor_byid', methods=["GET"])
+@user.route('/get_instructor_by_id', methods=["GET"])
 @cross_origin()
-def get_instructor_byid():
+def get_instructor_by_id():
     '''
-    /get_instructor_byid gets the student from the database
+    /get_instructor_by_id gets the student from the database
     Requires from the frontend a JSON containing:
     @param id    the instructor id
     '''

@@ -41,9 +41,9 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
       }
 
       const responseData = await response.json();
-      console.log("response:", responseData.openai_response);
+      // console.log("response:", responseData.openai_response);
 
-      message.success(`OpenAI response: ${responseData.openai_response}`);
+      // message.success(`OpenAI response: ${responseData.openai_response}`);
 
       // Proceed to results page after successful upload
       navigateToResults();

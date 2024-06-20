@@ -18,8 +18,8 @@ import zipfile
 import shutil
 import time
 from dotenv import load_dotenv
-import asyncio
-from openai import AsyncOpenAI
+# import asyncio
+# from openai import AsyncOpenAI
 
 from sqlalchemy import desc, func
 import base64
@@ -30,9 +30,9 @@ submission = Blueprint('submission', __name__)
 ALLOWED_EXTENSIONS = {'py','zip'}
 
 load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if not openai_api_key:
-    raise ValueError("OPENAI_API_KEY environment variable is not set")
+# openai_api_key = os.getenv("OPENAI_API_KEY")
+# if not openai_api_key:
+#     raise ValueError("OPENAI_API_KEY environment variable is not set")
 
 # Async function to get OpenAI completion
 async def get_completion(message):
@@ -168,9 +168,10 @@ def upload_submission():
     os.chdir(current_dir)
 
     #get openAI reponse
-    completion = asyncio.run(get_completion("Say hi"))
+    # completion = asyncio.run(get_completion("Say hi"))
     
-    return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path, "openai_response": completion}), 200
+    return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path#, "openai_response": completion
+    }), 200
 
 
 

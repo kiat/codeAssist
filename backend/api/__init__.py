@@ -23,4 +23,4 @@ db = SQLAlchemy(app)
 # Initialize Migrate with the Flask app and SQLAlchemy db instance
 migrate = Migrate(app, db)
 
-from api import routes, models
+from api import models

@@ -35,7 +35,7 @@ export default () => {
 
     const fetchData = async (id) => {
         try {
-            const response = isStudent ? await fetch(`${process.env.REACT_APP_API_URL}/get_student_byid?id=${id}`) : await fetch(`${process.env.REACT_APP_API_URL}/get_instructor_byid?id=${id}`);
+            const response = isStudent ? await fetch(`${process.env.REACT_APP_API_URL}/get_student_by_id?id=${id}`) : await fetch(`${process.env.REACT_APP_API_URL}/get_instructor_by_id?id=${id}`);
             if (!response.ok) {
                 throw new Error("Network response was not ok");
             }
