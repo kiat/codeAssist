@@ -18,7 +18,7 @@ import PageBottom from "../../components/layout/pageBottom";
 import RerunAutograderModal from "./RerunAutograderModal";
 import { useContext, useState, useEffect } from "react";
 import { GlobalContext } from "../../App";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import moment from "moment";
 
 const SubmissionsManager = () => {
@@ -28,6 +28,7 @@ const SubmissionsManager = () => {
   const [tableData, setTableData] = useState([]);
   const [forceUpdate, setForceUpdate] = useState(0); // State to trigger re-fetching
   const navigate = useNavigate();
+  const { assignmentId } = useParams(); // Get assignment ID from URL params
 
   const toggleRerunModalOpen = () => setRerunModalOpen(!rerunModalOpen);
 
@@ -62,7 +63,7 @@ const SubmissionsManager = () => {
     {
       title: "NAME",
       dataIndex: "name",
-      render: (text, record) => {
+      /*render: (text, record) => {
         //decrypting teh new way we're represnting the name field in our table
         // Split the concatenated string into name and id
         const [name, id] = text.split("(");
@@ -75,7 +76,13 @@ const SubmissionsManager = () => {
             {text}
           </Typography.Link>
         );
-      },
+      },*/
+      //changing the submission to only render the student name and pass in the students id implicitly
+      render: (text, record) => (
+        <Typography.Link onClick={() => goAssignmentResult(record.name, record.studentId)}>
+          {text}
+        </Typography.Link>
+      ),
       sorter: (a, b) => a.name.localeCompare(b.name),
       // title: "NAME",
       // dataIndex: "name",
@@ -109,6 +116,25 @@ const SubmissionsManager = () => {
     },
   ];
 
+  //trying to take care of a bug whne navigating back from assignment =results screen and no data is diplayed
+  useEffect(() => {
+    const fetchAssignmentDetails = async () => {
+      if (assignmentId) {
+        const response = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`
+        );
+        const data = await response.json();
+        updateAssignmentInfo((prev) => ({
+          ...prev,
+          id: data.id,
+          name: data.name,
+        }));
+      }
+    };
+
+    fetchAssignmentDetails();
+  }, [assignmentId, updateAssignmentInfo]);
+
   useEffect(() => {
     const fetchStudents = async () => {
       const response = await fetch(
@@ -137,12 +163,19 @@ const SubmissionsManager = () => {
             data.score !== undefined &&
             student.name
           ) {
-            return {
+            /*return {
               //apending both student name and student id so instructor side can access student results
               name: `${student.name} (${student.id})`, // You would need to adjust this if the name isn't in the 'students' variable
               submissionTime: moment(data.submitted_at).valueOf(),
               score: data.score,
               id: data.id, // This assumes that 'id' refers to the submission's unique identifier
+            };*/
+            return {
+              name: student.name, // Only display student name
+              studentId: student.id, // Store student ID for implicit passing
+              submissionTime: moment(data.submitted_at).valueOf(),
+              score: data.score,
+              id: data.id, // Submission's unique identifier
             };
           }
           return null;

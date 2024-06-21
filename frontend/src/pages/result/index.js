@@ -27,19 +27,49 @@
     const [assignmentName, setAssignmentName] = useState(""); // Placeholder value
     const { assignmentId, studentId } = useParams();
     const location = useLocation();
-    const { userInfo, assignmentInfo } = useContext(GlobalContext);
+    //adding global context variable
+    const { userInfo, assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
+  //updating useEffect dependencies, adding functionalit to render the students name ase don their id
+  useEffect(() => {
+    const fetchAssignmentDetails = async () => {
+      const res = await getAssignment({ assignment_id: assignmentId });
+      if (res?.data) {
+        setAutograderPoints(res.data.autograder_points);
+        setAssignmentName(res.data.name); // Assuming the API provides this
+        updateAssignmentInfo((prevInfo) => ({
+          ...prevInfo,
+          name: res.data.name,
+          id: assignmentId,
+        }));
+      }
+    };
 
-
-    useEffect(() => {
-      const fetchAssignmentDetails = async () => {
-        const res = await getAssignment({ assignment_id: assignmentId });
-        if (res?.data) {
-          setAutograderPoints(res.data.autograder_points);
-          setAssignmentName(res.data.name); // Assuming the API provides this
+    const fetchStudentName = async () => {
+      if (studentId) {
+        try {
+          const response = await fetch(
+            `${process.env.REACT_APP_API_URL}/get_student_by_id?` +
+            new URLSearchParams({
+              id: studentId,
+            })
+          );
+          const studentData = await response.json();
+          if (studentData) {
+            updateAssignmentInfo((prevInfo) => ({
+              ...prevInfo,
+              studentName: studentData.name,
+              studentId: studentId,
+            }));
+          }
+        } catch (error) {
+          console.error("Failed to fetch student data:", error);
         }
-      };
-      fetchAssignmentDetails();
-    }, [assignmentId, location.key]);
+      }
+    };
+
+    fetchAssignmentDetails();
+    fetchStudentName();
+  }, [assignmentId, studentId, location.key, updateAssignmentInfo]);
 
 
     const toggleModal = useCallback((type) => {
