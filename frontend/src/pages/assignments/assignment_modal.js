@@ -40,6 +40,8 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
         throw new Error("Network response was not ok");
       }
 
+      const responseData = await response.json();
+
       // Proceed to results page after successful upload
       navigateToResults();
     } catch (error) {
@@ -49,7 +51,8 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
   };
 
   const navigateToResults = () => {
-    navigate(`/assignmentResult/${assignmentID}`);
+    // using updated route def
+    navigate(`/assignmentResult/${assignmentID}/${userInfo.id}`);
   };
 
   return (

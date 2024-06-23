@@ -17,6 +17,7 @@ import docker
 import zipfile
 import shutil
 import time
+from dotenv import load_dotenv
 
 from sqlalchemy import desc, func
 import base64
@@ -25,6 +26,9 @@ import base64
 submission = Blueprint('submission', __name__)
 
 ALLOWED_EXTENSIONS = {'py','zip'}
+
+load_dotenv()
+
 
 def allowed_file(filename):
     return "." in filename and \

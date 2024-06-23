@@ -22,8 +22,7 @@ export default function AssignmentResult() {
   const [formattingModalOpen, setFormattingOpen] = useState(false);
   const [autoGraderPoints, setAutograderPoints] = useState(0);
   const [assignmentName, setAssignmentName] = useState(""); // Placeholder value
-
-  const { assignmentId } = useParams();
+  const { assignmentId, studentId } = useParams();
   const location = useLocation();
   const { userInfo, assignmentInfo } = useContext(GlobalContext);
 
@@ -69,11 +68,11 @@ export default function AssignmentResult() {
               ]}
             />
             <Card bordered={false}>
-              <TestResultsDisplay viewMode={viewMode} />
+              <TestResultsDisplay viewMode={viewMode} studentId={studentId} />
             </Card>
           </div>
           <StudentInfoPanel
-            assignmentName={assignmentName}
+            assignmentName={assignmentName} 
             studentName={assignmentInfo?.studentName ?? userInfo?.name}
             score={assignmentInfo?.score ?? "Unknown"} // Replace with actual score data as needed
             totalPoints={autoGraderPoints}
