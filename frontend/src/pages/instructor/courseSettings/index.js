@@ -13,6 +13,8 @@ import {
   Select,
   Space,
   Typography,
+  message,
+  Popconfirm
 } from "antd";
 import { useEffect, useState, useCallback } from "react";
 import { useContext } from "react";
@@ -44,18 +46,54 @@ export default () => {
 
   const navigate = useNavigate();
 
-  const handleDeleteCourse = () => {
-    if (assignments.length === 0) {
-      fetch(
-        process.env.REACT_APP_API_URL + "/delete_course?" +
-          new URLSearchParams({
-            course_id: courseId,
-          }), {
-            method: "DELETE"
-          })
+  const handleDeleteAllAssignments = (courseId) => {
+    if (!courseId) {
+      console.error('Course ID is undefined');
+      message.error('Cannot delete assignments without an ID');
+      return Promise.reject(new Error('Course ID is undefined'));
     }
-  }
 
+    return fetch(`${process.env.REACT_APP_API_URL}/delete_all_assignments?course_id=${courseId}`, {
+      method: "DELETE",
+      mode: 'cors',
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Network response was not ok, status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .catch(error => {
+        console.error('There has been a problem with the fetch operation:', error);
+        message.error('Failed to delete assignments');
+        return Promise.reject(error);
+      });
+  };
+  
+  const handleDeleteCourse = (courseId) => {
+    if (!courseId) {
+      console.error('Course ID is undefined');
+      message.error('Cannot delete course without an ID');
+      return Promise.reject(new Error('Course ID is undefined'));
+    }
+
+    return fetch(`${process.env.REACT_APP_API_URL}/delete_course?course_id=${courseId}`, {
+      method: "DELETE",
+      mode: 'cors',
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Network response was not ok, status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .catch(error => {
+        console.error('There has been a problem with the fetch operation:', error);
+        message.error('Failed to delete course');
+        return Promise.reject(error);
+      });
+  };
+  
   const navigateHome = () => {
     navigate("/dashboard")
   }
@@ -225,31 +263,55 @@ export default () => {
               onFinish();
               navigateMainPage();
             }}>Update Course</Button>
-            <Popover
-              // title='sf'
-              trigger='click'
-              content={
-                assignments.length !== 0 && (
-                  <div style={{ width: "300px" }}>
-                    This course cannot be deleted, as it contains assignments.
-                    Delete the assignments and try again.
-                  </div>
-                )
-              }
-            >
-              <Button 
-              type='primary' 
-              icon={<DeleteOutlined />} 
-              danger 
-              onClick = {() => {
-                handleDeleteCourse();
-                navigateHome();
-              }}>
-                Delete Course
-              </Button>
-            </Popover>
             <Button type='primary'>Deactivate</Button>
             <Button type='primary'>Reactivate</Button>
+          </Space>
+          <Typography.Title level={5} style={{ marginTop: '10px' }}>DANGER ZONE</Typography.Title>
+          <Space>
+          <Popconfirm
+            title="Are you sure you want to delete this course?"
+            onConfirm={() => {
+              handleDeleteCourse(courseId)
+                .then(() => {
+                  message.success("Course deleted");
+                  // Only navigate away if deletion was successful
+                  navigateHome();
+                })
+                .catch((error) => {
+                  if (error.response && error.response.status === 410) {
+                    message.error('Assignments must be deleted first');
+                  } else {
+                    message.error('Failed to delete course');
+                  }
+                });
+            }}
+            okText="Yes"
+            cancelText="No">
+            <Button 
+              danger type='primary' 
+              icon={<DeleteOutlined />} >
+              Delete Course
+            </Button>
+          </Popconfirm>
+          <Popconfirm
+            title="Are you sure you want to delete all assignments?"
+            onConfirm={() => {
+              handleDeleteAllAssignments(courseId)
+                .then(() => {
+                  message.success("All assignments deleted");
+                })
+                .catch((error) => {
+                  message.error('Failed to delete all assignments');
+                });
+            }}
+            okText="Yes"
+            cancelText="No">
+            <Button 
+              danger type='primary' 
+              icon={<DeleteOutlined />} >
+              Delete All Assignments
+            </Button>
+          </Popconfirm>
           </Space>
         </Card>
       </Space>
