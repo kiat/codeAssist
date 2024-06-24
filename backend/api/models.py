@@ -45,7 +45,7 @@ class Assignment(db.Model):
     anonymous_grading = db.Column(db.Boolean, default=False)
     enable_group = db.Column(db.Boolean, default=False)
     group_size = db.Column(db.Integer, nullable=True)
-    leaderboard = db.Column(db.Integer, nullable=True)
+    leaderboard = db.Column(db.Boolean, nullable=True)
     late_submission = db.Column(db.Boolean, default=False)
     late_due_date = db.Column(TIMESTAMP, nullable=True)
     manual_grading = db.Column(db.Boolean, default=False)
