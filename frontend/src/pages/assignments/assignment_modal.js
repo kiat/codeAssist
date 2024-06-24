@@ -31,7 +31,7 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
     formData.append('assignment_id', assignmentID);
 
     try {
-      const response = await fetch(process.env.REACT_APP_API_URL + "upload_submission", {
+      const response = await fetch(process.env.REACT_APP_API_URL + "/upload_submission", {
         method: "POST",
         body: formData,
       });

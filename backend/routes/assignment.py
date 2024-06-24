@@ -41,7 +41,6 @@ def get_assignment():
 
     return jsonify(assignment)
 
-
 @assignment.route('/create_assignment', methods=["POST", "GET"])
 @cross_origin()
 def create_assignment():
@@ -83,4 +82,21 @@ def delete_assignment():
     else:
         return jsonify("Assignment not found"), 404
 
+@assignment.route('/delete_submissions', methods=["DELETE"])
+@cross_origin()
+def delete_submissions():
+    assignment_id = request.args.get("assignment_id")
 
+    # Check if there are any submissions for this assignment
+    related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment_id).all()
+    if related_submissions:
+        for submission in related_submissions:
+            db.session.delete(submission)
+        db.session.commit()
+
+    # actually delete assignment
+    related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment_id).all()
+    if not related_submissions:
+        return jsonify("Submissions deleted successfully"), 200
+    else:
+        return jsonify("Submissions not deleted"), 404
