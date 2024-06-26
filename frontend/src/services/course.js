@@ -1,5 +1,9 @@
 import service from ".";
 
+export async function getCourseInfo(params) {
+  return service("get_course_info", params);
+}
+
 export async function getCourseAssignments(params) {
   return service("get_course_assignments", params);
 }

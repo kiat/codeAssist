@@ -4,6 +4,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../App";
 import moment from "moment";
 import AssignmentModal from "./assignment_modal";
+import { getCourseAssignments } from "../../services/course";
+import { getLatestSubmission } from "../../services/assignmentResult"
 
 export default function Assignments() {
   const [courseAssignment, setCourseAssignment] = useState([]);
@@ -64,10 +66,12 @@ export default function Assignments() {
       }
 
       try {
-        const assignmentsResponse = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_course_assignments?` +
-          new URLSearchParams({ course_id: urlParams.courseId })
-        );
+        // const assignmentsResponse = await fetch(
+        //   `${process.env.REACT_APP_API_URL}/get_course_assignments?` +
+        //   new URLSearchParams({ course_id: urlParams.courseId })
+        // );
+        const assignmentsResponse = await getCourseAssignments({ course_id: urlParams.courseId });
+
         const assignmentsData = await assignmentsResponse.json();
 
         const updatedAssignments = await Promise.all(assignmentsData.map(async (assignment) => {
