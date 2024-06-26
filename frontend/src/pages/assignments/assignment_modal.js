@@ -2,6 +2,7 @@ import { Button, message, Form, Modal, Upload } from "antd";
 import { InboxOutlined } from '@ant-design/icons';
 import { useState, useContext } from "react";
 import { GlobalContext } from "../../App";
+import { uploadSubmission } from "../../services/assignmentResult";
 import { useNavigate } from "react-router-dom";
 
 export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle }) {
@@ -31,10 +32,11 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
     formData.append('assignment_id', assignmentID);
 
     try {
-      const response = await fetch(process.env.REACT_APP_API_URL + "/upload_submission", {
-        method: "POST",
-        body: formData,
-      });
+      // const response = await fetch(process.env.REACT_APP_API_URL + "/upload_submission", {
+      //   method: "POST",
+      //   body: formData,
+      // });
+      const response = await uploadSubmission({ formData }); // TODO: Test this, no current test exists for this endpoint
 
       if (!response.ok) {
         throw new Error("Network response was not ok");
