@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { GlobalContext } from '../../App';
 import { Collapse, Button, Radio } from 'antd';
 import 'antd/dist/antd.css';
+import { getLatestSubmission } from "../../services/assignmentResult";
 
 const { Panel } = Collapse;
 const TestResultsDisplay = ({ viewMode, studentId }) => {
@@ -32,12 +33,13 @@ const TestResultsDisplay = ({ viewMode, studentId }) => {
       setIsLoading(true);
       try {
         const send = userInfo.isStudent? userInfo.id: studentId;
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/get_latest_submission?` +
-          new URLSearchParams({
-            student_id: /*userInfo.id*/send,
-            assignment_id: assignmentId
-          }));
+        // const response = await fetch(`${process.env.REACT_APP_API_URL}/get_latest_submission?` +
+        //   new URLSearchParams({
+        //     student_id: /*userInfo.id*/send,
+        //     assignment_id: assignmentId
+        //   }));
 
+        const response = getLatestSubmission({ student_id: send, assignment_id: assignmentId });
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }

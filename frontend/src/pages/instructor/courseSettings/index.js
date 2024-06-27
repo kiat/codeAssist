@@ -18,7 +18,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../../App";
-import { getCourseAssignments } from "../../../services/course";
+import { deleteCourse, getCourseAssignments, updateCourse, getCourseInfo } from "../../../services/course";
 
 export default () => {
   const { courseId } = useParams();
@@ -36,11 +36,13 @@ export default () => {
 
   const fetchCourseData = async (id) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/get_course_info?course_id=${id}`);
-      if (!response.ok) {
+      // const response = await fetch(`${process.env.REACT_APP_API_URL}/get_course_info?course_id=${id}`);
+      const response = await getCourseInfo({ course_id: id });
+      if (!response.status) {
         throw new Error("Network response was not ok");
       }
-      const data = await response.json();
+      console.log(response.data[0]);
+      const data = await response.data;
       setFormData(data[0]);
       setPlaceholders(data[0]);
     } catch (error) {
@@ -62,13 +64,15 @@ export default () => {
 
   const handleDeleteCourse = () => {
     if (assignments.length === 0) {
-      fetch(
-        process.env.REACT_APP_API_URL + "/delete_course?" +
-          new URLSearchParams({
-            course_id: courseId,
-          }), {
-            method: "DELETE"
-          })
+      // fetch(
+      //   process.env.REACT_APP_API_URL + "/delete_course?" +
+      //     new URLSearchParams({
+      //       course_id: courseId,
+      //     }), {
+      //       method: "DELETE"
+      //     })
+      console.log("calling delete course");
+      deleteCourse({ course_id: courseId });
     }
   };
 
@@ -94,6 +98,10 @@ export default () => {
       ...Object.fromEntries(
       Object.entries(formData).filter(([_, value]) => value !== undefined))
     };
+
+    console.log("calling updateCourse");
+    console.log("The data:", dataToSend);
+    
     fetch(process.env.REACT_APP_API_URL + "/update_course", {
       method: "POST",
       headers: {
@@ -104,6 +112,14 @@ export default () => {
     .then((response) => {response.json()})
     .then((data) => {console.log(data)})
     .catch((error) => {console.log(error)})
+    // updateCourse({ dataToSend })
+    //   .then((response) => {
+    //     const data = response.data;
+    //     console.log(data);
+    //   })
+    //   .catch((error) => {
+    //     console.log(error);
+    //   });
   };
 
   return (

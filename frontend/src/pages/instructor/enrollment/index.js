@@ -22,6 +22,8 @@ import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
 import { GlobalContext } from "../../../App";
 import AddCSVModal from "./AddCSVModal";
+import { getStudent } from "../../../services/user.js";
+
 const columns = [
   { title: "NAME", dataIndex: "name" },
   { title: "EMAIL", dataIndex: "email_address" },
@@ -64,14 +66,15 @@ export default () => {
 
   const finishForm = useCallback(
     (values) => {
-      const { email } = values;
+      const { getEmail } = values;
 
-      fetch(
-        process.env.REACT_APP_API_URL + "/get_student?" +
-          new URLSearchParams({
-            email: email,
-          })
-      )
+      // fetch(
+      //   process.env.REACT_APP_API_URL + "/get_student?" +
+      //     new URLSearchParams({
+      //       email: email,
+      //     })
+      // )
+      getStudent({ email: getEmail })
         .then((res) => res.json())
         .then((student) =>
           createEnrollment({
@@ -95,12 +98,13 @@ export default () => {
       values.forEach(enrollmentBulk);
 
       function enrollmentBulk(item) {
-        fetch(
-          process.env.REACT_APP_API_URL + "/get_student?" +
-            new URLSearchParams({
-              email: item,
-            })
-        )
+        // fetch(
+        //   process.env.REACT_APP_API_URL + "/get_student?" +
+        //     new URLSearchParams({
+        //       email: item,
+        //     })
+        // )
+        getStudent({ email: item })
           .then((res) => res.json())
           .then((student) =>
             createEnrollment({

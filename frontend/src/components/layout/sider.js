@@ -30,7 +30,8 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
       //       }
       //     });
       //   });
-      const res = getCourseInfo({ course_id: courseInfo.id }); // TODO: still needs testing
+      console.log("grabbing course info at:", courseInfo);
+      getCourseInfo({ course_id: courseInfo.id }); // TODO: still needs testing
     }
   }, [courseInfo, updateCourseInfo]);
 

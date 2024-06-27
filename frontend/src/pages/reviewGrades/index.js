@@ -16,6 +16,7 @@ import { useCallback } from "react";
 import { useContext } from "react";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
+import { getCourseAssignmentLatestSubmission } from "../../services/assignmentResult";
 
 
 export default () => {
@@ -122,10 +123,11 @@ export default () => {
       return;
     }
 
-    fetch(`${process.env.REACT_APP_API_URL}/get_course_assignment_latest_submissions?` +
-      new URLSearchParams({
-        course_id: courseInfo.id,
-        assignment_id: assignmentId }))
+    // fetch(`${process.env.REACT_APP_API_URL}/get_course_assignment_latest_submissions?` +
+    //   new URLSearchParams({
+    //     course_id: courseInfo.id,
+    //     assignment_id: assignmentId }))
+    getCourseAssignmentLatestSubmission({ course_id: courseInfo.id, assignment_id: assignmentId })
       .then(response => {
         if (!response.ok) {
           throw new Error('Network response was not ok');

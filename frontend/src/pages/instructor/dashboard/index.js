@@ -16,7 +16,7 @@ import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
-import { getCourseInfo } from "../../../services/course"
+import { getCourseAssignments, getCourseInfo } from "../../../services/course"
 
 //for now change this to a course_id you have in the database
 const columns = [
@@ -94,7 +94,6 @@ export default function InstructorDashboard() {
         const courseDetails = await getCourseInfo({ course_id: courseId });
         if (courseDetails.data) {
           const [detail] = courseDetails.data;
-          console.log(detail);
           updateCourseInfo({ ...detail, id: courseId });
           setDescription(detail.description);
         }
