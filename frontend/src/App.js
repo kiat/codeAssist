@@ -21,6 +21,7 @@ import GradeSubmissions from "./pages/gradeSubmissions";
 import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
+import RegradeRequests from './components/RegradeRequests';
 
 const { Content } = Layout;
 
@@ -61,7 +62,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem("courseInfo", JSON.stringify(courseInfo));
   }, [courseInfo]);
-
   // Callbacks for updating state, using empty dependencies to ensure they don't change
   const updateCourseInfo = useCallback(info => setCourseInfo(info), []);
   const updateUserInfo = useCallback(info => setUserInfo(info), []);
@@ -104,7 +104,9 @@ function App() {
               <Route path='/dashboard' element={<Dashboard />} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
-                path='/assignmentResult/:assignmentId'
+                path='/assignmentResult/:assignmentId/:studentId' 
+                //old route config
+                //path='/assignmentResult/:assignmentId'
                 element={<AssignmentResult />}
               />
               <Route
@@ -156,6 +158,7 @@ function App() {
                 path = '/editAccount/:userId'
                 element={<EditAccount />} 
               />
+              <Route path="/regradeRequests" element={<RegradeRequests />} />
             </Routes>
           </Content>
         </Layout>

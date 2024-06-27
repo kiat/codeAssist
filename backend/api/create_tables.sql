@@ -98,6 +98,14 @@ CREATE TABLE test_case_results (
     FOREIGN KEY (test_case_id) REFERENCES test_cases (id)
 );
 
+CREATE TABLE regrade_requests (
+    id uuid PRIMARY KEY,
+    submission_id uuid NOT NULL,
+    justification text NOT NULL,
+    reviewed boolean DEFAULT FALSE,
+    FOREIGN KEY (submission_id) REFERENCES submissions (id)
+);
+
 
 
 /* Submissions table index */

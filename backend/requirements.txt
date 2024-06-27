@@ -7,3 +7,4 @@ flask-sqlalchemy
 flask-marshmallow
 marshmallow-sqlalchemy
 Flask-Migrate
+openai

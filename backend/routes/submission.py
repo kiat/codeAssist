@@ -17,6 +17,9 @@ import docker
 import zipfile
 import shutil
 import time
+from dotenv import load_dotenv
+# import asyncio
+# from openai import AsyncOpenAI
 
 from sqlalchemy import desc, func
 import base64
@@ -25,6 +28,21 @@ import base64
 submission = Blueprint('submission', __name__)
 
 ALLOWED_EXTENSIONS = {'py','zip'}
+
+load_dotenv()
+# openai_api_key = os.getenv("OPENAI_API_KEY")
+# if not openai_api_key:
+#     raise ValueError("OPENAI_API_KEY environment variable is not set")
+
+# Async function to get OpenAI completion
+async def get_completion(message):
+    client = AsyncOpenAI(api_key=openai_api_key)
+    completion = await client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": message}],
+        max_tokens=50
+    )
+    return completion.choices[0].message.content
 
 def allowed_file(filename):
     return "." in filename and \
@@ -148,8 +166,12 @@ def upload_submission():
     subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
     subprocess.run(f"docker rm {container_name}".split(), capture_output=True)
     os.chdir(current_dir)
+
+    #get openAI reponse
+    # completion = asyncio.run(get_completion("Say hi"))
     
-    return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path}), 200
+    return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path#, "openai_response": completion
+    }), 200
 
 
 

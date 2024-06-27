@@ -136,6 +136,29 @@ Example Output:
       "sis_user_id": "rick123"
     }
 
+### GET /get_student_by_id
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets the student from the database based on the student ID provided.</p>
+
+**Example Input:**
+
+    {
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744"
+    }
+
+**Example Output:**
+
+    {
+      "email_address": "woodruffr@utexas.edu",
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744",
+      "name": "Ricky Woodruff",
+      "sis_user_id": "rick123"
+    }
+
 # Instructor
 
 ## POST /create_instructor
@@ -187,6 +210,29 @@ Example Output:
       "id":"a6888457-475a-47ab-8455-441cdd8b9744",
       "name":"Ricky Woodruff",
       "password":"password",
+      "sis_user_id": "rick123"
+    }
+
+### GET /get_instructor_by_id
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets the instructor from the database based on the instructor ID provided.</p>
+
+**Example Input:**
+
+    {
+      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
+    }
+
+**Example Output:**
+
+    {
+      "email_address": "woodruffr@utexas.edu",
+      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
+      "name": "Ricky Woodruff",
       "sis_user_id": "rick123"
     }
 
@@ -670,6 +716,142 @@ Example Output:
   }
 ]
 
+# Regrade Requests
+
+## POST /send_regrade_request
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Creates a regrade request with the given submission ID and justification.</p>
+
+Example input:
+
+    {
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c",
+      "justification": "I believe there was an error in grading."
+    }
+
+Example Output:
+
+    {
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744",
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c",
+      "justification": "I believe there was an error in grading."
+    }
+
+## GET /get_regrade_request
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets the regrade request associated with a submission ID.</p>
+
+Example input:
+
+    {
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c"
+    }
+
+Example Output:
+
+    {
+      "submission": { ... },  // Full submission details
+      "justification": "I believe there was an error in grading.",
+      "reviewed": false
+    }
+
+## POST /update_grade
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Updates the grade of a submission with a new grade.</p>
+
+Example input:
+
+    {
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c",
+      "new_grade": 95.0
+    }
+
+Example Output:
+
+    {
+      "message": "Grade updated successfully"
+    }
+
+## GET /get_student_regrade_requests
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets all regrade requests for a specific student based on their student ID.</p>
+
+Example input:
+
+    {
+      "student_id": "a6888457-475a-47ab-8455-441cdd8b9744"
+    }
+
+Example Output:
+
+    [
+      {
+        "regradeRequestId": "a6888457-475a-47ab-8455-441cdd8b9744",
+        "assignmentName": "Assignment 1",
+        "studentName": "John Doe",
+        "justification": "I believe there was an error in grading.",
+        "assignmentId": "dfbd967d-8951-4052-82aa-ce55b1d3d0e7",
+        "studentId": "a6888457-475a-47ab-8455-441cdd8b9744",
+        "reviewed": false
+      }
+    ]
+
+## GET /get_instructor_regrade_requests
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets all regrade requests for all assignments for an instructor.</p>
+
+Example Output:
+
+    [
+      {
+        "assignmentName": "Assignment 1",
+        "studentName": "John Doe",
+        "justification": "I believe there was an error in grading.",
+        "assignmentId": "dfbd967d-8951-4052-82aa-ce55b1d3d0e7",
+        "studentId": "a6888457-475a-47ab-8455-441cdd8b9744",
+        "reviewed": false
+      }
+    ]
+
+## POST /set_reviewed
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Marks a regrade request as reviewed.</p>
+
+Example input:
+
+    {
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c"
+    }
+
+Example Output:
+
+    {
+      "message": "Review updated successfully"
+    }
 
 # Other
 

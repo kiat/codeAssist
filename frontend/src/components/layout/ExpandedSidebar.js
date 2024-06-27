@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, Typography, Space, Popover } from 'antd';
 import { MenuFoldOutlined, TableOutlined, FileTextOutlined, UsergroupAddOutlined, SettingOutlined, UserOutlined, LogoutOutlined, RedoOutlined } from '@ant-design/icons';
 import AccountPopoverContent from './accountPopoverContent';
@@ -47,12 +47,11 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed }) {
                   <TableOutlined />
                   <span> Dashboard</span>
                 </Link>
-                {userInfo?.isStudent ? (
-                  <div style={{ cursor: 'pointer' }} onClick={() => console.log("Navigate to regrade requests")}>
-                    <RedoOutlined />
-                    <span> Regrade Requests</span>
-                  </div>
-                ) : (
+                <Link to={'/regradeRequests'} className={styles.linkText}>
+                  <RedoOutlined />
+                  <span> Regrade Requests</span>
+                </Link>
+                  {!userInfo?.isStudent &&
                   <>
                     <Link to={`/instructorAssignments/${courseInfo.id}`} className={styles.linkText}>
                       <FileTextOutlined />
@@ -67,7 +66,8 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed }) {
                       <span> Course Settings</span>
                     </Link>
                   </>
-                )}
+                }
+                
               </Space>
             </Card>
             <Card title={userInfo?.isStudent ? 'STUDENT' : 'INSTRUCTOR'} size='small' bordered={false}>
