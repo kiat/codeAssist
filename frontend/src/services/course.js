@@ -12,6 +12,10 @@ export async function createAssignment(params) {
   return service("create_assignment", params, "post");
 }
 
-export async function deleteCourses(params) {
+export async function updateCourse(params) {
+  return service("update_course", params, "post");
+}
+
+export async function deleteCourse(params) {
   return service("delete_course", params, "delete");
 }

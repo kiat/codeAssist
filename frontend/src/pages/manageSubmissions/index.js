@@ -16,6 +16,7 @@ import {
 import PageContent from "../../components/layout/pageContent";
 import PageBottom from "../../components/layout/pageBottom";
 import RerunAutograderModal from "./RerunAutograderModal";
+import { deleteSubmission } from "../../services/assignmentResult";
 import { useContext, useState, useEffect } from "react";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
@@ -36,11 +37,12 @@ const SubmissionsManager = () => {
     navigate(`/assignmentResult/${submissionId}`);
   };
 
-  const deleteSubmission = async (record) => {
-    const response = await fetch(
-      `${process.env.REACT_APP_API_URL}/delete_submission?submission_id=${record.id}`,
-      { method: "DELETE" }
-    );
+  const funcDeleteSubmission = async (record) => {
+    // const response = await fetch(
+    //   `${process.env.REACT_APP_API_URL}/delete_submission?submission_id=${record.id}`,
+    //   { method: "DELETE" }
+    // );
+    const response = deleteSubmission( { submission_id: record.id });
     if (response.ok) {
       // Increment forceUpdate to trigger a re-fetch of submissions
       setForceUpdate((u) => u + 1);
@@ -89,7 +91,7 @@ const SubmissionsManager = () => {
           type="primary"
           size="small"
           icon={<CloseOutlined />}
-          onClick={() => deleteSubmission(record)}
+          onClick={() => funcDeleteSubmission(record)}
         />
       ),
     },

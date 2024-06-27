@@ -10,6 +10,10 @@ export async function signUpStudent(params) {
   // };
 }
 
+export async function getStudent(params) {
+  return service("get_student", params);
+}
+
 export async function get_student_by_id(params) {
   return service("get_student_by_id", params, "get");
 }

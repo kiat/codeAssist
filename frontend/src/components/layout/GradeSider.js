@@ -9,6 +9,7 @@ import { useState, useEffect, useContext } from "react";
 import { Link } from "react-router-dom";
 import { GlobalContext } from "../../App";
 import styles from "./styles.module.css";
+import { getCourseAssignments } from "../../services/course";
 
 export default () => {
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
@@ -32,22 +33,25 @@ export default () => {
         id: assignmentId
       }));
     }
-    fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
-    new URLSearchParams({
-      course_id: courseInfo.id,
+    // fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
+    // new URLSearchParams({
+    //   course_id: courseInfo.id,
+    // })
+    // )
+    console.log("get course assignments");
+    getCourseAssignments({ course_id: courseInfo.id })
+    .then((response) => {
+      const data = response.data;
+      data.forEach((element) => {
+        if (element.id === assignmentId) {
+          updateAssignmentInfo({
+            id: element.id,
+            name: element.name,
+          });
+        }
+      });
     })
-    )
-    .then((res) => res.json())
-        .then((data) =>
-          data.forEach((element) => {
-            if (element.id === assignmentId) {
-              updateAssignmentInfo({
-                id: element.id,
-                name: element.name,
-              });
-            }
-          })
-        );
+    .catch((error) => console.error('Error:', error));
     }, [assignmentInfo.id, assignmentInfo.name, updateAssignmentInfo])
   
   return (
