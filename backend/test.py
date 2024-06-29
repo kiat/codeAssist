@@ -1,10 +1,21 @@
 import unittest
 import requests
 
+from routes.assignment import delete_assignment
+from routes.course import delete_course
+from routes.user import delete_instructor, delete_student
+
+env_file = "http://localhost:5000"
+
+
 
 class APITestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # print(dir(cls))
+        # app.config['TESTING'] = True
+        # cls.client = app.test_client()
+
         """Create test data that will be used across multiple tests."""
         cls.instructor_id = cls.create_instructor()
         cls.student_id = cls.create_student()
@@ -19,7 +30,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_instructor(cls):
         """Create an instructor and return the ID."""
-        url = "http://localhost:5000/create_instructor"
+        url = env_file + "/create_instructor"
         data = {
             "name": "Instructor Name",
             "email": "instructor@email.com",
@@ -32,7 +43,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_student(cls):
         """Create a student and return the ID."""
-        url = "http://localhost:5000/create_student"
+        url = env_file + "/create_student"
         data = {
             "name": "Ricky Woodruff",
             "email": "ricky@student.com",
@@ -45,7 +56,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_course(cls, instructor_id):
         """Create a course and return the ID."""
-        url = "http://localhost:5000/create_course"
+        url = env_file + "/create_course"
         data = {
             "name": "Introduction to Curl Testing",
             "instructor_id": instructor_id,
@@ -59,7 +70,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_assignment(cls, course_id, assignment_name):
         """Create an assignment and return the ID."""
-        url = f"http://localhost:5000/create_assignment"
+        url = env_file + "/create_assignment"
         data = {"name": assignment_name, "course_id": course_id}
         response = requests.post(url, json=data)
         return response.json().get("id")
@@ -67,7 +78,7 @@ class APITestCase(unittest.TestCase):
     # Actual tests to be run:
     def test_upload_autograder_A1(self):
         """Upload autograder for Assignment A1."""
-        url = "http://localhost:5000/upload_assignment_autograder"
+        url = env_file + "/upload_assignment_autograder"
         with open(self.A1_zip_path, "rb") as f:
             files = {"file": f}
             data = {"assignment_id": self.assignment_id_A1}
@@ -76,7 +87,7 @@ class APITestCase(unittest.TestCase):
 
     def test_upload_submission_A1(self):
         """Upload a student's submission for Assignment A1."""
-        url = "http://localhost:5000/upload_submission"
+        url = env_file + "/upload_submission"
         with open(self.A1_py_path, "rb") as f:
             files = {"file": f}
             data = {
@@ -88,7 +99,7 @@ class APITestCase(unittest.TestCase):
 
     def test_upload_autograder_A2(self):
         """Upload autograder for Assignment A2."""
-        url = "http://localhost:5000/upload_assignment_autograder"
+        url = env_file + "/upload_assignment_autograder"
         with open(self.A2_zip_path, "rb") as f:
             files = {"file": f}
             data = {"assignment_id": self.assignment_id_A2}
@@ -97,7 +108,7 @@ class APITestCase(unittest.TestCase):
 
     def test_upload_submission_A2(self):
         """Upload a student's submission for Assignment A2."""
-        url = "http://localhost:5000/upload_submission"
+        url = env_file + "/upload_submission"
         with open(self.A2_py_path, "rb") as f:
             files = {"file": f}
             data = {
@@ -107,6 +118,52 @@ class APITestCase(unittest.TestCase):
             response = requests.post(url, files=files, data=data)
             self.assertEqual(response.status_code, 200)
 
+
+    # Remove the database entries made to avoid conflicts
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up test data in order after running the test suite"""
+        cls.delete_assignment(cls.assignment_id_A1)
+        cls.A1_zip_path = ""
+        cls.A1_py_path = ""
+        cls.delete_assignment(cls.assignment_id_A2)
+        cls.A2_zip_path = ""
+        cls.A2_py_path = ""
+        cls.delete_student()
+        cls.delete_course()
+        cls.delete_instructor()
+ 
+    @classmethod
+    def delete_instructor(cls):
+        url = f"{env_file}/delete_instructor?id={cls.instructor_id}"
+        data = {
+            "id": cls.instructor_id,
+        }
+        response = requests.delete(url)
+
+    @classmethod
+    def delete_student(cls):
+        url = f"{env_file}/delete_student?id={cls.student_id}"
+        data = {
+            "id": cls.student_id,
+        }
+        response = requests.delete(url)
+
+    @classmethod
+    def delete_course(cls):
+        url = f"{env_file}/delete_course?course_id={cls.course_id}"
+        data = {
+            "course_id": cls.course_id,
+        }
+        response = requests.delete(url)
+
+    @classmethod
+    def delete_assignment(cls, assignment_id):
+        url = f"{env_file}/delete_assignment?assignment_id={assignment_id}"
+        data = {
+            "assignment_id": assignment_id}
+        response = requests.delete(url)
+        
 
 if __name__ == "__main__":
     unittest.main()

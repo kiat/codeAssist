@@ -246,7 +246,7 @@ def get_instructor():
 @cross_origin()
 def get_instructor_by_id():
     '''
-    /get_instructor_by_id gets the student from the database
+    /get_instructor_by_id gets the instructor from the database
     Requires from the frontend a JSON containing:
     @param id    the instructor id
     '''
@@ -256,3 +256,36 @@ def get_instructor_by_id():
     instructor = StudentSchema().dump(instructor, many=True)[0]
 
     return jsonify(instructor)
+
+@user.route('/delete_instructor', methods=["DELETE"])
+@cross_origin()
+def delete_instructor():
+   '''
+   /delete_instructor deletes an instructor from the database
+   Requires from the frontend a JSON containing:
+   @param id         id of the instructor
+   '''
+   instructor_id = request.args.get("id")
+   instructor = db.session.query(Instructor).get(instructor_id)
+   if instructor:
+       db.session.delete(instructor)
+       db.session.commit()
+       return jsonify({"message": "Instructor deleted successfully"}), 200
+   return jsonify({"message": "Instructor not found"}), 404
+
+
+@user.route('/delete_student', methods=["DELETE"])
+@cross_origin()
+def delete_student():
+   '''
+   /delete_student deletes a student from the database
+   Requires from the frontend a JSON containing:
+   @param id         id of the student
+   '''
+   student_id = request.args.get("id")
+   student = db.session.query(Student).get(student_id)
+   if student:
+       db.session.delete(student)
+       db.session.commit()
+       return jsonify({"message": "Student deleted successfully"}), 200
+   return jsonify({"message": "Student not found"}), 404
