@@ -159,6 +159,20 @@ Example Output:
       "sis_user_id": "rick123"
     }
 
+## DELETE /delete_student
+
+**Accepts Query String**
+
+**Description**
+
+<p>Deletes the student from the database based on the student ID provided</p>
+
+Example input:
+
+  {
+    "id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+  }
+
 # Instructor
 
 ## POST /create_instructor
@@ -235,6 +249,20 @@ Example Output:
       "name": "Ricky Woodruff",
       "sis_user_id": "rick123"
     }
+
+## DELETE /delete_instructor
+
+**Accepts Query String**
+
+**Description**
+
+<p>Deletes a course from the database</p>
+
+Example input:
+
+  {
+    "id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+  }
 
 # Course
 
