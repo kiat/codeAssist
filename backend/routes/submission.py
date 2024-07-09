@@ -90,15 +90,27 @@ def upload_submission():
         return jsonify({"error": "Missing required parameters or file"}), 400
 
     filename = secure_filename(file.filename)
+    # return jsonify({"message": filename})
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
     submissions_dir = os.path.join(assignment_dir, "submission")
     results_dir = os.path.join(assignment_dir, student_id, 'results')
     for directory in [submissions_dir, results_dir]:
         os.makedirs(directory, exist_ok=True)
+    
+    for filenames in os.listdir(submissions_dir):
+        file_path = os.path.join(submissions_dir, filenames)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            return jsonify({"error": f"Failed to delete {file_path}. Reason: {e}"}), 500
     file_path = os.path.join(submissions_dir, filename)
-    file.save(file_path)
 
+    file.save(file_path)
+    #if current_dir: return jsonify({"message": student_id})
 
     # Write the Dockerfile
     dockerfile_content = """
@@ -121,12 +133,12 @@ def upload_submission():
     if build_proc.returncode != 0:
         os.chdir(current_dir)
         return jsonify({"error": "Failed to build Docker image", "details": build_proc.stderr.decode()}), 500
-
+    
     container_name = f"ag_{assignment_id}_{student_id}"
     run_proc = subprocess.run(f"docker run -d --name {container_name} autograder-{assignment_id} tail -f /dev/null".split(), capture_output=True)
     if run_proc.returncode != 0:
         os.chdir(current_dir)
-        return jsonify({"error": "Failed to start Docker container", "details": run_proc.stderr.decode()}), 500
+        return jsonify({"error": "Failed to start Docker container", "details": run_proc.stderr.decode()})
 
     exec_proc = subprocess.run(f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(), capture_output=True)
     if exec_proc.returncode != 0:
@@ -145,7 +157,10 @@ def upload_submission():
 
     # Query the database for the number of previous submissions
     submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
-
+    #implement removing the old active submission
+    old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
+    if old:
+        old.update({'active': False})
     # Create a new submission record
     new_submission = Submission(
         id=uuid.uuid4(),
@@ -157,6 +172,8 @@ def upload_submission():
         score=json.loads(results_json_content)['score'],
         execution_time=float(json.loads(results_json_content).get('execution_time', 0)),
         submitted_at=datetime.now(),
+        #set the active to true for a newly submitted submission
+        active=True,
         completed=True,
         submission_number=submission_count + 1
     )
@@ -169,8 +186,8 @@ def upload_submission():
 
     #get openAI reponse
     # completion = asyncio.run(get_completion("Say hi"))
-    
-    return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path#, "openai_response": completion
+    # adding the submission id to return --> to be used to access assignment results
+    return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path, "submissionID": new_submission.id#, "openai_response": completion
     }), 200
 
 
@@ -298,3 +315,81 @@ def delete_submission():
 
     # Return a success message
     return jsonify({"message": "Submission successfully deleted"}), 200
+
+@submission.route('/get_submission_details', methods=["GET"])
+@cross_origin()
+def get_submission_details():
+    '''
+    /get_student_by_id gets the submission details from the db
+    Requires from the frontend a JSON containing:
+    @param submission_id    the submission id
+    '''
+    id = request.args.get("submission_id")
+
+    if not id:
+        return jsonify({"error": "Missing submission id"}), 400
+    
+    submission_to_get = db.session.query(Submission).filter_by(id=id)
+
+    if not submission_to_get:
+        # If no submission is found, return an error message
+        return jsonify({"message": "No submission found"}), 404
+    
+    submission = SubmissionSchema().dump(submission_to_get, many=True)[0]
+
+    return jsonify(submission), 200
+
+@submission.route('/get_active_submission', methods=["GET"])
+@cross_origin()
+def get_active_submission():
+    '''
+
+    '''
+    student = request.args.get("student_id")
+    assignment = request.args.get("assignment_id")
+
+    if not assignment or not student:
+        return jsonify({"error": "not sufficient details"})
+    
+    submission = db.session.query(Submission).filter_by(assignment_id=assignment, student_id=student, active=True).first()
+
+    if not submission:
+        return jsonify({"message": "no such submission found"})
+    
+    details = SubmissionSchema().dump(submission)
+
+    return jsonify(details), 200
+
+
+@submission.route('/activate_submission', methods=["POST"])
+@cross_origin()
+def activate_submission():
+    '''
+    Activates a submission and deactivates any currently active submission for the same assignment and student.
+    Requires from the frontend a JSON containing:
+    @param submission_id    the id of the submission to activate
+    @param student_id       the id of the student
+    @param assignment_id    the id of the assignment
+    '''
+    data = request.json
+    submission_id = data.get('submission_id')
+    student_id = data.get('student_id')
+    assignment_id = data.get('assignment_id')
+
+    if not submission_id or not student_id or not assignment_id:
+        return jsonify({"error": "Missing submission_id, student_id or assignment_id"}), 400
+
+    try:
+        # Deactivate the current active submission for the same assignment and student
+        old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
+        if old:
+            old.update({'active': False})
+        
+        # Activate the specified submission
+        db.session.query(Submission).filter_by(id=submission_id).update({'active': True})
+        db.session.commit()
+        
+        return jsonify({"message": "Submission activated successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500

@@ -99,12 +99,17 @@ def update_grade():
 @cross_origin()
 def get_student_regrade_requests():
     student_id = request.args.get("student_id")
+    course_id = request.args.get("course_id")
 
     if not student_id:
         return jsonify({"message": "Missing student_id"}), 400
+    
+    if not course_id:
+        return jsonify({"message": "Missing course_id"}), 400
 
-    regrade_requests = db.session.query(RegradeRequest).join(Submission).filter(
-        Submission.student_id == student_id
+    regrade_requests = db.session.query(RegradeRequest).join(Submission).join(Assignment).filter(
+        Submission.student_id == student_id,
+        Assignment.course_id == course_id
     ).all()
 
     result = []
@@ -127,20 +132,21 @@ def get_student_regrade_requests():
 @regrade_requests.route('/get_instructor_regrade_requests', methods=["GET"])
 @cross_origin()
 def get_instructor_regrade_requests():
-    regrade_requests = db.session.query(RegradeRequest).join(Submission).all()
+    course_id = request.args.get("course_id")
+    regrade_requests = db.session.query(RegradeRequest).join(Submission).join(Assignment).filter(Assignment.course_id == course_id)
 
     result = []
-    for request in regrade_requests:
-        submission = db.session.query(Submission).filter_by(id=request.submission_id).first()
+    for req in regrade_requests:
+        submission = db.session.query(Submission).filter_by(id=req.submission_id).first()
         assignment = db.session.query(Assignment).filter_by(id=submission.assignment_id).first()
         student = db.session.query(Student).filter_by(id=submission.student_id).first()
         result.append({
             "assignmentName": assignment.name,
             "studentName": student.name,
-            "justification": request.justification,
+            "justification": req.justification,
             "assignmentId": assignment.id,
             "studentId": student.id,
-            "reviewed": request.reviewed
+            "reviewed": req.reviewed
         })
 
     return jsonify(result), 200
@@ -155,3 +161,19 @@ def set_reviewed():
 
     return jsonify({"message": "Review updated successfully"}), 200
 
+@regrade_requests.route('/check_regrade_request', methods=["POST"])
+@cross_origin()
+def check_regrade_request():
+    submission_id = request.json["submission_id"]
+    regrade_request = db.session.query(RegradeRequest).filter_by(submission_id=submission_id).first()
+    if not regrade_request:
+        return jsonify({"has_request": False}), 200
+    return jsonify({"has_request": True}), 200
+
+@regrade_requests.route('/delete_regrade_request', methods=["POST"])
+@cross_origin()
+def delete_regrade_request():
+    submission_id = request.json["submission_id"]
+    RegradeRequest.query.filter_by(submission_id=submission_id).delete()
+    db.session.commit()
+    return jsonify({"message": "Regrade request deleted"}), 200
