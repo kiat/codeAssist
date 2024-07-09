@@ -1,20 +1,11 @@
 import unittest
 import requests
 
-from routes.assignment import delete_assignment
-from routes.course import delete_course
-from routes.user import delete_instructor, delete_student
-
 env_file = "http://localhost:5000"
-
-
 
 class APITestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # print(dir(cls))
-        # app.config['TESTING'] = True
-        # cls.client = app.test_client()
 
         """Create test data that will be used across multiple tests."""
         cls.instructor_id = cls.create_instructor()
@@ -136,32 +127,21 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def delete_instructor(cls):
         url = f"{env_file}/delete_instructor?id={cls.instructor_id}"
-        data = {
-            "id": cls.instructor_id,
-        }
         response = requests.delete(url)
 
     @classmethod
     def delete_student(cls):
         url = f"{env_file}/delete_student?id={cls.student_id}"
-        data = {
-            "id": cls.student_id,
-        }
         response = requests.delete(url)
 
     @classmethod
     def delete_course(cls):
         url = f"{env_file}/delete_course?course_id={cls.course_id}"
-        data = {
-            "course_id": cls.course_id,
-        }
         response = requests.delete(url)
 
     @classmethod
     def delete_assignment(cls, assignment_id):
         url = f"{env_file}/delete_assignment?assignment_id={assignment_id}"
-        data = {
-            "assignment_id": assignment_id}
         response = requests.delete(url)
         
 
