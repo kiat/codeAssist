@@ -7,9 +7,10 @@ import StudentInfoPanel from "./StudentInfoPanel";
 
 const { Panel } = Collapse;
 
-const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints }) => {
+const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data }) => {
   const { userInfo, courseInfo } = useContext(GlobalContext);
-  const { assignmentId } = useParams();
+  const { submissionId} = useParams();
+  //const { assignmentId } = useParams();
   const navigate = useNavigate();
   const [testResults, setTestResults] = useState(null);
   const [studentCode, setStudentCode] = useState('');
@@ -18,6 +19,29 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
   const [error, setError] = useState(null);
   const [StudScore, setStudScore] = useState(score);
 
+  useEffect(() => {
+    if (!userInfo || !userInfo.id) {
+      navigate('/');
+      return;
+    }
+    if (!submissionId) {
+      console.error('No submission_id provided');
+      return;
+    }
+    setIsLoading(true);
+    if (data){
+      setStudScore(data.score);
+      const parsedResults = JSON.parse(data.results);
+      setTestResults(parsedResults);
+      setStudentCode(data.student_code_file);
+      setStudentFileName(data.file_name);
+      console.log("this submission is", data.active)
+    } else {
+      console.error("not available");
+    }
+    setIsLoading(false)
+  },[submissionId, navigate, userInfo, courseInfo]);
+/*
   useEffect(() => {
     if (!userInfo || !userInfo.id) {
       navigate('/');
@@ -62,6 +86,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
 
     fetchResults();
   }, [assignmentId, navigate, userInfo, courseInfo, studentId]);
+  */
 
   const downloadFile = useCallback(() => {
     const element = document.createElement('a');
@@ -131,6 +156,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
           studentName={studentName}
           score={StudScore}
           totalPoints={totalPoints}
+          active={data.active}
         />
       </div>
     </div>

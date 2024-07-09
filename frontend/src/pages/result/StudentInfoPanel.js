@@ -9,6 +9,7 @@ export default function StudentInfoPanel({
   studentName,
   score,
   totalPoints,
+  active,
 }) {
   //if it is a student I want to display a button to submit a regrade request --> will take them to the add justification modal
   //if it is an instructor i want to be able to see the regarde request if it exists --> should have an edit butotn somewhere that opens a modal to chnage th student's grade
@@ -17,47 +18,24 @@ export default function StudentInfoPanel({
   const [EditGradeModalVisible, setEditGradeModalVisible] = useState(false);
   const [Grade, setGrade] = useState("");
   const [Justification, setJustification] = useState(null); // Initialize as null
-  const { assignmentId, studentId } = useParams();
+  //const { assignmentId, studentId } = useParams();
   const [SubmissionId, setSubmissionId] = useState();
   const [highlight, setHighlight] = useState(false);
   const justificationRef = useRef(null);
   const [CheckColor, SetCheckColor] = useState("grey");
   const [isLoading, setIsLoading] = useState(true); // Loading state
   const [TempJustification, setTempJustification] = useState(null)
-
-  useEffect(() => {
-    const fetchSubmissionDetails = async () => {
-      if (userInfo) {
-        console.log(assignmentId, studentId);
-        try {
-          const response = await fetch(
-            `${process.env.REACT_APP_API_URL}/get_latest_submission?` +
-              new URLSearchParams({
-                student_id: studentId,
-                assignment_id: assignmentId,
-              })
-          );
-          const submission = await response.json();
-          console.log(submission.id);
-          if (submission) {
-            setSubmissionId(submission.id);
-          }
-        } catch (error) {
-          console.log(error);
-        }
-      }
-    };
-    fetchSubmissionDetails();
-  }, [userInfo, assignmentId, studentId]);
+  const {submissionId} = useParams();
+  const [infoShown, SetInfoShown] = useState(false)
 
   useEffect(() => {
     const fetchJustificationDetails = async () => {
-      if (SubmissionId) {
+      if (submissionId) {
         try {
           const response = await fetch(
             `${process.env.REACT_APP_API_URL}/get_regrade_request?` +
               new URLSearchParams({
-                submission_id: SubmissionId,
+                submission_id: submissionId,
               })
           );
           const request = await response.json();
@@ -72,7 +50,10 @@ export default function StudentInfoPanel({
               if (request.reviewed === false) {
                 setHighlight(true);
                 setTimeout(() => setHighlight(false), 3000);
-                message.info("Regrade Request");
+                if (!infoShown){
+                  message.info("Regrade Request");
+                  SetInfoShown(true);
+                }
               }
             }
           } else {
@@ -88,7 +69,72 @@ export default function StudentInfoPanel({
       }
     };
     fetchJustificationDetails();
-  }, [SubmissionId, userInfo]);
+  },[submissionId, userInfo]);
+
+  // useEffect(() => {
+  //   const fetchSubmissionDetails = async () => {
+  //     if (userInfo) {
+  //       console.log(assignmentId, studentId);
+  //       try {
+  //         const response = await fetch(
+  //           `${process.env.REACT_APP_API_URL}/get_latest_submission?` +
+  //             new URLSearchParams({
+  //               student_id: studentId,
+  //               assignment_id: assignmentId,
+  //             })
+  //         );
+  //         const submission = await response.json();
+  //         console.log(submission.id);
+  //         if (submission) {
+  //           setSubmissionId(submission.id);
+  //         }
+  //       } catch (error) {
+  //         console.log(error);
+  //       }
+  //     }
+  //   };
+  //   fetchSubmissionDetails();
+  // }, [userInfo, assignmentId, studentId]);
+
+  // useEffect(() => {
+  //   const fetchJustificationDetails = async () => {
+  //     if (SubmissionId) {
+  //       try {
+  //         const response = await fetch(
+  //           `${process.env.REACT_APP_API_URL}/get_regrade_request?` +
+  //             new URLSearchParams({
+  //               submission_id: SubmissionId,
+  //             })
+  //         );
+  //         const request = await response.json();
+  //         if (request.justification) {
+  //           if (request.reviewed === true) {
+  //             SetCheckColor("green");
+  //           }
+  //           if (userInfo.isStudent) {
+  //             setJustification(request.justification);
+  //           } else {
+  //             setJustification(request.justification);
+  //             if (request.reviewed === false) {
+  //               setHighlight(true);
+  //               setTimeout(() => setHighlight(false), 3000);
+  //               message.info("Regrade Request");
+  //             }
+  //           }
+  //         } else {
+  //           setJustification("");
+  //         }
+  //       } catch (error) {
+  //         console.log(error);
+  //       } finally {
+  //         setIsLoading(false); // Set loading to false after fetching
+  //       }
+  //     } else {
+  //       setIsLoading(false); // Set loading to false if no SubmissionId
+  //     }
+  //   };
+  //   fetchJustificationDetails();
+  // }, [SubmissionId, userInfo]);
 
   const handleStudentClick = () => {
     setRequestModalVisible(true);
@@ -112,7 +158,7 @@ export default function StudentInfoPanel({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            submission_id: SubmissionId,
+            submission_id: submissionId,
             justification: TempJustification,
           }),
         }
@@ -145,7 +191,7 @@ export default function StudentInfoPanel({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            submission_id: SubmissionId,
+            submission_id: submissionId,
             new_grade: parseFloat(Grade), // Ensure the grade is a float
           }),
         }
@@ -158,7 +204,7 @@ export default function StudentInfoPanel({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            submission_id: SubmissionId,
+            submission_id: submissionId,
           }),
         }
       );
@@ -195,12 +241,34 @@ export default function StudentInfoPanel({
       size="middle"
       style={{ paddingLeft: "20px", paddingTop: "20px" }}
     >
-      <Typography.Title level={4}>{assignmentName}</Typography.Title>
+        <Space direction="horizontal" size="middle" style={{ justifyContent: "space-between", width: "100%" }}>
+          <Typography.Title level={4}>{assignmentName}</Typography.Title>
+          <div>
+            <strong>Score Received</strong>
+            <br />
+            {score}
+          </div>
+          <div>
+            <strong>Status</strong>
+            <br />
+            {active ? (
+              <div style={{ color: 'green', border: '1px solid green', padding: '5px', display: 'inline-block' }}>
+                Active
+              </div>
+            ) : (
+              <div style={{ color: 'red', border: '1px solid red', padding: '5px', display: 'inline-block' }}>
+                Not Active
+              </div>
+            )}
+          </div>
+        </Space>
+      {/* <Typography.Title level={4}>{assignmentName}</Typography.Title> */}
       <Space direction="horizontal" size="middle">
         <CheckCircleOutlined style={{ color: "green" }} />
         Graded
       </Space>
-      <Space>
+      {/* only render regrade request info if this submission is active */}
+      {active && <Space>
         {/* displaying the correct button if the user is a student or an instructor */}
         <Space direction="vertical" size="middle">
         {(userInfo.isStudent && Justification == "" &&(
@@ -252,7 +320,7 @@ export default function StudentInfoPanel({
             onChange={(e) => setGrade(e.target.value)}
           />
         </Modal>
-      </Space>
+      </Space>}
       <Space direction="vertical" size="middle" style={{ paddingTop: "20px" }}>
         <div>Select each question to review feedback and grading details.</div>
         <div>
@@ -265,11 +333,11 @@ export default function StudentInfoPanel({
           <br />
           {totalPoints}
         </div>
-        <div>
+        {/* <div>
           <strong>Score Received</strong>
           <br />
           {score}
-        </div>
+        </div> */}
       </Space>
     </Space>
   );

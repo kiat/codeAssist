@@ -104,7 +104,9 @@ function App() {
               <Route path='/dashboard' element={<Dashboard />} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
-                path='/assignmentResult/:assignmentId/:studentId' 
+                ///reconfiguring to use submissionid for navigation
+                path='/assignmentResult/:submissionId'
+                //path='/assignmentResult/:assignmentId/:studentId' 
                 //old route config
                 //path='/assignmentResult/:assignmentId'
                 element={<AssignmentResult />}

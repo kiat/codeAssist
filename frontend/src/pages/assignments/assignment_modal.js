@@ -46,16 +46,20 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
       // message.success(`OpenAI response: ${responseData.openai_response}`);
 
       // Proceed to results page after successful upload
-      navigateToResults();
+      console.log(responseData.submissionID);
+      navigateToResults(responseData.submissionID);
     } catch (error) {
       console.error("Error uploading file:", error);
       message.error("Failed to upload file. Please try again.");
     }
   };
 
-  const navigateToResults = () => {
+  const navigateToResults = (submissionID) => {
+    //use the returned submission id to navigate to its reults
+    navigate(`/assignmentResult/${submissionID}`);
+
     // using updated route def
-    navigate(`/assignmentResult/${assignmentID}/${userInfo.id}`);
+    //navigate(`/assignmentResult/${assignmentID}/${userInfo.id}`);
   };
 
   return (
