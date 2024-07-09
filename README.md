@@ -4,6 +4,8 @@
 
 ### Requirements:
 
+Note: for macOS make sure to turn off Airplay as it uses localport:5000 as well
+
 - `python` ([Install](https://www.python.org/downloads/))
 - `docker` ([Install](https://docs.docker.com/get-docker/))
 - npm ([Install](https://nodejs.org/en/download))
@@ -106,6 +108,7 @@ To enable this you need to make the following change in your .env file.
 ## New Backend stack completely on docker
 Prerequisites:
 - Postgres is not currently running on your system (otherwise you will get errors launching the postgres container because the port will conflict). Either uninstall postgres completely from your system or just kill it
+- If you are on macOS, make sure to turn off Airplay because it also runs on localport:5000
 
 Steps
 1. Install docker with the steps above

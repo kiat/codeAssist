@@ -1,5 +1,19 @@
 import { DeleteOutlined } from "@ant-design/icons";
-import { Button, Card, Checkbox, Col, DatePicker, Form, Input, message, PageHeader, Radio, Row, Space, } from "antd";
+import { 
+  Button, 
+  Card, 
+  Checkbox, 
+  Col, 
+  DatePicker, 
+  Form, 
+  Input, 
+  message, 
+  PageHeader, 
+  Radio, 
+  Row, 
+  Space,
+  Popconfirm
+} from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getAssignment, updateAssignment } from "../../services/assignment";
@@ -55,6 +69,34 @@ export default () => {
         return Promise.reject(error);
       });
   };
+
+  const handleDeleteSubmissions = (assignmentId) => {
+    if (!assignmentId) {
+      console.error('Assignment ID is undefined');
+      message.error('Cannot delete submissions without an ID');
+      return Promise.reject(new Error('Assignment ID is undefined'));
+    }
+
+    return fetch(`${process.env.REACT_APP_API_URL}/delete_submissions?assignment_id=${assignmentId}`, {
+      method: "DELETE",
+      mode: 'cors',
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Network response was not ok, status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .catch(error => {
+        console.error('There has been a problem with the fetch operation:', error);
+        message.error('Failed to delete submissions');
+        return Promise.reject(error);
+      });
+  };
+
+
+
+
 
 
   const currentDate = () => {
@@ -232,21 +274,46 @@ export default () => {
               <Button type='primary' htmlType='submit'>
                 Save
               </Button>
-              <Button
-                danger type='primary'
-                icon={<DeleteOutlined />}
-                onClick={() => {
+              <Popconfirm
+                title="Are you sure you want to delete this assignment?"
+                onConfirm={() => {
                   handleDeleteAssignment(assignmentId)
                     .then(() => {
+                      message.success("Assignment deleted");
                       // Only navigate away if deletion was successful
                       navigateMainPage();
                     })
                     .catch((error) => {
                       message.error('Failed to delete assignment');
                     });
-                }}>
-                Delete assignment
-              </Button>
+                }}
+                okText="Yes"
+                cancelText="No">
+                <Button 
+                  danger type='primary' 
+                  icon={<DeleteOutlined />} >
+                  Delete Assignment
+                </Button>
+              </Popconfirm>
+              <Popconfirm
+                title="Are you sure you want to delete all submissions?"
+                onConfirm={() => {
+                  handleDeleteSubmissions(assignmentId)
+                    .then(() => {
+                      message.success("All submissions deleted");
+                    })
+                    .catch((error) => {
+                      message.error('Failed to delete assignment');
+                    });
+                }}
+                okText="Yes"
+                cancelText="No">
+                <Button 
+                  danger type='primary' 
+                  icon={<DeleteOutlined />} >
+                  Delete All Submissions
+                </Button>
+              </Popconfirm>
             </Space>
           </Form.Item>
         </Card>
