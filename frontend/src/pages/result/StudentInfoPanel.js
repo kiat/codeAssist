@@ -71,71 +71,6 @@ export default function StudentInfoPanel({
     fetchJustificationDetails();
   },[submissionId, userInfo]);
 
-  // useEffect(() => {
-  //   const fetchSubmissionDetails = async () => {
-  //     if (userInfo) {
-  //       console.log(assignmentId, studentId);
-  //       try {
-  //         const response = await fetch(
-  //           `${process.env.REACT_APP_API_URL}/get_latest_submission?` +
-  //             new URLSearchParams({
-  //               student_id: studentId,
-  //               assignment_id: assignmentId,
-  //             })
-  //         );
-  //         const submission = await response.json();
-  //         console.log(submission.id);
-  //         if (submission) {
-  //           setSubmissionId(submission.id);
-  //         }
-  //       } catch (error) {
-  //         console.log(error);
-  //       }
-  //     }
-  //   };
-  //   fetchSubmissionDetails();
-  // }, [userInfo, assignmentId, studentId]);
-
-  // useEffect(() => {
-  //   const fetchJustificationDetails = async () => {
-  //     if (SubmissionId) {
-  //       try {
-  //         const response = await fetch(
-  //           `${process.env.REACT_APP_API_URL}/get_regrade_request?` +
-  //             new URLSearchParams({
-  //               submission_id: SubmissionId,
-  //             })
-  //         );
-  //         const request = await response.json();
-  //         if (request.justification) {
-  //           if (request.reviewed === true) {
-  //             SetCheckColor("green");
-  //           }
-  //           if (userInfo.isStudent) {
-  //             setJustification(request.justification);
-  //           } else {
-  //             setJustification(request.justification);
-  //             if (request.reviewed === false) {
-  //               setHighlight(true);
-  //               setTimeout(() => setHighlight(false), 3000);
-  //               message.info("Regrade Request");
-  //             }
-  //           }
-  //         } else {
-  //           setJustification("");
-  //         }
-  //       } catch (error) {
-  //         console.log(error);
-  //       } finally {
-  //         setIsLoading(false); // Set loading to false after fetching
-  //       }
-  //     } else {
-  //       setIsLoading(false); // Set loading to false if no SubmissionId
-  //     }
-  //   };
-  //   fetchJustificationDetails();
-  // }, [SubmissionId, userInfo]);
-
   const handleStudentClick = () => {
     setRequestModalVisible(true);
   };
@@ -333,11 +268,6 @@ export default function StudentInfoPanel({
           <br />
           {totalPoints}
         </div>
-        {/* <div>
-          <strong>Score Received</strong>
-          <br />
-          {score}
-        </div> */}
       </Space>
     </Space>
   );

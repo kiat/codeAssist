@@ -35,133 +35,6 @@
     const { userInfo, assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
     const [toSend, setToSend] = useState();
     const [dueDate, setDueDate] = useState();
-  //updating useEffect dependencies, adding functionalit to render the students name ase don their id
-  /*
-  useEffect(() => {
-    //fetching student and assignment ids and setting the state variables based on thsi submission id
-    const fetchIds = async () => {
-      console.log("first thing")
-      console.log(submissionId)
-      try {
-        console.log("hello")
-        const details = await fetch(`${process.env.REACT_APP_API_URL}/get_submission_details?` + new URLSearchParams({submission_id:submissionId,}));
-        const data = await details.json();
-        if (data){
-          console.log(data.assignment_id)
-          setAssignmentId(data.assignment_id)
-          setStudentId(data.student_id)
-          console.log("student id:", studentId)
-          console.log("assignment id:", assignmentId)
-        } else {
-          console.log("no response data")
-        }
-      } catch (error) {
-        console.error("Failed to fetch IDs: ", error)
-      }
-
-    };
-
-    fetchIds();
-  },[submissionId]);
-  
-  useEffect(() => {
-    //ensuring that the assignment and student ids have been fetched
-    if (!assignmentId || !studentId){
-      console.log("not yet")
-      return;
-    }
-    const fetchAssignmentDetails = async () => {
-      const res = await getAssignment({ assignment_id: assignmentId });
-      if (res?.data) {
-        setAutograderPoints(res.data.autograder_points);
-        setAssignmentName(res.data.name); // Assuming the API provides this
-        updateAssignmentInfo((prevInfo) => ({
-          ...prevInfo,
-          name: res.data.name,
-          id: assignmentId,
-        }));
-      }
-    };
-
-    const fetchStudentName = async () => {
-      if (studentId) {
-        try {
-          const response = await fetch(
-            `${process.env.REACT_APP_API_URL}/get_student_by_id?` +
-            new URLSearchParams({
-              id: studentId,
-            })
-          );
-          const studentData = await response.json();
-          if (studentData) {
-            updateAssignmentInfo((prevInfo) => ({
-              ...prevInfo,
-              studentName: studentData.name,
-              studentId: studentId,
-            }));
-          }
-        } catch (error) {
-          console.error("Failed to fetch student data:", error);
-        }
-      }
-    };
-    fetchAssignmentDetails();
-    fetchStudentName();
-  }, [assignmentId, studentId, location.key, updateAssignmentInfo]);
-  */
- /*
-  useEffect(() => {
-    const fetchIdsAndDetails = async () => {
-      console.log("first thing");
-      console.log(submissionId);
-
-      try {
-        console.log("hello");
-        const details = await fetch(`${process.env.REACT_APP_API_URL}/get_submission_details?` + new URLSearchParams({ submission_id: submissionId }));
-        const data = await details.json();
-        if (data) {
-          setAssignmentId(data.assignment_id)
-          setStudentId(data.student_id)
-          console.log("assignment id:", assignmentId);
-          console.log("student id:", studentId)
-          setAssignmentId(data.assignment_id);
-          setStudentId(data.student_id);
-
-          // Fetch assignment details
-          const res = await getAssignment({ assignment_id: data.assignment_id });
-          if (res?.data) {
-            setAutograderPoints(res.data.autograder_points);
-            setAssignmentName(res.data.name); // Assuming the API provides this
-            updateAssignmentInfo((prevInfo) => ({
-              ...prevInfo,
-              name: res.data.name,
-              id: data.assignment_id,
-            }));
-          }
-
-          // Fetch student name
-          const response = await fetch(
-            `${process.env.REACT_APP_API_URL}/get_student_by_id?` + new URLSearchParams({ id: data.student_id })
-          );
-          const studentData = await response.json();
-          if (studentData) {
-            updateAssignmentInfo((prevInfo) => ({
-              ...prevInfo,
-              studentName: studentData.name,
-              studentId: data.student_id,
-            }));
-          }
-        } else {
-          console.log("no response data");
-        }
-      } catch (error) {
-        console.error("Failed to fetch IDs or details: ", error);
-      }
-    };
-
-    fetchIdsAndDetails();
-  }, [submissionId, location.key, updateAssignmentInfo]);
-*/
 useEffect(() => {
   // Fetching student and assignment IDs based on this submission ID
   const fetchIds = async () => {
@@ -280,6 +153,7 @@ useEffect(() => {
               <Card bordered={false}>
                 {toSend && <TestResultsDisplay viewMode={viewMode} assignmentName={assignmentName} studentName={assignmentInfo?.studentName ?? userInfo?.name} score={assignmentInfo?.score ?? "Unknown"} // Replace with actual score data as needed
               totalPoints={autoGraderPoints} data={toSend}/>}
+              {/* old calls */}
               {/* {studentId && assignmentId && <TestResultsDisplay viewMode={viewMode} studentId={studentId} assignmentName={assignmentName}
               //<TestResultsDisplay viewMode={viewMode} studentId={studentId} assignmentName={assignmentName}
               studentName={assignmentInfo?.studentName ?? userInfo?.name}

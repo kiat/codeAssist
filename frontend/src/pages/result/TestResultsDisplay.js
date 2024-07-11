@@ -41,52 +41,6 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     }
     setIsLoading(false)
   },[submissionId, navigate, userInfo, courseInfo]);
-/*
-  useEffect(() => {
-    if (!userInfo || !userInfo.id) {
-      navigate('/');
-      return;
-    }
-    if (!assignmentId) {
-      console.error('No assignment_id provided');
-      return;
-    }
-
-    const fetchResults = async () => {
-      setIsLoading(true);
-      try {
-        const send = userInfo.isStudent ? userInfo.id : studentId;
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/get_latest_submission?` +
-          new URLSearchParams({
-            student_id: send,
-            assignment_id: assignmentId
-          }));
-
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        const data = await response.json();
-        if (data.score) {
-          setStudScore(data.score);
-        }
-        if (data.results) {
-          const parsedResults = JSON.parse(data.results);
-          setTestResults(parsedResults);
-          setStudentCode(data.student_code_file);
-          setStudentFileName(data.file_name);
-        } else {
-          throw new Error('Results data is not available');
-        }
-      } catch (error) {
-        setError(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchResults();
-  }, [assignmentId, navigate, userInfo, courseInfo, studentId]);
-  */
 
   const downloadFile = useCallback(() => {
     const element = document.createElement('a');
