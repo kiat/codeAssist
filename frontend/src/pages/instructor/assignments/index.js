@@ -1,4 +1,3 @@
-// import { Tabs } from "antd";
 import { CopyFilled, DownloadOutlined } from "@ant-design/icons";
 import { Button, Form, PageHeader, Popover, Space, Typography } from "antd";
 import { useCallback, useState } from "react";
@@ -15,6 +14,8 @@ export default function InstructorAssignments() {
   const [currentStep, setCurrentStep] = useState(0);
   const [form] = Form.useForm();
   const { courseId } = useParams();
+  const [nameValidationStatus, setNameValidationStatus] = useState("");
+  const [nameValidationHelp, setNameValidationHelp] = useState("");
 
   const updateCurrentStep = useCallback(current => {
     setCurrentStep(current);
@@ -28,7 +29,7 @@ export default function InstructorAssignments() {
     setIsCreate(t => !t);
   }, []);
 
-  const finishForm = () => {
+  const finishForm = async () => {
     const values = form.getFieldsValue();
     const assignmentData = {
       name: values.name, 
@@ -47,11 +48,14 @@ export default function InstructorAssignments() {
     const validData = Object.fromEntries(
       Object.entries(assignmentData).filter(([_, value]) => value !== undefined)
     );
-    createAssignment(validData).then(res => {
-      toggleIsCreate();
-    });
-   
-  
+    createAssignment(validData)
+      .then(res => {
+        toggleIsCreate();
+      })
+    .catch(err => {
+      setNameValidationStatus("error");
+    })
+    
   };
 
   return (
@@ -73,6 +77,8 @@ export default function InstructorAssignments() {
             updateCurrentStep={updateCurrentStep}
             toggleIsCreate={toggleIsCreate}
             form={form}
+            nameValidationStatus={nameValidationStatus}
+            nameValidationHelp={nameValidationHelp}
           />
         </div>
       </div>
