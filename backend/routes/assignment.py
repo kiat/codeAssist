@@ -49,16 +49,20 @@ def create_assignment():
     id in the database
     '''
     assignment_data = request.json
+    # Check for duplicate name
+    assignment_name = assignment_data.get("name")
+    course_id = assignment_data.get("course_id")
+    course_assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
+    for a in course_assignments:
+        if a.name == assignment_name:
+            return jsonify({"message": "An assignment with this name already exists"}), 400
     assignment_id = str(uuid.uuid4())
     assignment_data["id"] = assignment_id
     valid_assignment_data = {k: v for k,v in assignment_data.items() if v is not None}
-
     db.session.add(Assignment(**valid_assignment_data))
     db.session.commit()
-
     newAssignment = db.session.query(Assignment).filter_by(id=assignment_id)
     newAssignment = AssignmentSchema().dump(newAssignment, many=True)[0]
-
     return jsonify(newAssignment)
 
 @assignment.route('/delete_assignment', methods=["DELETE"])
