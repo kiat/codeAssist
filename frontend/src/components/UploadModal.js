@@ -145,7 +145,7 @@ export default function UploadModal({
 
 
       const responseData = await response.json();
-      //console.log(responseData);
+      console.log(responseData);
       // Proceed to results page after successful upload
       console.log(responseData);
       navigateToResults(responseData.submissionID);

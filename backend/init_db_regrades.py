@@ -8,20 +8,20 @@ def add_is_reviewed_column():
         inspector = inspect(db.engine)
         
         # Check if the 'submissions' table exists
-        if inspector.has_table("submissions"):
+        if inspector.has_table("assignments"):
             # Reflect the existing table structure
-            submissions_table = Table("submissions", db.metadata, autoload_with=db.engine)
+            assignments_table = Table("assignments", db.metadata, autoload_with=db.engine)
 
             # Check if the 'is_reviewed' column exists
-            if not hasattr(submissions_table.c, 'default'):
+            if not hasattr(assignments_table.c, 'container_id'):
                 # Add the 'is_reviewed' column with default value as False
                 with db.engine.connect() as connection:
-                    connection.execute('ALTER TABLE submissions ADD COLUMN default BOOLEAN DEFAULT FALSE')
-                    print("Column 'default' added to 'submissions' table.")
+                    connection.execute('ALTER TABLE assignments ADD COLUMN container_id VARCHAR')
+                    print("Column 'conatiner_id' added to 'assignments' table.")
             else:
-                print("Column 'default' already exists in 'submissions' table.")
+                print("Column 'container_id' already exists in 'assignments' table.")
         else:
-            print("Table 'submissions' does not exist.")
+            print("Table 'assignments' does not exist.")
 
 if __name__ == "__main__":
     add_is_reviewed_column()

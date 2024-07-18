@@ -51,6 +51,8 @@ def create_assignment():
     assignment_data = request.json
     assignment_id = str(uuid.uuid4())
     assignment_data["id"] = assignment_id
+    # not creating a container yet
+    assignment_data["container_id"] = None
     valid_assignment_data = {k: v for k,v in assignment_data.items() if v is not None}
 
     db.session.add(Assignment(**valid_assignment_data))

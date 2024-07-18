@@ -36,11 +36,13 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
+      // if (!response.ok) {
+      //   throw new Error("Network response was not ok");
+      // }
 
       const responseData = await response.json();
+      console.log(responseData);
+      // return;
       // console.log("response:", responseData.openai_response);
 
       // message.success(`OpenAI response: ${responseData.openai_response}`);
