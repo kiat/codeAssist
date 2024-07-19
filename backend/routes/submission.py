@@ -90,7 +90,6 @@ def upload_submission():
         return jsonify({"error": "Missing required parameters or file"}), 400
 
     filename = secure_filename(file.filename)
-    # return jsonify({"message": filename})
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
     submissions_dir = os.path.join(assignment_dir, "submission")
@@ -139,50 +138,6 @@ def upload_submission():
     host_results_json_path = os.path.join(results_dir, 'results.json')
     with open(host_results_json_path, 'w') as file:
         file.write(results_json_content)
-
-    # old method
-    # Write the Dockerfile
-    # dockerfile_content = """
-    # FROM python:3.9
-    # RUN apt-get update && apt-get install -y python3-pip python3-dev unzip && rm -rf /var/lib/apt/lists/*
-    # COPY *.zip /autograder/
-    # RUN unzip /autograder/*.zip -d /autograder/source
-    # COPY submission /autograder/submission
-    # RUN chmod +x /autograder/source/setup.sh && /autograder/source/setup.sh
-    # RUN chmod +x /autograder/source/run_autograder
-    # RUN mkdir -p /autograder/results
-    # WORKDIR /autograder
-    # CMD ["/bin/bash", "/autograder/source/run_autograder"]
-    # """
-    # with open(os.path.join(assignment_dir, 'Dockerfile'), 'w') as dockerfile:
-    #     dockerfile.write(dockerfile_content)
-
-    # os.chdir(assignment_dir)
-    # build_proc = subprocess.run(f"docker build -t autograder-{assignment_id} .".split(), capture_output=True)
-    # if build_proc.returncode != 0:
-    #     os.chdir(current_dir)
-    #     return jsonify({"error": "Failed to build Docker image", "details": build_proc.stderr.decode()}), 500
-    
-    # container_name = f"ag_{assignment_id}_{student_id}"
-    # run_proc = subprocess.run(f"docker run -d --name {container_name} autograder-{assignment_id} tail -f /dev/null".split(), capture_output=True)
-    # if run_proc.returncode != 0:
-    #     os.chdir(current_dir)
-    #     return jsonify({"error": "Failed to start Docker container", "details": run_proc.stderr.decode()})
-
-    # exec_proc = subprocess.run(f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(), capture_output=True)
-    # if exec_proc.returncode != 0:
-    #     os.chdir(current_dir)
-    #     return jsonify({"error": "Autograder execution failed", "details": exec_proc.stderr.decode()}), 500
-
-    # cat_proc = subprocess.run(f"docker exec {container_name} cat /autograder/results/results.json".split(), capture_output=True)
-    # if cat_proc.returncode != 0:
-    #     os.chdir(current_dir)
-    #     return jsonify({"error": "Failed to read results.json", "details": cat_proc.stderr.decode()}), 500
-
-    # results_json_content = cat_proc.stdout.decode()
-    # host_results_json_path = os.path.join(results_dir, 'results.json')
-    # with open(host_results_json_path, 'w') as file:
-    #     file.write(results_json_content)
 
     # Query the database for the number of previous submissions
     submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
