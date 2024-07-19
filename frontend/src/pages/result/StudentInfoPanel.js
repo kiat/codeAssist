@@ -18,7 +18,6 @@ export default function StudentInfoPanel({
   const [EditGradeModalVisible, setEditGradeModalVisible] = useState(false);
   const [Grade, setGrade] = useState("");
   const [Justification, setJustification] = useState(null); // Initialize as null
-  //const { assignmentId, studentId } = useParams();
   const [SubmissionId, setSubmissionId] = useState();
   const [highlight, setHighlight] = useState(false);
   const justificationRef = useRef(null);
