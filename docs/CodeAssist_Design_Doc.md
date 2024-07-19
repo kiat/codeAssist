@@ -82,7 +82,7 @@ The CodeAssist backend takes advantage of Docker to ensure that all student code
 
 After exploring SQL and NoSQL options for our database, I recommended we use a SQL Database model. A NoSQL database, specifically a document model, won’t provide us with any advantages given that we won’t be loading a single document at once. Additionally, we have several many-to-many relationships, which makes using a document database difficult. In order to make our queries, we’ll likely need to filter on `student_id = {current_student_id}`. To speed up these queries, we can add indices (single or complex) to large tables to make our queries faster. Finally, SQL databases allow us to maintain data accuracy with `cascade delete`. If we delete a row in a parent table, related rows in child tables will also be deleted. NoSQL databases don’t have this feature, and this would add additional work on our end to ensure data correctness every time a row is deleted. 
 
-**Student Table**
+**People Table**
 
 | id            | uuid (primary key) |
 | ------------- | ------------------ |
@@ -90,15 +90,7 @@ After exploring SQL and NoSQL options for our database, I recommended we use a S
 | name          | varchar            |
 | email_address | varchar            |
 | sis_user_id   | varchar            |
-
-**Instructor Table**
-
-| id            | uuid (primary key) |
-| ------------- | ------------------ |
-| password      | varchar            |
-| name          | varchar            |
-| email_address | varchar            |
-| sis_user_id   | varchar            |
+| role          | varchar            |
 
 
 **Enrollment Table (composite primary key)**

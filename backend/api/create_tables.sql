@@ -1,17 +1,4 @@
 /* Create Students table */
-CREATE TABLE students (
-    id uuid PRIMARY KEY,
-    password varchar(60) NOT NULL,
-    name varchar(30) NOT NULL,
-    email_address varchar(30) NOT NULL UNIQUE,
-    sis_user_id varchar(50) NOT NULL UNIQUE
-);
-
-/* Create Instructors table (Inherits Students table) */
-CREATE TABLE instructors (
-    id uuid PRIMARY KEY INHERITS (students)
-);
-
 CREATE TABLE people (
     id uuid PRIMARY KEY,
     password varchar(60) NOT NULL,

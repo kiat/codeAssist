@@ -19,7 +19,7 @@ Example input:
       email: "woodruffr@utexas.edu",
       password: "password",
       eid: "rick123",
-      role: "0"
+      role: "instructor"
     }
 
 Example Output(instructor):
@@ -29,8 +29,85 @@ Example Output(instructor):
       "id":"a6888457-475a-47ab-8455-441cdd8b9744",
       "name":"Ricky Woodruff",
       "password":"password",
-      "sis_user_id": "rick123"
+      "sis_user_id": "rick123",
+      "role": "instructor"
     }
+
+## POST /user_login
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Logs in a user that exists in the database into their account</p>
+
+Example input:
+
+    {
+      email: "woodruffr@utexas.edu",
+      password: "password",
+    }
+
+Example Output:
+
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123",
+      "role": "instructor"
+    }
+
+## GET /get_user
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets the user from the database based on the email put in</p>
+
+Example input:
+
+    {
+      email: "woodruffr@utexas.edu",
+    }
+
+Example Output:
+
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123",
+      "role": "TA"
+    }
+
+### GET /get_user_by_id
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets the user from the database based on the student ID provided.</p>
+
+**Example Input:**
+
+    {
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744"
+    }
+
+**Example Output:**
+
+    {
+      "email_address": "woodruffr@utexas.edu",
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744",
+      "name": "Ricky Woodruff",
+      "sis_user_id": "rick123",
+      "role": "TA"
+    }
+
 
 ## POST /update_account
 
@@ -58,183 +135,6 @@ Example Output:
       "sis_user_id": "rick123"
     }
 
-# Student
-
-## POST /create_student
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Creates a student and generates an id in the database</p>
-
-Example input:
-
-    {
-      name: "Ricky Woodruff",
-      email: "woodruffr@utexas.edu",
-      password: "password",
-      eid: "rick123"
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-## POST /student_login
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Logs in a student that exists in the database into their account</p>
-
-Example input:
-
-    {
-      email: "woodruffr@utexas.edu",
-      password: "password",
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-## GET /get_student
-
-**Accepts Query String**
-
-**Description:**
-
-<p>Gets the student from the database based on the email put in</p>
-
-Example input:
-
-    {
-      email: "woodruffr@utexas.edu",
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-### GET /get_student_by_id
-
-**Accepts Query String**
-
-**Description:**
-
-<p>Gets the student from the database based on the student ID provided.</p>
-
-**Example Input:**
-
-    {
-      "id": "a6888457-475a-47ab-8455-441cdd8b9744"
-    }
-
-**Example Output:**
-
-    {
-      "email_address": "woodruffr@utexas.edu",
-      "id": "a6888457-475a-47ab-8455-441cdd8b9744",
-      "name": "Ricky Woodruff",
-      "sis_user_id": "rick123"
-    }
-
-# Instructor
-
-## POST /create_instructor
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Creates an instructor and generates an id in the database</p>
-
-Example input:
-
-    {
-      name: "Ricky Woodruff",
-      email: "woodruffr@utexas.edu",
-      password: "password",
-      eid: "rick123"
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-## POST /instructor_login
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Logs in an instructor that exists in the database to their account</p>
-
-Example input:
-
-    {
-      email: "woodruffr@utexas.edu",
-      password: "password",
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-### GET /get_instructor_by_id
-
-**Accepts Query String**
-
-**Description:**
-
-<p>Gets the instructor from the database based on the instructor ID provided.</p>
-
-**Example Input:**
-
-    {
-      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
-    }
-
-**Example Output:**
-
-    {
-      "email_address": "woodruffr@utexas.edu",
-      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
-      "name": "Ricky Woodruff",
-      "sis_user_id": "rick123"
-    }
 
 # Course
 
@@ -274,7 +174,7 @@ Example output:
 
 **Description:**
 
-<p>Enrolls a student in a course using entry code. This is used on the student 
+<p>Enrolls a person in a course using entry code. This is used on the student 
 side where they can enroll into a course without a instructor adding them
 if they have the entry code.</p>
 

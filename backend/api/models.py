@@ -3,22 +3,6 @@ from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
 
-class Student(db.Model):
-    __tablename__ = "students"
-    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
-    password = db.Column(db.String, nullable=False)
-    name = db.Column(db.String, nullable=False)
-    email_address = db.Column(db.String, nullable=False)
-    sis_user_id = db.Column(db.String, nullable=False, unique=True)
-
-class Instructor(db.Model):
-    __tablename__ = "instructors"
-    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
-    password = db.Column(db.String, nullable=False)
-    name = db.Column(db.String, nullable=False)
-    email_address = db.Column(db.String, nullable=False)
-    sis_user_id = db.Column(db.String, nullable=False)
-
 class People(db.Model):
     __tablename__ = "people"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
