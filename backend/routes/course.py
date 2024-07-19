@@ -99,7 +99,7 @@ def delete_course():
         return jsonify("Assignments must be deleted"), 410
     
     enrollments = db.session.query(Enrollment).filter_by(course_id=course_id).all()
-    if (enrollments):
+    if enrollments:
         for enrollment in enrollments:
             db.session.delete(enrollment)
         db.session.commit()
