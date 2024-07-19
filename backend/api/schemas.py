@@ -1,4 +1,4 @@
-from api.models import Student, Course, Enrollment, Assignment, Submission, Instructor, TestCaseResult, TestCase, RegradeRequest
+from api.models import Student, Course, Enrollment, Assignment, Submission, Instructor, TestCaseResult, TestCase, RegradeRequest, People
 from api import ma
 
 
@@ -10,6 +10,11 @@ class StudentSchema(ma.SQLAlchemyAutoSchema):
 class InstructorSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Instructor
+        include_fk = True
+
+class PeopleSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = People
         include_fk = True
     
 class CourseSchema(ma.SQLAlchemyAutoSchema):

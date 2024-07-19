@@ -7,8 +7,8 @@ from functools import reduce
 from flask import Blueprint, request, jsonify, flash
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission, Student, Enrollment, TestCaseResult, TestCase
-from api.schemas import AssignmentSchema, SubmissionSchema, StudentSchema, EnrollmentSchema
+from api.models import Assignment, Submission, People, Enrollment, TestCaseResult, TestCase
+from api.schemas import AssignmentSchema, SubmissionSchema, PeopleSchema, EnrollmentSchema
 from datetime import datetime, timezone
 import subprocess
 import os
@@ -218,7 +218,7 @@ def get_results():
     email = request.args.get("email")
     assignment_id = request.args.get("assignment_id")
 
-    student = db.session.query(Student).filter_by(email_address=email).first()
+    student = db.session.query(People).filter_by(email_address=email).first()
     if student:
         student_id = student.id
 

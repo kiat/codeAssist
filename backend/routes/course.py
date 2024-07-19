@@ -2,8 +2,8 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Course, Enrollment, Student, Submission
-from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, StudentSchema
+from api.models import Assignment, Course, Enrollment, Submission, People
+from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, PeopleSchema
 
 course = Blueprint('course', __name__)
 
@@ -212,8 +212,8 @@ def get_course_enrollment():
 
     list_of_students = [x["student_id"] for x in students]
 
-    students = db.session.query(Student.name, Student.email_address, Student.id).filter(Student.id.in_(list_of_students))
-    students = StudentSchema().dump(students, many=True)
+    students = db.session.query(People.name, People.email_address, People.id).filter(People.id.in_(list_of_students))
+    students = PeopleSchema().dump(students, many=True)
 
     return jsonify(students)
 
