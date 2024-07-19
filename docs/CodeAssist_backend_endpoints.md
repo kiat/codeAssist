@@ -762,6 +762,51 @@ Example Output:
       "justification": "I believe there was an error in grading.",
       "reviewed": false
     }
+## POST /check_regrade_request
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Checks if a regrade request exists for the given submission ID.</p>
+
+Example input:
+
+    {
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c"
+    }
+
+Example Output:
+
+    {
+      "has_request": true
+    }
+
+or
+
+    {
+      "has_request": false
+    }
+
+## POST /delete_regrade_request
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Deletes the regrade request associated with the given submission ID.</p>
+
+Example input:
+
+    {
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c"
+    }
+
+Example Output:
+
+    {
+      "message": "Regrade request deleted"
+    }
 
 ## POST /update_grade
 
