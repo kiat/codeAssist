@@ -41,14 +41,6 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
       // }
 
       const responseData = await response.json();
-      console.log(responseData);
-      // return;
-      // console.log("response:", responseData.openai_response);
-
-      // message.success(`OpenAI response: ${responseData.openai_response}`);
-
-      // Proceed to results page after successful upload
-      console.log(responseData.submissionID);
       navigateToResults(responseData.submissionID);
     } catch (error) {
       console.error("Error uploading file:", error);
