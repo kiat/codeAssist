@@ -7,9 +7,10 @@ import StudentInfoPanel from "./StudentInfoPanel";
 
 const { Panel } = Collapse;
 
-const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints }) => {
+const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data }) => {
   const { userInfo, courseInfo } = useContext(GlobalContext);
-  const { assignmentId } = useParams();
+  const { submissionId} = useParams();
+  //const { assignmentId } = useParams();
   const navigate = useNavigate();
   const [testResults, setTestResults] = useState(null);
   const [studentCode, setStudentCode] = useState('');
@@ -23,45 +24,23 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
       navigate('/');
       return;
     }
-    if (!assignmentId) {
-      console.error('No assignment_id provided');
+    if (!submissionId) {
+      console.error('No submission_id provided');
       return;
     }
-
-    const fetchResults = async () => {
-      setIsLoading(true);
-      try {
-        const send = userInfo.isStudent ? userInfo.id : studentId;
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/get_latest_submission?` +
-          new URLSearchParams({
-            student_id: send,
-            assignment_id: assignmentId
-          }));
-
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        const data = await response.json();
-        if (data.score) {
-          setStudScore(data.score);
-        }
-        if (data.results) {
-          const parsedResults = JSON.parse(data.results);
-          setTestResults(parsedResults);
-          setStudentCode(data.student_code_file);
-          setStudentFileName(data.file_name);
-        } else {
-          throw new Error('Results data is not available');
-        }
-      } catch (error) {
-        setError(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchResults();
-  }, [assignmentId, navigate, userInfo, courseInfo, studentId]);
+    setIsLoading(true);
+    if (data){
+      setStudScore(data.score);
+      const parsedResults = JSON.parse(data.results);
+      setTestResults(parsedResults);
+      setStudentCode(data.student_code_file);
+      setStudentFileName(data.file_name);
+      console.log("this submission is", data.active)
+    } else {
+      console.error("not available");
+    }
+    setIsLoading(false)
+  },[submissionId, navigate, userInfo, courseInfo]);
 
   const downloadFile = useCallback(() => {
     const element = document.createElement('a');
@@ -131,6 +110,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
           studentName={studentName}
           score={StudScore}
           totalPoints={totalPoints}
+          active={data.active}
         />
       </div>
     </div>

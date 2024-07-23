@@ -53,6 +53,7 @@ class Assignment(db.Model):
     published = db.Column(db.Boolean, default=False)
     published_date = db.Column(TIMESTAMP, nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
+    container_id = db.Column(db.String)
 
 class Submission(db.Model):
     __tablename__ = "submissions"

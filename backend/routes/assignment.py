@@ -2,7 +2,7 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission
+from api.models import Assignment, Submission, RegradeRequest
 from api.schemas import AssignmentSchema, SubmissionSchema
 
 assignment = Blueprint('assignment', __name__)
@@ -51,6 +51,8 @@ def create_assignment():
     assignment_data = request.json
     assignment_id = str(uuid.uuid4())
     assignment_data["id"] = assignment_id
+    # not creating a container yet
+    assignment_data["container_id"] = None
     valid_assignment_data = {k: v for k,v in assignment_data.items() if v is not None}
 
     db.session.add(Assignment(**valid_assignment_data))
@@ -70,6 +72,10 @@ def delete_assignment():
     related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment_id).all()
     if related_submissions:
         for submission in related_submissions:
+            related_requests = db.session.query(RegradeRequest).filter_by(submission_id = submission.id)
+            if related_requests:
+                for req in related_requests :
+                    db.session.delete(req)
             db.session.delete(submission)
         db.session.commit()
 

@@ -2,7 +2,7 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Course, Enrollment, Student, Submission
+from api.models import Assignment, Course, Enrollment, Student, Submission, RegradeRequest, Enrollment
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, StudentSchema
 
 course = Blueprint('course', __name__)
@@ -97,6 +97,12 @@ def delete_course():
     if related_assignments:
         print("410")
         return jsonify("Assignments must be deleted"), 410
+    
+    enrollments = db.session.query(Enrollment).filter_by(course_id=course_id).all()
+    if enrollments:
+        for enrollment in enrollments:
+            db.session.delete(enrollment)
+        db.session.commit()
 
     # actually delete course
     course_to_delete = db.session.query(Course).get(course_id)
@@ -119,6 +125,10 @@ def delete_all_assignments():
             related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment.id).all()
             if related_submissions:
                 for submission in related_submissions:
+                    related_requests = db.session.query(RegradeRequest).filter_by(submission_id = submission.id)
+                    if related_requests:
+                        for req in related_requests :
+                            db.session.delete(req)
                     db.session.delete(submission)
                 db.session.commit()
             db.session.delete(assignment)

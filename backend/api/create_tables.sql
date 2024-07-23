@@ -52,6 +52,8 @@ CREATE TABLE assignments (
     published boolean DEFAULT FALSE,
     published_date timestamp,
     autograder_file bytea,
+    -- new container_id column
+    container_id varchar(),
     FOREIGN KEY (course_id) REFERENCES courses (id)
 );
 
