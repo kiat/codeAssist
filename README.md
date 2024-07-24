@@ -131,8 +131,8 @@ Hoppscotch is open source [Postman](https://www.linkedin.com/advice/1/why-should
 3. Make sure that the database is running (whether you're running the backend in docker container or not), otherwise Hoppscotch won't be able to send requests 
 4. When creating or updating endpoints, make sure to update the collections as well by [adding/updating that endpoint](https://docs.hoppscotch.io/documentation/getting-started/rest/organizing-requests#adding-requests-to-a-collection). 
 
-Note 1: Make sure that when you are running the collection that the environment is loaded for the specific request you are running.
-Note 2: You won't be able to make GET requests until you actually create (POST requests) that student/course/instructor/etc. 
+- Note 1: Make sure that when you are running the collection that the environment is loaded for the specific request you are running.
+- Note 2: You won't be able to make GET requests until you actually create (POST requests) that student/course/instructor/etc. 
 
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
