@@ -82,7 +82,7 @@ Note: for macOS make sure to turn off Airplay as it uses localport:5000 as well
 If you run backend in a docker container, then the backend inside the container needs to connect to the localhost databases. 
 To enable this you need to make the following change in your .env file. 
 ```
-   DB_CONNECTION_STRING="postgresql://{username}:{password}@host.docker.internal:5432/codeassist"
+   DB_CONNECTION_STRING="postgresql://root:root@host.docker.internal:5432/codeassist"
 ```
 
 
@@ -124,11 +124,15 @@ Steps
 6. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
 7. Begin sending requests.
 
-## Using Hoppscotch
-Hoppscotch is open source postman, it can test endpoints pretty well
+## Using [Hoppscotch](https://docs.hoppscotch.io/documentation/getting-started/introduction)
+Hoppscotch is open source [Postman](https://www.linkedin.com/advice/1/why-should-you-use-postman-api-testing-skills-software-testing-a6hbe), it can test endpoints pretty well
 1. Navigate to [Hoppscotch](https://hoppscotch.io/)
 2. Import the collections and environments located in the backend folder. They are named accordingly
-3. Make sure that when you are running the collection that the environment is loaded for the specific request you are running.
+3. Make sure that the database is running (whether you're running the backend in docker container or not), otherwise Hoppscotch won't be able to send requests 
+4. When creating or updating endpoints, make sure to update the collections as well by [adding/updating that endpoint](https://docs.hoppscotch.io/documentation/getting-started/rest/organizing-requests#adding-requests-to-a-collection). 
+
+Note 1: Make sure that when you are running the collection that the environment is loaded for the specific request you are running.
+Note 2: You won't be able to make GET requests until you actually create (POST requests) that student/course/instructor/etc. 
 
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
