@@ -16,12 +16,24 @@ def update_assignment():
     Requires from the frontend a JSON containing:
     @param assignment_id    the id of the assignment
     '''
-    assignment_id = request.json["assignment_id"]
+    new_data = request.json
+    assignment_id = new_data.get("assignment_id")
+    new_assignment_name = new_data.get("name")
+    course_id = new_data.get("course_id")
 
-    data = request.json
-    del data["assignment_id"]
+    existing_assignment = db.session.query(Assignment).filter(
+        Assignment.course_id == course_id,
+        Assignment.name == new_assignment_name,
+        Assignment.id != assignment_id
+    ).first()
 
-    assignment = db.session.query(Assignment).filter_by(id=assignment_id).update(data)
+    if existing_assignment:
+        return jsonify({"message": "An assignment with this name already exists"}), 400
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).update(new_data)
+    if not assignment:
+        return jsonify({"message": "Assignment not found"}), 404
+
     db.session.commit()
 
     return jsonify({"message": "Success"}), 200
