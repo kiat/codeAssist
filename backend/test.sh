@@ -28,35 +28,35 @@ function check_response {
 # Store IDs in variables without outputting them
 instructor_id=$(check_response "curl -s -X POST -H 'Content-Type: application/json' -d \
 '{\"name\": \"Instructor Name\", \"email\": \"instructor@email.com\", \"password\": \"password\", \"eid\": \"unique-instructor-id\"}' \
-localhost:5000/create_instructor" "Create Instructor" | tail -n 1)
+localhost:5001/create_instructor" "Create Instructor" | tail -n 1)
 
 student_id=$(check_response "curl -s -X POST -H 'Content-Type: application/json' -d \
 '{\"name\": \"Ricky Woodruff\", \"email\": \"ricky@student.com\", \"password\": \"password\", \"eid\": \"unique-student-id\"}' \
-localhost:5000/create_student" "Create Student" | tail -n 1)
+localhost:5001/create_student" "Create Student" | tail -n 1)
 
 # Perform login tests without outputting IDs
 check_response "curl -s -X POST -d '{\"email\":\"instructor@email.com\", \"password\":\"password\"}' \
-localhost:5000/instructor_login -H 'Content-Type: application/json'" "Instructor Login" | tail -n 1 > /dev/null
+localhost:5001/instructor_login -H 'Content-Type: application/json'" "Instructor Login" | tail -n 1 > /dev/null
 
 check_response "curl -s -X POST -d '{\"email\":\"ricky@student.com\", \"password\":\"password\"}' \
-localhost:5000/student_login -H 'Content-Type: application/json'" "Student Login" | tail -n 1 > /dev/null
+localhost:5001/student_login -H 'Content-Type: application/json'" "Student Login" | tail -n 1 > /dev/null
 
 # Create a course using the captured instructor ID without outputting the course ID
 course_id=$(check_response "curl -s -X POST -H 'Content-Type: application/json' -d \
 '{\"name\": \"Introduction to Curl Testing\", \"instructor_id\": \"$instructor_id\", \"semester\": \"Fall\", \"year\": 2024, \"entryCode\": \"1000\"}' \
-localhost:5000/create_course" "Create Course" | tail -n 1)
+localhost:5001/create_course" "Create Course" | tail -n 1)
 
 # Enroll in Course
-check_response "curl -s -X POST -d '{\"entryCode\":\"1000\", \"student_id\":\"$student_id\"}' localhost:5000/enroll_course -H 'Content-Type: application/json'" "Enroll in Course" | tail -n 1 > /dev/null
+check_response "curl -s -X POST -d '{\"entryCode\":\"1000\", \"student_id\":\"$student_id\"}' localhost:5001/enroll_course -H 'Content-Type: application/json'" "Enroll in Course" | tail -n 1 > /dev/null
 
 # Create Assignment
-assignment_id=$(check_response "curl -s -X POST -d '{\"name\":\"A1\", \"course_id\":\"$course_id\"}' localhost:5000/create_assignment -H 'Content-Type: application/json'" "Create Assignment" | tail -n 1)
+assignment_id=$(check_response "curl -s -X POST -d '{\"name\":\"A1\", \"course_id\":\"$course_id\"}' localhost:5001/create_assignment -H 'Content-Type: application/json'" "Create Assignment" | tail -n 1)
 
 # Update Assignment
-check_response "curl -s -X POST -d '{\"assignment_id\":\"$assignment_id\", \"name\":\"Updated Assignment A1\"}' localhost:5000/update_assignment -H 'Content-Type: application/json'" "Update Assignment" | tail -n 1 > /dev/null
+check_response "curl -s -X POST -d '{\"assignment_id\":\"$assignment_id\", \"name\":\"Updated Assignment A1\"}' localhost:5001/update_assignment -H 'Content-Type: application/json'" "Update Assignment" | tail -n 1 > /dev/null
 
 # Get Assignment (using a specific assignment_id from your example)
-check_response "curl -s localhost:5000/get_assignment?assignment_id=$assignment_id" "Get Assignment" | tail -n 1 > /dev/null
+check_response "curl -s localhost:5001/get_assignment?assignment_id=$assignment_id" "Get Assignment" | tail -n 1 > /dev/null
 
 
 # # Create Bulk Enrollments

@@ -83,7 +83,7 @@ Change the policy for the iptables FORWARD policy from DROP to ACCEPT.
    sudo iptables -P FORWARD ACCEPT
    ```
 
-Your backend should now be running on `http://localhost:5000` and your frontend on `http://localhost:3000`.
+Your backend should now be running on `http://localhost:5001` and your frontend on `http://localhost:3000`.
 
 ---
 
