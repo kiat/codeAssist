@@ -4,7 +4,7 @@
 
 ### Requirements:
 
-Note: for macOS make sure to turn off Airplay as it uses localport:5001 as well
+Note: for macOS make sure to turn off Airplay as it uses localport:5000 as well
 
 - `python` ([Install](https://www.python.org/downloads/))
 - `docker` ([Install](https://docs.docker.com/get-docker/))
@@ -108,7 +108,7 @@ To enable this you need to make the following change in your .env file.
 ## New Backend stack completely on docker
 Prerequisites:
 - Postgres is not currently running on your system (otherwise you will get errors launching the postgres container because the port will conflict). Either uninstall postgres completely from your system or just kill it
-- If you are on macOS, make sure to turn off Airplay because it also runs on localport:5001
+- If you are on macOS, make sure to turn off Airplay because it also runs on localport:5000
 
 Steps
 1. Install docker with the steps above
@@ -132,7 +132,7 @@ Hoppscotch is open source postman, it can test endpoints pretty well
 
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
-Backend is hosted at `localhost:5001`  
+Backend is hosted at `localhost:5000`  
 Server is hosted at `localhost:5432`
 
 ## Important Links (Development)

@@ -12,7 +12,7 @@ CORS(app)
 # def hello_world():
 #     '''
 #     This is the default response with no methods and extensions - '/'
-#     If you host the backend locally at localhost:5001 it should display "Hello World"
+#     If you host the backend locally at localhost:5000 it should display "Hello World"
 #     '''
 #     return 'Hello World'
 

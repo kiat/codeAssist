@@ -19,7 +19,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_instructor(cls):
         """Create an instructor and return the ID."""
-        url = "http://localhost:5001/create_instructor"
+        url = "http://localhost:5000/create_instructor"
         data = {
             "name": "Instructor Name",
             "email": "instructor@email.com",
@@ -32,7 +32,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_student(cls):
         """Create a student and return the ID."""
-        url = "http://localhost:5001/create_student"
+        url = "http://localhost:5000/create_student"
         data = {
             "name": "Ricky Woodruff",
             "email": "ricky@student.com",
@@ -45,7 +45,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_course(cls, instructor_id):
         """Create a course and return the ID."""
-        url = "http://localhost:5001/create_course"
+        url = "http://localhost:5000/create_course"
         data = {
             "name": "Introduction to Curl Testing",
             "instructor_id": instructor_id,
@@ -59,7 +59,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_assignment(cls, course_id, assignment_name):
         """Create an assignment and return the ID."""
-        url = f"http://localhost:5001/create_assignment"
+        url = f"http://localhost:5000/create_assignment"
         data = {"name": assignment_name, "course_id": course_id}
         response = requests.post(url, json=data)
         return response.json().get("id")
@@ -67,7 +67,7 @@ class APITestCase(unittest.TestCase):
     # Actual tests to be run:
     def test_upload_autograder_A1(self):
         """Upload autograder for Assignment A1."""
-        url = "http://localhost:5001/upload_assignment_autograder"
+        url = "http://localhost:5000/upload_assignment_autograder"
         with open(self.A1_zip_path, "rb") as f:
             files = {"file": f}
             data = {"assignment_id": self.assignment_id_A1}
@@ -76,7 +76,7 @@ class APITestCase(unittest.TestCase):
 
     def test_upload_submission_A1(self):
         """Upload a student's submission for Assignment A1."""
-        url = "http://localhost:5001/upload_submission"
+        url = "http://localhost:5000/upload_submission"
         with open(self.A1_py_path, "rb") as f:
             files = {"file": f}
             data = {
@@ -88,7 +88,7 @@ class APITestCase(unittest.TestCase):
 
     def test_upload_autograder_A2(self):
         """Upload autograder for Assignment A2."""
-        url = "http://localhost:5001/upload_assignment_autograder"
+        url = "http://localhost:5000/upload_assignment_autograder"
         with open(self.A2_zip_path, "rb") as f:
             files = {"file": f}
             data = {"assignment_id": self.assignment_id_A2}
@@ -97,7 +97,7 @@ class APITestCase(unittest.TestCase):
 
     def test_upload_submission_A2(self):
         """Upload a student's submission for Assignment A2."""
-        url = "http://localhost:5001/upload_submission"
+        url = "http://localhost:5000/upload_submission"
         with open(self.A2_py_path, "rb") as f:
             files = {"file": f}
             data = {

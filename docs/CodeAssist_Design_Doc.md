@@ -192,7 +192,7 @@ After exploring SQL and NoSQL options for our database, I recommended we use a S
     `docker-compose up frontend`
 ## Done!
 
-Your backend should now be running on `http://localhost:5001` and your frontend on `http://localhost:3000`.
+Your backend should now be running on `http://localhost:5000` and your frontend on `http://localhost:3000`.
 
 ----------
 # Future Work
