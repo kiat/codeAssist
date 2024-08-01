@@ -17,7 +17,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt --break-system-packages
 COPY . .
 
 # Expose the port the app runs on
-EXPOSE 5001
+EXPOSE 5000
 
 # Set environment variables
 ENV PYTHONPATH /usr/src/app
