@@ -16,7 +16,7 @@ import {
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getAssignment, updateAssignment } from "../../services/assignment";
+import { getAssignment, updateAssignment, deleteAssignment } from "../../services/assignment";
 import moment from "moment";
 
 export default () => {
@@ -46,6 +46,30 @@ export default () => {
     getAssignmentInfo();
   }, [getAssignmentInfo]);
 
+  // const handleDeleteAssignment = (assignmentId) => {
+  //   if (!assignmentId) {
+  //     console.error('Assignment ID is undefined');
+  //     message.error('Cannot delete assignment without an ID');
+  //     return Promise.reject(new Error('Assignment ID is undefined'));
+  //   }
+
+  //   return fetch(`${process.env.REACT_APP_API_URL}/delete_assignment?assignment_id=${assignmentId}`, {
+  //     method: "DELETE",
+  //     mode: 'cors',
+  //   })
+  //     .then(response => {
+  //       if (!response.ok) {
+  //         throw new Error(`Network response was not ok, status: ${response.status}`);
+  //       }
+  //       return response.json();
+  //     })
+  //     .catch(error => {
+  //       console.error('There has been a problem with the fetch operation:', error);
+  //       message.error('Failed to delete assignment');
+  //       return Promise.reject(error);
+  //     });
+  // };
+
   const handleDeleteAssignment = (assignmentId) => {
     if (!assignmentId) {
       console.error('Assignment ID is undefined');
@@ -53,21 +77,14 @@ export default () => {
       return Promise.reject(new Error('Assignment ID is undefined'));
     }
 
-    return fetch(`${process.env.REACT_APP_API_URL}/delete_assignment?assignment_id=${assignmentId}`, {
-      method: "DELETE",
-      mode: 'cors',
-    })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Network response was not ok, status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .catch(error => {
-        console.error('There has been a problem with the fetch operation:', error);
-        message.error('Failed to delete assignment');
-        return Promise.reject(error);
-      });
+    try {
+      const res = deleteAssignment({ assignment_id: assignmentId });
+      return res;
+    } catch(error) {
+      console.error('There has been a problem with the fetch operation:', error);
+      message.error('Failed to delete assignment');
+      return Promise.reject(error);
+    }
   };
 
   const handleDeleteSubmissions = (assignmentId) => {
@@ -277,7 +294,7 @@ export default () => {
               <Popconfirm
                 title="Are you sure you want to delete this assignment?"
                 onConfirm={() => {
-                  handleDeleteAssignment(assignmentId)
+                  handleDeleteSubmissions(assignmentId)
                     .then(() => {
                       message.success("Assignment deleted");
                       // Only navigate away if deletion was successful

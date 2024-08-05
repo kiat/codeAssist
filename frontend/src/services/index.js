@@ -28,8 +28,8 @@ const service = (url, params, method = "get", options) =>
   instance({
     method: method,
     url,
-    params: method === "get" ? params : "",
-    data: method === "get" ? "" : params,
+    params: (method === "get" || method === "delete") ? params : "",
+    data: (method === "get" || method == "delete") ? "" : params,
     ...options,
   });
 
