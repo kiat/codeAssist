@@ -52,6 +52,8 @@ CREATE TABLE assignments (
     published boolean DEFAULT FALSE,
     published_date timestamp,
     autograder_file bytea,
+    -- new container_id column
+    container_id varchar(),
     FOREIGN KEY (course_id) REFERENCES courses (id)
 );
 
@@ -96,6 +98,14 @@ CREATE TABLE test_case_results (
     passed boolean,
     FOREIGN KEY (submission_id) REFERENCES submissions (id),
     FOREIGN KEY (test_case_id) REFERENCES test_cases (id)
+);
+
+CREATE TABLE regrade_requests (
+    id uuid PRIMARY KEY,
+    submission_id uuid NOT NULL,
+    justification text NOT NULL,
+    reviewed boolean DEFAULT FALSE,
+    FOREIGN KEY (submission_id) REFERENCES submissions (id)
 );
 
 

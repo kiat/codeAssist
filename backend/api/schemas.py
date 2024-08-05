@@ -1,4 +1,4 @@
-from api.models import Student, Course, Enrollment, Assignment, Submission, Instructor, TestCaseResult, TestCase
+from api.models import Student, Course, Enrollment, Assignment, Submission, Instructor, TestCaseResult, TestCase, RegradeRequest
 from api import ma
 
 
@@ -41,5 +41,11 @@ class TestCaseSchema(ma.SQLAlchemyAutoSchema):
 class TestCaseResultSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = TestCaseResult
+        include_fk = True
+        include_relationships = True  # Add this if you want to include relationships in the serialized data
+
+class RegradeRequestSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = RegradeRequest
         include_fk = True
         include_relationships = True  # Add this if you want to include relationships in the serialized data

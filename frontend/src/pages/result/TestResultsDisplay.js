@@ -1,67 +1,46 @@
 import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { GlobalContext } from '../../App';
-import { Collapse, Button, Radio } from 'antd';
+import { Collapse, Button, Space } from 'antd';
 import 'antd/dist/antd.css';
-import { getLatestSubmission } from "../../services/assignmentResult";
+import StudentInfoPanel from "./StudentInfoPanel";
 
 const { Panel } = Collapse;
-const TestResultsDisplay = ({ viewMode, studentId }) => {
-//const TestResultsDisplay = ({ viewMode }) => {
-  const { userInfo, courseInfo, assignmentInfo} = useContext(GlobalContext);
-  const { assignmentId } = useParams();
+
+const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data }) => {
+  const { userInfo, courseInfo } = useContext(GlobalContext);
+  const { submissionId} = useParams();
+  //const { assignmentId } = useParams();
   const navigate = useNavigate();
-  const [testResults, setTestResults] = useState(null); 
+  const [testResults, setTestResults] = useState(null);
   const [studentCode, setStudentCode] = useState('');
   const [studentFileName, setStudentFileName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [StudScore, setStudScore] = useState(score);
 
   useEffect(() => {
-    //console.log('user_id: ', userInfo.id)
-    //console.log('isStudent?', userInfo.isStudent)
     if (!userInfo || !userInfo.id) {
       navigate('/');
       return;
     }
-    if (!assignmentId) {
-      console.error('No assignment_id provided');
+    if (!submissionId) {
+      console.error('No submission_id provided');
       return;
     }
-
-    const fetchResults = async () => {
-      setIsLoading(true);
-      try {
-        const send = userInfo.isStudent? userInfo.id: studentId;
-        // const response = await fetch(`${process.env.REACT_APP_API_URL}/get_latest_submission?` +
-        //   new URLSearchParams({
-        //     student_id: /*userInfo.id*/send,
-        //     assignment_id: assignmentId
-        //   }));
-
-        const response = getLatestSubmission({ student_id: send, assignment_id: assignmentId });
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        const data = await response.json();
-        //console.log('API Response:', data);
-        if (data.results) {
-          const parsedResults = JSON.parse(data.results);
-          setTestResults(parsedResults);
-          setStudentCode(data.student_code_file);  // Update this line if the data is not base64 encoded
-          setStudentFileName(data.file_name);
-        } else {
-          throw new Error('Results data is not available');
-        }
-      } catch (error) {
-        setError(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchResults();
-  }, [assignmentId, navigate, userInfo, courseInfo]);
+    setIsLoading(true);
+    if (data){
+      setStudScore(data.score);
+      const parsedResults = JSON.parse(data.results);
+      setTestResults(parsedResults);
+      setStudentCode(data.student_code_file);
+      setStudentFileName(data.file_name);
+      console.log("this submission is", data.active)
+    } else {
+      console.error("not available");
+    }
+    setIsLoading(false)
+  },[submissionId, navigate, userInfo, courseInfo]);
 
   const downloadFile = useCallback(() => {
     const element = document.createElement('a');
@@ -121,8 +100,19 @@ const TestResultsDisplay = ({ viewMode, studentId }) => {
   );
 
   return (
-    <div>
-      {viewMode === "Results" ? displayTests() : displayCode()}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: '60%' }}>
+        {viewMode === "Results" ? displayTests() : displayCode()}
+      </div>
+      <div style={{ marginLeft: '20px', flex: '0 1 auto' }}>
+        <StudentInfoPanel
+          assignmentName={assignmentName}
+          studentName={studentName}
+          score={StudScore}
+          totalPoints={totalPoints}
+          active={data.active}
+        />
+      </div>
     </div>
   );
 };

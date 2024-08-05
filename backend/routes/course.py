@@ -2,7 +2,7 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Course, Enrollment, Student
+from api.models import Assignment, Course, Enrollment, Student, Submission, RegradeRequest, Enrollment
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, StudentSchema
 
 course = Blueprint('course', __name__)
@@ -88,26 +88,58 @@ def update_course():
 
     return jsonify({"message": "Success"}), 200
 
-@course.route('/delete_course', methods=["DELETE", "OPTIONS"])
+@course.route('/delete_course', methods=["DELETE"])
 @cross_origin()
 def delete_course():
-    '''
-    /delete_course deletes a course from the database
-    Requires from the frontend a JSON containing:
-    @param course_id        the id of the course
-    '''
-    print(request)
-    if request.method == "OPTIONS":
-        return "", 200
-    if request.method == "DELETE":
-        course_id = request.args.get("course_id")
-        course_to_delete = db.session.get(Course, course_id)
-        try:
-            db.session.delete(course_to_delete)
-            db.session.commit()
-        except:
-            return "Error removing course"
-        
+    course_id = request.args.get("course_id")
+    # Check if there are any assignments for this course
+    related_assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
+    if related_assignments:
+        print("410")
+        return jsonify("Assignments must be deleted"), 410
+    
+    enrollments = db.session.query(Enrollment).filter_by(course_id=course_id).all()
+    if enrollments:
+        for enrollment in enrollments:
+            db.session.delete(enrollment)
+        db.session.commit()
+
+    # actually delete course
+    course_to_delete = db.session.query(Course).get(course_id)
+    if course_to_delete:
+        db.session.delete(course_to_delete)
+        db.session.commit()
+        return jsonify("Course deleted successfully"), 200
+    else:
+        return jsonify("Course not found"), 404
+
+@course.route('/delete_all_assignments', methods=["DELETE"])
+@cross_origin()
+def delete_all_assignments():
+    course_id = request.args.get("course_id")
+
+    # Check if there are any assignments for this course
+    related_assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
+    if related_assignments:
+        for assignment in related_assignments:
+            related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment.id).all()
+            if related_submissions:
+                for submission in related_submissions:
+                    related_requests = db.session.query(RegradeRequest).filter_by(submission_id = submission.id)
+                    if related_requests:
+                        for req in related_requests :
+                            db.session.delete(req)
+                    db.session.delete(submission)
+                db.session.commit()
+            db.session.delete(assignment)
+        db.session.commit()
+    
+    related_assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
+    if not related_assignments:
+        return jsonify("Assignments deleted successfully"), 200
+    else:
+        return jsonify("Assignments not deleted"), 404
+
 @course.route('/create_enrollment', methods=["POST", "GET"])
 @cross_origin()
 def create_enrollment():

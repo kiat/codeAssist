@@ -76,27 +76,16 @@ export default function Assignments() {
 
         const updatedAssignments = await Promise.all(assignmentsData.map(async (assignment) => {
           try {
-            // const submissionResponse = await fetch(
-            //   `${process.env.REACT_APP_API_URL}/get_latest_submission?` +
-            //   new URLSearchParams({
-            //     student_id: userInfo.id,
-            //     assignment_id: assignment.id,
-            //   })
-            // );
-
-            // TODO: check if this works properly, no tests for this at the moment
-            const submissionResponse = await getLatestSubmission({ student_id: userInfo.id, assignment_id: assignment.id});
-
-            const submissionData = await submissionResponse.json();
-
-            // Use the submission data to determine if the assignment was submitted and the score
-            const submitted = submissionData.completed;
-            const score = submitted ? submissionData.score : null;
-
+            const activeSubmissions = await fetch(`${process.env.REACT_APP_API_URL}/get_active_submission?` + new URLSearchParams({student_id: userInfo.id, assignment_id: assignment.id}))
+            const activeData = await activeSubmissions.json();
+            const submitted = activeData.completed;
+            const score = submitted ? activeData.score : null;
+            const submissionId = activeData.id;
             return {
               ...assignment,
               submitted,
               score,
+              submissionId,
             };
           } catch (error) {
             console.error("Error fetching submission data:", error);
@@ -104,6 +93,7 @@ export default function Assignments() {
               ...assignment,
               submitted: false,
               score: null,
+              submissionId: null,
             };
           }
         }));
@@ -127,8 +117,9 @@ export default function Assignments() {
 
     if (isSubmitted) {
       //navigate(`/assignmentresult/${assignment.id}`);
-      //using new route def
-      navigate(`/assignmentresult/${assignment.id}/${userInfo.id}`);
+      //navigate(`/assignmentresult/${assignment.id}/${userInfo.id}`);
+      //latest route def
+      navigate(`/assignmentresult/${assignment.submissionId}`);
     } else if (!dueDateHasPassed) {
       setModalOpen(true);
       setAssignmentTitle(assignment.name);

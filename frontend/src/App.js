@@ -21,6 +21,7 @@ import GradeSubmissions from "./pages/gradeSubmissions";
 import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
+import RegradeRequests from './components/RegradeRequests';
 
 const { Content } = Layout;
 
@@ -103,7 +104,9 @@ function App() {
               <Route path='/dashboard' element={<Dashboard />} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
-                path='/assignmentResult/:assignmentId/:studentId' 
+                ///reconfiguring to use submissionid for navigation
+                path='/assignmentResult/:submissionId'
+                //path='/assignmentResult/:assignmentId/:studentId' 
                 //old route config
                 //path='/assignmentResult/:assignmentId'
                 element={<AssignmentResult />}
@@ -157,6 +160,7 @@ function App() {
                 path = '/editAccount/:userId'
                 element={<EditAccount />} 
               />
+              <Route path="/regradeRequests" element={<RegradeRequests />} />
             </Routes>
           </Content>
         </Layout>

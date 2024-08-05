@@ -53,6 +53,7 @@ class Assignment(db.Model):
     published = db.Column(db.Boolean, default=False)
     published_date = db.Column(TIMESTAMP, nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
+    container_id = db.Column(db.String)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
@@ -95,3 +96,12 @@ class TestCaseResult(db.Model):
 
     submission = db.relationship("Submission", backref=db.backref("test_case_results", lazy="dynamic"))
     test_case = db.relationship("TestCase", backref="results")
+
+class RegradeRequest(db.Model):
+    __tablename__ = "regrade_requests"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    submission_id = db.Column(UUID(as_uuid=False), db.ForeignKey("submissions.id"), nullable=False)
+    justification = db.Column(db.Text, nullable=False)
+    reviewed = db.Column(db.Boolean, default=False)
+
+    submission = db.relationship("Submission", backref=db.backref("regrade_requests", lazy="dynamic"))

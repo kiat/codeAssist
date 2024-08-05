@@ -38,23 +38,24 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
       // });
       const response = await uploadSubmission({ formData }); // TODO: Test this, no current test exists for this endpoint
 
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
+      // if (!response.ok) {
+      //   throw new Error("Network response was not ok");
+      // }
 
       const responseData = await response.json();
-
-      // Proceed to results page after successful upload
-      navigateToResults();
+      navigateToResults(responseData.submissionID);
     } catch (error) {
       console.error("Error uploading file:", error);
       message.error("Failed to upload file. Please try again.");
     }
   };
 
-  const navigateToResults = () => {
+  const navigateToResults = (submissionID) => {
+    //use the returned submission id to navigate to its reults
+    navigate(`/assignmentResult/${submissionID}`);
+
     // using updated route def
-    navigate(`/assignmentResult/${assignmentID}/${userInfo.id}`);
+    //navigate(`/assignmentResult/${assignmentID}/${userInfo.id}`);
   };
 
   return (

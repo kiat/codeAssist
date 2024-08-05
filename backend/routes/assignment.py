@@ -2,7 +2,7 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission
+from api.models import Assignment, Submission, RegradeRequest
 from api.schemas import AssignmentSchema, SubmissionSchema
 
 assignment = Blueprint('assignment', __name__)
@@ -41,7 +41,6 @@ def get_assignment():
 
     return jsonify(assignment)
 
-
 @assignment.route('/create_assignment', methods=["POST", "GET"])
 @cross_origin()
 def create_assignment():
@@ -52,6 +51,8 @@ def create_assignment():
     assignment_data = request.json
     assignment_id = str(uuid.uuid4())
     assignment_data["id"] = assignment_id
+    # not creating a container yet
+    assignment_data["container_id"] = None
     valid_assignment_data = {k: v for k,v in assignment_data.items() if v is not None}
 
     db.session.add(Assignment(**valid_assignment_data))
@@ -71,6 +72,10 @@ def delete_assignment():
     related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment_id).all()
     if related_submissions:
         for submission in related_submissions:
+            related_requests = db.session.query(RegradeRequest).filter_by(submission_id = submission.id)
+            if related_requests:
+                for req in related_requests :
+                    db.session.delete(req)
             db.session.delete(submission)
         db.session.commit()
 
@@ -83,4 +88,21 @@ def delete_assignment():
     else:
         return jsonify("Assignment not found"), 404
 
+@assignment.route('/delete_submissions', methods=["DELETE"])
+@cross_origin()
+def delete_submissions():
+    assignment_id = request.args.get("assignment_id")
 
+    # Check if there are any submissions for this assignment
+    related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment_id).all()
+    if related_submissions:
+        for submission in related_submissions:
+            db.session.delete(submission)
+        db.session.commit()
+
+    # actually delete assignment
+    related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment_id).all()
+    if not related_submissions:
+        return jsonify("Submissions deleted successfully"), 200
+    else:
+        return jsonify("Submissions not deleted"), 404

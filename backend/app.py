@@ -4,6 +4,7 @@ from routes.assignment import assignment
 from routes.course import course
 from routes.submission import submission
 from routes.user import user
+from routes.regrade_routes import regrade_requests
 
 CORS(app)
 # @app.route('/', methods=["GET", "POST"])
@@ -19,6 +20,7 @@ app.register_blueprint(assignment)
 app.register_blueprint(course)
 app.register_blueprint(submission)
 app.register_blueprint(user)
+app.register_blueprint(regrade_requests)
 
 if __name__ == "__main__":
     app.run()

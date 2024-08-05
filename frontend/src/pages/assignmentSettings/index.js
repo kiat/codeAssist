@@ -1,5 +1,19 @@
 import { DeleteOutlined } from "@ant-design/icons";
-import { Button, Card, Checkbox, Col, DatePicker, Form, Input, message, PageHeader, Radio, Row, Space, } from "antd";
+import { 
+  Button, 
+  Card, 
+  Checkbox, 
+  Col, 
+  DatePicker, 
+  Form, 
+  Input, 
+  message, 
+  PageHeader, 
+  Radio, 
+  Row, 
+  Space,
+  Popconfirm
+} from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getAssignment, updateAssignment, deleteAssignment } from "../../services/assignment";
@@ -72,7 +86,7 @@ export default () => {
       return Promise.reject(error);
     }
   };
-
+  
   const currentDate = () => {
     const current = new Date();
     const formatDate = current.toISOString();
@@ -248,21 +262,46 @@ export default () => {
               <Button type='primary' htmlType='submit'>
                 Save
               </Button>
-              <Button
-                danger type='primary'
-                icon={<DeleteOutlined />}
-                onClick={() => {
+              <Popconfirm
+                title="Are you sure you want to delete this assignment?"
+                onConfirm={() => {
                   handleDeleteAssignment(assignmentId)
                     .then(() => {
+                      message.success("Assignment deleted");
                       // Only navigate away if deletion was successful
                       navigateMainPage();
                     })
                     .catch((error) => {
                       message.error('Failed to delete assignment');
                     });
-                }}>
-                Delete assignment
-              </Button>
+                }}
+                okText="Yes"
+                cancelText="No">
+                <Button 
+                  danger type='primary' 
+                  icon={<DeleteOutlined />} >
+                  Delete Assignment
+                </Button>
+              </Popconfirm>
+              <Popconfirm
+                title="Are you sure you want to delete all submissions?"
+                onConfirm={() => {
+                  handleDeleteSubmissions(assignmentId)
+                    .then(() => {
+                      message.success("All submissions deleted");
+                    })
+                    .catch((error) => {
+                      message.error('Failed to delete assignment');
+                    });
+                }}
+                okText="Yes"
+                cancelText="No">
+                <Button 
+                  danger type='primary' 
+                  icon={<DeleteOutlined />} >
+                  Delete All Submissions
+                </Button>
+              </Popconfirm>
             </Space>
           </Form.Item>
         </Card>
