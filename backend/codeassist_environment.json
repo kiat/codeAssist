@@ -5,7 +5,7 @@
   "variables": [
     {
       "key": "base_url",
-      "value": "http://localhost:5000",
+      "value": "http://localhost:5001",
       "secret": false
     }
   ]

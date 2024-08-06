@@ -30,7 +30,7 @@ services:
             FLASK_DEBUG: 1
             PYTHONUNBUFFERED: 1
         ports:
-            - "5000:5000"
+            - "5001:5001"
         extra_hosts:
               - "host.docker.internal:host-gateway"
         volumes:
