@@ -3,27 +3,20 @@ from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
 
-class Student(db.Model):
-    __tablename__ = "students"
+class User(db.Model):
+    __tablename__ = "user"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     password = db.Column(db.String, nullable=False)
     name = db.Column(db.String, nullable=False)
     email_address = db.Column(db.String, nullable=False)
     sis_user_id = db.Column(db.String, nullable=False, unique=True)
-
-class Instructor(db.Model):
-    __tablename__ = "instructors"
-    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
-    password = db.Column(db.String, nullable=False)
-    name = db.Column(db.String, nullable=False)
-    email_address = db.Column(db.String, nullable=False)
-    sis_user_id = db.Column(db.String, nullable=False)
+    role = db.Column(db.String, nullable = False)
 
 class Course(db.Model):
     __tablename__ = "courses"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     name = db.Column(db.String, nullable=False)
-    instructor_id = db.Column(UUID(as_uuid=False), db.ForeignKey("instructors.id"), nullable=False)
+    instructor_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), nullable=False)
     sis_course_id = db.Column(db.String, nullable=True)
     semester = db.Column(db.String, nullable=False)
     year = db.Column(db.String, nullable=False)
@@ -33,7 +26,7 @@ class Course(db.Model):
 
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
-    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), primary_key=True, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key=True, nullable=False)
 
 class Assignment(db.Model):
@@ -61,7 +54,7 @@ class Submission(db.Model):
     file_name = db.Column(db.String, nullable=False)
     submission_number = db.Column(db.Integer, nullable=False)
     submitted_at = db.Column(TIMESTAMP, nullable=True)
-    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), nullable=False, index=True)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), nullable=False, index=True)
     assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False, index=True)
     student_code_file = db.Column(LargeBinary, nullable=False)
     results = db.Column(LargeBinary, nullable=True)
@@ -74,7 +67,7 @@ class Submission(db.Model):
 class SubmissionSubmitter(db.Model):
     __tablename__ = "submission_submitters"
     submission_id = db.Column(UUID(as_uuid=False), db.ForeignKey("submissions.id"), primary_key=True, nullable=False)
-    submitter_id = db.Column(UUID(as_uuid=False), db.ForeignKey("students.id"), primary_key=True, nullable=False)
+    submitter_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), primary_key=True, nullable=False)
     
 class TestCase(db.Model):
     __tablename__ = "test_cases"

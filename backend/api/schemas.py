@@ -1,15 +1,10 @@
-from api.models import Student, Course, Enrollment, Assignment, Submission, Instructor, TestCaseResult, TestCase, RegradeRequest
+from api.models import Course, Enrollment, Assignment, Submission, User, TestCaseResult, TestCase, RegradeRequest
 from api import ma
 
 
-class StudentSchema(ma.SQLAlchemyAutoSchema):
+class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
-        model = Student
-        include_fk = True
-
-class InstructorSchema(ma.SQLAlchemyAutoSchema):
-    class Meta:
-        model = Instructor
+        model = User
         include_fk = True
     
 class CourseSchema(ma.SQLAlchemyAutoSchema):

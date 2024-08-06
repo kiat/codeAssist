@@ -1,15 +1,12 @@
-/* Create Students table */
-CREATE TABLE students (
+/* Create Users table */
+
+CREATE TABLE user (
     id uuid PRIMARY KEY,
     password varchar(60) NOT NULL,
     name varchar(30) NOT NULL,
     email_address varchar(30) NOT NULL UNIQUE,
-    sis_user_id varchar(50) NOT NULL UNIQUE
-);
-
-/* Create Instructors table (Inherits Students table) */
-CREATE TABLE instructors (
-    id uuid PRIMARY KEY INHERITS (students)
+    sis_user_id varchar(50) NOT NULL UNIQUE,
+    role varchar(30) NOT NULL
 );
 
 /* Create Courses table */
@@ -23,7 +20,7 @@ CREATE TABLE courses (
     entryCode varchar(50),
     allowEntryCode boolean DEFAULT FALSE,
     description varchar(100),
-    FOREIGN KEY (instructor_id) REFERENCES instructors (id)
+    FOREIGN KEY (instructor_id) REFERENCES user (id)
 );
 
 /* Create Enrollments table */
@@ -31,7 +28,7 @@ CREATE TABLE enrollments (
     student_id uuid NOT NULL,
     course_id uuid NOT NULL,
     PRIMARY KEY (student_id, course_id),
-    FOREIGN KEY (student_id) REFERENCES students (id),
+    FOREIGN KEY (student_id) REFERENCES user (id),
     FOREIGN KEY (course_id) REFERENCES courses (id)
 );
 
@@ -68,7 +65,7 @@ CREATE TABLE submissions (
     execution_time float,
     submitted_at timestamp,
     completed boolean DEFAULT FALSE,
-    FOREIGN KEY (student_id) REFERENCES students (id),
+    FOREIGN KEY (student_id) REFERENCES user (id),
     FOREIGN KEY (assignment_id) REFERENCES assignments (id)
 );
 
@@ -77,7 +74,7 @@ CREATE TABLE submission_submitters (
     submitter_id uuid NOT NULL,
     PRIMARY KEY (submission_id, submitter_id),
     FOREIGN KEY (submission_id) REFERENCES submissions (id),
-    FOREIGN KEY (submitter_id) REFERENCES students (id)
+    FOREIGN KEY (submitter_id) REFERENCES user (id)
 );
 
 /* Create TestCases table */
