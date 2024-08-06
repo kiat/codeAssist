@@ -17,7 +17,10 @@ def update_assignment():
     @param assignment_id    the id of the assignment
     '''
     new_data = request.json
-    assignment_id = new_data.get("assignment_id")
+    assignment_id = request.json["assignment_id"]
+
+    del new_data["assignment_id"]
+
     new_assignment_name = new_data.get("name")
     course_id = new_data.get("course_id")
 
@@ -31,6 +34,7 @@ def update_assignment():
         return jsonify({"message": "An assignment with this name already exists"}), 400
 
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).update(new_data)
+
     if not assignment:
         return jsonify({"message": "Assignment not found"}), 404
 
