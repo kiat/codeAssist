@@ -15,7 +15,6 @@ export default function InstructorAssignments() {
   const [form] = Form.useForm();
   const { courseId } = useParams();
   const [nameValidationStatus, setNameValidationStatus] = useState("");
-  const [nameValidationHelp, setNameValidationHelp] = useState("");
 
   const updateCurrentStep = useCallback(current => {
     setCurrentStep(current);
@@ -78,7 +77,6 @@ export default function InstructorAssignments() {
             toggleIsCreate={toggleIsCreate}
             form={form}
             nameValidationStatus={nameValidationStatus}
-            nameValidationHelp={nameValidationHelp}
           />
         </div>
       </div>
