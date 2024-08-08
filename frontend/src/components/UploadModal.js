@@ -1,6 +1,9 @@
 import { Button, Form, message, Modal, Upload } from "antd";
 import { InboxOutlined } from '@ant-design/icons';
-import { useState } from "react";
+import { useState, useContext, useEffect } from "react";
+import { GlobalContext } from "../App";
+import { useNavigate } from "react-router-dom";
+import LoadingOverlay from './LoadingOverlay'; // Import the LoadingOverlay component
 // changes made for resubmit functionality
 /**
  * file upload windows modal
@@ -14,8 +17,51 @@ export default function UploadModal({
   afterUpdate,
   url,
   data,
+  assignmentID,
+  assignmentTitle,
+  extra
 }) {
   const [file, setFile] = useState(null);
+  const { userInfo } = useContext(GlobalContext);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false); // State for loading overlay
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [activeSubmission, setActiveSubmission] = useState();
+  const [hasRequest, setHasRequest] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      getActive();
+    }
+  }, [open, userInfo.id, assignmentID]);
+
+  const getActive = async () => {
+    try {
+      const submissionResponse = await fetch(`${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${userInfo.id}&assignment_id=${assignmentID}`);
+      const submissionData = await submissionResponse.json();
+      console.log(submissionData)
+      console.log(submissionData.id)
+      setActiveSubmission(submissionData.id)
+      const req = await fetch(
+        `${process.env.REACT_APP_API_URL}/check_regrade_request`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            submission_id: submissionData.id,
+          }),
+        }
+      );
+      const reqData = await req.json();
+      console.log("this is the response data:", reqData.has_request)
+      setHasRequest(reqData.has_request)
+    } catch(error){
+      message.error("Failed")
+    }
+  }
+
 
   const handleFileChange = (info) => {
     if (info.file.status === 'done') {
@@ -25,8 +71,98 @@ export default function UploadModal({
       message.error(`${info.file.name} file upload failed.`);
     }
   };
+
+
+  const handleSubmit = async () => {
+    if (!file) {
+      message.error("No file uploaded");
+      return;
+    }
+
+    if (hasRequest){
+      setConfirmModalVisible(true);
+    }
+    else {
+      finallySubmit();
+    }
+
+    console.log("these are the assignmnet details from the upload modal", assignmentID, assignmentTitle);
+  };
+
+
+  const navigateToResults = (submissionID) => {
+    onCancel()
+    //use the returned submission id to navigate to its reults
+    navigate(`/assignmentResult/${submissionID}`);
+    extra()
+  };
+
+  const handleConfirm = async () => {
+    if (activeSubmission) {
+      try {
+        console.log("deleting regarde request ", activeSubmission)
+        const req = await fetch(
+          `${process.env.REACT_APP_API_URL}/delete_regrade_request`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              submission_id: activeSubmission,
+            }),
+          }
+        );
+        console.log(req);
+        message.success("Deleted successfully")
+        finallySubmit();
+      } catch (error) {
+        message.error("Failed to delete regrade request");
+      }
+    }
+    setConfirmModalVisible(false);
+  };
+
+  const finallySubmit = async () => {
+    try {
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('assignment', assignmentTitle);
+      formData.append('student_id', userInfo.id);
+      formData.append('assignment_id', assignmentID);
+      
+      setLoading(true); // Show loading overlay
+      const response = await fetch(process.env.REACT_APP_API_URL + "/upload_submission", {
+        method: "POST",
+        body: formData,
+      });
+
+
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+
+
+      const responseData = await response.json();
+      console.log(responseData);
+      // Proceed to results page after successful upload
+      console.log(responseData);
+      navigateToResults(responseData.submissionID);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      message.error("Failed to upload file. Please try again.");
+    }
+    finally {
+      setLoading(false); // Hide loading overlay
+    }
+  }
+
+
   return (
     //working on adding resubmit feature
+    <>
+    <LoadingOverlay loading={loading} /> 
     <Modal title="Submit Assignment" open={open} onCancel={onCancel} footer={null}>
       <Form layout="vertical">
         <Form.Item name="upload">
@@ -47,29 +183,20 @@ export default function UploadModal({
           </Upload.Dragger>
         </Form.Item>
         <Form.Item>
-          {/* <Button style={{ width: "100%" }} type="primary" onClick={handleSubmit}>
+          <Button style={{ width: "100%" }} type="primary" onClick={handleSubmit}>
             Submit
-          </Button> */}
+          </Button>
         </Form.Item>
       </Form>
+      <Modal
+        title="Confirm Change Default Submission"
+        open={confirmModalVisible}
+        onOk={handleConfirm}
+        onCancel={() => setConfirmModalVisible(false)}
+      >
+        <p>Changing the default submission will delete the existing regrade request for the current default submission. Do you want to proceed?</p>
+      </Modal>
     </Modal>
-    // <Modal
-    //   title={title}
-    //   open={open}
-    //   onCancel={onCancel}
-    //   footer={null}
-    //   destroyOnClose={true}
-    // >
-    //   {/* <div style={{ textAlign: "center" }}> */}
-    //   <Upload
-    //     name='file'
-    //     maxCount={1}
-    //     customRequest={({ file, onError, onSuccess }) => {
-    //       afterUpdate(file, onError, onSuccess);
-        
-    //     }}>
-    //     <Button>Click to Uplaod</Button>
-    //   </Upload>
-    // </Modal>
+    </>
   );
 }
