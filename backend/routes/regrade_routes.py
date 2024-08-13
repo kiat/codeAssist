@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, Submission, User, RegradeRequest
-from api.schemas import SubmissionSchema, UserScheme
+from api.schemas import SubmissionSchema, UserSchema
 # import asyncio
 # from openai import AsyncOpenAI
 

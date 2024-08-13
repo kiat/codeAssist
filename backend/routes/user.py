@@ -111,3 +111,12 @@ def get_user_by_id():
     instructor = UserSchema().dump(instructor, many=True)[0]
 
     return jsonify(instructor)
+
+@user.route('/delete_user', methods=["DELETE"])
+@cross_origin()
+def delete_user():
+    user_id = request.args.get("id")
+    User.query.filter_by(id=user_id).delete()
+    # user = UserSchema().dump(user)
+    db.session.commit()
+    return "Success", 200

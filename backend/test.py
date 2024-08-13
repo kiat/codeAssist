@@ -1,6 +1,8 @@
 import unittest
 import requests
 
+env_file = "http://localhost:5000"
+
 
 class APITestCase(unittest.TestCase):
     @classmethod
@@ -19,12 +21,13 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_instructor(cls):
         """Create an instructor and return the ID."""
-        url = "http://localhost:5000/create_instructor"
+        url = "http://localhost:5000/create_user"
         data = {
             "name": "Instructor Name",
             "email": "instructor@email.com",
             "password": "password",
             "eid": "unique-instructor-id",
+            "role": "instructor"
         }
         response = requests.post(url, json=data)
         return response.json().get("id")
@@ -32,12 +35,13 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_student(cls):
         """Create a student and return the ID."""
-        url = "http://localhost:5000/create_student"
+        url = "http://localhost:5000/create_user"
         data = {
             "name": "Ricky Woodruff",
             "email": "ricky@student.com",
             "password": "password",
             "eid": "unique-student-id",
+            "role": "student"
         }
         response = requests.post(url, json=data)
         return response.json().get("id")
@@ -106,6 +110,39 @@ class APITestCase(unittest.TestCase):
             }
             response = requests.post(url, files=files, data=data)
             self.assertEqual(response.status_code, 200)
+
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up test data in order after running the test suite"""
+        cls.delete_assignment(cls.assignment_id_A1)
+        cls.A1_zip_path = ""
+        cls.A1_py_path = ""
+        cls.delete_assignment(cls.assignment_id_A2)
+        cls.A2_zip_path = ""
+        cls.A2_py_path = ""
+        cls.delete_student()
+        cls.delete_course()
+        cls.delete_instructor()
+ 
+    @classmethod
+    def delete_instructor(cls):
+        url = f"{env_file}/delete_user?id={cls.instructor_id}"
+        response = requests.delete(url)
+
+    @classmethod
+    def delete_student(cls):
+        url = f"{env_file}/delete_user?id={cls.student_id}"
+        response = requests.delete(url)
+
+    @classmethod
+    def delete_course(cls):
+        url = f"{env_file}/delete_course?course_id={cls.course_id}"
+        response = requests.delete(url)
+
+    @classmethod
+    def delete_assignment(cls, assignment_id):
+        url = f"{env_file}/delete_assignment?assignment_id={assignment_id}"
+        response = requests.delete(url)
 
 
 if __name__ == "__main__":

@@ -28,6 +28,7 @@ class Enrollment(db.Model):
     __tablename__ = "enrollments"
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), primary_key=True, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key=True, nullable=False)
+    role = db.Column(db.String, nullable = False)
 
 class Assignment(db.Model):
     __tablename__ = "assignments"

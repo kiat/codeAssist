@@ -27,6 +27,7 @@ CREATE TABLE courses (
 CREATE TABLE enrollments (
     student_id uuid NOT NULL,
     course_id uuid NOT NULL,
+    role varchar(30) NOT NULL,
     PRIMARY KEY (student_id, course_id),
     FOREIGN KEY (student_id) REFERENCES user (id),
     FOREIGN KEY (course_id) REFERENCES courses (id)
