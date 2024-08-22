@@ -24,7 +24,7 @@ export default ({ open, toggleAddCSVModalOpen, finishCSVForm }) => {
           {/* <Upload.Dragger
             name="file"
             multiple={false}
-            action="http://localhost:5000/upload_submission"
+            action="http://localhost:5001/upload_submission"
             onChange={handleFileChange}
             beforeUpload={handleBeforeUpload}
             onDrop={e => console.log('Dropped files', e.dataTransfer.files)}
