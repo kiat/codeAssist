@@ -86,7 +86,7 @@ export default function Dashboard() {
   const handleAddCourse = useCallback(values => {
     const addCourseFunction = userInfo?.isStudent ? enrollCourse : createCourse;
     const params = userInfo?.isStudent
-      ? { student_id: userInfo.id, entryCode: values.entryCode }
+      ? { user_id: userInfo.id, entryCode: values.entryCode }
       : { name: values.courseName, instructor_id: userInfo.id, semester: values.semester, year: values.year, entryCode: values.entryCode };
     addCourseFunction(params).then(() => {
       toggleModal();

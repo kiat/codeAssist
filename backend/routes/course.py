@@ -2,8 +2,8 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Course, Enrollment, Student, Submission, RegradeRequest, Enrollment
-from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, StudentSchema
+from api.models import Assignment, Course, Enrollment, User, Submission, RegradeRequest, Enrollment
+from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 
 course = Blueprint('course', __name__)
 
@@ -35,7 +35,14 @@ def create_course():
         "entryCode": entryCode
     }
 
+    enrollment_data = {
+        "student_id": instructor_id,
+        "course_id": course_id,
+        "role": "instructor",
+    }
+
     db.session.add(Course(**course_data))
+    db.session.add(Enrollment(**enrollment_data))
     db.session.commit()
 
     newCourse = db.session.query(Course).filter_by(id=course_id)
@@ -60,6 +67,7 @@ def enroll_course():
     enrollment_data = {
         "student_id": student_id,
         "course_id": enrolled_list[0],
+        "role": "student"
     }
     db.session.add(Enrollment(**enrollment_data))
     db.session.commit()
@@ -152,10 +160,12 @@ def create_enrollment():
     '''
     student_id = request.json["student_id"]
     course_id = request.json["course_id"]
+    role = request.json["role"]
 
     enrollment_data = {
         "student_id": student_id,
         "course_id": course_id,
+        "role": role,
     }
 
     db.session.add(Enrollment(**enrollment_data))
@@ -165,6 +175,26 @@ def create_enrollment():
     newEnrollment = EnrollmentSchema().dump(newEnrollment, many=True)[0]
 
     return jsonify(newEnrollment)
+
+@course.route('/update_role', methods = ["POST"])
+@cross_origin()
+def update_role():
+    data = request.get_json()
+    student_id = data.get('student_id')
+    course_id = data.get('course_id')
+    new_role = data.get('new_role')
+    
+    if not student_id or not course_id or not new_role:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    # Update the role in the database
+    enrollment = db.session.query(Enrollment).filter_by(student_id=student_id, course_id=course_id).first()
+    if enrollment:
+        enrollment.role = new_role
+        db.session.commit()
+        return jsonify({"message": "Role updated successfully"}), 200
+    else:
+        return jsonify({"error": "Enrollment not found"}), 404
 
 @course.route('/create_enrollment_bulk', methods=["POST", "GET"])
 @cross_origin()
@@ -222,8 +252,8 @@ def get_course_enrollment():
 
     list_of_students = [x["student_id"] for x in students]
 
-    students = db.session.query(Student.name, Student.email_address, Student.id).filter(Student.id.in_(list_of_students))
-    students = StudentSchema().dump(students, many=True)
+    students = db.session.query(User.name, User.email_address, User.id, User.role).filter(User.id.in_(list_of_students))
+    students = UserSchema().dump(students, many=True)
 
     return jsonify(students)
 
@@ -251,11 +281,14 @@ def get_instructor_courses():
     @param instructor_id    the id of an instructor
     '''
     instructor_id = request.args.get("instructor_id")
+    
+    course = db.session.query(Enrollment.course_id).filter_by(student_id=instructor_id)
+    course = EnrollmentSchema().dump(course, many=True)
 
-    courses = db.session.query(Course).filter_by(instructor_id=instructor_id)
+    list_of_courses = [x["course_id"] for x in course]
+
+    courses = db.session.query(Course).filter(Course.id.in_(list_of_courses))
     courses = CourseSchema().dump(courses, many=True)
-   
-    return jsonify(courses)
 
 @course.route('/get_course_info', methods=["GET"])
 @cross_origin()

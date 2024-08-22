@@ -2,8 +2,8 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission, Student, RegradeRequest
-from api.schemas import SubmissionSchema, StudentSchema
+from api.models import Assignment, Submission, User, RegradeRequest
+from api.schemas import SubmissionSchema, UserSchema
 # import asyncio
 # from openai import AsyncOpenAI
 
@@ -34,7 +34,7 @@ def send_regrade_request():
     db.session.commit()
 
     res = db.session.query(RegradeRequest).filter_by(id=request_id)
-    res = StudentSchema().dump(res, many=True)[0]
+    res = UserSchema().dump(res, many=True)[0]
     response = jsonify(res)
     return response
 
@@ -116,7 +116,7 @@ def get_student_regrade_requests():
     for req in regrade_requests:
         submission = db.session.query(Submission).filter_by(id=req.submission_id).first()
         assignment = db.session.query(Assignment).filter_by(id=submission.assignment_id).first()
-        student = db.session.query(Student).filter_by(id=submission.student_id).first()
+        student = db.session.query(User).filter_by(id=submission.student_id).first()
         result.append({
             "regradeRequestId": req.id,
             "assignmentName": assignment.name,
@@ -139,7 +139,7 @@ def get_instructor_regrade_requests():
     for req in regrade_requests:
         submission = db.session.query(Submission).filter_by(id=req.submission_id).first()
         assignment = db.session.query(Assignment).filter_by(id=submission.assignment_id).first()
-        student = db.session.query(Student).filter_by(id=submission.student_id).first()
+        student = db.session.query(User).filter_by(id=submission.student_id).first()
         result.append({
             "assignmentName": assignment.name,
             "studentName": student.name,
