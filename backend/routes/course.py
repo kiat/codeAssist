@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, Course, Enrollment, User, Submission, RegradeRequest, Enrollment
-from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
+from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema, StudentSchema
 
 course = Blueprint('course', __name__)
 
@@ -148,6 +148,45 @@ def delete_all_assignments():
     else:
         return jsonify("Assignments not deleted"), 404
 
+@course.route('/delete_enrollment', methods=["DELETE"])
+@cross_origin()
+def delete_enrollment():
+    try:
+        student_id = request.json["student_id"]
+        course_id = request.json["course_id"]
+
+        student_to_delete = db.session.query(Enrollment).filter_by(student_id=student_id, course_id=course_id).first()
+        db.session.delete(student_to_delete)
+        db.session.commit()
+        return jsonify("Student deleted successfully"), 200
+    except:
+        return jsonify("Student not found"), 404
+    
+@course.route('/create_ta_enrollment', methods=["POST", "GET"])
+@cross_origin()
+def create_ta_enrollment():
+    '''
+    /create_ta_enrollment enrolls a TA in a course
+    '''
+    student_id = request.json["student_id"]
+    course_id = request.json["course_id"]
+
+    # try:
+    #     student_email = request.json["student_email"]
+    # except:
+    #     print("no student email")
+
+    enrollment_data = {
+        "student_id": student_id,
+        "course_id": course_id,
+        "ta": True
+    }
+
+    newTAcommand = db.session.query(Enrollment).filter_by(student_id=student_id, course_id=course_id).update(enrollment_data)
+    db.session.commit()
+
+    return jsonify({"message": "Success"}), 200
+
 @course.route('/create_enrollment', methods=["POST", "GET"])
 @cross_origin()
 def create_enrollment():
@@ -237,7 +276,7 @@ def get_student_enrollments():
     #return jsonify(enrollments)
     return jsonify(student_courses)
 
-@course.route('/get_course_enrollment', methods=["GET"])
+@course.route('/get_course_enrollment', methods=["POST", "GET"])
 @cross_origin()
 def get_course_enrollment():
     '''
@@ -247,15 +286,19 @@ def get_course_enrollment():
     '''
     course_id = request.args.get("course_id")
 
-    students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id)
-    students = EnrollmentSchema().dump(students, many=True)
+    enrollments = db.session.query(
+            Enrollment.student_id,
+            Enrollment.ta,
+            User.name,
+            User.email_address,
+            User.sis_user_id
+        ).filter_by(
+            course_id=course_id
+        ).join(
+            User, User.id == Enrollment.student_id
+        ).order_by(User.name).all()
 
-    list_of_students = [x["student_id"] for x in students]
-
-    students = db.session.query(User.name, User.email_address, User.id, User.role).filter(User.id.in_(list_of_students))
-    students = UserSchema().dump(students, many=True)
-
-    return jsonify(students)
+    return [row._asdict() for row in enrollments]
 
 @course.route('/get_course_assignments', methods=["GET"])
 @cross_origin()
