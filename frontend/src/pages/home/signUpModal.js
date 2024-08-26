@@ -12,14 +12,12 @@ import { signUpUser } from "../../services/user";
  */
 export default function SignUpModal({ open, onCancel }) {
   const { updateUserInfo } = useContext(GlobalContext);
-  // const [isStudent, setIsStudent] = useState(false);
 
   // action after successfully signup
   const finishSignUp = async (values) => {
     const {role, ...restValue } = values;
     // const isStudent = values.isStudent;
     let res;
-    // let taRes;
     res = await signUpUser({...restValue, role});
 
     if (res) {
