@@ -17,6 +17,7 @@ import {
   createEnrollment,
   createEnrollmentBulk,
   createTA,
+  deleteUser,
   getCourseEnrollment,
 } from "../../../services/enrollment";
 import { useParams } from "react-router-dom";
@@ -25,25 +26,27 @@ import AddMoreUsersModal from "./AddMoreUsersModal";
 import { GlobalContext } from "../../../App";
 import AddCSVModal from "./AddCSVModal";
 import AddTAModal from "./AddTAModal";
+import RemoveUserModal from "./RemoveUserModal";
+import { get_student_by_email, get_student_by_id } from "../../../services/user";
 const columns = [
   { title: "NAME", dataIndex: "name" },
   { title: "EMAIL", dataIndex: "email_address" },
 ];
 
 export default () => {
-<<<<<<< HEAD
-  const { userInfo } = useContext(GlobalContext);
-  
-=======
   const [addTAModalOpen, setAddTAModalOpen] = useState(false);
->>>>>>> 22999c8 (Implementing TA changes within database)
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCSVModalOpen, setAddCSVModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
+  const [removeUserModalOpen, setRemoveUserModalOpen] = useState(false);
   const [enrollment, setEnrollment] = useState([]);
   const urlParams = useParams();
   const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const { courseId } = urlParams;
+
+  const toggleRemoveUserModal = useCallback(() => {
+    setRemoveUserModalOpen((t) => !t);
+  }, []);
 
   const toggleAddTAModal = useCallback(() => {
     setAddTAModalOpen((t) => !t);
@@ -63,11 +66,11 @@ export default () => {
 
   const getEnrollment = useCallback(() => {
     getCourseEnrollment({ course_id: courseId }).then((res) => {
+      console.log(res)
       setEnrollment(res.data);
     });
   }, [courseId]);
 
-<<<<<<< HEAD
   const handleRoleChange = useCallback(
     (newRole, studentId) => {
       message.info("You are changing a student's role in the course.");
@@ -99,11 +102,30 @@ export default () => {
         });
     },
     [courseId, getEnrollment]
-=======
+  )
+
+  const finishRemoveUser = useCallback(
+    async (values) => {
+      try {
+        const selectedStudentID = values.student;
+        let res = await deleteUser({ student_id: selectedStudentID, course_id: courseId });
+
+        if (res.status === 200) {
+          const updatedEnrollment = enrollment.filter(student => student.id !== selectedStudentID);
+          setEnrollment(updatedEnrollment);
+          alert("User was successfully deleted");
+        }
+
+      }
+      catch {
+        console.log("error while deleting user");
+        alert("An error occured while deleting a user");
+      }
+    }
+  );
+
   const finishAddTAForm = useCallback(
     async (values) => {
-      console.log("Add TA button has been pushed");
-      console.log(values);
       try {
         let res = await createTA({ student_id: values.student, course_id: courseId });
         console.log(res.data);
@@ -112,76 +134,106 @@ export default () => {
         console.log("error while creating TA");
       }
     }
-    // on open modal, get a list of current enrolled students and save it into a state -> turn this into a toggle button and display that within the thing
->>>>>>> 22999c8 (Implementing TA changes within database)
   );
 
-  const finishForm = useCallback(
-    (values) => {
-      const { email } = values;
+  // const finishForm = useCallback(
+  //   (values) => {
+  //     const { email } = values;
   
-      fetch(
-        process.env.REACT_APP_API_URL + "/get_users?" +
-          new URLSearchParams({
-            email: email,
-          })
-      )
-        .then((res) => {
-          if (!res.ok) {
-            if (res.status === 404) {
-              throw new Error("User not found");
-            } else {
-              return res.json().then((error) => {
-                throw new Error(error.error || "Something went wrong");
-              });
-            }
-          }
-          return res.json();
-        })
-        .then((student) => {
-          fetch(process.env.REACT_APP_API_URL + "/create_enrollment", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              student_id: student.id,
-              course_id: courseId,
-              role: values.role, // Include the role from form values
-            }),
-          })
-          .then((res) => {
-            if (!res.ok) {
-              return res.json().then((error) => {
-                throw new Error(error.error || "Something went wrong");
-              });
-            }
-            return res.json();
-          })
-          .then(() => {
-            toggleAddModalOpen();
-            getEnrollment();
-          })
-          .catch((error) => {
-            console.error("Error creating enrollment:", error);
-            message.error("An error occurred while creating enrollment.");
-          });
-        })
-        .catch((error) => {
-          console.error("Error fetching user:", error);
-          message.error(error.message);  // Display the error message
-        });
+  //     fetch(
+  //       process.env.REACT_APP_API_URL + "/get_users?" +
+  //         new URLSearchParams({
+  //           email: email,
+  //         })
+  //     )
+  //       .then((res) => {
+  //         if (!res.ok) {
+  //           if (res.status === 404) {
+  //             throw new Error("User not found");
+  //           } else {
+  //             return res.json().then((error) => {
+  //               throw new Error(error.error || "Something went wrong");
+  //             });
+  //           }
+  //         }
+  //         return res.json();
+  //       })
+  //       .then((student) => {
+  //         fetch(process.env.REACT_APP_API_URL + "/create_enrollment", {
+  //           method: "POST",
+  //           headers: {
+  //             "Content-Type": "application/json",
+  //           },
+  //           body: JSON.stringify({
+  //             student_id: student.id,
+  //             course_id: courseId,
+  //             role: values.role, // Include the role from form values
+  //           }),
+  //         })
+  //         .then((res) => {
+  //           if (!res.ok) {
+  //             return res.json().then((error) => {
+  //               throw new Error(error.error || "Something went wrong");
+  //             });
+  //           }
+  //           return res.json();
+  //         })
+  //         .then(() => {
+  //           toggleAddModalOpen();
+  //           getEnrollment();
+  //         })
+  //         .catch((error) => {
+  //           console.error("Error creating enrollment:", error);
+  //           message.error("An error occurred while creating enrollment.");
+  //         });
+  //       })
+  //       .catch((error) => {
+  //         console.error("Error fetching user:", error);
+  //         message.error(error.message);  // Display the error message
+  //       });
+  // );
+
+  const finishForm = useCallback(
+    async (values) => {
+      // const { email } = values;
+      try {
+        let res = await get_student_by_email({ email: values.email });
+        console.log(res);
+
+        const student = res.data[0];
+        console.log(student)
+        await createEnrollment({ student_id: student.id, course_id: courseId })
+
+        toggleAddModalOpen();
+        getEnrollment();
+      }
+      catch (e) {
+        if (e.response.status === 404) {
+          alert("User does not exist")
+        }
+      }
+
+      // fetch(
+      //   process.env.REACT_APP_API_URL + "/get_student?" +
+      //     new URLSearchParams({
+      //       email: email,
+      //     })
+      // )
+      //   .then((res) => res.json())
+      //   .then((student) =>
+      //     createEnrollment({
+      //       student_id: student.id,
+      //       course_id: courseId,
+      //     }).then((res) => {
+      //       toggleAddModalOpen();
+      //       getEnrollment();
+      //     })
+      //   );
     },
     [courseId, getEnrollment, toggleAddModalOpen]
   );
-<<<<<<< HEAD
-  
-  const finishCSVForm =
-    useCallback();
-=======
 
   const finishCSVForm = useCallback();
->>>>>>> 22999c8 (Implementing TA changes within database)
     //toggleAddCSVModalOpen()
 
   const finishMoreUsers = useCallback(
@@ -295,6 +347,9 @@ export default () => {
         >
           <Space>
             {/* <Button icon={<UploadOutlined />}>Download Enrollment</Button> */}
+            <Button icon={<PlusOutlined />} onClick={toggleRemoveUserModal}>
+              Delete Users
+            </Button>
             <Button icon={<PlusOutlined />} onClick={toggleAddTAModal}>
               Add TAs
             </Button>
@@ -304,20 +359,30 @@ export default () => {
             <Button icon={<PlusOutlined />} onClick={toggleAddCSVModalOpen}>
               Add With CSV
             </Button>
-            <Button
+            {/* <Button
               icon={<PlusOutlined />}
               onClick={toggleAddMoreUsersModalOpen}
             >
               Add More Students
-            </Button>
+            </Button> */}
           </Space>
         </div>
       </div>
+      <RemoveUserModal
+        open={removeUserModalOpen}
+        toggleAddModalOpen={toggleRemoveUserModal}
+        onFinish={finishRemoveUser}
+        course_id={courseId}
+        enrollment={enrollment}
+        setEnrollment={setEnrollment}
+      />
       <AddTAModal
         open={addTAModalOpen}
         toggleAddModalOpen={toggleAddTAModal}
         onFinish={finishAddTAForm}
         course_id={courseId}
+        enrollment={enrollment}
+        setEnrollment={setEnrollment}
       />
       <AddUserModal
         open={addModalOpen}
@@ -329,11 +394,11 @@ export default () => {
         toggleAddModalOpen={toggleAddCSVModalOpen}
         finishCSVForm={finishCSVForm}
       />
-      <AddMoreUsersModal
+      {/* <AddMoreUsersModal
         toggleAddMoreUsersModalOpen={toggleAddMoreUsersModalOpen}
         open={addMoreUsersModalOpen}
         finishMoreUsers={finishMoreUsers}
-      />
+      /> */}
     </>
   );
 };

@@ -1,6 +1,7 @@
 from marshmallow import Schema, fields
 from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
+from dataclasses import dataclass
 from api import db
 
 class User(db.Model):
@@ -32,11 +33,16 @@ class Course(db.Model):
     allowEntryCode = db.Column(db.Boolean, default=False)
     description = db.Column(db.String, default="")
 
+@dataclass
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), primary_key=True, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key=True, nullable=False)
+<<<<<<< HEAD
     role = db.Column(db.String, nullable = False)
+=======
+    ta = db.Column(db.Boolean, nullable=False, default=False)
+>>>>>>> eec65ad (Updating previous changes)
 
 class Assignment(db.Model):
     __tablename__ = "assignments"

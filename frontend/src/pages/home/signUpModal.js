@@ -5,6 +5,8 @@ import { GlobalContext } from "../../App";
 // import service from "../../services";
 import { signUpUser } from "../../services/user";
 
+import React from 'react'
+
 /**
  * user signup window modal
  * @param {*} param0

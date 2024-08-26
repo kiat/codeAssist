@@ -22,8 +22,28 @@ export async function get_user(params) {
   return service("get_users", params, "get");
 }
 
+<<<<<<< HEAD
 export async function userLogin(params) {
   return service("user_login", params, "post");
+=======
+export async function get_student_by_email(params) {
+  return service("get_student", params, "get");
+}
+
+/**
+ * signUpInstructor POSTs a new instructor to the database
+ * @param {*} params the data for the new instructor
+ * @returns 
+ */
+export async function signUpInstructor(params) {
+  return service("create_instructor", params, "post");
+  // return {
+  //   data: {
+  //     id: 123456,
+  //     name: "aaa bbb",
+  //   },
+  // };
+>>>>>>> eec65ad (Updating previous changes)
 }
 
 <<<<<<< HEAD
