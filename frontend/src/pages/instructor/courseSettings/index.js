@@ -68,7 +68,11 @@ export default () => {
       message.error('Cannot delete assignments without an ID');
       return Promise.reject(new Error('Course ID is undefined'));
     }
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 22999c8 (Implementing TA changes within database)
     return fetch(`${process.env.REACT_APP_API_URL}/delete_all_assignments?course_id=${courseId}`, {
       method: "DELETE",
       mode: 'cors',

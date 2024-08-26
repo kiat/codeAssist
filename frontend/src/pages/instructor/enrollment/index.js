@@ -16,6 +16,7 @@ import { useCallback, useState, useContext } from "react";
 import {
   createEnrollment,
   createEnrollmentBulk,
+  createTA,
   getCourseEnrollment,
 } from "../../../services/enrollment";
 import { useParams } from "react-router-dom";
@@ -23,14 +24,19 @@ import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
 import { GlobalContext } from "../../../App";
 import AddCSVModal from "./AddCSVModal";
+import AddTAModal from "./AddTAModal";
 const columns = [
   { title: "NAME", dataIndex: "name" },
   { title: "EMAIL", dataIndex: "email_address" },
 ];
 
 export default () => {
+<<<<<<< HEAD
   const { userInfo } = useContext(GlobalContext);
   
+=======
+  const [addTAModalOpen, setAddTAModalOpen] = useState(false);
+>>>>>>> 22999c8 (Implementing TA changes within database)
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCSVModalOpen, setAddCSVModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
@@ -39,9 +45,14 @@ export default () => {
   const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const { courseId } = urlParams;
 
+  const toggleAddTAModal = useCallback(() => {
+    setAddTAModalOpen((t) => !t);
+  }, []);
+
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen((t) => !t);
   }, []);
+  
   const toggleAddCSVModalOpen = useCallback(() => {
     setAddCSVModalOpen((t) => !t);
   }, []);
@@ -56,6 +67,7 @@ export default () => {
     });
   }, [courseId]);
 
+<<<<<<< HEAD
   const handleRoleChange = useCallback(
     (newRole, studentId) => {
       message.info("You are changing a student's role in the course.");
@@ -87,6 +99,21 @@ export default () => {
         });
     },
     [courseId, getEnrollment]
+=======
+  const finishAddTAForm = useCallback(
+    async (values) => {
+      console.log("Add TA button has been pushed");
+      console.log(values);
+      try {
+        let res = await createTA({ student_id: values.student, course_id: courseId });
+        console.log(res.data);
+      }
+      catch {
+        console.log("error while creating TA");
+      }
+    }
+    // on open modal, get a list of current enrolled students and save it into a state -> turn this into a toggle button and display that within the thing
+>>>>>>> 22999c8 (Implementing TA changes within database)
   );
 
   const finishForm = useCallback(
@@ -147,9 +174,14 @@ export default () => {
     },
     [courseId, getEnrollment, toggleAddModalOpen]
   );
+<<<<<<< HEAD
   
   const finishCSVForm =
     useCallback();
+=======
+
+  const finishCSVForm = useCallback();
+>>>>>>> 22999c8 (Implementing TA changes within database)
     //toggleAddCSVModalOpen()
 
   const finishMoreUsers = useCallback(
@@ -263,6 +295,9 @@ export default () => {
         >
           <Space>
             {/* <Button icon={<UploadOutlined />}>Download Enrollment</Button> */}
+            <Button icon={<PlusOutlined />} onClick={toggleAddTAModal}>
+              Add TAs
+            </Button>
             <Button icon={<PlusOutlined />} onClick={toggleAddModalOpen}>
               Add Students or Staff
             </Button>
@@ -278,6 +313,12 @@ export default () => {
           </Space>
         </div>
       </div>
+      <AddTAModal
+        open={addTAModalOpen}
+        toggleAddModalOpen={toggleAddTAModal}
+        onFinish={finishAddTAForm}
+        course_id={courseId}
+      />
       <AddUserModal
         open={addModalOpen}
         toggleAddModalOpen={toggleAddModalOpen}
