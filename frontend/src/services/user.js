@@ -11,3 +11,7 @@ export async function get_user(params) {
 export async function userLogin(params) {
   return service("user_login", params, "post");
 }
+
+export async function googleLogin(params) {
+  return service("google_login", params, "post");
+}

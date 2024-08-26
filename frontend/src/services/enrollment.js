@@ -5,9 +5,17 @@ export async function getCourseEnrollment(params) {
 }
 
 export async function createEnrollment(params) {
-  return service("create_enrollment", params, "post");
+  return service("create_enrollment", params, "post");  
 }
 
 export async function createEnrollmentBulk(params) {
   return service("create_enrollment_bulk", params, "post");
+}
+
+export async function createTA(params) {
+  return service("create_ta_enrollment", params, "post");
+}
+
+export async function deleteUser(params) {
+  return service("delete_enrollment", params, "delete");
 }

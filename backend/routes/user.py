@@ -1,15 +1,16 @@
 import uuid
+import requests
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import User
-from api.schemas import UserSchema
+from api.models import Student, Instructor, GoogleUser, User
+from api.schemas import StudentSchema, InstructorSchema, GoogleUserSchema, UserSchema
 
 user = Blueprint('user', __name__)
 
 # TODO THIS ROUTE IS NOT BEING USED AT THE MOMENT
-@user.route('/create_user', methods=["GET","POST"])
-@cross_origin()
+@user.route('/create_user', methods=["GET", "POST"])
+@cross_origin
 def create_user():
     '''
     /create_user creates a student and generates a sis_user_id in the database
@@ -31,7 +32,6 @@ def create_user():
         return "all good"
     user_id = str(uuid.uuid4())
     name = request.json['name']
-    password = request.json['password']
     email_address = request.json['email']
     sis_user_id = request.json['eid']
     role = request.json['role']
@@ -40,7 +40,6 @@ def create_user():
         "id": user_id,
         "name": name,
         "email_address": email_address,
-        "password": password,
         "sis_user_id": sis_user_id,
         "role": role
     }
@@ -62,44 +61,275 @@ def create_user():
     response = jsonify(res)
     return response
 
-@user.route('/user_login', methods = ["GET", "POST"])
+@user.route('/create_google_user', methods=["GET", "POST"])
 @cross_origin()
-def user_login():
+def create_google_user():
+    '''
+    /create_user creates a student and generates a sis_user_id in the database
+    Requires from the frontend a JSON containing:
+    @param credential   Google ID Token to authenticate a valid login
+    @param name         name of the user
+    @param email        email of the user
+    @param eid          eid of the user
+    @param role         role of the user
+
+    Roles have 3 categories:
+    0 = Instructor
+    2 = Student
+    '''
+    id_token = request.json['credential']
+
+    url = f'https://oauth2.googleapis.com/tokeninfo?id_token={id_token}'
+    response = requests.get(url)
+    data = response.json()
+
+    # or data['aud'] != google_client_id_link - maybe should be added as a precaution
+    if 'error' in data:
+        return "Invalid google token", 400
+
+    # TODO Create new database tables to unify all users
+    if request.method != "POST":
+        return "all good"
+    user_id = str(uuid.uuid4())
+    name = request.json['name']
+    email_address = data['email']
+    sis_user_id = request.json['eid']
+    student = request.json['role']
+
+    user_data = {
+        "id": user_id,
+        "name": name,
+        "email_address": email_address,
+        "sis_user_id": sis_user_id,
+        "student": student
+    }
+
+    db.session.add(GoogleUser(**user_data))
+    db.session.commit()
+
+    res = db.session.query(GoogleUser).filter_by(id=user_id)
+    res = GoogleUserSchema().dump(res, many=True)[0]
+    response = jsonify(res)
+    return response
+
+@user.route('/google_login', methods=["POST", "GET"])
+@cross_origin()
+def google_login():
+    '''
+    /google_login logs in a user that exists in the database
+    Requires from the frontend a JSON containing:
+    @param email          email of the student
+    '''
+    id_token = request.json['credential']
+
+    url = f'https://oauth2.googleapis.com/tokeninfo?id_token={id_token}'
+    response = requests.get(url)
+    data = response.json()
+
+    # or data['aud'] != google_client_id_link - maybe should be added as a precaution
+    if 'error' in data:
+        return "Invalid google token", 400
+    
+    # Check the database if there is already a valid login in place
+    
+    email = data['email']
+
+    res = db.session.query(GoogleUser).filter_by(email_address=email)
+    res = GoogleUserSchema().dump(res, many=True)
+
+    if len(res) == 0:
+        return email, 202
+
+    return jsonify(res[0])
+
+
+@user.route('/create_student', methods=["GET", "POST"])
+@cross_origin()
+def create_student():
+    '''
+    /create_student creates a student and generates a sis_user_id
+    in the database
+    Requires from the frontend a JSON containing:
+    @param name         name of the student
+    @param password     password for the student
+    @param email        email of the student
+    @param eid          eid of the student
+    '''
+
+    # TODO: Remove below - /create_student should only be POST
+    if request.method != "POST":
+        return "all good"
+    user_id = str(uuid.uuid4())
+    name = request.json['name']
+    password = request.json['password']
+    email_address = request.json['email']
+    sis_user_id = request.json['eid']
+
+    user_data = {
+        "id": user_id,
+        "name": name,
+        "email_address": email_address,
+        "password": password,
+        "sis_user_id": sis_user_id,
+    }
+
+    db.session.add(Student(**user_data))
+    db.session.commit()
+
+    res = db.session.query(Student).filter_by(id=user_id)
+    res = StudentSchema().dump(res, many=True)[0]
+    response = jsonify(res)
+    return response
+
+@user.route('/student_login', methods=["POST", "GET"])
+@cross_origin()
+def student_login():
+    '''
+    /student_login logs in a student that exists in the database
+    Requires from the frontend a JSON containing:
+    @param email          email of the student
+    @param password     password for the student
+    '''
     email = request.json['email']
     password = request.json['password']
 
-    res = db.session.query(User).filter_by(email_address=email, password=password)
-    res = UserSchema().dump(res, many=True)
+    res = db.session.query(Student).filter_by(email_address=email, password=password)
+    res = StudentSchema().dump(res, many=True)
 
     if len(res) == 0:
         return "No user found", 404
 
     return jsonify(res[0])
 
-
-
-@user.route('/get_users', methods = ["GET"])
+@user.route('/create_instructor', methods=["POST", "GET"])
 @cross_origin()
-def get_users():
+def create_instructor():
+    '''
+    /create_instructor creates an instructor and generates a
+    sis_user_id in the database
+    Requires from the frontend a JSON containing:
+    @param name         name of the instructor
+    @param password     password for the instructor
+    @param email        email of the instructor
+    @param eid          eid of the instructor
+    '''
+    user_id = str(uuid.uuid4())
+    name = request.json['name']
+    password = request.json['password']
+    email_address = request.json['email']
+    sis_user_id = request.json['eid']
+
+    user_data = {
+        "id": user_id,
+        "name": name,
+        "email_address": email_address,
+        "password": password,
+        "sis_user_id": sis_user_id,
+    }
+
+    db.session.add(Instructor(**user_data))
+    db.session.commit()
+
+    res = db.session.query(Instructor).filter_by(id=user_id)
+    res = InstructorSchema().dump(res, many=True)[0]
+
+    return jsonify(res)
+
+@user.route('/instructor_login', methods=["POST", "GET"])
+@cross_origin()
+def instructor_login():
+    '''
+    /instructor_login logs in an instructor that exists in
+    the database
+    Requires from the frontend a JSON containing:
+    @param email          email of the instructor
+    @param password     password for the instructor
+    '''
+    email = request.json['email']
+    password = request.json['password']
+
+    res = db.session.query(Instructor).filter_by(email_address=email, password=password)
+    res = InstructorSchema().dump(res, many=True)[0]
+
+    # TODO: What if an instructor does not exist in the database?
+    # See: /student_login
+    return jsonify(res)
+
+@user.route('/update_account', methods = ["POST"])
+@cross_origin()
+def update_account():
+    '''
+    /update_account updates account details in the database
+    Requires from the frontend a JSON containing:
+    @param id       id of user (can be either instructor or student)
+    '''
+    user_id = request.json["id"]
+    data = request.json
+    del data["id"]
+
+    student = db.session.query(Student).filter(Student.id == user_id).first()
+    instructor = db.session.query(Instructor).filter(Instructor.id == user_id).first()
+    if not student:
+        instructor_update = db.session.query(Instructor).filter_by(id = user_id).update(data)
+        db.session.commit()
+    if not instructor:
+        student_update = db.session.query(Student).filter_by(id = user_id).update(data)
+        db.session.commit()
+
+    return jsonify({"message": "Success"}), 200
+
+@user.route('/get_student', methods=["GET"])
+@cross_origin()
+def get_student():
+    '''
+    /get_student gets the student from the database
+    Requires from the frontend a JSON containing:
+    @param email    the student email
+    '''
     email = request.args.get("email")
-    # role = request.args.get("role")
 
-    res = db.session.query(User).filter_by(email_address=email)
-    result = UserSchema().dump(res, many=True)
-    # print(result)
-    
-    # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
-    if len(result) == 0:
+    student = db.session.query(Student).filter_by(email_address=email)
+    student = StudentSchema().dump(student, many=True)
+
+    if not student:
         return "No user found", 404
-    return jsonify(result)
+        
+    # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
+    return jsonify(student)
 
-    #It shows an error for this method but the user_login works
-
-
-
-@user.route('/get_user_by_id', methods=["GET"])
+@user.route('/get_student_by_id', methods=["GET"])
 @cross_origin()
-def get_user_by_id():
+def get_student_by_id():
+    '''
+    /get_student_by_id gets the student from the database
+    Requires from the frontend a JSON containing:
+    @param id    the student id
+    '''
+    studid = request.args.get("id")
+
+    student = db.session.query(Student).filter_by(id=studid)
+    student = StudentSchema().dump(student, many=True)[0]
+
+    return jsonify(student)
+
+@user.route('/get_instructor', methods=["GET"])
+@cross_origin()
+def get_instructor():
+    '''
+    /get_instructor gets the instructor data from the database
+    Requires the frontend a JSON containing:
+    @param email    the instructor email
+    '''
+    email = request.args.get("email")
+
+    instructor = db.session.query(Instructor).filter_by(email_address=email)
+    instructor = StudentSchema().dump(instructor, many=True)[0]
+    # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
+    return jsonify(instructor)
+
+@user.route('/get_instructor_by_id', methods=["GET"])
+@cross_origin()
+def get_instructor_by_id():
     '''
     /get_instructor_by_id gets the student from the database
     Requires from the frontend a JSON containing:
@@ -107,16 +337,7 @@ def get_user_by_id():
     '''
     insid = request.args.get("id")
 
-    instructor = db.session.query(User).filter_by(id=insid)
-    instructor = UserSchema().dump(instructor, many=True)[0]
+    instructor = db.session.query(Instructor).filter_by(id=insid)
+    instructor = StudentSchema().dump(instructor, many=True)[0]
 
     return jsonify(instructor)
-
-@user.route('/delete_user', methods=["DELETE"])
-@cross_origin()
-def delete_user():
-    user_id = request.args.get("id")
-    User.query.filter_by(id=user_id).delete()
-    # user = UserSchema().dump(user)
-    db.session.commit()
-    return "Success", 200
