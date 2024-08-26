@@ -6,22 +6,9 @@ import LogInModal from "./logInModal";
 import SignUpModal from "./signUpModal";
 
 import { GoogleLogin } from '@react-oauth/google';
-<<<<<<< HEAD
-<<<<<<< HEAD
 import { useGoogleOneTapLogin } from '@react-oauth/google';
 import GoogleSignUp from "./googleSignUp";
 import { userLogin } from "../../services/user";
-=======
-import { jwtDecode } from "jwt-decode";
-import GoogleSignUp from "./googleSignUp";
-import { userLogin } from "../../services/user";
-import axios from "axios";
->>>>>>> c8f5145 (Working functionality with google login)
-=======
-import { useGoogleOneTapLogin } from '@react-oauth/google';
-import GoogleSignUp from "./googleSignUp";
-import { userLogin } from "../../services/user";
->>>>>>> a0d7bfb (Finalizing CSS and adding authentication for user signup)
 
 /**
  * home modal
@@ -62,23 +49,22 @@ export default function Home() {
   }, [userInfo, navigate]);
 
   const handleOAuth = async (credentialResponse) => {
-    // let res;
-    // try {
-    //   res = await userLogin(credentialResponse);
-    // }
-    // catch (error) {
-    //   if (!error.response) {
-    //     alert(`User authentication failed.`);
-    //     return;
-    //   };
-    //   if (error.response.status === 400) {
-    //     const errorType = error.response.data;
-    //     alert(`User authentication failed. ${errorType}`);
-    //     return;
-    //   };
-    // }
+    let res;
+    try {
+      res = await userLogin(credentialResponse);
+    }
+    catch (error) {
+      if (!error.response) {
+        alert(`User authentication failed.`);
+        return;
+      };
+      if (error.response.status === 400) {
+        const errorType = error.response.data;
+        alert(`User authentication failed. ${errorType}`);
+        return;
+      };
+    }
 
-<<<<<<< HEAD
     if (res.data.name) {
       console.log("valid login")
       const userInfo = {
@@ -89,37 +75,11 @@ export default function Home() {
       localStorage.setItem("userInfo", JSON.stringify(userInfo));
       updateUserInfo(userInfo);
       return
-<<<<<<< HEAD
     }
 
     setGoogleValues ({
       ...googleValues,
       credential: credentialResponse.credential
-=======
-    } 
-
-    setGoogleValues ({
-      ...googleValues,
-      email: res.data
->>>>>>> c8f5145 (Working functionality with google login)
-=======
-    // if (res.data.name) {
-    //   console.log("valid login")
-    //   const userInfo = {
-    //     name: res.data?.name,
-    //     id: res.data?.id,
-    //     isStudent: res.data?.student,
-    //   };
-    //   localStorage.setItem("userInfo", JSON.stringify(userInfo));
-    //   updateUserInfo(userInfo);
-    //   return
-    // } 
-    console.log("First", credentialResponse.credential);
-
-    setGoogleValues ({
-      ...googleValues,
-      credential: credentialResponse.credential
->>>>>>> a0d7bfb (Finalizing CSS and adding authentication for user signup)
     });
 
     toggleGoogleModal();
