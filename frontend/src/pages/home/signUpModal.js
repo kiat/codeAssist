@@ -36,21 +36,35 @@ export default function SignUpModal({ open, onCancel }) {
   return (
     <Modal title="SIGN UP" open={open} footer={null} onCancel={onCancel}>
       <Form layout="vertical" onFinish={finishSignUp}>
+<<<<<<< HEAD
         <Form.Item name="role" initialValue='student'>
+=======
+        <Form.Item name="isStudent" initialValue={1} style={{ width: "100%" }}>
+>>>>>>> c8f5145 (Working functionality with google login)
           <Radio.Group
             optionType="button"
             buttonStyle="solid"
-            style={{ width: "100%" }}
+            style={{ display: "flex", width: "100%" }}
           >
             <Radio.Button
+<<<<<<< HEAD
               value='instructor'
               style={{ width: "33%", textAlign: "center" }}
+=======
+              value={0}
+              style={{ flex: 1, textAlign: "center" }}
+>>>>>>> c8f5145 (Working functionality with google login)
             >
               Instructor
             </Radio.Button>
             <Radio.Button
+<<<<<<< HEAD
               value='student'
               style={{ width: "33%", textAlign: "center" }}
+=======
+              value={1}
+              style={{ flex: 1, textAlign: "center" }}
+>>>>>>> c8f5145 (Working functionality with google login)
             >
               Student
             </Radio.Button>

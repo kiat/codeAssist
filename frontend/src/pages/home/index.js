@@ -6,9 +6,16 @@ import LogInModal from "./logInModal";
 import SignUpModal from "./signUpModal";
 
 import { GoogleLogin } from '@react-oauth/google';
+<<<<<<< HEAD
 import { useGoogleOneTapLogin } from '@react-oauth/google';
 import GoogleSignUp from "./googleSignUp";
 import { userLogin } from "../../services/user";
+=======
+import { jwtDecode } from "jwt-decode";
+import GoogleSignUp from "./googleSignUp";
+import { userLogin } from "../../services/user";
+import axios from "axios";
+>>>>>>> c8f5145 (Working functionality with google login)
 
 /**
  * home modal
@@ -75,11 +82,19 @@ export default function Home() {
       localStorage.setItem("userInfo", JSON.stringify(userInfo));
       updateUserInfo(userInfo);
       return
+<<<<<<< HEAD
     }
 
     setGoogleValues ({
       ...googleValues,
       credential: credentialResponse.credential
+=======
+    } 
+
+    setGoogleValues ({
+      ...googleValues,
+      email: res.data
+>>>>>>> c8f5145 (Working functionality with google login)
     });
 
     toggleGoogleModal();
@@ -161,6 +176,14 @@ export default function Home() {
               >
                 Log In
               </Button>
+              <GoogleLogin
+                onSuccess={credentialResponse => {
+                  handleOAuth(credentialResponse);
+                }}
+                onError={() => {
+                  console.log('Login Failed');
+                }}
+              />
             </div>
             <div
               style={{

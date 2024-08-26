@@ -9,6 +9,14 @@ CREATE TABLE user (
     role varchar(30) NOT NULL
 );
 
+CREATE TABLE google_users (
+    id uuid PRIMARY KEY,
+    name varchar(30) NOT NULL,
+    email_address varchar(30) NOT NULL UNIQUE,
+    sis_user_id varchar(50) NOT NULL UNIQUE,
+    instructor BOOLEAN
+);
+
 /* Create Courses table */
 CREATE TABLE courses (
     id uuid PRIMARY KEY,

@@ -43,7 +43,6 @@ def create_user():
         "sis_user_id": sis_user_id,
         "role": role
     }
-
     res = None
 
     db.session.add(User(**user_data))
@@ -56,7 +55,6 @@ def create_user():
     #     db.session.commit()
     #     res = db.session.query(Student).filter_by(id=user_id)
     #     res = StudentSchema().dump(res, many=True)[0]
-
 
     response = jsonify(res)
     return response
