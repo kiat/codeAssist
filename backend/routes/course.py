@@ -218,7 +218,7 @@ def create_ta_enrollment():
     enrollment_data = {
         "student_id": student_id,
         "course_id": course_id,
-        "ta": True
+        "role": "ta"
     }
 
     newTAcommand = db.session.query(Enrollment).filter_by(student_id=student_id, course_id=course_id).update(enrollment_data)
@@ -334,7 +334,6 @@ def get_course_enrollment():
     enrollments = db.session.query(
             Enrollment.student_id,
             Enrollment.ta,
-<<<<<<< HEAD
             User.name,
             User.email_address,
             User.sis_user_id
@@ -345,30 +344,6 @@ def get_course_enrollment():
         ).order_by(User.name).all()
 
     return [row._asdict() for row in enrollments]
-=======
-            Student.name,
-            Student.email_address,
-            Student.sis_user_id
-        ).filter_by(
-            course_id=course_id
-        ).join(
-            Student, Student.id == Enrollment.student_id
-        ).order_by(Student.name).all()
-
-    return [row._asdict() for row in enrollments]
-
-    # course_id = request.args.get("course_id")
-
-    # students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id)
-    # students = EnrollmentSchema().dump(students, many=True)
-
-    # list_of_students = [x["student_id"] for x in students]
-
-    # students = db.session.query(Student.name, Student.email_address, Student.id, Student.sis_user_id).filter(Student.id.in_(list_of_students))
-    # students = StudentSchema().dump(students, many=True)
-
-    # return jsonify(students)
->>>>>>> eec65ad (Updating previous changes)
 
 @course.route('/get_course_assignments', methods=["GET"])
 @cross_origin()

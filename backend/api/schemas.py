@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 from api.models import Course, Enrollment, Assignment, Submission, User, TestCaseResult, TestCase, RegradeRequest, GoogleUser
-=======
-from api.models import Student, Course, Enrollment, Assignment, Submission, Instructor, TestCaseResult, TestCase, RegradeRequest, GoogleUser
->>>>>>> eec65ad (Updating previous changes)
 from api import ma
 
 class GoogleUserSchema(ma.SQLAlchemyAutoSchema):

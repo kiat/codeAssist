@@ -35,7 +35,7 @@ function AddTAModal({ open, toggleAddModalOpen, onFinish, course_id, enrollment 
         </Form.Item> */}
         <Form.Item label="STUDENT" name="student" rules={[{ required: true, message: 'Please select a student' }]}>
           <Select>
-            {enrollment.filter(student => !student.ta).map((student, index) => (
+            {enrollment.filter(student => student.role !== "ta").map((student, index) => (
               <Option key={index} value={student.id}>{student.sis_user_id}</Option>
             ))}
           </Select>

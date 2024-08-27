@@ -9,7 +9,7 @@ class User(db.Model):
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     password = db.Column(db.String, nullable=False)
     name = db.Column(db.String, nullable=False)
-    email_address = db.Column(db.String, nullable=False)
+    email_address = db.Column(db.String, nullable=False, unique=True)
     sis_user_id = db.Column(db.String, nullable=False, unique=True)
     role = db.Column(db.String, nullable = False)
 
@@ -38,11 +38,7 @@ class Enrollment(db.Model):
     __tablename__ = "enrollments"
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), primary_key=True, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key=True, nullable=False)
-<<<<<<< HEAD
     role = db.Column(db.String, nullable = False)
-=======
-    ta = db.Column(db.Boolean, nullable=False, default=False)
->>>>>>> eec65ad (Updating previous changes)
 
 class Assignment(db.Model):
     __tablename__ = "assignments"

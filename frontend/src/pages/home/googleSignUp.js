@@ -9,29 +9,12 @@ function GoogleSignUp({ open, onCancel, googleValues }) {
   const { updateUserInfo } = useContext(GlobalContext);
 
   const finishSignUp = async (values) => {
-<<<<<<< HEAD
-<<<<<<< HEAD
     values["credential"] = googleValues.credential;
     // console.log(values)
-=======
-    values["email"] = googleValues.email;
->>>>>>> c8f5145 (Working functionality with google login)
-=======
-    values["credential"] = googleValues.credential;
-    // console.log(values)
->>>>>>> a0d7bfb (Finalizing CSS and adding authentication for user signup)
 
     let res;
     try {
-      res = await signUpUser(values);
-<<<<<<< HEAD
-<<<<<<< HEAD
-      console.log(res)
-=======
->>>>>>> c8f5145 (Working functionality with google login)
-=======
-      console.log(res)
->>>>>>> a0d7bfb (Finalizing CSS and adding authentication for user signup)
+      res = await create_google_user(values);
 
       if (res) {
         const userInfo = {

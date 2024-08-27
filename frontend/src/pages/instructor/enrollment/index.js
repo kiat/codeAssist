@@ -136,102 +136,104 @@ export default () => {
     }
   );
 
-  // const finishForm = useCallback(
-  //   (values) => {
-  //     const { email } = values;
-  
-  //     fetch(
-  //       process.env.REACT_APP_API_URL + "/get_users?" +
-  //         new URLSearchParams({
-  //           email: email,
-  //         })
-  //     )
-  //       .then((res) => {
-  //         if (!res.ok) {
-  //           if (res.status === 404) {
-  //             throw new Error("User not found");
-  //           } else {
-  //             return res.json().then((error) => {
-  //               throw new Error(error.error || "Something went wrong");
-  //             });
-  //           }
-  //         }
-  //         return res.json();
-  //       })
-  //       .then((student) => {
-  //         fetch(process.env.REACT_APP_API_URL + "/create_enrollment", {
-  //           method: "POST",
-  //           headers: {
-  //             "Content-Type": "application/json",
-  //           },
-  //           body: JSON.stringify({
-  //             student_id: student.id,
-  //             course_id: courseId,
-  //             role: values.role, // Include the role from form values
-  //           }),
-  //         })
-  //         .then((res) => {
-  //           if (!res.ok) {
-  //             return res.json().then((error) => {
-  //               throw new Error(error.error || "Something went wrong");
-  //             });
-  //           }
-  //           return res.json();
-  //         })
-  //         .then(() => {
-  //           toggleAddModalOpen();
-  //           getEnrollment();
-  //         })
-  //         .catch((error) => {
-  //           console.error("Error creating enrollment:", error);
-  //           message.error("An error occurred while creating enrollment.");
-  //         });
-  //       })
-  //       .catch((error) => {
-  //         console.error("Error fetching user:", error);
-  //         message.error(error.message);  // Display the error message
-  //       });
-  // );
-
   const finishForm = useCallback(
-    async (values) => {
-      // const { email } = values;
-      try {
-        let res = await get_student_by_email({ email: values.email });
-        console.log(res);
-
-        const student = res.data[0];
-        console.log(student)
-        await createEnrollment({ student_id: student.id, course_id: courseId })
-
-        toggleAddModalOpen();
-        getEnrollment();
-      }
-      catch (e) {
-        if (e.response.status === 404) {
-          alert("User does not exist")
-        }
-      }
-
-      // fetch(
-      //   process.env.REACT_APP_API_URL + "/get_student?" +
-      //     new URLSearchParams({
-      //       email: email,
-      //     })
-      // )
-      //   .then((res) => res.json())
-      //   .then((student) =>
-      //     createEnrollment({
-      //       student_id: student.id,
-      //       course_id: courseId,
-      //     }).then((res) => {
-      //       toggleAddModalOpen();
-      //       getEnrollment();
-      //     })
-      //   );
+    (values) => {
+      const { email } = values;
+  
+      fetch(
+        process.env.REACT_APP_API_URL + "/get_users?" +
+          new URLSearchParams({
+            email: email,
+          })
+      )
+        .then((res) => {
+          if (!res.ok) {
+            if (res.status === 404) {
+              throw new Error("User not found");
+            } else {
+              return res.json().then((error) => {
+                throw new Error(error.error || "Something went wrong");
+              });
+            }
+          }
+          return res.json();
+        })
+        .then((student) => {
+          fetch(process.env.REACT_APP_API_URL + "/create_enrollment", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              student_id: student.id,
+              course_id: courseId,
+              role: values.role, // Include the role from form values
+            }),
+          })
+          .then((res) => {
+            if (!res.ok) {
+              return res.json().then((error) => {
+                throw new Error(error.error || "Something went wrong");
+              });
+            }
+            return res.json();
+          })
+          .then(() => {
+            toggleAddModalOpen();
+            getEnrollment();
+          })
+          .catch((error) => {
+            console.error("Error creating enrollment:", error);
+            message.error("An error occurred while creating enrollment.");
+          });
+        })
+        .catch((error) => {
+          console.error("Error fetching user:", error);
+          message.error(error.message);  // Display the error message
+        });
     },
     [courseId, getEnrollment, toggleAddModalOpen]
   );
+
+  // const finishForm = useCallback(
+  //   async (values) => {
+  //     // const { email } = values;
+  //     try {
+  //       let res = await get_student_by_email({ email: values.email });
+  //       console.log(res);
+
+  //       const student = res.data[0];
+  //       console.log(student)
+  //       await createEnrollment({ student_id: student.id, course_id: courseId })
+
+  //       toggleAddModalOpen();
+  //       getEnrollment();
+  //     }
+  //     catch (e) {
+  //       if (e.response.status === 404) {
+  //         alert("User does not exist")
+  //       }
+  //     }
+
+  //     // fetch(
+  //     //   process.env.REACT_APP_API_URL + "/get_student?" +
+  //     //     new URLSearchParams({
+  //     //       email: email,
+  //     //     })
+  //     // )
+  //     //   .then((res) => res.json())
+  //     //   .then((student) =>
+  //     //     createEnrollment({
+  //     //       student_id: student.id,
+  //     //       course_id: courseId,
+  //     //     }).then((res) => {
+  //     //       toggleAddModalOpen();
+  //     //       getEnrollment();
+  //     //     })
+  //     //   );
+  //   },
+  //   [courseId, getEnrollment, toggleAddModalOpen]
+  // );
 
   const finishCSVForm = useCallback();
     //toggleAddCSVModalOpen()
