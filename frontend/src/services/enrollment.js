@@ -16,6 +16,6 @@ export async function createTA(params) {
   return service("create_ta_enrollment", params, "post");
 }
 
-export async function deleteUser(params) {
+export async function deleteEnrollment(params) {
   return service("delete_enrollment", params, "delete");
 }

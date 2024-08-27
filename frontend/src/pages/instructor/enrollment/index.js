@@ -17,7 +17,7 @@ import {
   createEnrollment,
   createEnrollmentBulk,
   createTA,
-  deleteUser,
+  deleteEnrollment,
   getCourseEnrollment,
 } from "../../../services/enrollment";
 import { useParams } from "react-router-dom";
@@ -108,7 +108,7 @@ export default () => {
     async (values) => {
       try {
         const selectedStudentID = values.student;
-        let res = await deleteUser({ student_id: selectedStudentID, course_id: courseId });
+        let res = await deleteEnrollment({ student_id: selectedStudentID, course_id: courseId });
 
         if (res.status === 200) {
           const updatedEnrollment = enrollment.filter(student => student.id !== selectedStudentID);

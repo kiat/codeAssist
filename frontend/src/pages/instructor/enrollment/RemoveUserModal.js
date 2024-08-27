@@ -1,6 +1,6 @@
 import { Button, Form, Input, Modal, Radio, Space, Select } from "antd";
 import React, { useEffect, useState } from 'react'
-import { deleteUser, getCourseEnrollment } from '../../../services/enrollment';
+import { deleteEnrollment, getCourseEnrollment } from '../../../services/enrollment';
 
 const { Option } = Select;
 

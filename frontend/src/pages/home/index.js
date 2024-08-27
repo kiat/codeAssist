@@ -182,26 +182,6 @@ export default function Home() {
                 // }}
               />
             </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                textAlign: "center"
-              }}
-            >
-              <GoogleLogin
-                onSuccess={credentialResponse => {
-                  handleOAuth(credentialResponse);
-                }}
-                onError={() => {
-                  console.log('Login Failed');
-                }}
-                // style={{
-                //   flex: 1,
-                //   display: "flex",
-                // }}
-              />
-            </div>
           </div>
         </div>
       </div>

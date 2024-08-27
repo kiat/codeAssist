@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, Course, Enrollment, User, Submission, RegradeRequest, Enrollment
-from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema, StudentSchema
+from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 
 course = Blueprint('course', __name__)
 
@@ -158,7 +158,9 @@ def delete_enrollment():
         student_to_delete = db.session.query(Enrollment).filter_by(student_id=student_id, course_id=course_id).first()
         db.session.delete(student_to_delete)
         db.session.commit()
+
         return jsonify("Student deleted successfully"), 200
+    
     except:
         return jsonify("Student not found"), 404
 

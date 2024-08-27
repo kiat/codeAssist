@@ -5,8 +5,8 @@ import string
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Student, Instructor, GoogleUser, User
-from api.schemas import StudentSchema, InstructorSchema, GoogleUserSchema, UserSchema
+from api.models import User
+from api.schemas import UserSchema
 
 user = Blueprint('user', __name__)
 

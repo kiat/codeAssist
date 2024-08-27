@@ -1,10 +1,5 @@
-from api.models import Course, Enrollment, Assignment, Submission, User, TestCaseResult, TestCase, RegradeRequest, GoogleUser
+from api.models import Course, Enrollment, Assignment, Submission, User, TestCaseResult, TestCase, RegradeRequest
 from api import ma
-
-class GoogleUserSchema(ma.SQLAlchemyAutoSchema):
-    class Meta:
-        model = GoogleUser
-        include_fk = True
 
 class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:

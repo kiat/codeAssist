@@ -2,7 +2,7 @@ import { Button, Form, Input, Modal, Radio } from "antd";
 import { useContext, useEffect, useState } from "react";
 import { GlobalContext } from "../../App";
 // import axios from "axios";
-import { instructorLogin, studentLogin } from "../../services/user";
+import { userLogin } from "../../services/user";
 
 /**
  * login window modal

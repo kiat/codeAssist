@@ -2,8 +2,8 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission, RegradeRequest, Course, Enrollment, Student
-from api.schemas import AssignmentSchema, SubmissionSchema, CourseSchema, EnrollmentSchema, StudentSchema
+from api.models import Assignment, Submission, RegradeRequest, Course, Enrollment
+from api.schemas import AssignmentSchema, SubmissionSchema, CourseSchema, EnrollmentSchema
 
 assignment = Blueprint('assignment', __name__)
 

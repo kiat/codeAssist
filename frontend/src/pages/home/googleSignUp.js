@@ -3,7 +3,7 @@ import { Button, Form, Input, Modal, Radio } from "antd";
 // import axios from "axios";
 import { GlobalContext } from "../../App";
 // import service from "../../services";
-import { signUpInstructor, signUpStudent, signUpUser } from "../../services/user";
+import { googleSignUp } from "../../services/user";
 
 function GoogleSignUp({ open, onCancel, googleValues }) {
   const { updateUserInfo } = useContext(GlobalContext);
@@ -14,7 +14,7 @@ function GoogleSignUp({ open, onCancel, googleValues }) {
 
     let res;
     try {
-      res = await create_google_user(values);
+      res = await googleSignUp(values);
 
       if (res) {
         const userInfo = {
