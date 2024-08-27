@@ -1,5 +1,7 @@
 import uuid
 import requests
+import random
+import string
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
@@ -88,6 +90,11 @@ def create_google_user():
     # TODO Create new database tables to unify all users
     if request.method != "POST":
         return "all good"
+
+    # generate random, encrypted password to be used within the database
+    characters = string.ascii_letters + string.digits + string.punctuation
+    password = ''.join(random.choice(characters) for _ in range(12))
+
     user_id = str(uuid.uuid4())
     name = request.json['name']
     email_address = data['email']
@@ -98,15 +105,17 @@ def create_google_user():
         "id": user_id,
         "name": name,
         "email_address": email_address,
+        "password": password,
         "sis_user_id": sis_user_id,
         "student": student
     }
 
-    db.session.add(GoogleUser(**user_data))
+    db.session.add(User(**user_data))
     db.session.commit()
 
-    res = db.session.query(GoogleUser).filter_by(id=user_id)
-    res = GoogleUserSchema().dump(res, many=True)[0]
+    res = db.session.query(User).filter_by(id=user_id)
+    res = UserSchema().dump(res, many=True)[0]
+
     response = jsonify(res)
     return response
 
@@ -129,11 +138,10 @@ def google_login():
         return "Invalid google token", 400
     
     # Check the database if there is already a valid login in place
-    
     email = data['email']
 
-    res = db.session.query(GoogleUser).filter_by(email_address=email)
-    res = GoogleUserSchema().dump(res, many=True)
+    res = db.session.query(User).filter_by(email_address=email)
+    res = UserSchema().dump(res, many=True)
 
     if len(res) == 0:
         return email, 202
