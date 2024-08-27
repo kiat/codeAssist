@@ -8,7 +8,7 @@ import SignUpModal from "./signUpModal";
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleOneTapLogin } from '@react-oauth/google';
 import GoogleSignUp from "./googleSignUp";
-import { userLogin } from "../../services/user";
+import { googleLogin } from "../../services/user";
 
 /**
  * home modal
@@ -51,7 +51,7 @@ export default function Home() {
   const handleOAuth = async (credentialResponse) => {
     let res;
     try {
-      res = await userLogin(credentialResponse);
+      res = await googleLogin(credentialResponse);
     }
     catch (error) {
       if (!error.response) {

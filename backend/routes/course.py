@@ -189,45 +189,6 @@ def create_ta_enrollment():
 
     return jsonify({"message": "Success"}), 200
 
-@course.route('/delete_enrollment', methods=["DELETE"])
-@cross_origin()
-def delete_enrollment():
-    try:
-        student_id = request.json["student_id"]
-        course_id = request.json["course_id"]
-
-        student_to_delete = db.session.query(Enrollment).filter_by(student_id=student_id, course_id=course_id).first()
-        db.session.delete(student_to_delete)
-        db.session.commit()
-        return jsonify("Student deleted successfully"), 200
-    except:
-        return jsonify("Student not found"), 404
-    
-@course.route('/create_ta_enrollment', methods=["POST", "GET"])
-@cross_origin()
-def create_ta_enrollment():
-    '''
-    /create_ta_enrollment enrolls a TA in a course
-    '''
-    student_id = request.json["student_id"]
-    course_id = request.json["course_id"]
-
-    # try:
-    #     student_email = request.json["student_email"]
-    # except:
-    #     print("no student email")
-
-    enrollment_data = {
-        "student_id": student_id,
-        "course_id": course_id,
-        "role": "ta"
-    }
-
-    newTAcommand = db.session.query(Enrollment).filter_by(student_id=student_id, course_id=course_id).update(enrollment_data)
-    db.session.commit()
-
-    return jsonify({"message": "Success"}), 200
-
 @course.route('/create_enrollment', methods=["POST", "GET"])
 @cross_origin()
 def create_enrollment():

@@ -35,51 +35,11 @@ export default function LogInModal({ open, onCancel, logIn }) {
         alert('User authentication failed. Invalid Username/Password combination');
       }
     }
-    // axios
-    //   .post("/logIn", values)
-    //   .then(res => {
-    //     if (res.data.status === 1) {
-    //       const { name, isStudent } = res.data.data;
-    //       const userInfo = { name, isStudent };
-    //       localStorage.setItem("userInfo", JSON.stringify(userInfo));
-    //       updateUserInfo(userInfo);
-    //     } else {
-    //       message.error("login failed");
-    //     }
-    //   })
-    //   .catch(err => {
-    //     message.error("connection failed");
-    //   });
-    // return;
-  };
-
-  const handleCancel = () => {
-    onCancel();
   };
 
   return (
-    <Modal title="LOG IN" open={open} footer={null} onCancel={handleCancel}>
+    <Modal title="LOG IN" open={open} footer={null} onCancel={onCancel}>
       <Form layout="vertical" onFinish={onSubmit}>
-        <Form.Item name="isStudent" initialValue={1} style={{ width: "100%" }}>
-          <Radio.Group
-            optionType="button"
-            buttonStyle="solid"
-            style={{ display: "flex", width: "100%" }}
-          >
-            <Radio.Button
-              value={0}
-              style={{ flex: 1, textAlign: "center" }}
-            >
-              Instructor
-            </Radio.Button>
-            <Radio.Button
-              value={1}
-              style={{ flex: 1, textAlign: "center" }}
-            >
-              Student
-            </Radio.Button>
-          </Radio.Group>
-        </Form.Item>
         <Form.Item label="Email" name="email">
           <Input placeholder="Your Email" />
         </Form.Item>

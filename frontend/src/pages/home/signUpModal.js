@@ -21,18 +21,18 @@ export default function SignUpModal({ open, onCancel }) {
     // const isStudent = values.isStudent;
     let res;
     res = await signUpUser({...restValue, role});
+    console.log(res);
 
     if (res) {
       const userInfo = {
         name: res.data?.name,
         id: res.data?.id,
-        isStudent: role === 'student',
+        isStudent: role === "student",
         role: role
       };
       localStorage.setItem("userInfo", JSON.stringify(userInfo));
       updateUserInfo(userInfo);
     }
-
   };  
 
   return (

@@ -10,7 +10,6 @@ function GoogleSignUp({ open, onCancel, googleValues }) {
 
   const finishSignUp = async (values) => {
     values["credential"] = googleValues.credential;
-    // console.log(values)
 
     let res;
     try {
@@ -40,20 +39,20 @@ function GoogleSignUp({ open, onCancel, googleValues }) {
     <div>
       <Modal title="Finish Sign Up" open={open} footer={null} onCancel={onCancel}>
         <Form layout="vertical" onFinish={finishSignUp}>
-          <Form.Item name="role" initialValue={1} style={{ width: "100%" }}>
+          <Form.Item name="role" initialValue={"student"} style={{ width: "100%" }}>
             <Radio.Group
               optionType="button"
               buttonStyle="solid"
               style={{ display: "flex", width: "100%" }}
             >
               <Radio.Button
-                value={0}
+                value={"instructor"}
                 style={{ flex: 1, textAlign: "center" }}
               >
                 Instructor
               </Radio.Button>
               <Radio.Button
-                value={1}
+                value={"student"}
                 style={{ flex: 1, textAlign: "center" }}
               >
                 Student
