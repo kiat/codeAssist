@@ -19,3 +19,7 @@ export async function googleSignUp(params) {
 export async function googleLogin(params) {
   return service("google_login", params, "post");
 }
+
+export async function get_student_by_email(params) {
+  return service("get_student", params, "get");
+}

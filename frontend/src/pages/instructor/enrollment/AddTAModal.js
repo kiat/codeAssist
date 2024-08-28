@@ -1,10 +1,7 @@
-import { Button, Form, Input, Modal, Radio, Space, Select } from "antd";
-import React, { useEffect, useState } from 'react'
-import { getCourseEnrollment } from '../../../services/enrollment';
-
+import { Button, Form, Modal, Space, Select } from "antd";
 const { Option } = Select;
 
-function AddTAModal({ open, toggleAddModalOpen, onFinish, course_id, enrollment }) {
+function AddTAModal({ open, toggleAddModalOpen, onFinish, enrollment, form }) {
   // const [students, setStudents] = useState(["No Students"]);
 
   // useEffect(() => {
@@ -25,7 +22,7 @@ function AddTAModal({ open, toggleAddModalOpen, onFinish, course_id, enrollment 
       footer={null}
       onCancel={toggleAddModalOpen}
     >
-      <Form layout="vertical" onFinish={onFinish}>
+      <Form form={form} layout="vertical" onFinish={onFinish}>
         {/* <Form.Item label="STUDENT" name="student" rules={[{ required: true, message: 'Please select a student' }]}>
           <Select>
             {students.map((name, index) => (
@@ -34,9 +31,10 @@ function AddTAModal({ open, toggleAddModalOpen, onFinish, course_id, enrollment 
           </Select>
         </Form.Item> */}
         <Form.Item label="STUDENT" name="student" rules={[{ required: true, message: 'Please select a student' }]}>
-          <Select>
-            {enrollment.filter(student => student.role !== "ta").map((student, index) => (
-              <Option key={index} value={student.id}>{student.sis_user_id}</Option>
+          <Select placeholder="Select a student">
+            {/* <Option disabled={true}></Option> */}
+            {enrollment.filter(student => student.role === "student").map((student, index) => (
+              <Option key={index} value={student.student_id}>{student.name}: ({student.sis_user_id})</Option>
             ))}
           </Select>
         </Form.Item>

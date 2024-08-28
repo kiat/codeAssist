@@ -43,6 +43,8 @@ export default () => {
   const urlParams = useParams();
   const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const { courseId } = urlParams;
+  const [addTAForm] = Form.useForm();
+  const [removeUserForm] = Form.useForm();
 
   const toggleRemoveUserModal = useCallback(() => {
     setRemoveUserModalOpen((t) => !t);
@@ -70,6 +72,12 @@ export default () => {
       setEnrollment(res.data);
     });
   }, [courseId]);
+
+  const roleCounts = enrollment.reduce((acc, user) => {
+    const { role } = user;
+    acc[role] = (acc[role] || 0) + 1;
+    return acc;
+  }, {});
 
   const handleRoleChange = useCallback(
     (newRole, studentId) => {
@@ -114,11 +122,12 @@ export default () => {
           const updatedEnrollment = enrollment.filter(student => student.id !== selectedStudentID);
           setEnrollment(updatedEnrollment);
           alert("User was successfully deleted");
-        }
 
+          toggleRemoveUserModal();
+          removeUserForm.resetFields();
+        }
       }
       catch {
-        console.log("error while deleting user");
         alert("An error occured while deleting a user");
       }
     }
@@ -128,10 +137,20 @@ export default () => {
     async (values) => {
       try {
         let res = await createTA({ student_id: values.student, course_id: courseId });
-        console.log(res.data);
+
+        // Update enrollment state variable
+        const userIndex = enrollment.findIndex(student => student.student_id === values.student);
+        const updatedUsers = [...enrollment];
+        updatedUsers[userIndex].role = 'ta';
+        setEnrollment(updatedUsers);
+
+        // Handletoggle on the form and reset selected option
+        toggleAddTAModal();
+        addTAForm.resetFields();
+        alert("TA was successfully added!");
       }
-      catch {
-        console.log("error while creating TA");
+      catch (e) {
+        alert("An error occured while deleting a user");
       }
     }
   );
@@ -194,46 +213,6 @@ export default () => {
     },
     [courseId, getEnrollment, toggleAddModalOpen]
   );
-
-  // const finishForm = useCallback(
-  //   async (values) => {
-  //     // const { email } = values;
-  //     try {
-  //       let res = await get_student_by_email({ email: values.email });
-  //       console.log(res);
-
-  //       const student = res.data[0];
-  //       console.log(student)
-  //       await createEnrollment({ student_id: student.id, course_id: courseId })
-
-  //       toggleAddModalOpen();
-  //       getEnrollment();
-  //     }
-  //     catch (e) {
-  //       if (e.response.status === 404) {
-  //         alert("User does not exist")
-  //       }
-  //     }
-
-  //     // fetch(
-  //     //   process.env.REACT_APP_API_URL + "/get_student?" +
-  //     //     new URLSearchParams({
-  //     //       email: email,
-  //     //     })
-  //     // )
-  //     //   .then((res) => res.json())
-  //     //   .then((student) =>
-  //     //     createEnrollment({
-  //     //       student_id: student.id,
-  //     //       course_id: courseId,
-  //     //     }).then((res) => {
-  //     //       toggleAddModalOpen();
-  //     //       getEnrollment();
-  //     //     })
-  //     //   );
-  //   },
-  //   [courseId, getEnrollment, toggleAddModalOpen]
-  // );
 
   const finishCSVForm = useCallback();
     //toggleAddCSVModalOpen()
@@ -337,9 +316,9 @@ export default () => {
         }}
       >
         <Space size="large">
-          <Typography.Title level={5}>50 students</Typography.Title>
-          <Typography.Title level={5}>2 instructors</Typography.Title>
-          <Typography.Title level={5}>2 TAs</Typography.Title>
+          <Typography.Title level={5}>{roleCounts["student"]} students</Typography.Title>
+          <Typography.Title level={5}>{roleCounts["instructor"]} instructors</Typography.Title>
+          <Typography.Title level={5}>{roleCounts["ta"]} TAs</Typography.Title>
         </Space>
         <div
           style={{
@@ -376,15 +355,14 @@ export default () => {
         onFinish={finishRemoveUser}
         course_id={courseId}
         enrollment={enrollment}
-        setEnrollment={setEnrollment}
+        form={removeUserForm}
       />
       <AddTAModal
         open={addTAModalOpen}
         toggleAddModalOpen={toggleAddTAModal}
         onFinish={finishAddTAForm}
-        course_id={courseId}
         enrollment={enrollment}
-        setEnrollment={setEnrollment}
+        form={addTAForm}
       />
       <AddUserModal
         open={addModalOpen}

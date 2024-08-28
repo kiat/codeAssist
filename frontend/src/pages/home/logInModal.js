@@ -1,5 +1,5 @@
 import { Button, Form, Input, Modal, Radio } from "antd";
-import { useContext, useEffect, useState } from "react";
+import { useContext } from "react";
 import { GlobalContext } from "../../App";
 // import axios from "axios";
 import { userLogin } from "../../services/user";
@@ -12,10 +12,8 @@ import { userLogin } from "../../services/user";
 export default function LogInModal({ open, onCancel, logIn }) {
   const { updateUserInfo } = useContext(GlobalContext);
 
-  // login action
   const onSubmit = async (values) => {
-    // const isStudent = values.isStudent;
-    const { isStudent, ...restValue } = values;
+    const {...restValue } = values;
     let res;
     try {
       res = await userLogin(restValue);
@@ -23,14 +21,13 @@ export default function LogInModal({ open, onCancel, logIn }) {
         const userInfo = {
           name: res.data?.name,
           id: res.data?.id,
-          isStudent,
+          isStudent: res.data?.role === 'student',
+          role: res.data?.role
         };
         localStorage.setItem("userInfo", JSON.stringify(userInfo));
         updateUserInfo(userInfo);
       } 
-    }
-    
-    catch (error) {
+    } catch (error) {
       if (error.response) {
         alert('User authentication failed. Invalid Username/Password combination');
       }

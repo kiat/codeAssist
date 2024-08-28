@@ -7,9 +7,6 @@ import GradeSider from './GradeSider';
 import styles from './styles.module.css';
 
 function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed }) {
-  const Capitalize = (str) =>{
-    return str.toUpperCase();
-  }
 
   return (
     <>
@@ -74,16 +71,10 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed }) {
                 
               </Space>
             </Card>
-            <Card title={Capitalize(userInfo?.role)} size='small' bordered={false}>
+            <Card title={userInfo?.role} size='small' bordered={false}>
               <div className={styles.iconText}>
                 <UserOutlined />
                 <span> {userInfo?.name}</span>
-              </div>
-            </Card>
-            <Card title='ADD INSTRUCTORS' size='small' bordered={false}>
-              <div className={styles.iconText}>
-                <span>Add instructors test</span>
-                <button>Add instructors</button>
               </div>
             </Card>
             <Card title='COURSE ACTIONS' size='small' bordered={false}>

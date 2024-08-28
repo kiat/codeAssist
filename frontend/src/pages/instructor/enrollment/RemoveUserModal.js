@@ -4,7 +4,7 @@ import { deleteEnrollment, getCourseEnrollment } from '../../../services/enrollm
 
 const { Option } = Select;
 
-function RemoveUserModal({ open, toggleAddModalOpen, onFinish, course_id, enrollment }) {
+function RemoveUserModal({ open, toggleAddModalOpen, onFinish, enrollment, form }) {
   // const [students, setStudents] = useState(["No Students"]);
 
   // useEffect(() => {
@@ -28,7 +28,7 @@ function RemoveUserModal({ open, toggleAddModalOpen, onFinish, course_id, enroll
       footer={null}
       onCancel={toggleAddModalOpen}
     >
-      <Form layout="vertical" onFinish={onFinish}>
+      <Form form={form} layout="vertical" onFinish={onFinish}>
         <Form.Item label="STUDENT" name="student" rules={[{ required: true, message: 'Please select a student' }]}>
           <Select>
             {enrollment.map((student, index) => (
