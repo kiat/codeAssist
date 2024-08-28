@@ -13,8 +13,10 @@ Because CodeAssist is a based around UT Austin's programming courses, a necessar
 7. Save the newly created Client ID in the frontend .env file as REACT_APP_CLIENT_ID
 
 **An Example .env**
-`   REACT_APP_API_URL=http://localhost:5000/
-    REACT_APP_CLIENT_ID=6385ospaidfpwoiee1sa56678uckg9futpnp7hhdq8a.apps.googleusercontent.com`
+    ```
+    REACT_APP_API_URL=http://localhost:5000/
+    REACT_APP_CLIENT_ID=6385ospaidfpwoiee1sa56678uckg9futpnp7hhdq8a.apps.googleusercontent.com
+    ```
 
 # Frontend
 
@@ -29,4 +31,4 @@ Response Format:
 
 # Backend
 
-**New Endpoints**
+The backend works similarly to the current user signup and login features in place. First, before any action, it authenticates whether or not the id token is functional. Then it checks whether or not the user already exists within the database. If they do not, then a new user is a created with a random, secure 12 length password. Then the user is logged in afterwards.
