@@ -13,8 +13,8 @@ Because CodeAssist is a based around UT Austin's programming courses, a necessar
 7. Save the newly created Client ID in the frontend .env file as REACT_APP_CLIENT_ID
 
 **An Example .env**
-    REACT_APP_API_URL=http://localhost:5000/
-    REACT_APP_CLIENT_ID=638552505153-melmqe1sa56678uckg9futpnp7hhdq8a.apps.googleusercontent.com
+`   REACT_APP_API_URL=http://localhost:5000/
+    REACT_APP_CLIENT_ID=6385ospaidfpwoiee1sa56678uckg9futpnp7hhdq8a.apps.googleusercontent.com`
 
 # Frontend
 
