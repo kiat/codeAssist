@@ -17,6 +17,9 @@ Because CodeAssist is a based around UT Austin's programming courses, a necessar
     REACT_APP_API_URL=http://localhost:5000/
     REACT_APP_CLIENT_ID=6385ospaidfpwoiee1sa56678uckg9futpnp7hhdq8a.apps.googleusercontent.com
     ```
+# Design
+
+!(images/Oauth.png)
 
 # Frontend
 
