@@ -5,7 +5,7 @@ export async function getCourseEnrollment(params) {
 }
 
 export async function createEnrollment(params) {
-  return service("create_enrollment", params, "post");  
+  return service("create_enrollment", params, "post");
 }
 
 export async function createEnrollmentBulk(params) {

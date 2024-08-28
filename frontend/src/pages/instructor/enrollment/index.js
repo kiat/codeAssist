@@ -68,7 +68,6 @@ export default () => {
 
   const getEnrollment = useCallback(() => {
     getCourseEnrollment({ course_id: courseId }).then((res) => {
-      console.log(res)
       setEnrollment(res.data);
     });
   }, [courseId]);
@@ -340,12 +339,12 @@ export default () => {
             <Button icon={<PlusOutlined />} onClick={toggleAddCSVModalOpen}>
               Add With CSV
             </Button>
-            {/* <Button
+            <Button
               icon={<PlusOutlined />}
               onClick={toggleAddMoreUsersModalOpen}
             >
               Add More Students
-            </Button> */}
+            </Button>
           </Space>
         </div>
       </div>
@@ -374,11 +373,11 @@ export default () => {
         toggleAddModalOpen={toggleAddCSVModalOpen}
         finishCSVForm={finishCSVForm}
       />
-      {/* <AddMoreUsersModal
+      <AddMoreUsersModal
         toggleAddMoreUsersModalOpen={toggleAddMoreUsersModalOpen}
         open={addMoreUsersModalOpen}
         finishMoreUsers={finishMoreUsers}
-      /> */}
+      />
     </>
   );
 };

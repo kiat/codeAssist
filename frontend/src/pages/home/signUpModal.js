@@ -21,7 +21,6 @@ export default function SignUpModal({ open, onCancel }) {
     // const isStudent = values.isStudent;
     let res;
     res = await signUpUser({...restValue, role});
-    console.log(res);
 
     if (res) {
       const userInfo = {
