@@ -19,7 +19,7 @@ Because CodeAssist is a based around UT Austin's programming courses, a necessar
     ```
 # Design
 
-!(images/Oauth.png)
+![Design image](images/Oauth.png)
 
 # Frontend
 
