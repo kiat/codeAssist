@@ -11,8 +11,24 @@ instance.interceptors.response.use(
     return res;
   },
   err => {
-    message.error("operation failed");
-    return Promise.reject(err); // TODO: put real error reason
+    let errorMessage = 'Operation failed';
+
+    if (err.response) {
+      // Server responded with a status other than 200 range
+      if (err.response.status) {
+        errorMessage = err.response.data.message;
+      } else {
+        errorMessage = 'An unexpected error occurred. Please try again.';
+      }
+    } else if (err.request) {
+      // Request was made but no response was received
+      errorMessage = 'No response from the server. Please check your network connection.';
+    } else {
+      // Something happened in setting up the request that triggered an error
+      errorMessage = 'Request error. Please try again.';
+    }
+    message.error(errorMessage);
+    return Promise.reject(err);
   }
 );
 

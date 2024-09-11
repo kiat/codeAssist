@@ -26,8 +26,7 @@ import { useState } from "react";
 
 const { Sider, Content } = Layout;
 
-export default ({ currentStep, updateCurrentStep, toggleIsCreate, form }) => {
-  // const [currentStep, setCurrentStep] = useState(0);
+export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidationStatus, form }) => {
   const [assignmentType, setAssignmentType] = useState(0);
   return (
     <>
@@ -49,11 +48,14 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, form }) => {
           <Menu
             onClick={({ key }) => {
               setAssignmentType(key);
-              // setCurrentStep(1);
               updateCurrentStep(1);
             }}
             items={[
-              { label: "Exam / Quiz", key: 0, icon: <FileTextOutlined /> },
+              { 
+                label: "Exam / Quiz", 
+                key: 0, 
+                icon: <FileTextOutlined /> 
+              },
               {
                 label: "Homework / Problem Set",
                 key: 1,
@@ -78,7 +80,6 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, form }) => {
               <Typography.Link
                 onClick={() => {
                   setAssignmentType("");
-                  // setCurrentStep(0);
                   updateCurrentStep(0);
                 }}
               >
@@ -114,7 +115,11 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, form }) => {
           <Content>
             <Card bordered={false}>
               <Form layout='vertical' form={form}>
-                <Form.Item label='ASSIGNMENT NAME' name='name'>
+                <Form.Item 
+                  label='ASSIGNMENT NAME'
+                  name='name'
+                  validateStatus={nameValidationStatus}
+                >
                   <Input placeholder='Name your assignment' />
                 </Form.Item>
                 {assignmentType !== "2" ? (
