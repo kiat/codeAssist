@@ -57,9 +57,9 @@ def enroll_course():
     /enroll_course enrolls a student in a course using entryCode
     Requires from the frontend a JSON containing:
     @param entryCode        entryCode of the course
-    @param student_id       id of the student
+    @param user_id       id of the student
     '''
-    student_id = request.json['student_id']
+    student_id = request.json['user_id']
     entryCode = request.json['entryCode']
     enrolledCourse = db.session.query(Course).filter_by(entryCode=entryCode)
     enrolled_list = [enroll.id for enroll in enrolledCourse]
@@ -289,7 +289,7 @@ def get_instructor_courses():
 
     courses = db.session.query(Course).filter(Course.id.in_(list_of_courses))
     courses = CourseSchema().dump(courses, many=True)
-    
+
     return jsonify(courses)
 
 @course.route('/get_course_info', methods=["GET"])
