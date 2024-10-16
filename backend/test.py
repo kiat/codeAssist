@@ -1,7 +1,7 @@
 import unittest
 import requests
 
-env_file = "http://localhost:5000"
+env_file = "http://localhost:5001"
 
 
 class APITestCase(unittest.TestCase):
@@ -21,7 +21,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_instructor(cls):
         """Create an instructor and return the ID."""
-        url = "http://localhost:5000/create_user"
+        url = "http://localhost:5001/create_user"
         data = {
             "name": "Instructor Name",
             "email": "instructor@email.com",
@@ -35,7 +35,7 @@ class APITestCase(unittest.TestCase):
     @classmethod
     def create_student(cls):
         """Create a student and return the ID."""
-        url = "http://localhost:5000/create_user"
+        url = "http://localhost:5001/create_user"
         data = {
             "name": "Ricky Woodruff",
             "email": "ricky@student.com",

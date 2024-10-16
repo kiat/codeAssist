@@ -289,6 +289,8 @@ def get_instructor_courses():
 
     courses = db.session.query(Course).filter(Course.id.in_(list_of_courses))
     courses = CourseSchema().dump(courses, many=True)
+    
+    return jsonify(courses)
 
 @course.route('/get_course_info', methods=["GET"])
 @cross_origin()
