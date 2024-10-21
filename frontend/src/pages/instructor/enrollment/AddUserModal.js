@@ -24,7 +24,7 @@ export default ({ open, toggleAddModalOpen, onFinish }) => {
           <Input />
         </Form.Item>
         <Form.Item label="ROLE" name="role">
-          <Radio.Group options={["Student", "Instructor", "TA"]} />
+          <Radio.Group options={["student", "instructor", "TA"]} />
         </Form.Item>
         <Form.Item
           label="EMAIL NOTIFICATION"

@@ -8,6 +8,7 @@ import {
   Space,
   Table,
   Typography,
+  message
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
@@ -25,18 +26,11 @@ import AddCSVModal from "./AddCSVModal";
 const columns = [
   { title: "NAME", dataIndex: "name" },
   { title: "EMAIL", dataIndex: "email_address" },
-  // { title: "ROLE", dataIndex: "role" },
-  // { title: "SECTIONS", dataIndex: "sections" },
-  // { title: "SUBMISSIONS", dataIndex: "submissions" },
-  // {
-  //   title: "REMOVE",
-  //   render: () => (
-  //     <Button type='primary' size='small' danger icon={<CloseOutlined />} />
-  //   ),
-  // },
 ];
 
 export default () => {
+  const { userInfo } = useContext(GlobalContext);
+  
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCSVModalOpen, setAddCSVModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
@@ -62,29 +56,98 @@ export default () => {
     });
   }, [courseId]);
 
+  const handleRoleChange = useCallback(
+    (newRole, studentId) => {
+      message.info("You are changing a student's role in the course.");
+
+      fetch(process.env.REACT_APP_API_URL + "/update_role", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          student_id: studentId,
+          course_id: courseId,
+          new_role: newRole,
+        }),
+      })
+        .then((res) => {
+          if (!res.ok) {
+            return res.json().then((error) => {
+              throw new Error(error.error || "Something went wrong");
+            });
+          }
+          return res.json();
+        })
+        .then(() => {
+          getEnrollment(); // Refresh the enrollment list
+        })
+        .catch((error) => {
+          console.error("Error updating role:", error);
+        });
+    },
+    [courseId, getEnrollment]
+  );
+
   const finishForm = useCallback(
     (values) => {
       const { email } = values;
-
+  
       fetch(
-        process.env.REACT_APP_API_URL + "/get_student?" +
+        process.env.REACT_APP_API_URL + "/get_users?" +
           new URLSearchParams({
             email: email,
           })
       )
-        .then((res) => res.json())
-        .then((student) =>
-          createEnrollment({
-            student_id: student.id,
-            course_id: courseId,
-          }).then((res) => {
+        .then((res) => {
+          if (!res.ok) {
+            if (res.status === 404) {
+              throw new Error("User not found");
+            } else {
+              return res.json().then((error) => {
+                throw new Error(error.error || "Something went wrong");
+              });
+            }
+          }
+          return res.json();
+        })
+        .then((student) => {
+          fetch(process.env.REACT_APP_API_URL + "/create_enrollment", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              student_id: student.id,
+              course_id: courseId,
+              role: values.role, // Include the role from form values
+            }),
+          })
+          .then((res) => {
+            if (!res.ok) {
+              return res.json().then((error) => {
+                throw new Error(error.error || "Something went wrong");
+              });
+            }
+            return res.json();
+          })
+          .then(() => {
             toggleAddModalOpen();
             getEnrollment();
           })
-        );
+          .catch((error) => {
+            console.error("Error creating enrollment:", error);
+            message.error("An error occurred while creating enrollment.");
+          });
+        })
+        .catch((error) => {
+          console.error("Error fetching user:", error);
+          message.error(error.message);  // Display the error message
+        });
     },
     [courseId, getEnrollment, toggleAddModalOpen]
   );
+  
   const finishCSVForm =
     useCallback();
     //toggleAddCSVModalOpen()
@@ -96,7 +159,7 @@ export default () => {
 
       function enrollmentBulk(item) {
         fetch(
-          process.env.REACT_APP_API_URL + "/get_student?" +
+          process.env.REACT_APP_API_URL + "/get_users?" +
             new URLSearchParams({
               email: item,
             })
@@ -104,21 +167,14 @@ export default () => {
           .then((res) => res.json())
           .then((student) =>
             createEnrollment({
-              student_id: student.id,
-              course_id: courseId,
+              'student_id': student.id,
+              'course_id': courseId,
             }).then((res) => {
               toggleAddMoreUsersModalOpen();
               getEnrollment();
             })
           );
       }
-      // createEnrollmentBulk({
-      //   course_id: courseId,
-      //   student_ids: values,
-      // }).then(() => {
-      //   toggleAddMoreUsersModalOpen();
-      //   getEnrollment();
-      // });
     },
     [courseId, getEnrollment, toggleAddMoreUsersModalOpen]
   );
@@ -158,7 +214,29 @@ export default () => {
             <Button type="primary">search</Button>
           </Form.Item>
         </Form>
-        <Table columns={columns} dataSource={enrollment} rowKey="id" />
+        <Table
+          columns={[
+            ...columns,
+            {
+              title: "ROLE",
+              dataIndex: "role",
+              render: (text, record) => (
+                <Select
+                  defaultValue={text}
+                  style={{ width: 120 }}
+                  onChange={(value) => handleRoleChange(value, record.id)}
+                  disabled={text === "instructor"} // Disable dropdown if the role is instructor
+                >
+                  <Select.Option value="student">Student</Select.Option>
+                  <Select.Option value="TA">TA</Select.Option>
+                  <Select.Option value="instructor">Instructor</Select.Option>
+                </Select>
+              ),
+            },
+          ]}
+          dataSource={enrollment}
+          rowKey="id"
+        />
       </Card>
       <div
         style={{

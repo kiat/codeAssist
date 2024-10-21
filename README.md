@@ -7,6 +7,7 @@ Frontend is hosted at `localhost:3000`
 Backend is hosted at `localhost:5000`  
 Server is hosted at `localhost:5432`
 
+
 Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well (or just switch to `localhost:5001`)
 
 ### Requirements:
@@ -85,9 +86,11 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
 
 11. If you can access the website and can create a user, you can now begin development :bowtie:
 
+
 Notes: 
 - Make sure Postgres is not running on your system (otherwise you will get errors launching the postgres container because the port will conflict). You can either uninstall postgres completely from your system or just kill the run
 - Once again, if you are on macOS, make sure to turn off Airplay because it also runs on `localhost:5000`, otherwise Flask won't run!
+
 
 ## Using [Hoppscotch](https://docs.hoppscotch.io/documentation/getting-started/introduction)
 Hoppscotch is open source [Postman](https://www.linkedin.com/advice/1/why-should-you-use-postman-api-testing-skills-software-testing-a6hbe), it can test endpoints pretty well
@@ -96,10 +99,12 @@ Hoppscotch is open source [Postman](https://www.linkedin.com/advice/1/why-should
 3. Make sure that the database is running (whether you're running the backend in docker container or not), otherwise Hoppscotch won't be able to send requests 
 4. When creating or updating endpoints, make sure to update the collections as well by [adding/updating that endpoint](https://docs.hoppscotch.io/documentation/getting-started/rest/organizing-requests#adding-requests-to-a-collection). 
 
+
 Notes:
 - Make sure that when you are running the collection that the environment is loaded for the specific request you are running.
 - You won't be able to make GET requests until you actually create (POST requests) that student/course/instructor/etc. 
 - GET and DELETE requests require you to fill in the fields in the parameter tab, POST requests require you to fill stuff out in the body tab
+
 
 ## Important Links (Development)
 -   [Design Doc](https://www.dropbox.com/scl/fi/ddxu41wbo558d3m7c8t7t/CodeAssist-Design-Doc.paper?dl=0&rlkey=mlyww3cy74tr2utmmdbnsu6eb)
