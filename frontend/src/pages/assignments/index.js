@@ -147,6 +147,7 @@ export default function Assignments() {
       setModalOpen(true);
       setAssignmentTitle(assignment.name);
       setAssignmentID(assignment.id);
+      setIsLate(false);
     } else if (assignment.late_submission && !lateDueDateHasPassed) {
       setModalOpen(true);
       setAssignmentTitle(assignment.name);
