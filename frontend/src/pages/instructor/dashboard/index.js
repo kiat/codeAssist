@@ -30,19 +30,13 @@ const columns = [
     title: "RELEASED",
     dataIndex: "published_date",
     sorter: (a, b) => a.released - b.released,
-    render: (text) =>
-      moment(text + "Z")
-        .format("MMM DD [AT] h:mmA")
-        .toUpperCase(),
+    render: (text) => moment(text + "Z").format("MMM DD [AT] h:mmA").toUpperCase(),
   },
   {
     title: "DUE(CDT)",
     dataIndex: "due_date",
     sorter: (a, b) => a.due - b.due,
-    render: (text) =>
-      moment(text + "Z")
-        .format("MMM DD [AT] h:mmA")
-        .toUpperCase(),
+    render: (text) => moment(text + "Z").format("MMM DD [AT] h:mmA").toUpperCase(),
   },
   {
     title: "SUBMISSIONS",
@@ -80,38 +74,21 @@ export default function InstructorDashboard() {
 
   const fetchData = async (endpoint, params) => {
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL}${endpoint}?${new URLSearchParams(
-          params
-        )}`
-      );
-      if (!response.ok) throw new Error("Network response was not ok.");
+      const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}?${new URLSearchParams(params)}`);
+      if (!response.ok) throw new Error('Network response was not ok.');
       return await response.json();
     } catch (error) {
-      console.error(
-        "There has been a problem with your fetch operation:",
-        error
-      );
+      console.error('There has been a problem with your fetch operation:', error);
     }
   };
 
   useEffect(() => {
     const initFetch = async () => {
-      const assignmentsData = await fetchData("/get_course_assignments", {
-        course_id: courseId,
-      });
+      const assignmentsData = await fetchData("/get_course_assignments", { course_id: courseId });
       setData(assignmentsData);
 
-      if (
-        !courseInfo.id ||
-        !courseInfo.name ||
-        !courseInfo.year ||
-        !courseInfo.semester ||
-        !courseInfo.entryCode
-      ) {
-        const courseDetails = await fetchData("/get_course_info", {
-          course_id: courseId,
-        });
+      if (!courseInfo.id || !courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode) {
+        const courseDetails = await fetchData("/get_course_info", { course_id: courseId });
         if (courseDetails && courseDetails.length > 0) {
           const [detail] = courseDetails;
           updateCourseInfo({ ...detail, id: courseId });
@@ -126,10 +103,7 @@ export default function InstructorDashboard() {
 
   return (
     <>
-      <PageHeader
-        title={courseInfo.name}
-        subTitle={`${courseInfo.semester} ${courseInfo.year}`}
-      >
+      <PageHeader title={courseInfo.name} subTitle={`${courseInfo.semester} ${courseInfo.year}`}>
         <Descriptions>
           <Descriptions.Item label="Course ID">{courseId}</Descriptions.Item>
         </Descriptions>
