@@ -16,7 +16,6 @@ def update_assignment():
     Requires from the frontend a JSON containing:
     @param assignment_id    the id of the assignment
     '''
-    print("UPDATE")
     new_data = request.json
     assignment_id = request.json["assignment_id"]
 
@@ -51,7 +50,6 @@ def get_assignment():
     Requires from the frontend a JSON containing:
     @param assignment_id    the id of the assignment
     '''
-    print("get_assignmeNT")
     assignment_id = request.args.get("assignment_id")
 
     assignment = db.session.query(Assignment).filter_by(id=assignment_id)
@@ -66,7 +64,6 @@ def create_assignment():
     /create_assignment creates an assignment and generates an assignment
     id in the database
     '''
-    print("TEST")
     assignment_data = request.json
     # Check for duplicate name
     assignment_name = assignment_data.get("name")
