@@ -106,7 +106,9 @@ class AssignmentExtension(db.Model):
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False)
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), nullable=False)
-    new_due_date = db.Column(TIMESTAMP, nullable=False)
+    release_date_extension = db.Column(TIMESTAMP, nullable=True)
+    due_date_extension = db.Column(TIMESTAMP, nullable=True)
+    late_due_date_extension = db.Column(TIMESTAMP, nullable=True)
 
     assignment = db.relationship("Assignment", backref=db.backref("extensions", lazy="dynamic"))
     student = db.relationship("User", backref=db.backref("extensions", lazy="dynamic"))
