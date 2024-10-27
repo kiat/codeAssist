@@ -8,25 +8,36 @@ import {
   Space,
   Typography,
 } from "antd";
+import { useState } from "react";
+import moment from "moment";
 
-export default ({ open, onCancel }) => {
+export default ({ open, onCancel, students, assignmentInfo }) => {
+  const [checkedValues, setCheckedValues] = useState({
+    releaseDate: false,
+    dueDate: false,
+    lateDueDate: false,
+  });
+
+  const handleCheckBoxChange = (type) => {
+    setCheckedValues((prev) => ({
+      ...prev,
+      [type]: !prev[type],
+    }));
+  };
   return (
-    <Modal open={open} onCancel={onCancel} title='Add an Extension'>
-      <Form layout='vertical'>
-        <Form.Item label='STUDENT'>
+    <Modal open={open} onCancel={onCancel} title="Add an Extension">
+      <Form layout="vertical">
+        <Form.Item label="STUDENT">
           <Select
             showSearch
-            placeholder='Search students by name or email'
+            placeholder="Search students by name or email"
             filterOption={(input, option) =>
               option.label.toLowerCase().includes(input.toLowerCase())
             }
-            options={[
-              { label: "aaa - aaa@example.com", value: "aaa" },
-              { label: "aaa2 - aaa2@example.com", value: "aaa2" },
-              { label: "aaa3 - aaa3@example.com", value: "aaa3" },
-              { label: "aaa4 - aaa4@example.com", value: "aaa4" },
-              { label: "aaa5 - aaa5@example.com", value: "aaa5" },
-            ]}
+            options={students.map((student) => ({
+              label: student.name + " - " + student.email_address,
+              value: student.id,
+            }))}
           />
         </Form.Item>
         <div
@@ -43,35 +54,62 @@ export default ({ open, onCancel }) => {
                 <Typography.Title level={5}>
                   RELEASE DATE (CST)
                 </Typography.Title>
-                <Typography.Paragraph>May 1,2022 6:00 AM</Typography.Paragraph>
+                <Typography.Paragraph>
+                  {assignmentInfo && assignmentInfo.published_date
+                    ? moment(assignmentInfo.published_date).format(
+                        "yyyy-MM-DD HH:mm:ss"
+                      )
+                    : "--"}
+                </Typography.Paragraph>
               </div>
               <div>
                 <Typography.Title level={5}>
                   LATE DUE DATE (CST)
                 </Typography.Title>
-                <Typography.Paragraph>May 1,2022 6:00 AM</Typography.Paragraph>
+                <Typography.Paragraph>
+                  {assignmentInfo && assignmentInfo.late_due_date
+                    ? moment(assignmentInfo.late_due_date).format(
+                        "yyyy-MM-DD HH:mm:ss"
+                      )
+                    : "--"}
+                </Typography.Paragraph>
               </div>
             </Col>
             <Col span={12}>
               <div>
                 <Typography.Title level={5}>DUE DATE (CST)</Typography.Title>
-                <Typography.Paragraph>May 1,2022 6:00 AM</Typography.Paragraph>
-              </div>
-              <div>
-                <Typography.Title level={5}>TIME LIMIT</Typography.Title>
-                <Typography.Paragraph>--</Typography.Paragraph>
+                <Typography.Paragraph>
+                  {assignmentInfo && assignmentInfo.due_date
+                    ? moment(assignmentInfo.due_date).format(
+                        "yyyy-MM-DD HH:mm:ss"
+                      )
+                    : "--"}
+                </Typography.Paragraph>
               </div>
             </Col>
           </Row>
         </div>
-        <Form.Item label='EXTENSION TYPE'>
-          <Checkbox.Group>
-            <Space direction='vertical'>
-              <Checkbox>Release Date</Checkbox>
-              <Checkbox>Due Date</Checkbox>
-              <Checkbox>Late Due Date</Checkbox>
-            </Space>
-          </Checkbox.Group>
+        <Form.Item label="EXTENSION TYPE">
+          <Space direction="vertical">
+            <Checkbox
+              checked={checkedValues.releaseDate}
+              onChange={() => handleCheckBoxChange("releaseDate")}
+            >
+              Release Date
+            </Checkbox>
+            <Checkbox
+              checked={checkedValues.dueDate}
+              onChange={() => handleCheckBoxChange("dueDate")}
+            >
+              Due Date
+            </Checkbox>
+            <Checkbox
+              checked={checkedValues.lateDueDate}
+              onChange={() => handleCheckBoxChange("lateDueDate")}
+            >
+              Late Due Date
+            </Checkbox>
+          </Space>
         </Form.Item>
       </Form>
     </Modal>

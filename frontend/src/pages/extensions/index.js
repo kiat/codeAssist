@@ -3,22 +3,58 @@ import {
   Button,
   Card,
   Input,
+  message,
   PageHeader,
   Space,
   Table,
   Typography,
 } from "antd";
 import { useCallback } from "react";
-import { useState } from "react";
+import { useState, useEffect, useContext } from "react";
+import { useParams } from "react-router-dom";
+import { GlobalContext } from "../../App";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import ExtensionModal from "./ExtensionModal";
+import moment from "moment";
 
 export default () => {
+  const { assignmentId } = useParams();
+  const [courseStudents, setCourseStudents] = useState([]);
+  const [assignmentInfo, setAssignmentInfo] = useState(null);
+  const { courseInfo } = useContext(GlobalContext);
+  useEffect(() => {
+    const fetchCourseStudents = async () => {
+      try {
+        const studentsResponse = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_student_enrollment?course_id=${courseInfo.id}`
+        );
+        const studentsData = await studentsResponse.json();
+        setCourseStudents(studentsData);
+      } catch (error) {
+        message.error("Failed to fetch course students.");
+        console.error("Error fetching students:", error);
+      }
+    };
+    fetchCourseStudents();
+    const fetchAssignmentDetails = async () => {
+      try {
+        const assignmentResponse = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`
+        );
+        const assignmentData = await assignmentResponse.json();
+        setAssignmentInfo(assignmentData);
+      } catch (error) {
+        message.error("Failed to fetch assignment details.");
+        console.error("Error fetching assignment details:", error);
+      }
+    };
+    fetchAssignmentDetails();
+  }, [courseInfo.id]);
   const [extensionModalOpen, setExtensionModalOpen] = useState(false);
 
   const toggleExtensionModalOpen = useCallback(() => {
-    setExtensionModalOpen(t => !t);
+    setExtensionModalOpen((t) => !t);
   }, []);
 
   const columns = [
@@ -32,32 +68,50 @@ export default () => {
   return (
     <>
       <PageContent>
-        <PageHeader title='Extensions' />
-        <Card title='Assignsment Settings' bordered={false}>
-          <Space size='large'>
+        <PageHeader title="Extensions" />
+        <Card title="Assignsment Settings" bordered={false}>
+          <Space size="large">
             <div>
               <Typography.Title level={5}>RELEASE DATE (CST)</Typography.Title>
-              <p>Jun 26 2022 06:00 AM</p>
+              <p>
+                {assignmentInfo && assignmentInfo.published_date
+                  ? moment(assignmentInfo.published_date).format(
+                      "yyyy-MM-DD HH:mm:ss"
+                    )
+                  : "--"}
+              </p>
             </div>
             <div>
               <Typography.Title level={5}>DUE DATE (CST)</Typography.Title>
-              <p>Jun 26 2022 06:00 AM</p>
+              <p>
+                {assignmentInfo && assignmentInfo.due_date
+                  ? moment(assignmentInfo.due_date).format(
+                      "yyyy-MM-DD HH:mm:ss"
+                    )
+                  : "--"}
+              </p>
             </div>
             <div>
               <Typography.Title level={5}>LATE DATE (CST)</Typography.Title>
-              <p>--</p>
+              <p>
+                {assignmentInfo && assignmentInfo.late_due_date
+                  ? moment(assignmentInfo.late_due_date).format(
+                      "yyyy-MM-DD HH:mm:ss"
+                    )
+                  : "--"}
+              </p>
             </div>
           </Space>
         </Card>
         <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>
-          <Space direction='vertical' style={{ width: "100%" }}>
+          <Space direction="vertical" style={{ width: "100%" }}>
             <Input.Search
               enterButton
-              placeholder='Find a student'
+              placeholder="Find a student"
               style={{ width: "300px" }}
             />
             <Table
-              rowKey='id'
+              rowKey="id"
               columns={columns}
               dataSource={[]}
               locale={{
@@ -70,12 +124,12 @@ export default () => {
                       Add an extension for a student below.
                     </Typography.Paragraph>
                     <Button
-                      type='primary'
+                      type="primary"
                       ghost
-                      shape='round'
+                      shape="round"
                       onClick={toggleExtensionModalOpen}
                     >
-                      Add an extension
+                      Add an Extension
                     </Button>
                   </div>
                 ),
@@ -86,13 +140,15 @@ export default () => {
       </PageContent>
       <PageBottom>
         <Button onClick={toggleExtensionModalOpen}>
-          <span>Add an extension</span>
+          <span>Add an Extension</span>
           <PlusOutlined />
         </Button>
       </PageBottom>
       <ExtensionModal
         open={extensionModalOpen}
         onCancel={toggleExtensionModalOpen}
+        students={courseStudents}
+        assignmentInfo={assignmentInfo}
       />
     </>
   );
