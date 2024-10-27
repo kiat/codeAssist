@@ -7,6 +7,7 @@ import {
   Select,
   Space,
   Typography,
+  DatePicker,
 } from "antd";
 import { useState } from "react";
 import moment from "moment";
@@ -97,18 +98,27 @@ export default ({ open, onCancel, students, assignmentInfo }) => {
             >
               Release Date
             </Checkbox>
+            {checkedValues.releaseDate && (
+              <DatePicker showTime style={{ width: "100%" }} />
+            )}
             <Checkbox
               checked={checkedValues.dueDate}
               onChange={() => handleCheckBoxChange("dueDate")}
             >
               Due Date
             </Checkbox>
+            {checkedValues.dueDate && (
+              <DatePicker showTime style={{ width: "100%" }} />
+            )}
             <Checkbox
               checked={checkedValues.lateDueDate}
               onChange={() => handleCheckBoxChange("lateDueDate")}
             >
               Late Due Date
             </Checkbox>
+            {checkedValues.lateDueDate && (
+              <DatePicker showTime style={{ width: "100%" }} />
+            )}
           </Space>
         </Form.Item>
       </Form>
