@@ -100,3 +100,14 @@ class RegradeRequest(db.Model):
     reviewed = db.Column(db.Boolean, default=False)
 
     submission = db.relationship("Submission", backref=db.backref("regrade_requests", lazy="dynamic"))
+
+class AssignmentExtension(db.Model):
+    __tablename__ = "assignment_extensions"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), nullable=False)
+    new_due_date = db.Column(TIMESTAMP, nullable=False)
+
+    assignment = db.relationship("Assignment", backref=db.backref("extensions", lazy="dynamic"))
+    student = db.relationship("User", backref=db.backref("extensions", lazy="dynamic"))
+
