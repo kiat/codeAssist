@@ -2,6 +2,7 @@ import { PlusOutlined } from "@ant-design/icons";
 import {
   Button,
   Card,
+  Form,
   Input,
   message,
   PageHeader,
@@ -13,6 +14,7 @@ import { useCallback } from "react";
 import { useState, useEffect, useContext } from "react";
 import { useParams } from "react-router-dom";
 import { GlobalContext } from "../../App";
+import { createExtension } from "../../services/assignment";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import ExtensionModal from "./ExtensionModal";
@@ -20,9 +22,31 @@ import moment from "moment";
 
 export default () => {
   const { assignmentId } = useParams();
+  const [form] = Form.useForm();
   const [courseStudents, setCourseStudents] = useState([]);
   const [assignmentInfo, setAssignmentInfo] = useState(null);
   const { courseInfo } = useContext(GlobalContext);
+  const finishForm = async () => {
+    const values = form.getFieldsValue();
+    const extensionData = {
+      assignment_id: assignmentId,
+      student_id: values.student,
+      release_date_extension: values.releaseDate || null,
+      due_date_extension: values.dueDate || null,
+      late_due_date_extension: values.lateDueDate || null,
+    };
+    createExtension(extensionData)
+      .then((res) => {
+        toggleExtensionModalOpen();
+      })
+      .catch((err) => {
+        if (!values.student) {
+          message.error("Select a student");
+        } else {
+          message.error("Failed to create extension");
+        }
+      });
+  };
   useEffect(() => {
     const fetchCourseStudents = async () => {
       try {
@@ -149,6 +173,8 @@ export default () => {
         onCancel={toggleExtensionModalOpen}
         students={courseStudents}
         assignmentInfo={assignmentInfo}
+        onFinish={finishForm}
+        form={form}
       />
     </>
   );

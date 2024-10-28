@@ -1,4 +1,5 @@
 import {
+  Button,
   Checkbox,
   Col,
   Form,
@@ -12,7 +13,14 @@ import {
 import { useState } from "react";
 import moment from "moment";
 
-export default ({ open, onCancel, students, assignmentInfo }) => {
+export default ({
+  open,
+  onCancel,
+  students,
+  assignmentInfo,
+  onFinish,
+  form,
+}) => {
   const [checkedValues, setCheckedValues] = useState({
     releaseDate: false,
     dueDate: false,
@@ -26,9 +34,14 @@ export default ({ open, onCancel, students, assignmentInfo }) => {
     }));
   };
   return (
-    <Modal open={open} onCancel={onCancel} title="Add an Extension">
-      <Form layout="vertical">
-        <Form.Item label="STUDENT">
+    <Modal
+      open={open}
+      onCancel={onCancel}
+      onOk={() => form.submit()}
+      title="Add an Extension"
+    >
+      <Form layout="vertical" form={form} onFinish={onFinish}>
+        <Form.Item label="STUDENT" name="student">
           <Select
             showSearch
             placeholder="Search students by name or email"
@@ -99,7 +112,9 @@ export default ({ open, onCancel, students, assignmentInfo }) => {
               Release Date
             </Checkbox>
             {checkedValues.releaseDate && (
-              <DatePicker showTime style={{ width: "100%" }} />
+              <Form.Item name="releaseDate">
+                <DatePicker showTime style={{ width: "100%" }} />
+              </Form.Item>
             )}
             <Checkbox
               checked={checkedValues.dueDate}
@@ -108,7 +123,9 @@ export default ({ open, onCancel, students, assignmentInfo }) => {
               Due Date
             </Checkbox>
             {checkedValues.dueDate && (
-              <DatePicker showTime style={{ width: "100%" }} />
+              <Form.Item name="dueDate">
+                <DatePicker showTime style={{ width: "100%" }} />
+              </Form.Item>
             )}
             <Checkbox
               checked={checkedValues.lateDueDate}
@@ -117,7 +134,9 @@ export default ({ open, onCancel, students, assignmentInfo }) => {
               Late Due Date
             </Checkbox>
             {checkedValues.lateDueDate && (
-              <DatePicker showTime style={{ width: "100%" }} />
+              <Form.Item name="lateDueDate">
+                <DatePicker showTime style={{ width: "100%" }} />
+              </Form.Item>
             )}
           </Space>
         </Form.Item>

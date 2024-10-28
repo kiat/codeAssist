@@ -193,9 +193,8 @@ def create_extension():
         "due_date_extension": due_date_extension,
         "late_due_date_extension": late_due_date_extension
     }
-
     db.session.add(AssignmentExtension(**extension_data))
     db.session.commit()
-
     newExtension = db.session.query(AssignmentExtension).filter_by(id=extension_id).first()
     newExtension = AssignmentExtensionSchema().dump(newExtension, many=False)
+    return jsonify(newExtension)
