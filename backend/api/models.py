@@ -63,7 +63,6 @@ class Submission(db.Model):
     execution_time = db.Column(db.Float, nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=False)
     completed = db.Column(db.Boolean, nullable=False)
-    late = db.Column(db.Boolean, nullable=True)
     
 # Handling multiple submitters for a single submission
 class SubmissionSubmitter(db.Model):

@@ -159,11 +159,11 @@ def upload_submission():
         #set the active to true for a newly submitted submission
         active=True,
         completed=True,
-        submission_number=submission_count + 1,
-        late=(request.form.get("late") == 'true')
+        submission_number=submission_count + 1
     )
     db.session.add(new_submission)
     db.session.commit()
+
     # Remove the contents of the submission directory inside the Docker container
     clear_dir_proc = subprocess.run(f"docker exec {container_name} rm -rf /autograder/submission/{filename}".split(), capture_output=True)
     if clear_dir_proc.returncode != 0:

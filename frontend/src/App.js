@@ -1,18 +1,12 @@
 import { Layout } from "antd";
-import {
-  BrowserRouter,
-  Route,
-  Routes,
-  useNavigate,
-  useLocation,
-} from "react-router-dom";
+import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import Home from "./pages/home";
 import Dashboard from "./pages/dashboard";
 import { createContext, useCallback, useEffect, useState } from "react";
 import Assignments from "./pages/assignments";
 import AssignmentResult from "./pages/result";
 import RootSider from "./components/layout/sider";
-
+  
 import "./mock";
 import InstructorDashboard from "./pages/instructor/dashboard";
 import CourseSettings from "./pages/instructor/courseSettings";
@@ -27,19 +21,13 @@ import GradeSubmissions from "./pages/gradeSubmissions";
 import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
-import RegradeRequests from "./components/RegradeRequests";
+import RegradeRequests from './components/RegradeRequests';
 
 const { Content } = Layout;
 
 // Defining initial states as constants to avoid recreating objects on re-renders
 const initialUserInfo = { name: "", isStudent: 1 };
-const initialCourseInfo = {
-  id: "",
-  name: "",
-  code: "",
-  semester: "",
-  year: "",
-};
+const initialCourseInfo = { id: "", name: "", code: "", semester: "", year: "" };
 const initialAssignmentInfo = { id: "", score: "", results: null, code: null };
 
 export const GlobalContext = createContext({
@@ -52,11 +40,11 @@ export const GlobalContext = createContext({
 });
 
 function App() {
-  const [userInfo, setUserInfo] = useState(
-    () => JSON.parse(localStorage.getItem("userInfo")) || initialUserInfo
+  const [userInfo, setUserInfo] = useState(() => 
+    JSON.parse(localStorage.getItem("userInfo")) || initialUserInfo
   );
-  const [courseInfo, setCourseInfo] = useState(
-    () => JSON.parse(localStorage.getItem("courseInfo")) || initialCourseInfo
+  const [courseInfo, setCourseInfo] = useState(() => 
+    JSON.parse(localStorage.getItem("courseInfo")) || initialCourseInfo
   );
   const [assignmentInfo, setAssignmentInfo] = useState(initialAssignmentInfo);
   const navigate = useNavigate();
@@ -75,12 +63,9 @@ function App() {
     localStorage.setItem("courseInfo", JSON.stringify(courseInfo));
   }, [courseInfo]);
   // Callbacks for updating state, using empty dependencies to ensure they don't change
-  const updateCourseInfo = useCallback((info) => setCourseInfo(info), []);
-  const updateUserInfo = useCallback((info) => setUserInfo(info), []);
-  const updateAssignmentInfo = useCallback(
-    (info) => setAssignmentInfo(info),
-    []
-  );
+  const updateCourseInfo = useCallback(info => setCourseInfo(info), []);
+  const updateUserInfo = useCallback(info => setUserInfo(info), []);
+  const updateAssignmentInfo = useCallback(info => setAssignmentInfo(info), []);
 
   // Redirect to home if not logged in and not on home page
   useEffect(() => {
@@ -90,16 +75,12 @@ function App() {
   }, [userInfo, location, navigate]);
 
   return (
-    <GlobalContext.Provider
-      value={{
-        userInfo,
-        updateUserInfo,
-        courseInfo,
-        updateCourseInfo,
-        assignmentInfo,
-        updateAssignmentInfo,
-      }}
-    >
+    <GlobalContext.Provider value={{
+      userInfo, updateUserInfo,
+      courseInfo, updateCourseInfo,
+      assignmentInfo, updateAssignmentInfo
+    }}>
+
       <Layout>
         {location.pathname === "/" ? null : (
           <RootSider
@@ -119,63 +100,66 @@ function App() {
             }}
           >
             <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/assignments/:courseId" element={<Assignments />} />
+              <Route path='/' element={<Home />} />
+              <Route path='/dashboard' element={<Dashboard />} />
+              <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
                 ///reconfiguring to use submissionid for navigation
-                path="/assignmentResult/:submissionId"
-                //path='/assignmentResult/:assignmentId/:studentId'
+                path='/assignmentResult/:submissionId'
+                //path='/assignmentResult/:assignmentId/:studentId' 
                 //old route config
                 //path='/assignmentResult/:assignmentId'
                 element={<AssignmentResult />}
               />
               <Route
-                path="/instructorDashboard/:courseId"
+                path='/instructorDashboard/:courseId'
                 element={<InstructorDashboard />}
               />
               <Route
-                path="/instructorAssignments/:courseId"
+                path='/instructorAssignments/:courseId'
                 element={<InstructorAssignments />}
               />
               <Route
-                path="/courseSettings/:courseId"
+                path='/courseSettings/:courseId'
                 element={<CourseSettings />}
               />
-              <Route path="/enrollment/:courseId" element={<Enrollment />} />
+              <Route path='/enrollment/:courseId' element={<Enrollment />} />
               <Route
-                path="/assignment/reviewGrades/:assignmentId"
+                path='/assignment/reviewGrades/:assignmentId'
                 element={<ReviewGrades />}
               />
               <Route
-                path="/assignment/editOutline/:assignmentId"
+                path='/assignment/editOutline/:assignmentId'
                 element={<EditOutline />}
               />
               <Route
-                path="/assignment/configureAutograder/:assignmentId"
+                path='/assignment/configureAutograder/:assignmentId'
                 element={<ConfigureAutograder />}
               />
               <Route
-                path="/assignment/createRubric/:assignmentId"
+                path='/assignment/createRubric/:assignmentId'
                 element={<CreateRubric />}
               />
               <Route
-                path="/assignment/manageSubmissions/:assignmentId"
+                path='/assignment/manageSubmissions/:assignmentId'
                 element={<ManageSubmissions />}
               />
               <Route
-                path="/assignment/gradeSubmissions/:assignmentId"
+                path='/assignment/gradeSubmissions/:assignmentId'
                 element={<GradeSubmissions />}
               />
               <Route
-                path="/assignment/extensions/:assignmentId"
+                path='/assignment/extensions/:assignmentId'
                 element={<Extensions />}
               />
               <Route
-                path="/assignment/assignmentSettings/:assignmentId"
+                path='/assignment/assignmentSettings/:assignmentId'
                 element={<AssignmentSettings />}
               />
-              <Route path="/editAccount/:userId" element={<EditAccount />} />
+              <Route
+                path = '/editAccount/:userId'
+                element={<EditAccount />} 
+              />
               <Route path="/regradeRequests" element={<RegradeRequests />} />
             </Routes>
           </Content>
