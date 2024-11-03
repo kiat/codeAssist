@@ -10,7 +10,7 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
 class CourseSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Course
-        include_fk = True
+        include_fk = True 
 
 class EnrollmentSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
