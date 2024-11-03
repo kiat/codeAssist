@@ -9,7 +9,7 @@ class User(db.Model):
     password = db.Column(db.String, nullable=False)
     name = db.Column(db.String, nullable=False)
     email_address = db.Column(db.String, nullable=False)
-    sis_user_id = db.Column(db.String, nullable=False, unique=True) 
+    sis_user_id = db.Column(db.String, nullable=False, unique=True)
     role = db.Column(db.String, nullable = False)
 
 class Course(db.Model):
