@@ -66,6 +66,7 @@ CREATE TABLE submissions (
     execution_time float,
     submitted_at timestamp,
     completed boolean DEFAULT FALSE,
+    late boolean DEFAULT FALSE,
     FOREIGN KEY (student_id) REFERENCES user (id),
     FOREIGN KEY (assignment_id) REFERENCES assignments (id)
 );
