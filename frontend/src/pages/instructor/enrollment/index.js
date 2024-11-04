@@ -112,7 +112,6 @@ export default () => {
           return res.json();
         })
         .then((student) => {
-          console.log("component updaed")
           fetch(process.env.REACT_APP_API_URL + "/create_enrollment", {
             method: "POST",
             headers: {
