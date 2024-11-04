@@ -91,7 +91,7 @@ def get_users():
     # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
     if not(result):
         return "No user found", 404
-    return jsonify(result[0])
+    return jsonify(result)
 
     #It shows an error for this method but the user_login works
 

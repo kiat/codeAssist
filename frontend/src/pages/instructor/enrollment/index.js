@@ -112,13 +112,14 @@ export default () => {
           return res.json();
         })
         .then((student) => {
+          console.log("component updaed")
           fetch(process.env.REACT_APP_API_URL + "/create_enrollment", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              student_id: student.id,
+              student_id: student[0].id,
               course_id: courseId,
               role: values.role, // Include the role from form values
             }),
