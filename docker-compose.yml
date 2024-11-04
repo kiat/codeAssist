@@ -1,71 +1,71 @@
 version: "3.8"
 services:
-    # frontend:
-    #     build:
-    #         context: ./frontend/
-    #         target: prod
-    #     ports:
-    #         - "3000:3000"
-    #     volumes:
-    #         - ./frontend:/app
-    #         - /app/node_modules
-    #     stdin_open: true
-    #     command: npm start
-    # frontend-test:
-    #     build:
-    #         context: ./frontend/
-    #         target: test
-    #     volumes:
-    #         - /app/node_modules
-    #     environment:
-    #         - CI=true
-    #     command: npm run test
-    backend:
-        container_name: flask_container
-        build: 
-            context: "./backend/"
-            dockerfile: Dockerfile
-        environment:
-            FLASK_APP: app.py
-            FLASK_DEBUG: 1
-            PYTHONUNBUFFERED: 1
-        ports:
-            - "5001:5001"
-        extra_hosts:
-              - "host.docker.internal:host-gateway"
-        volumes:
-            - ./backend/:/usr/src/app
-            - /var/run/docker.sock:/var/run/docker.sock
+  # frontend:
+  #     build:
+  #         context: ./frontend/
+  #         target: prod
+  #     ports:
+  #         - "3000:3000"
+  #     volumes:
+  #         - ./frontend:/app
+  #         - /app/node_modules
+  #     stdin_open: true
+  #     command: npm start
+  # frontend-test:
+  #     build:
+  #         context: ./frontend/
+  #         target: test
+  #     volumes:
+  #         - /app/node_modules
+  #     environment:
+  #         - CI=true
+  #     command: npm run test
+  backend:
+    container_name: flask_container
+    build:
+      context: "./backend/"
+      dockerfile: Dockerfile
+    environment:
+      FLASK_APP: app.py
+      FLASK_DEBUG: 1
+      PYTHONUNBUFFERED: 1
+    ports:
+      - "5001:5000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend/:/usr/src/app
+      - /var/run/docker.sock:/var/run/docker.sock
 
-    db:
-        container_name: postgres_container
-        image: postgres:15.3-alpine3.18
-        restart: always
-        environment:
-            POSTGRES_USER: root
-            POSTGRES_PASSWORD: root
-            POSTGRES_DB: test_db
-        ports:
-            - "5432:5432"
-        volumes: 
-            - db:/var/lib/postgresql/data
+  db:
+    container_name: postgres_container
+    image: postgres:15.3-alpine3.18
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db:/var/lib/postgresql/data
 
-    pgadmin:
-        container_name: pgadmin4_container
-        image: dpage/pgadmin4:7.5
-        restart: always
-        environment:
-            PGADMIN_DEFAULT_EMAIL: admin@admin.com
-            PGADMIN_DEFAULT_PASSWORD: 12345
-        ports:
-            - "5050:80"
-        volumes:
-            - pgadmin:/var/lib/pgadmin
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4:7.5
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: 12345
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin:/var/lib/pgadmin
 
 volumes:
-    db:
-        driver: local
-        name: postgres_volume
-    pgadmin:
-        driver: local
-        name: pgadmin_volume
+  db:
+    driver: local
+    name: postgres_volume
+  pgadmin:
+    driver: local
+    name: pgadmin_volume
