@@ -67,6 +67,22 @@ export default function Assignments() {
   ];
 
   useEffect(() => {
+    const fetchAssignmentExtensions = async (assignment_id) => {
+      try {
+        const extensionResponse = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_extension?` +
+            new URLSearchParams({
+              student_id: userInfo.id,
+              assignment_id: assignment_id,
+            })
+        );
+        const extensionData = await extensionResponse.json();
+        return extensionData;
+      } catch (error) {
+        message.error("Failed to fetch extension data.");
+        console.error("Error fetching extensions:", error);
+      }
+    };
     const fetchCourseAssignments = async () => {
       if (!userInfo || !userInfo.id) {
         navigate("/");
@@ -87,6 +103,7 @@ export default function Assignments() {
         const updatedAssignments = await Promise.all(
           assignmentsData.map(async (assignment) => {
             try {
+              const extension = await fetchAssignmentExtensions(assignment.id);
               const activeSubmissions = await fetch(
                 `${process.env.REACT_APP_API_URL}/get_active_submission?` +
                   new URLSearchParams({
@@ -99,6 +116,16 @@ export default function Assignments() {
               const score = submitted ? activeData.score : null;
               const submissionId = activeData.id;
               const late = activeData.late;
+              if (extension.release_date_extension) {
+                assignment.release_date = extension.release_date_extension;
+              }
+              if (extension.due_date_extension) {
+                assignment.due_date = extension.due_date_extension;
+              }
+              if (extension.late_due_date_extension) {
+                assignment.late_due_date = extension.late_due_date_extension;
+                assignment.late_submission = true;
+              }
               return {
                 ...assignment,
                 submitted,
@@ -133,15 +160,21 @@ export default function Assignments() {
     const now = moment();
     const dueDateTime = moment(assignment.due_date).valueOf();
     const lateDueDateTime = moment(assignment.late_due_date).valueOf();
+    // const extension = await fetchAssignmentExtensions(assignment.id);
+    // if (extension != null) {
+    //   if (extension.due_date_extension) {
+    //     dueDateTime = moment(extension.due_date_extension).valueOf();
+    //   }
+    //   if (extension.late_due_date_extension) {
+    //     dueDateTime = moment(extension.late_due_date_extension).valueOf();
+    //   }
+    // }
 
     const isSubmitted = assignment.submitted;
     const dueDateHasPassed = now.isAfter(dueDateTime);
     const lateDueDateHasPassed = now.isAfter(lateDueDateTime);
 
     if (isSubmitted) {
-      //navigate(`/assignmentresult/${assignment.id}`);
-      //navigate(`/assignmentresult/${assignment.id}/${userInfo.id}`);
-      //latest route def
       navigate(`/assignmentresult/${assignment.submissionId}`);
     } else if (!dueDateHasPassed) {
       setModalOpen(true);

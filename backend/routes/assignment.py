@@ -51,7 +51,6 @@ def get_assignment():
     Requires from the frontend a JSON containing:
     @param assignment_id    the id of the assignment
     '''
-    print("get_assignmeNT")
     assignment_id = request.args.get("assignment_id")
 
     assignment = db.session.query(Assignment).filter_by(id=assignment_id)
@@ -198,3 +197,15 @@ def create_extension():
     newExtension = db.session.query(AssignmentExtension).filter_by(id=extension_id).first()
     newExtension = AssignmentExtensionSchema().dump(newExtension, many=False)
     return jsonify(newExtension)
+
+@assignment.route('/get_extension', methods=["GET"])
+@cross_origin()
+def get_extension():
+    assignment_id = request.args.get("assignment_id")
+    student_id = request.args.get("student_id")
+    # Fetch extension for this assignment and student
+    extension = db.session.query(AssignmentExtension).filter_by(assignment_id=assignment_id, student_id=student_id).first()
+
+    extension = AssignmentExtensionSchema().dump(extension)
+    return jsonify(extension)
+

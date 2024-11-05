@@ -12,7 +12,7 @@ import UploadModal from "../../components/UploadModal";
 import SubmissionHistoryModal from "./submissionHistoryModal";
 import FormattingModal from "./FormattingModal";
 
-import { getAssignment } from "../../services/assignment";
+import { getAssignment, getExtension } from "../../services/assignment";
 import moment from "moment";
 
 export default function AssignmentResult() {
@@ -74,12 +74,25 @@ export default function AssignmentResult() {
     const fetchAssignmentDetails = async () => {
       try {
         const res = await getAssignment({ assignment_id: assignmentId });
+        const extension = await getExtension({
+          assignment_id: assignmentId,
+          student_id: studentId,
+        });
         if (res?.data) {
           setAutograderPoints(res.data.autograder_points);
           setAssignmentName(res.data.name); // Assuming the API provides this
           setDueDate(moment(res.data.due_date).valueOf());
           setLateAllowed(res.data.late_submission);
           setLateDueDate(moment(res.data.late_due_date).valueOf());
+          if (extension?.data.due_date_extension) {
+            setDueDate(moment(extension.data.due_date_extension).valueOf());
+          }
+          if (extension?.data.late_due_date_extension) {
+            setDueDate(
+              moment(extension.data.late_due_date_extension).valueOf()
+            );
+            setLateAllowed(true);
+          }
           updateAssignmentInfo((prevInfo) => ({
             ...prevInfo,
             name: res.data.name,
@@ -121,14 +134,11 @@ export default function AssignmentResult() {
         //if the due date hasnt passed open the model or else send an error message saying dude date has passes
         const now = moment();
         if (!now.isAfter(dueDate)) {
-          console.log("Date rn: ", now, "Due Date: ", { dueDate });
           setUploadModalOpen((prev) => !prev);
         } else if (lateAllowed && !now.isAfter(lateDueDate)) {
-          console.log("Date rn: ", now, "Due Date: ", { dueDate });
           setUploadModalOpen((prev) => !prev);
           setIsLate(true);
         } else {
-          console.log("Date rn: ", now, "Due Date: ", { dueDate });
           message.error("Due Date Has Passed");
         }
       } else if (type === "history") setHistoryModalOpen((prev) => !prev);

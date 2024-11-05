@@ -142,7 +142,7 @@ export default () => {
                 emptyText: (
                   <div style={{ marginTop: "50px", marginBottom: "50px" }}>
                     <Typography.Title level={4}>
-                      There are no assignment extension.
+                      There are no assignment extensions.
                     </Typography.Title>
                     <Typography.Paragraph>
                       Add an extension for a student below.
