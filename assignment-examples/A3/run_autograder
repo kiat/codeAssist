@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Set up autograder files
+
+cp /autograder/submission/Cipher.py /autograder/source/Cipher.py
+
+cd /autograder/source
+
+python3 run_tests.py

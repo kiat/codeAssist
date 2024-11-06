@@ -118,7 +118,7 @@ export default () => {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              student_id: student.id,
+              student_id: student[0].id,
               course_id: courseId,
               role: values.role, // Include the role from form values
             }),
