@@ -65,7 +65,6 @@ def create_assignment():
     /create_assignment creates an assignment and generates an assignment
     id in the database
     '''
-    print("TEST")
     assignment_data = request.json
     # Check for duplicate name
     assignment_name = assignment_data.get("name")
@@ -209,3 +208,27 @@ def get_extension():
     extension = AssignmentExtensionSchema().dump(extension)
     return jsonify(extension)
 
+@assignment.route('/get_assignment_extensions', methods=["GET"])
+@cross_origin()
+def get_assignment_extensions():
+    assignment_id = request.args.get("assignment_id")
+    # Fetch extension for this assignment and student
+    extensions = db.session.query(AssignmentExtension).filter_by(assignment_id=assignment_id)
+
+    extensions = AssignmentExtensionSchema().dump(extensions, many=True)
+    return jsonify(extensions)
+
+@assignment.route('/delete_extension', methods=["DELETE"])
+@cross_origin()
+def delete_extension():
+    extension_id = request.args.get("extension_id")
+    related_extension = db.session.query(AssignmentExtension).filter_by(id=extension_id).first()
+    if related_extension:
+        db.session.delete(related_extension)
+        db.session.commit()
+
+    related_extension = db.session.query(AssignmentExtension).filter_by(id=extension_id).all()
+    if not related_extension:
+        return jsonify("Extension deleted successfully"), 200
+    else:
+        return jsonify("Extension not deleted"), 404
