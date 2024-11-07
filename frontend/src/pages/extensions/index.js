@@ -12,6 +12,7 @@ import {
 } from "antd";
 import { useCallback } from "react";
 import { useState, useEffect, useContext } from "react";
+import { CloseOutlined } from "@ant-design/icons";
 import { useParams } from "react-router-dom";
 import { GlobalContext } from "../../App";
 import { createExtension } from "../../services/assignment";
@@ -25,6 +26,9 @@ export default () => {
   const [form] = Form.useForm();
   const [courseStudents, setCourseStudents] = useState([]);
   const [assignmentInfo, setAssignmentInfo] = useState(null);
+  const [extensions, setExtensions] = useState([]);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
   const { courseInfo } = useContext(GlobalContext);
   const finishForm = async () => {
     const values = form.getFieldsValue();
@@ -38,6 +42,7 @@ export default () => {
     createExtension(extensionData)
       .then((res) => {
         toggleExtensionModalOpen();
+        setForceUpdate((u) => u + 1);
       })
       .catch((err) => {
         if (!values.student) {
@@ -47,7 +52,51 @@ export default () => {
         }
       });
   };
+
+  const deleteExtension = async (record) => {
+    console.log("ID", record.id);
+    const response = await fetch(
+      `${process.env.REACT_APP_API_URL}/delete_extension?extension_id=${record.id}`,
+      { method: "DELETE" }
+    );
+    if (response.ok) {
+      setForceUpdate((u) => u + 1);
+      message.success("Extension deleted successfully");
+    } else {
+      message.error("Failed to delete extension");
+    }
+  };
+
   useEffect(() => {
+    const fetchAssignmentExtensions = async () => {
+      try {
+        const extensionsResponse = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_assignment_extensions?assignment_id=${assignmentId}`
+        );
+        const extensionsData = await extensionsResponse.json();
+        const updatedExtensions = await Promise.all(
+          extensionsData.map(async (extension) => {
+            try {
+              const student = await fetch(
+                `${process.env.REACT_APP_API_URL}/get_user_by_id?id=${extension.student_id}`
+              );
+              const studentData = await student.json();
+              return {
+                ...extension,
+                name: studentData.name,
+              };
+            } catch (error) {
+              console.error("Error fetching extension data:", error);
+            }
+          })
+        );
+        setExtensions(updatedExtensions);
+      } catch (error) {
+        message.error("Failed to fetch extensions.");
+        console.error("Error fetching extensions:", error);
+      }
+    };
+    fetchAssignmentExtensions();
     const fetchCourseStudents = async () => {
       try {
         const studentsResponse = await fetch(
@@ -74,7 +123,7 @@ export default () => {
       }
     };
     fetchAssignmentDetails();
-  }, [courseInfo.id]);
+  }, [courseInfo.id, forceUpdate]);
   const [extensionModalOpen, setExtensionModalOpen] = useState(false);
 
   const toggleExtensionModalOpen = useCallback(() => {
@@ -82,13 +131,69 @@ export default () => {
   }, []);
 
   const columns = [
-    { title: "FIRST & LAST NAME", dataIndex: "" },
-    { title: "EXTENSION TYPE", dataIndex: "" },
-    { title: "RELEASE (CST)", dataIndex: "" },
-    { title: "DUE (CST)", dataIndex: "" },
-    { title: "LATE DUE (CST)", dataIndex: "" },
-    { title: "EDIT", dataIndex: "" },
+    {
+      title: "NAME",
+      dataIndex: "name",
+      key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name),
+      render: (text) => text,
+    },
+    {
+      title: "RELEASE (CST)",
+      dataIndex: "release_date_extension",
+      key: "release_date_extension",
+      render: (text) => {
+        const dateToDisplay = text || assignmentInfo?.published_date;
+        return dateToDisplay
+          ? moment(dateToDisplay).format("MMM DD [AT] h:mmA").toUpperCase()
+          : "--";
+      },
+      sorter: (a, b) =>
+        moment(a.published_date).unix() - moment(b.published_date).unix(),
+    },
+    {
+      title: "DUE (CDT)",
+      dataIndex: "due_date_extension",
+      key: "due_date_extension",
+      render: (text) => {
+        const dateToDisplay = text || assignmentInfo?.due_date;
+        return dateToDisplay
+          ? moment(dateToDisplay).format("MMM DD [AT] h:mmA").toUpperCase()
+          : "--";
+      },
+      sorter: (a, b) => moment(a.due_date).unix() - moment(b.due_date).unix(),
+    },
+    {
+      title: "LATE DUE (CDT)",
+      dataIndex: "late_due_date_extension",
+      key: "late_due_date_extension",
+      render: (text) => {
+        const dateToDisplay = text || assignmentInfo?.late_due_date;
+        return dateToDisplay
+          ? moment(dateToDisplay).format("MMM DD [AT] h:mmA").toUpperCase()
+          : "--";
+      },
+      sorter: (a, b) => moment(a.due_date).unix() - moment(b.due_date).unix(),
+    },
+    {
+      title: "EDIT",
+      align: "center",
+      render: (_, record) => (
+        <Button
+          danger
+          type="primary"
+          size="small"
+          icon={<CloseOutlined />}
+          onClick={() => deleteExtension(record)}
+        />
+      ),
+    },
   ];
+
+  const filteredExtensions = extensions.filter((extension) =>
+    extension.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <>
       <PageContent>
@@ -133,11 +238,12 @@ export default () => {
               enterButton
               placeholder="Find a student"
               style={{ width: "300px" }}
+              onSearch={(value) => setSearchQuery(value)}
             />
             <Table
               rowKey="id"
               columns={columns}
-              dataSource={[]}
+              dataSource={filteredExtensions}
               locale={{
                 emptyText: (
                   <div style={{ marginTop: "50px", marginBottom: "50px" }}>
