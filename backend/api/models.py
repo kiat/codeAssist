@@ -8,7 +8,7 @@ class User(db.Model):
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     password = db.Column(db.String, nullable=False)
     name = db.Column(db.String, nullable=False)
-    email_address = db.Column(db.String, nullable=False)
+    email_address = db.Column(db.String, nullable=False, unique=True)
     sis_user_id = db.Column(db.String, nullable=False, unique=True)
     role = db.Column(db.String, nullable = False)
 
@@ -20,7 +20,7 @@ class Course(db.Model):
     sis_course_id = db.Column(db.String, nullable=True)
     semester = db.Column(db.String, nullable=False)
     year = db.Column(db.String, nullable=False)
-    entryCode = db.Column(db.String, nullable=False)
+    entryCode = db.Column(db.String, nullable=False, unique=True)
     allowEntryCode = db.Column(db.Boolean, default=False)
     description = db.Column(db.String, default="")
 
