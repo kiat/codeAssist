@@ -50,22 +50,22 @@ services:
         volumes: 
             - db:/var/lib/postgresql/data
 
-    pgadmin:
-        container_name: pgadmin4_container
-        image: dpage/pgadmin4:7.5
-        restart: always
-        environment:
-            PGADMIN_DEFAULT_EMAIL: admin@admin.com
-            PGADMIN_DEFAULT_PASSWORD: 12345
-        ports:
-            - "5050:80"
-        volumes:
-            - pgadmin:/var/lib/pgadmin
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4:7.5
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: 12345
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin:/var/lib/pgadmin
 
 volumes:
-    db:
-        driver: local
-        name: postgres_volume
-    pgadmin:
-        driver: local
-        name: pgadmin_volume
+  db:
+    driver: local
+    name: postgres_volume
+  pgadmin:
+    driver: local
+    name: pgadmin_volume
