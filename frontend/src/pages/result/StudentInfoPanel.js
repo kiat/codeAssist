@@ -10,7 +10,6 @@ export default function StudentInfoPanel({
   score,
   totalPoints,
   active,
-  late,
 }) {
   //if it is a student I want to display a button to submit a regrade request --> will take them to the add justification modal
   //if it is an instructor i want to be able to see the regarde request if it exists --> should have an edit butotn somewhere that opens a modal to chnage th student's grade
@@ -24,9 +23,9 @@ export default function StudentInfoPanel({
   const justificationRef = useRef(null);
   const [CheckColor, SetCheckColor] = useState("grey");
   const [isLoading, setIsLoading] = useState(true); // Loading state
-  const [TempJustification, setTempJustification] = useState(null);
-  const { submissionId } = useParams();
-  const [infoShown, SetInfoShown] = useState(false);
+  const [TempJustification, setTempJustification] = useState(null)
+  const {submissionId} = useParams();
+  const [infoShown, SetInfoShown] = useState(false)
 
   useEffect(() => {
     const fetchJustificationDetails = async () => {
@@ -50,7 +49,7 @@ export default function StudentInfoPanel({
               if (request.reviewed === false) {
                 setHighlight(true);
                 setTimeout(() => setHighlight(false), 3000);
-                if (!infoShown) {
+                if (!infoShown){
                   message.info("Regrade Request");
                   SetInfoShown(true);
                 }
@@ -69,7 +68,7 @@ export default function StudentInfoPanel({
       }
     };
     fetchJustificationDetails();
-  }, [submissionId, userInfo]);
+  },[submissionId, userInfo]);
 
   const handleStudentClick = () => {
     setRequestModalVisible(true);
@@ -84,7 +83,7 @@ export default function StudentInfoPanel({
     }
     setRequestModalVisible(false);
     try {
-      console.log(TempJustification);
+      console.log(TempJustification)
       const response = await fetch(
         `${process.env.REACT_APP_API_URL}/send_regrade_request`,
         {
@@ -176,111 +175,86 @@ export default function StudentInfoPanel({
       size="middle"
       style={{ paddingLeft: "20px", paddingTop: "20px" }}
     >
-      <Space
-        direction="horizontal"
-        size="middle"
-        style={{ justifyContent: "space-between", width: "100%" }}
-      >
-        <Typography.Title level={4}>{assignmentName}</Typography.Title>
-        <div>
-          <strong>Score Received</strong>
-          <br />
-          {score}
-        </div>
-        <div>
-          <strong>Status</strong>
-          <br />
-          {active ? (
-            <div
-              style={{
-                color: "green",
-                border: "1px solid green",
-                padding: "5px",
-                display: "inline-block",
-              }}
-            >
-              Active
-            </div>
-          ) : (
-            <div
-              style={{
-                color: "red",
-                border: "1px solid red",
-                padding: "5px",
-                display: "inline-block",
-              }}
-            >
-              Not Active
-            </div>
-          )}
-        </div>
-      </Space>
+        <Space direction="horizontal" size="middle" style={{ justifyContent: "space-between", width: "100%" }}>
+          <Typography.Title level={4}>{assignmentName}</Typography.Title>
+          <div>
+            <strong>Score Received</strong>
+            <br />
+            {score}
+          </div>
+          <div>
+            <strong>Status</strong>
+            <br />
+            {active ? (
+              <div style={{ color: 'green', border: '1px solid green', padding: '5px', display: 'inline-block' }}>
+                Active
+              </div>
+            ) : (
+              <div style={{ color: 'red', border: '1px solid red', padding: '5px', display: 'inline-block' }}>
+                Not Active
+              </div>
+            )}
+          </div>
+        </Space>
       {/* <Typography.Title level={4}>{assignmentName}</Typography.Title> */}
       <Space direction="horizontal" size="middle">
         <CheckCircleOutlined style={{ color: "green" }} />
         Graded
-        {late && (
-          <div style={{ fontWeight: "1000", color: "#e10b0b" }}>Late</div>
-        )}
       </Space>
       {/* only render regrade request info if this submission is active */}
-      {active && (
-        <Space>
-          {/* displaying the correct button if the user is a student or an instructor */}
-          <Space direction="vertical" size="middle">
-            {(userInfo.isStudent && Justification == "" && (
-              <Button type="primary" onClick={handleStudentClick}>
-                Submit a Regrade Request
+      {active && <Space>
+        {/* displaying the correct button if the user is a student or an instructor */}
+        <Space direction="vertical" size="middle">
+        {(userInfo.isStudent && Justification == "" &&(
+            <Button type="primary" onClick={handleStudentClick}>
+              Submit a Regrade Request
+            </Button>
+          )) ||
+            (!userInfo.isStudent && (
+              <Button type="primary" onClick={handleInstructorClick}>
+                Edit Grade
               </Button>
-            )) ||
-              (!userInfo.isStudent && (
-                <Button type="primary" onClick={handleInstructorClick}>
-                  Edit Grade
-                </Button>
-              ))}
-            {Justification && (
-              <div
-                ref={justificationRef}
-                tabIndex={-1}
-                style={justificationStyle}
-              >
-                <strong>Regrade Justification</strong>
-                {/* conditionally render the color of this checkmark as gray or green based on if this regrade request is reviewed */}
-                <CheckCircleOutlined
-                  style={{ color: CheckColor, marginLeft: 5 }}
-                />
-                <br></br>
-                {Justification || "bleh"}
-              </div>
-            )}
-          </Space>
-          <Modal
-            title="Regrade Request"
-            open={RequestModalVisible}
-            onCancel={() => setRequestModalVisible(false)}
-            onOk={() => handleRequestSubmission()}
-          >
-            <Input.TextArea
-              rows={4}
-              placeholder="Enter Justification for Regrade Request"
-              onChange={(e) => setTempJustification(e.target.value)}
-              //onChange={(e) => setJustification(e.target.value)}
-            />
-          </Modal>
-          <Modal
-            title="Edit Grades"
-            open={EditGradeModalVisible}
-            onCancel={() => setEditGradeModalVisible(false)}
-            onOk={() => handleGradeSubmission()}
-          >
-            <Input
-              type="number"
-              placeholder="Enter New Grade"
-              onChange={(e) => setGrade(e.target.value)}
-            />
-          </Modal>
+            ))}
+          {Justification && (
+            <div
+              ref={justificationRef}
+              tabIndex={-1}
+              style={justificationStyle}
+            >
+              <strong>Regrade Justification</strong>
+              {/* conditionally render the color of this checkmark as gray or green based on if this regrade request is reviewed */}
+              <CheckCircleOutlined style={{ color: CheckColor, marginLeft: 5 }} />
+              <br></br>
+              {Justification || "bleh"}
+            </div>
+          )}
         </Space>
-      )}
+        <Modal
+          title="Regrade Request"
+          open={RequestModalVisible}
+          onCancel={() => setRequestModalVisible(false)}
+          onOk={() => handleRequestSubmission()}
+        >
+          <Input.TextArea
+            rows={4}
+            placeholder="Enter Justification for Regrade Request"
+            onChange={(e) => setTempJustification(e.target.value)}
+            //onChange={(e) => setJustification(e.target.value)}
+          />
+        </Modal>
+        <Modal
+          title="Edit Grades"
+          open={EditGradeModalVisible}
+          onCancel={() => setEditGradeModalVisible(false)}
+          onOk={() => handleGradeSubmission()}
+        >
+          <Input
+            type="number"
+            placeholder="Enter New Grade"
+            onChange={(e) => setGrade(e.target.value)}
+          />
+        </Modal>
+      </Space>}
       <Space direction="vertical" size="middle" style={{ paddingTop: "20px" }}>
         <div>Select each question to review feedback and grading details.</div>
         <div>

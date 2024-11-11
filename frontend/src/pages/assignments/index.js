@@ -1,4 +1,4 @@
-import { Card, Descriptions, PageHeader, Table, Button, message } from "antd";
+import { Card, Descriptions, PageHeader, Table, Button, message} from "antd";
 import { useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../App";
@@ -13,7 +13,6 @@ export default function Assignments() {
   const [isModalOpen, setModalOpen] = useState(false);
   const [assignmentID, setAssignmentID] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
-  const [isLate, setIsLate] = useState(false);
 
   const columns = [
     {
@@ -31,37 +30,28 @@ export default function Assignments() {
       title: "STATUS",
       dataIndex: "submitted",
       key: "submitted",
-      render: (submitted, record) => {
-        if (submitted) {
-          if (record.late) {
-            return <span style={{ color: "#e10b0b " }}>LATE</span>;
-          }
-          return "Completed";
-        }
-        return "Unsubmitted";
-      },
+      render: submitted => submitted ? "Completed" : "Unsubmitted",
       sorter: (a, b) => a.submitted - b.submitted,
     },
     {
       title: "GRADES",
       dataIndex: "score",
       key: "score",
-      render: (score) => (score !== null ? score : "-"),
+      render: score => score !== null ? score : "-",
       sorter: (a, b) => (a.score || 0) - (b.score || 0),
     },
     {
       title: "RELEASED",
       dataIndex: "published_date",
       key: "published_date",
-      render: (text) => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
-      sorter: (a, b) =>
-        moment(a.published_date).unix() - moment(b.published_date).unix(),
+      render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+      sorter: (a, b) => moment(a.published_date).unix() - moment(b.published_date).unix(),
     },
     {
       title: "DUE (CDT)",
       dataIndex: "due_date",
       key: "due_date",
-      render: (text) => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
+      render: text => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
       sorter: (a, b) => moment(a.due_date).unix() - moment(b.due_date).unix(),
     },
     {
@@ -104,18 +94,14 @@ export default function Assignments() {
     };
     const fetchCourseAssignments = async () => {
       if (!userInfo || !userInfo.id) {
-        navigate("/");
+        navigate('/');
         return;
       }
 
       try {
-        console.log(
-          `${process.env.REACT_APP_API_URL}/get_course_assignments?` +
-            new URLSearchParams({ course_id: urlParams.courseId })
-        );
         const assignmentsResponse = await fetch(
           `${process.env.REACT_APP_API_URL}/get_course_assignments?` +
-            new URLSearchParams({ course_id: urlParams.courseId })
+          new URLSearchParams({ course_id: urlParams.courseId })
         );
         const assignmentsData = await assignmentsResponse.json();
 
@@ -165,10 +151,11 @@ export default function Assignments() {
           })
         );
 
+
         setCourseAssignment(updatedAssignments);
       } catch (error) {
-        message.error("Failed to fetch assignments data.");
-        console.error("Error fetching assignments:", error);
+        message.error('Failed to fetch assignments data.');
+        console.error('Error fetching assignments:', error);
       }
     };
 
@@ -178,6 +165,7 @@ export default function Assignments() {
   const handleAssignmentInteraction = (assignment) => {
     const now = moment();
     const dueDateTime = moment(assignment.due_date).valueOf();
+
     const lateDueDateTime = moment(assignment.late_due_date).valueOf();
     // const extension = await fetchAssignmentExtensions(assignment.id);
     // if (extension != null) {
@@ -189,9 +177,9 @@ export default function Assignments() {
     //   }
     // }
 
+
     const isSubmitted = assignment.submitted;
     const dueDateHasPassed = now.isAfter(dueDateTime);
-    const lateDueDateHasPassed = now.isAfter(lateDueDateTime);
 
     if (isSubmitted) {
       navigate(`/assignmentresult/${assignment.submissionId}`);
@@ -199,13 +187,7 @@ export default function Assignments() {
       setModalOpen(true);
       setAssignmentTitle(assignment.name);
       setAssignmentID(assignment.id);
-      setIsLate(false);
-    } else if (assignment.late_submission && !lateDueDateHasPassed) {
-      setModalOpen(true);
-      setAssignmentTitle(assignment.name);
-      setAssignmentID(assignment.id);
-      setIsLate(true);
-    } else {
+    } else if (dueDateHasPassed){
       message.error("Due Date Has Passed");
     }
   };
@@ -222,14 +204,16 @@ export default function Assignments() {
         style={{ borderBottom: "1px solid #f0f0f0" }}
       >
         <Descriptions>
-          <Descriptions.Item label="Course ID">
-            {urlParams.courseId}
-          </Descriptions.Item>
+          <Descriptions.Item label="Course ID">{urlParams.courseId}</Descriptions.Item>
         </Descriptions>
       </PageHeader>
 
       <Card bordered={false}>
-        <Table columns={columns} dataSource={courseAssignment} rowKey="id" />
+        <Table
+          columns={columns}
+          dataSource={courseAssignment}
+          rowKey="id"
+        />
       </Card>
 
       <AssignmentModal
@@ -237,7 +221,6 @@ export default function Assignments() {
         onCancel={closeModal}
         assignmentID={assignmentID}
         assignmentTitle={assignmentTitle}
-        late={isLate}
       />
     </>
   );

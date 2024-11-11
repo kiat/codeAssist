@@ -16,25 +16,25 @@ export default function InstructorAssignments() {
   const { courseId } = useParams();
   const [nameValidationStatus, setNameValidationStatus] = useState("");
 
-  const updateCurrentStep = useCallback((current) => {
+  const updateCurrentStep = useCallback(current => {
     setCurrentStep(current);
   }, []);
 
   const toggleDuplicateAssignmentModal = useCallback(() => {
-    setIsDuplicateAssignmentModalOpen((b) => !b);
+    setIsDuplicateAssignmentModalOpen(b => !b);
   }, []);
 
   const toggleIsCreate = useCallback(() => {
-    setIsCreate((t) => !t);
+    setIsCreate(t => !t);
   }, []);
 
   const finishForm = async () => {
     const values = form.getFieldsValue();
     const assignmentData = {
-      name: values.name,
-      course_id: courseId,
-      due_date: values.dueDate?._d,
-      autograder_points: values.autograderPoints,
+      name: values.name, 
+      course_id: courseId, 
+      due_date: values.dueDate._d, 
+      autograder_points: values.autograderPoints, 
       anonymous_grading: values.submissionAnonymization,
       manual_grading: values.manualGrading,
       late_submission: values.allowLateSubmissions,
@@ -42,18 +42,19 @@ export default function InstructorAssignments() {
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
-      published_date: values.releaseDate?._d,
+      published_date: values.releaseDate._d,
     };
     const validData = Object.fromEntries(
       Object.entries(assignmentData).filter(([_, value]) => value !== undefined)
     );
     createAssignment(validData)
-      .then((res) => {
+      .then(res => {
         toggleIsCreate();
       })
-      .catch((err) => {
-        setNameValidationStatus("error");
-      });
+    .catch(err => {
+      setNameValidationStatus("error");
+    })
+    
   };
 
   return (
@@ -107,7 +108,7 @@ export default function InstructorAssignments() {
             <Space>
               <Popover
                 content={
-                  <Space direction="vertical" style={{ color: "black" }}>
+                  <Space direction='vertical' style={{ color: "black" }}>
                     <Typography.Link>
                       <DownloadOutlined />
                       <span> Download CSV</span>

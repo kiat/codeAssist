@@ -16,7 +16,6 @@ def update_assignment():
     Requires from the frontend a JSON containing:
     @param assignment_id    the id of the assignment
     '''
-    print("UPDATE")
     new_data = request.json
     assignment_id = request.json["assignment_id"]
 

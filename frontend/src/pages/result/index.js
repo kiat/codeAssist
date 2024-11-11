@@ -33,10 +33,6 @@ export default function AssignmentResult() {
     useContext(GlobalContext);
   const [toSend, setToSend] = useState();
   const [dueDate, setDueDate] = useState();
-  const [lateDueDate, setLateDueDate] = useState();
-  const [lateAllowed, setLateAllowed] = useState();
-  const [isLate, setIsLate] = useState(false);
-
   useEffect(() => {
     // Fetching student and assignment IDs based on this submission ID
     const fetchIds = async () => {
@@ -79,6 +75,7 @@ export default function AssignmentResult() {
           student_id: studentId,
         });
         if (res?.data) {
+          console.log("Im in");
           setAutograderPoints(res.data.autograder_points);
           setAssignmentName(res.data.name); // Assuming the API provides this
           setDueDate(moment(res.data.due_date).valueOf());
@@ -112,6 +109,7 @@ export default function AssignmentResult() {
         );
         const studentData = await response.json();
         if (studentData) {
+          console.log("im in");
           updateAssignmentInfo((prevInfo) => ({
             ...prevInfo,
             studentName: studentData.name,
@@ -137,7 +135,6 @@ export default function AssignmentResult() {
           setUploadModalOpen((prev) => !prev);
         } else if (lateAllowed && !now.isAfter(lateDueDate)) {
           setUploadModalOpen((prev) => !prev);
-          setIsLate(true);
         } else {
           message.error("Due Date Has Passed");
         }
@@ -153,6 +150,21 @@ export default function AssignmentResult() {
   const Reload = useCallback(() => {
     window.location.reload();
   }, []);
+
+  const handleDownload = () => {
+    if (toSend && toSend.student_code_file && toSend.file_name) {
+      const blob = new Blob([toSend.student_code_file], { type: "text/plain" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = toSend.file_name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } else {
+      message.error("File not available for download");
+    }
+  };
 
   return (
     <>
@@ -200,7 +212,7 @@ export default function AssignmentResult() {
           <ActionButtons
             onRerun={() => {}} // Implement or replace with actual function
             onUpload={() => toggleModal("upload")}
-            onDownload={() => {}} // Implement or replace with actual function
+            onDownload={handleDownload} // Implement or replace with actual function
             onHistoryOpen={() => toggleModal("history")}
             isStudent={userInfo?.isStudent}
           />
@@ -214,7 +226,6 @@ export default function AssignmentResult() {
         onCancel={() => toggleModal("upload")}
         assignmentID={assignmentId}
         assignmentTitle={assignmentName}
-        late={isLate}
         extra={() => Reload()}
       />
       <SubmissionHistoryModal

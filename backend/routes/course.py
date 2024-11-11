@@ -19,7 +19,6 @@ def create_course():
     @param year             year of the course
     @param entryCode        entryCode of the course
     '''
-    print(course)
     course_id = str(uuid.uuid4())
     name = request.json['name']
     instructor_id = request.json['instructor_id']
@@ -58,7 +57,7 @@ def enroll_course():
     /enroll_course enrolls a student in a course using entryCode
     Requires from the frontend a JSON containing:
     @param entryCode        entryCode of the course
-    @param student_id       id of the student
+    @param user_id       id of the student
     '''
     student_id = request.json['user_id']
     entryCode = request.json['entryCode']
@@ -266,7 +265,6 @@ def get_course_assignments():
     Requires from the frontend a JSON containing:
     @param course_id        the id of a course
     '''
-
     course_id = request.args.get("course_id")
 
     assignments = db.session.query(Assignment).filter_by(course_id=course_id)
@@ -291,7 +289,8 @@ def get_instructor_courses():
 
     courses = db.session.query(Course).filter(Course.id.in_(list_of_courses))
     courses = CourseSchema().dump(courses, many=True)
-    return(jsonify(courses))
+
+    return jsonify(courses)
 
 @course.route('/get_course_info', methods=["GET"])
 @cross_origin()
