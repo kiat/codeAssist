@@ -17,7 +17,7 @@ CREATE TABLE courses (
     sis_course_id varchar(50),
     semester varchar(50),
     year varchar(50),
-    entryCode varchar(50),
+    entryCode varchar(50) UNIQUE,
     allowEntryCode boolean DEFAULT FALSE,
     description varchar(100),
     FOREIGN KEY (instructor_id) REFERENCES user (id)
