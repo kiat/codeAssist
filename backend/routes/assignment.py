@@ -2,8 +2,8 @@ import uuid
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission, RegradeRequest, Course, Enrollment
-from api.schemas import AssignmentSchema, SubmissionSchema, CourseSchema, EnrollmentSchema
+from api.models import Assignment, AssignmentExtension, Submission, RegradeRequest, Course, Enrollment
+from api.schemas import AssignmentSchema, SubmissionSchema, CourseSchema, EnrollmentSchema, AssignmentExtensionSchema
 
 assignment = Blueprint('assignment', __name__)
 
@@ -164,3 +164,70 @@ def delete_submissions():
         return jsonify("Submissions deleted successfully"), 200
     else:
         return jsonify("Submissions not deleted"), 404
+
+
+@assignment.route('/create_extension', methods=["POST", "GET"])
+@cross_origin()
+def create_extension():
+    assignment_id = request.json["assignment_id"]
+    student_id = request.json["student_id"]
+    # Check if there are any extensions for this assignment and student
+    related_extension = db.session.query(AssignmentExtension).filter_by(assignment_id=assignment_id, student_id=student_id).first()
+    if related_extension:
+        db.session.delete(related_extension)
+        db.session.commit()
+
+    extension_id = str(uuid.uuid4())
+    release_date_extension = request.json['release_date_extension']
+    due_date_extension = request.json['due_date_extension']
+    late_due_date_extension = request.json['late_due_date_extension']
+
+    extension_data = {
+        "id": extension_id,
+        "assignment_id": assignment_id,
+        "student_id": student_id,
+        "release_date_extension": release_date_extension,
+        "due_date_extension": due_date_extension,
+        "late_due_date_extension": late_due_date_extension
+    }
+    db.session.add(AssignmentExtension(**extension_data))
+    db.session.commit()
+    newExtension = db.session.query(AssignmentExtension).filter_by(id=extension_id).first()
+    newExtension = AssignmentExtensionSchema().dump(newExtension, many=False)
+    return jsonify(newExtension)
+
+@assignment.route('/get_extension', methods=["GET"])
+@cross_origin()
+def get_extension():
+    assignment_id = request.args.get("assignment_id")
+    student_id = request.args.get("student_id")
+    # Fetch extension for this assignment and student
+    extension = db.session.query(AssignmentExtension).filter_by(assignment_id=assignment_id, student_id=student_id).first()
+
+    extension = AssignmentExtensionSchema().dump(extension)
+    return jsonify(extension)
+
+@assignment.route('/get_assignment_extensions', methods=["GET"])
+@cross_origin()
+def get_assignment_extensions():
+    assignment_id = request.args.get("assignment_id")
+    # Fetch extension for this assignment and student
+    extensions = db.session.query(AssignmentExtension).filter_by(assignment_id=assignment_id)
+
+    extensions = AssignmentExtensionSchema().dump(extensions, many=True)
+    return jsonify(extensions)
+
+@assignment.route('/delete_extension', methods=["DELETE"])
+@cross_origin()
+def delete_extension():
+    extension_id = request.args.get("extension_id")
+    related_extension = db.session.query(AssignmentExtension).filter_by(id=extension_id).first()
+    if related_extension:
+        db.session.delete(related_extension)
+        db.session.commit()
+
+    related_extension = db.session.query(AssignmentExtension).filter_by(id=extension_id).all()
+    if not related_extension:
+        return jsonify("Extension deleted successfully"), 200
+    else:
+        return jsonify("Extension not deleted"), 404
