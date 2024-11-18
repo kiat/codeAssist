@@ -248,28 +248,7 @@ export default () => {
               onFinish();
               navigateMainPage();
             }}>Update Course</Button>
-            <Popover
-              trigger='click'
-              content={
-                assignments.length !== 0 && (
-                  <div style={{ width: "300px" }}>
-                    This course cannot be deleted, as it contains assignments.
-                    Delete the assignments and try again.
-                  </div>
-                )
-              }
-            >
-              <Button 
-              type='primary' 
-              icon={<DeleteOutlined />} 
-              danger 
-              onClick = {() => {
-                handleDeleteCourse();
-                navigateHome();
-              }}>
-                Delete Course
-              </Button>
-            </Popover>
+            
             <Button type='primary'>Deactivate</Button>
             <Button type='primary'>Reactivate</Button>
           </Space>
