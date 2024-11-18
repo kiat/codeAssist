@@ -354,3 +354,23 @@ def get_course_info():
     course = CourseSchema().dump(course, many=True)
 
     return jsonify(course)
+
+@course.route('/get_student_enrollment', methods=["GET"])
+@cross_origin()
+def get_student_enrollment():
+    '''
+    /get_course_enrollment gets all students enrolled in a course
+    Requires from the frontend a JSON containing:
+    @param course_id        the id of a course
+    '''
+    course_id = request.args.get("course_id")
+
+    students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id, role="student")
+    students = EnrollmentSchema().dump(students, many=True)
+
+    list_of_students = [x["student_id"] for x in students]
+
+    students = db.session.query(User.name, User.email_address, User.id, User.role).filter(User.id.in_(list_of_students))
+    students = UserSchema().dump(students, many=True)
+
+    return jsonify(students)

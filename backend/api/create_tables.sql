@@ -33,6 +33,16 @@ CREATE TABLE enrollments (
     FOREIGN KEY (course_id) REFERENCES courses (id)
 );
 
+/* Create Assignment_extension table */
+CREATE TABLE assignment_extensions (
+    id uuid PRIMARY KEY,
+    FOREIGN KEY (assignment_id) REFERENCES assignments (id),
+    FOREIGN KEY (student_id) REFERENCES user (id),
+    release_date_extension timestamp NOT NULL,
+    due_date_extension timestamp,
+    late_due_date_extension timestamp,
+);
+
 /* Create Assignments table */
 CREATE TABLE assignments (
     id uuid PRIMARY KEY,
@@ -106,7 +116,6 @@ CREATE TABLE regrade_requests (
     reviewed boolean DEFAULT FALSE,
     FOREIGN KEY (submission_id) REFERENCES submissions (id)
 );
-
 
 
 /* Submissions table index */
