@@ -26,13 +26,19 @@ import { useState } from "react";
 
 const { Sider, Content } = Layout;
 
-export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidationStatus, form }) => {
+export default ({
+  currentStep,
+  updateCurrentStep,
+  toggleIsCreate,
+  nameValidationStatus,
+  form,
+}) => {
   const [assignmentType, setAssignmentType] = useState(0);
   return (
     <>
       <Steps
         current={currentStep}
-        type='navigation'
+        type="navigation"
         items={[
           { title: "Assignment Type", status: "process" },
           { title: "Assignment Settings", status: "process" },
@@ -51,16 +57,16 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
               updateCurrentStep(1);
             }}
             items={[
-              { 
-                label: "Exam / Quiz", 
-                key: 0, 
-                icon: <FileTextOutlined /> 
-              },
-              {
-                label: "Homework / Problem Set",
-                key: 1,
-                icon: <BookOutlined />,
-              },
+              // {
+              //   label: "Exam / Quiz",
+              //   key: 0,
+              //   icon: <FileTextOutlined />,
+              // },
+              // {
+              //   label: "Homework / Problem Set",
+              //   key: 1,
+              //   icon: <BookOutlined />,
+              // },
               {
                 label: "Programming Assignment",
                 key: 2,
@@ -71,7 +77,7 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
         </Card>
       ) : (
         <Layout>
-          <Sider theme='light' width={230}>
+          <Sider theme="light" width={230}>
             <Card bordered={false}>
               {/* <Typography.Text level={5}>
               <LeftCircleFilled />
@@ -114,19 +120,19 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
           </Sider>
           <Content>
             <Card bordered={false}>
-              <Form layout='vertical' form={form}>
-                <Form.Item 
-                  label='ASSIGNMENT NAME'
-                  name='name'
+              <Form layout="vertical" form={form}>
+                <Form.Item
+                  label="ASSIGNMENT NAME"
+                  name="name"
                   validateStatus={nameValidationStatus}
                 >
-                  <Input placeholder='Name your assignment' />
+                  <Input placeholder="Name your assignment" />
                 </Form.Item>
                 {assignmentType !== "2" ? (
                   <Form.Item
-                    label='TEMPLATE'
-                    name='template'
-                    valuePropName='fileList'
+                    label="TEMPLATE"
+                    name="template"
+                    valuePropName="fileList"
                   >
                     <Upload>
                       <Button icon={<UploadOutlined />}>select PDF</Button>
@@ -134,32 +140,32 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
                   </Form.Item>
                 ) : null}
                 <Form.Item
-                  label='SUBMISSION ANONYMIZATION'
-                  name='submissionAnonymization'
-                  valuePropName='checked'
+                  label="SUBMISSION ANONYMIZATION"
+                  name="submissionAnonymization"
+                  valuePropName="checked"
                 >
                   <Checkbox>Enable Anonymous Grading</Checkbox>
                 </Form.Item>
                 {assignmentType === "2" ? (
                   <>
                     <Form.Item
-                      label='AUTOGRADER POINTS'
-                      name='autograderPoints'
+                      label="AUTOGRADER POINTS"
+                      name="autograderPoints"
                     >
                       <Input />
                     </Form.Item>
                     <Form.Item
-                      label='MANUAL GRADING'
-                      name='manualGrading'
-                      valuePropName='checked'
+                      label="MANUAL GRADING"
+                      name="manualGrading"
+                      valuePropName="checked"
                     >
                       <Checkbox>Enable Manual Grading</Checkbox>
                     </Form.Item>
                   </>
                 ) : (
                   <Form.Item
-                    label='WHO WILL UPLOAD SUBMISSIONS?'
-                    name='identify'
+                    label="WHO WILL UPLOAD SUBMISSIONS?"
+                    name="identify"
                   >
                     <Radio.Group options={["Instructor", "Student"]} />
                   </Form.Item>
@@ -171,29 +177,29 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
                       <Row gutter={20}>
                         <Col span={24} md={12}>
                           <Form.Item
-                            label='RELEASE DATE (CDT)'
-                            name='releaseDate'
+                            label="RELEASE DATE (CDT)"
+                            name="releaseDate"
                           >
                             <DatePicker showTime style={{ width: "100%" }} />
                           </Form.Item>
                         </Col>
                         <Col span={24} md={12}>
-                          <Form.Item label='DUE DATE (CDT)' name='dueDate'>
+                          <Form.Item label="DUE DATE (CDT)" name="dueDate">
                             <DatePicker showTime style={{ width: "100%" }} />
                           </Form.Item>
                         </Col>
                         <Col span={24} md={12}>
                           <Form.Item
-                            name='allowLateSubmissions'
-                            valuePropName='checked'
+                            name="allowLateSubmissions"
+                            valuePropName="checked"
                           >
                             <Checkbox>Allow Late Submissions</Checkbox>
                           </Form.Item>
                         </Col>
                         <Col span={24} md={12}>
                           <Form.Item
-                            label='LATE DUE DATE (CDT)'
-                            name='lateDueDate'
+                            label="LATE DUE DATE (CDT)"
+                            name="lateDueDate"
                           >
                             <DatePicker showTime style={{ width: "100%" }} />
                           </Form.Item>
@@ -202,16 +208,16 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
                           <>
                             <Col span={24} md={12}>
                               <Form.Item
-                                name='enforceTimeLimit'
-                                valuePropName='checked'
+                                name="enforceTimeLimit"
+                                valuePropName="checked"
                               >
                                 <Checkbox>Enforce time limit</Checkbox>
                               </Form.Item>
                             </Col>
                             <Col span={24} md={12}>
                               <Form.Item
-                                label='MAXIMUM TIME PERMITTED (MINUTES)'
-                                name='maximumTimePermitted'
+                                label="MAXIMUM TIME PERMITTED (MINUTES)"
+                                name="maximumTimePermitted"
                               >
                                 <DatePicker
                                   showTime
@@ -224,9 +230,9 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
                       </Row>
                     </Form.Item>
                     {assignmentType === "2" ? null : (
-                      <Form.Item label='SUBMISSION TYPE' name='submissionType'>
+                      <Form.Item label="SUBMISSION TYPE" name="submissionType">
                         <Radio.Group>
-                          <Space direction='vertical'>
+                          <Space direction="vertical">
                             <Radio value={0}>Variable Length</Radio>
                             <Radio value={1}>Templated (Fixed Length)</Radio>
                           </Space>
@@ -234,13 +240,13 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
                       </Form.Item>
                     )}
                     <Form.Item
-                      label='GROUP SUBMISSION'
-                      name='groupSubmission'
-                      valuePropName='checked'
+                      label="GROUP SUBMISSION"
+                      name="groupSubmission"
+                      valuePropName="checked"
                     >
                       <Checkbox>Enable Group Submission</Checkbox>
                     </Form.Item>
-                    <Form.Item label='LIMIT GROUP SIZE' name='limitGroupSize'>
+                    <Form.Item label="LIMIT GROUP SIZE" name="limitGroupSize">
                       <Input />
                     </Form.Item>
                   </>
@@ -248,18 +254,18 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
                 {assignmentType === "2" ? (
                   <>
                     <Form.Item
-                      label='LEADERBOARD'
-                      name='leaderBoard'
-                      valuePropName='checked'
+                      label="LEADERBOARD"
+                      name="leaderBoard"
+                      valuePropName="checked"
                     >
                       <Checkbox>Enable Leaderboard</Checkbox>
                     </Form.Item>
-                    <Form.Item label='DEFAULT # OF ENTRIES' name='leaderBoard'>
+                    <Form.Item label="DEFAULT # OF ENTRIES" name="leaderBoard">
                       <Input />
                     </Form.Item>
                   </>
                 ) : (
-                  <Form.Item label='CREATE YOUR RUBRIC' name='rubric'>
+                  <Form.Item label="CREATE YOUR RUBRIC" name="rubric">
                     <Radio.Group
                       options={[
                         { label: "Before student submission", value: 0 },
@@ -270,9 +276,9 @@ export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidation
                 )}
                 {assignmentType === "1" ? (
                   <Form.Item
-                    label='TEMPLATE VISIBILITY'
-                    name='templateVisibility'
-                    valuePropName='checked'
+                    label="TEMPLATE VISIBILITY"
+                    name="templateVisibility"
+                    valuePropName="checked"
                   >
                     <Checkbox>
                       Allow student to view and download the template
