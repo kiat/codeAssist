@@ -128,8 +128,8 @@ def update_account():
     /update_account updates the name and/or password of a user.
     Requires from the frontend a JSON containing:
     @param id            the user id (required)
-    @param new_name      the new name for the user (optional)
-    @param new_password  the new password for the user (optional)
+    @param name      the name for the user (optional)
+    @param password  the password for the user (optional)
     '''
     # Extract required and optional data from the request
     user_id = request.json.get('id')
