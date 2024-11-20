@@ -236,6 +236,36 @@ export default () => {
             </Row>
           </Form.Item>
         </Card>
+        {/* <Card title="Grading Defaults">
+          <p>
+            Any newly created assignments will have these settings. Existing
+            assignments won't be changed.
+          </p>
+          <Form.Item label="DEFAULT SCORING METHOD" name="defaultScoringMethod">
+            <Radio.Group
+              options={[
+                { label: "Negative Scoring", value: 0 },
+                { label: "Positive Scoring", value: 1 },
+              ]}
+              value={formData.defaultScoringMethod}
+            />
+          </Form.Item>
+          <Form.Item
+            label="DEFAULT SCORE BOUNDS"
+            name="DefaultScoreBounds"
+            wrapperCol={24}
+          >
+            <Checkbox.Group value={formData.DefaultScoreBounds}>
+              <Space direction="vertical">
+                <Checkbox value="ceiling">
+                  Ceiling (maximum score is determined by the Assignment
+                  Outline)
+                </Checkbox>
+                <Checkbox value="floor">Floor (minimum score is 0.0)</Checkbox>
+              </Space>
+            </Checkbox.Group>
+          </Form.Item>
+        </Card> */}
         <Card title="Modify Course">
           <Typography.Title level={5}>COURSE ACTIONS</Typography.Title>
           <Space>
