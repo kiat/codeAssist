@@ -120,3 +120,33 @@ def delete_user():
     # user = UserSchema().dump(user)
     db.session.commit()
     return "Success", 200
+
+@user.route('/update_account', methods=["PUT", "POST"])
+@cross_origin()
+def update_account():
+    '''
+    /update_account updates the name and/or password of a user.
+    Requires from the frontend a JSON containing:
+    @param id            the user id (required)
+    @param new_name      the new name for the user (optional)
+    @param new_password  the new password for the user (optional)
+    '''
+    # Extract required and optional data from the request
+    user_id = request.json.get('id')
+    new_name = request.json.get('name')
+    new_password = request.json.get('password')
+
+    # Find the user in the database
+    user = db.session.query(User).filter_by(id=user_id).first()
+
+    # Update the fields if provided
+    if new_name:
+        user.name = new_name
+    if new_password:
+        user.password = new_password
+
+    # Commit changes to the database
+    db.session.commit()
+
+    # Return a success response
+    return jsonify({"message": "Account updated successfully"}), 200
