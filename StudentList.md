@@ -1,18 +1,36 @@
+# Spring 2025 
+
+* Pranav N Sridhar <pranavs@utexas.edu>
+* Gio B Eloja <gioeloja@utexas.edu>
+* Maxim Gao <maxim.gao@utexas.edu>
+* Donne Su <sudonne@gmail.com>
+* Aryan Samal <aryan.samal@utexas.edu>
+* Kan Lu <ken.lu@utexas.edu>
+* Patrick Pichardo <busibbpicha717@gmail.com>
+* Will Kung <wk5389@utexas.edu>
+* Ethan H Zhang <ethanhzhang15@utexas.edu>
+* Jayanth Vellanki <vellankijay@utexas.edu>
+* Tanish Gupta <tanish.gupta@utexas.edu>
+
+
+
 # Summer 2024
 
-* Annabel G Tu <annabeltu@utexas.edu> , (GitHub annabel2u)
-* Jayanth Vellanki <vellankijay@utexas.edu>  (GitHub Vellankijay)
-* Tanish Gupta <tanish.gupta@utexas.edu>  (Github TanishG123)
+* Annabel G Tu <annabeltu@utexas.edu>
+* Jayanth Vellanki <vellankijay@utexas.edu>  
+* Tanish Gupta <tanish.gupta@utexas.edu> 
 * Lawrence Park <lawrencepark@utexas.edu>
-* Hudson Whipple <hudsonwhipple@utexas.edu> (Github )
-* Ben Yu <benyu1414@gmail.com> (Github )
-* Brandon H Song <brandonsong@utexas.edu> (Github )
-* Braden Carter <carterbd@utexas.edu> (Github )
-* Ethan H Zhang <ethanhzhang15@utexas.edu> (Github )
-* Prajay Pandiri <prajaypandiri@gmail.com> (Github )
-* Abhinav Bichal <abhinavbichal@utexas.edu> (Github )
-* Kan Lu <ken.lu@utexas.edu> (Github )
-* Logan J Kim <logan.kim@utexas.edu> (Github )
+* Hudson Whipple <hudsonwhipple@utexas.edu> 
+* Ben Yu <benyu1414@gmail.com> 
+* Brandon H Song <brandonsong@utexas.edu> 
+* Braden Carter <carterbd@utexas.edu> 
+* Ethan H Zhang <ethanhzhang15@utexas.edu> 
+* Prajay Pandiri <prajaypandiri@gmail.com> 
+* Abhinav Bichal <abhinavbichal@utexas.edu> 
+* Kan Lu <ken.lu@utexas.edu> 
+* Logan J Kim <logan.kim@utexas.edu>
+* Shreya Nakka <shreyanakka@utexas.edu>
+* 
 
 
 # Spring 2024
