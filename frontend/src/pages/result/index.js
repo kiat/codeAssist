@@ -33,6 +33,9 @@ export default function AssignmentResult() {
     useContext(GlobalContext);
   const [toSend, setToSend] = useState();
   const [dueDate, setDueDate] = useState();
+  const [lateDueDate, setLateDueDate] = useState();
+  const [lateAllowed, setLateAllowed] = useState;
+  
   useEffect(() => {
     // Fetching student and assignment IDs based on this submission ID
     const fetchIds = async () => {
