@@ -1,13 +1,10 @@
 import {
   Button,
   Checkbox,
-  Col,
   Form,
   Input,
   Modal,
   Radio,
-  Row,
-  Select,
   Space,
 } from "antd";
 

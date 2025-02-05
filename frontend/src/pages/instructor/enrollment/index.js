@@ -42,6 +42,7 @@ export default () => {
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen((t) => !t);
   }, []);
+  
   const toggleAddCSVModalOpen = useCallback(() => {
     setAddCSVModalOpen((t) => !t);
   }, []);
@@ -148,16 +149,17 @@ export default () => {
     [courseId, getEnrollment, toggleAddModalOpen]
   );
   
-  const finishCSVForm =
-    useCallback();
-    //toggleAddCSVModalOpen()
-
+  const finishCSVForm = useCallback((values) => {
+    console.log("Form values:", values);
+    toggleAddCSVModalOpen();
+  }, [toggleAddCSVModalOpen]);
+  
   const finishMoreUsers = useCallback(
     (values) => {
       console.log(values);
-      values.forEach(enrollmentBulk);
+      values.forEach(enrollEntry);
 
-      function enrollmentBulk(item) {
+      function enrollEntry(item) {
         fetch(
           process.env.REACT_APP_API_URL + "/get_users?" +
             new URLSearchParams({
@@ -283,10 +285,10 @@ export default () => {
         toggleAddModalOpen={toggleAddModalOpen}
         onFinish={finishForm}
       />
-      <AddCSVModal
-        open={addCSVModalOpen}
-        toggleAddModalOpen={toggleAddCSVModalOpen}
-        finishCSVForm={finishCSVForm}
+      <AddCSVModal 
+        open={addCSVModalOpen} 
+        toggleAddCSVModalOpen={toggleAddCSVModalOpen} 
+        finishCSVForm={finishCSVForm} 
       />
       <AddMoreUsersModal
         toggleAddMoreUsersModalOpen={toggleAddMoreUsersModalOpen}
