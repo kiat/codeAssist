@@ -12,6 +12,9 @@ import { InboxOutlined } from "@ant-design/icons"
 const AddCSVModal = ({ open, toggleAddCSVModalOpen, finishCSVForm }) => {
   const [fileList, setFileList] = useState([]);
 
+  const maxMB = 4 // limit in MB
+  const maxSize = maxMB * 1024 * 1024; // limit in bytes
+
   const handleFileChange = (info) => {
     let newFileList = [...info.fileList];
 
@@ -29,15 +32,30 @@ const AddCSVModal = ({ open, toggleAddCSVModalOpen, finishCSVForm }) => {
   };
 
   const handleBeforeUpload = (file) => {
-    const isCSV = file.type === "csv";
+    // require csv file format
+    const isCSV = file.type === "text/csv" || file.name.endsWith(".csv");
     if (!isCSV) {
       message.error("You can only upload CSV file!");
+      return Upload.LIST_IGNORE;
     }
-    return isCSV;
+
+    // limit file size on upload
+    if (file.size > maxSize) {
+      message.error(`File must be smaller than ${maxMB}MB!`);
+      return Upload.LIST_IGNORE;
+    }
+
+    return true;
   };
 
   const handleFinish = (values) => {
-    finishCSVForm(values);
+    if (fileList.length === 0) {
+      message.error("Please upload a CSV file");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", fileList[0].originFileObj);
+    finishCSVForm(formData);
     setFileList([]);
   }
 
@@ -54,14 +72,18 @@ const AddCSVModal = ({ open, toggleAddCSVModalOpen, finishCSVForm }) => {
       onCancel={handleCancel}
     >
       <Form layout="vertical" onFinish={handleFinish}>
-        <Form.Item label="Upload" name = "file">
+        <Form.Item label={`Upload File (${maxMB}MB limit)`} name = "file">
           <Upload.Dragger
             name="file"
             multiple={false}
             fileList={fileList}
-            action="http://localhost:5001/upload_submission"
             onChange={handleFileChange}
             beforeUpload={handleBeforeUpload}
+            customRequest={({ file, onSuccess }) => {
+              setTimeout(() => {
+                onSuccess("ok");
+              }, 0);
+            }}
             onDrop={e => console.log('Dropped files', e.dataTransfer.files)}
           >
             <p className="ant-upload-drag-icon">

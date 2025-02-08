@@ -15,7 +15,7 @@ import AddUserModal from "./AddUserModal";
 import { useCallback, useState, useContext } from "react";
 import {
   createEnrollment,
-  createEnrollmentBulk,
+  createEnrollmentCSV,
   getCourseEnrollment,
 } from "../../../services/enrollment";
 import { useParams } from "react-router-dom";
@@ -149,10 +149,29 @@ export default () => {
     [courseId, getEnrollment, toggleAddModalOpen]
   );
   
-  const finishCSVForm = useCallback((values) => {
-    console.log("Form values:", values);
-    toggleAddCSVModalOpen();
-  }, [toggleAddCSVModalOpen]);
+  const finishCSVForm = useCallback(
+    (formData) => {
+      formData.append("course_id", courseId);
+
+      createEnrollmentCSV(formData)
+        .then((res) => {
+          if (res.status !== 200) {
+            return res.data.then((error) => {
+              throw new Error(error.error || "Something went wrong");
+            });
+          }
+          return res.data;
+        })
+        .then(() => {
+          message.success("Enrollments processed.");
+          toggleAddCSVModalOpen();
+          getEnrollment();
+        })
+        .catch((error) => {
+          console.error("Error processing enrollments:", error);
+          message.error("An error occurred while processing enrollments.");
+        });
+  }, [courseId, getEnrollment, toggleAddCSVModalOpen]);
   
   const finishMoreUsers = useCallback(
     (values) => {
@@ -171,7 +190,7 @@ export default () => {
             createEnrollment({
               'student_id': student.id,
               'course_id': courseId,
-            }).then((res) => {
+            }).then(() => {
               toggleAddMoreUsersModalOpen();
               getEnrollment();
             })

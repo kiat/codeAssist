@@ -8,6 +8,6 @@ export async function createEnrollment(params) {
   return service("create_enrollment", params, "post");
 }
 
-export async function createEnrollmentBulk(params) {
-  return service("create_enrollment_bulk", params, "post");
+export async function createEnrollmentCSV(params) {
+  return service("create_enrollment_csv", params, "post");
 }

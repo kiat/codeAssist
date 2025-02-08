@@ -1,6 +1,9 @@
 import uuid
-from flask import Blueprint, request, jsonify
+import os
+import csv
+from flask import Blueprint, request, jsonify, make_response
 from flask_cors import cross_origin
+from werkzeug.utils import secure_filename
 from api import db
 from api.models import (
     Assignment,
@@ -15,6 +18,8 @@ from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSc
 
 course = Blueprint("course", __name__)
 
+ALLOWED_EXTENSIONS = {'csv'}
+UPLOAD_FOLDER = 'uploads'
 
 @course.route("/create_course", methods=["POST", "GET"])
 @cross_origin()
@@ -184,7 +189,7 @@ def delete_all_assignments():
         return jsonify("Assignments not deleted"), 404
 
 
-@course.route("/create_enrollment", methods=["POST", "GET"])
+@course.route("/create_enrollment", methods=["POST"])
 @cross_origin()
 def create_enrollment():
     """
@@ -238,34 +243,85 @@ def update_role():
     else:
         return jsonify({"error": "Enrollment not found"}), 404
 
-
-@course.route("/create_enrollment_bulk", methods=["POST", "GET"])
-@cross_origin()
-def create_enrollment_bulk():
+# converted to a helper as a part of issue #41, to facilitate create_enrollment_csv()
+def create_enrollment_bulk(data):
     """
     /create_enrollment_bulk mass enrolls students in a course
     Requires from the frontend a JSON containing:
     @param course_id        the id of the course
-    @parma student_ids      a list of student ids
+    @param student_ids      a list of student ids
     """
-    course_id = request.json["course_id"]
-    students = request.json["student_ids"]
+    course_id = data["course_id"]
+    students = data["student_ids"]
+    # default role to student if not present
+    role = data.get("role", "student")
 
-    students_to_add = [
-        Enrollment(
-            **{
-                "student_id": id,
-                "course_id": course_id,
-            }
-        )
-        for id in students
-    ]
+    if not course_id or not students:
+        return jsonify({"error": "Missing required fields"}), 400
 
-    db.session.add_all(students_to_add)
-    db.session.commit()
+    # remove duplicates in students
+    students = list(set(students))
 
-    return jsonify({"message": "Success"}), 200
+    failed_enrollments = []
 
+    for student_id in students:
+        try:
+            enrollment = Enrollment(
+                student_id=student_id, 
+                course_id=course_id, 
+                role=role
+            )
+            db.session.add(enrollment)
+            db.session.commit()
+        except Exception:
+            failed_enrollments.append(student_id)
+    
+    return {
+        "failed_enrollments" : failed_enrollments
+    }
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@course.route("/create_enrollment_csv", methods=["POST"])
+@cross_origin()
+def create_enrollment_csv():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({"error": "Invalid file type"}), 400
+
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
+
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(file_path)
+
+    student_ids = []
+    course_id = request.form.get("course_id")
+    try:
+        with open(file_path, newline='')  as csvfile:
+            csv_reader = csv.reader(csvfile, delimiter=',')
+            for row in csv_reader:
+                student_ids.append(row[0])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    response = create_enrollment_bulk({
+        "course_id": course_id,
+        "student_ids": student_ids
+        })
+
+    os.remove(file_path)
+
+    res = make_response(jsonify(response), 200)
+    return res
 
 @course.route("/get_student_enrollments", methods=["GET"])
 @cross_origin()
