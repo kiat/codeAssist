@@ -125,6 +125,7 @@ export default ({
                   label="ASSIGNMENT NAME"
                   name="name"
                   validateStatus={nameValidationStatus}
+                  rules={[{ required: true, message: "Please enter a name" }]}
                 >
                   <Input placeholder="Name your assignment" />
                 </Form.Item>
@@ -144,6 +145,10 @@ export default ({
                     <Form.Item
                       label="AUTOGRADER POINTS"
                       name="autograderPoints"
+                      rules={[
+                        { required: true, message: "Please enter a point value" },
+                        { pattern: /^\d+$/, message: "Only numeric values allowed" },
+                      ]}
                     >
                       <Input />
                     </Form.Item>
@@ -172,12 +177,13 @@ export default ({
                           <Form.Item
                             label="RELEASE DATE (CDT)"
                             name="releaseDate"
+                            rules={[{ required: true, message: "Please select a release date" }]}
                           >
                             <DatePicker showTime style={{ width: "100%" }} />
                           </Form.Item>
                         </Col>
                         <Col span={24} md={12}>
-                          <Form.Item label="DUE DATE (CDT)" name="dueDate">
+                          <Form.Item label="DUE DATE (CDT)" name="dueDate" rules={[{ required: true, message: "Please select a due date" }]}>
                             <DatePicker showTime style={{ width: "100%" }} />
                           </Form.Item>
                         </Col>
@@ -192,7 +198,18 @@ export default ({
                         <Col span={24} md={12}>
                           <Form.Item
                             label="LATE DUE DATE (CDT)"
+                            dependencies={["dueDate"]}
                             name="lateDueDate"
+                            rules={[
+                              ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                  if (!value || getFieldValue("dueDate") < value) {
+                                    return Promise.resolve();
+                                  }
+                                  return Promise.reject(new Error("Late due date must be after due date"));
+                                },
+                              }),
+                            ]}
                           >
                             <DatePicker showTime style={{ width: "100%" }} />
                           </Form.Item>
@@ -239,11 +256,53 @@ export default ({
                     >
                       <Checkbox>Enable Group Submission</Checkbox>
                     </Form.Item>
-                    <Form.Item label="LIMIT GROUP SIZE" name="limitGroupSize">
+                    <Form.Item label="LIMIT GROUP SIZE" 
+                    name="limitGroupSize" 
+                    rules={[
+                      { required: false},
+                      { pattern: /^\d+$/, message: "Only numeric values allowed" },
+                    ]}>
                       <Input />
                     </Form.Item>
                   </>
                 )}
+                {assignmentType === "2" ? (
+                  <>
+                    <Form.Item
+                      label="LEADERBOARD"
+                      name="leaderBoard"
+                      valuePropName="checked"
+                    >
+                      <Checkbox>Enable Leaderboard</Checkbox>
+                    </Form.Item>
+                    <Form.Item label="DEFAULT # OF ENTRIES" name="leaderBoard" rules={[
+                      { required: false},
+                      { pattern: /^\d+$/, message: "Only numeric values allowed" },
+                    ]}>
+                      <Input />
+                    </Form.Item>
+                  </>
+                ) : (
+                  <Form.Item label="CREATE YOUR RUBRIC" name="rubric">
+                    <Radio.Group
+                      options={[
+                        { label: "Before student submission", value: 0 },
+                        { label: "while grading submissions", value: 1 },
+                      ]}
+                    />
+                  </Form.Item>
+                )}
+                {assignmentType === "1" ? (
+                  <Form.Item
+                    label="TEMPLATE VISIBILITY"
+                    name="templateVisibility"
+                    valuePropName="checked"
+                  >
+                    <Checkbox>
+                      Allow student to view and download the template
+                    </Checkbox>
+                  </Form.Item>
+                ) : null}
               </Form>
             </Card>
           </Content>
