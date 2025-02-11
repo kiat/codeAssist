@@ -189,10 +189,8 @@ export default () => {
           <Form.Item label="ENTRY CODE" name="entryCode">
             <Input />
           </Form.Item>
-          <Form.Item label="ALLOW ENTRY CODE" wrapperCol={24}>
-            <Checkbox
-              name="allowEntryCode"
-            >
+          <Form.Item label="ALLOW ENTRY CODE" wrapperCol={24} name="allowEntryCode" valuePropName="checked" >
+            <Checkbox            >
               Allow students to enroll via course entry code
             </Checkbox>
           </Form.Item>
