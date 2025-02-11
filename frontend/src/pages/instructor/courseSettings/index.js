@@ -144,29 +144,36 @@ export default () => {
     }));
   };
 
-  const onFinish = () => {
+  const onFinish = async () => {
     const dataToSend = {
       course_id: courseId,
       ...Object.fromEntries(
         Object.entries(formData).filter(([_, value]) => value !== undefined)
       ),
     };
-    fetch(process.env.REACT_APP_API_URL + "/update_course", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(dataToSend),
-    })
-      .then((response) => {
-        response.json();
-      })
-      .then((data) => {
-        console.log(data);
-      })
-      .catch((error) => {
-        console.log(error);
+    try {
+      const response = await fetch(process.env.REACT_APP_API_URL + "/update_course", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(dataToSend),
       });
+  
+      if (!response.ok) {
+        throw new Error("Failed to update course");
+      }
+  
+      const updatedData = await response.json();
+      
+      // Update global context with the new course info
+      updateCourseInfo(updatedData);
+  
+      message.success("Course updated successfully");
+    } catch (error) {
+      console.error("Error updating course:", error);
+      message.error("Failed to update course");
+    }
   };
 
   return (
