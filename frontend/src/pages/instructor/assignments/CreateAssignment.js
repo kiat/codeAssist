@@ -266,43 +266,6 @@ export default ({
                     </Form.Item>
                   </>
                 )}
-                {assignmentType === "2" ? (
-                  <>
-                    <Form.Item
-                      label="LEADERBOARD"
-                      name="leaderBoard"
-                      valuePropName="checked"
-                    >
-                      <Checkbox>Enable Leaderboard</Checkbox>
-                    </Form.Item>
-                    <Form.Item label="DEFAULT # OF ENTRIES" name="leaderBoard" rules={[
-                      { required: false},
-                      { pattern: /^\d+$/, message: "Only numeric values allowed" },
-                    ]}>
-                      <Input />
-                    </Form.Item>
-                  </>
-                ) : (
-                  <Form.Item label="CREATE YOUR RUBRIC" name="rubric">
-                    <Radio.Group
-                      options={[
-                        { label: "Before student submission", value: 0 },
-                        { label: "while grading submissions", value: 1 },
-                      ]}
-                    />
-                  </Form.Item>
-                )}
-                {assignmentType === "1" ? (
-                  <Form.Item
-                    label="TEMPLATE VISIBILITY"
-                    name="templateVisibility"
-                    valuePropName="checked"
-                  >
-                    <Checkbox>
-                      Allow student to view and download the template
-                    </Checkbox>
-                  </Form.Item>
-                ) : null}
               </Form>
             </Card>
           </Content>
