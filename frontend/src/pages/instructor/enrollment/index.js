@@ -15,7 +15,7 @@ import AddUserModal from "./AddUserModal";
 import { useCallback, useState, useContext } from "react";
 import {
   createEnrollment,
-  createEnrollmentBulk,
+  createEnrollmentCSV,
   getCourseEnrollment,
 } from "../../../services/enrollment";
 import { useParams } from "react-router-dom";
@@ -42,6 +42,7 @@ export default () => {
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen((t) => !t);
   }, []);
+  
   const toggleAddCSVModalOpen = useCallback(() => {
     setAddCSVModalOpen((t) => !t);
   }, []);
@@ -148,16 +149,27 @@ export default () => {
     [courseId, getEnrollment, toggleAddModalOpen]
   );
   
-  const finishCSVForm =
-    useCallback();
-    //toggleAddCSVModalOpen()
+  const finishCSVForm = useCallback(
+    async (formData) => {
+      formData.append("course_id", courseId);
 
+      return createEnrollmentCSV(formData)
+        .then((res) => {
+          if (res.status !== 200) {
+            return res.data.then((error) => {
+              throw new Error(error.error || "Something went wrong");
+            });
+          }
+          return res.data;
+        })
+  }, [courseId]);
+  
   const finishMoreUsers = useCallback(
     (values) => {
       console.log(values);
-      values.forEach(enrollmentBulk);
+      values.forEach(enrollEntry);
 
-      function enrollmentBulk(item) {
+      function enrollEntry(item) {
         fetch(
           process.env.REACT_APP_API_URL + "/get_users?" +
             new URLSearchParams({
@@ -169,7 +181,7 @@ export default () => {
             createEnrollment({
               'student_id': student.id,
               'course_id': courseId,
-            }).then((res) => {
+            }).then(() => {
               toggleAddMoreUsersModalOpen();
               getEnrollment();
             })
@@ -283,10 +295,11 @@ export default () => {
         toggleAddModalOpen={toggleAddModalOpen}
         onFinish={finishForm}
       />
-      <AddCSVModal
-        open={addCSVModalOpen}
-        toggleAddModalOpen={toggleAddCSVModalOpen}
-        finishCSVForm={finishCSVForm}
+      <AddCSVModal 
+        open={addCSVModalOpen} 
+        toggleAddCSVModalOpen={toggleAddCSVModalOpen} 
+        finishCSVForm={finishCSVForm} 
+        getEnrollment={getEnrollment}
       />
       <AddMoreUsersModal
         toggleAddMoreUsersModalOpen={toggleAddMoreUsersModalOpen}
