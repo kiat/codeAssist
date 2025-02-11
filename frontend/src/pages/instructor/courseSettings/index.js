@@ -151,6 +151,7 @@ export default () => {
         Object.entries(formData).filter(([_, value]) => value !== undefined)
       ),
     };
+    updateCourseInfo({ ...dataToSend, id: courseId });
     fetch(process.env.REACT_APP_API_URL + "/update_course", {
       method: "POST",
       headers: {
