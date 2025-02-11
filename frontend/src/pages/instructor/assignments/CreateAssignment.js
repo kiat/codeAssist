@@ -140,13 +140,13 @@ export default ({
                     </Upload>
                   </Form.Item>
                 ) : null}
-                <Form.Item
+                 {/* <Form.Item
                   label="SUBMISSION ANONYMIZATION"
                   name="submissionAnonymization"
                   valuePropName="checked"
                 >
                   <Checkbox>Enable Anonymous Grading</Checkbox>
-                </Form.Item>
+                </Form.Item> */}
                 {assignmentType === "2" ? (
                   <>
                     <Form.Item
@@ -273,7 +273,7 @@ export default ({
                     </Form.Item>
                   </>
                 )}
-                {assignmentType === "2" ? (
+                {/* {assignmentType === "2" ? (
                   <>
                     <Form.Item
                       label="LEADERBOARD"
@@ -309,7 +309,7 @@ export default ({
                       Allow student to view and download the template
                     </Checkbox>
                   </Form.Item>
-                ) : null}
+                ) : null} */}
               </Form>
             </Card>
           </Content>
