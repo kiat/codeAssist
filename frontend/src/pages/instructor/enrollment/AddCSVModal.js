@@ -1,18 +1,13 @@
 import React, { useState } from "react";
-import {
-  Button,
-  Form,
-  Modal,
-  Space,
-  Upload,
-  message
-} from "antd";
+import { Button, Form, Modal, Space, Upload, message } from "antd";
 import { InboxOutlined } from "@ant-design/icons"
+import LoadingOverlay from "../../../components/LoadingOverlay";
 
-const AddCSVModal = ({ open, toggleAddCSVModalOpen, finishCSVForm }) => {
+const AddCSVModal = ({ open, toggleAddCSVModalOpen, finishCSVForm , getEnrollment}) => {
   const [fileList, setFileList] = useState([]);
+  const [loading, setLoading]  = useState(false);
 
-  const maxMB = 4 // limit in MB
+  const maxMB = 101 // limit in MB
   const maxSize = maxMB * 1024 * 1024; // limit in bytes
 
   const handleFileChange = (info) => {
@@ -48,14 +43,27 @@ const AddCSVModal = ({ open, toggleAddCSVModalOpen, finishCSVForm }) => {
     return true;
   };
 
-  const handleFinish = (values) => {
+  const handleFinish = async () => {
     if (fileList.length === 0) {
       message.error("Please upload a CSV file");
       return;
     }
     const formData = new FormData();
     formData.append("file", fileList[0].originFileObj);
-    finishCSVForm(formData);
+    
+    setLoading(true);
+
+    try {
+      await finishCSVForm(formData);
+      message.success("Enrollments processed.");
+      toggleAddCSVModalOpen();
+      getEnrollment();
+    } catch(error) {
+      console.error("Error processing enrollments:", error);
+      message.error("An error occurred while processing enrollments.");
+    } finally {
+      setLoading(false);
+    }
     setFileList([]);
   }
 
@@ -65,12 +73,9 @@ const AddCSVModal = ({ open, toggleAddCSVModalOpen, finishCSVForm }) => {
   }
 
   return (
-    <Modal
-      open={open}
-      title="Add a User With CSV file"
-      footer={null}
-      onCancel={handleCancel}
-    >
+    <>
+    <LoadingOverlay loading={loading}/>
+    <Modal open={open} title="Add a User With CSV file" footer={null} onCancel={handleCancel}>
       <Form layout="vertical" onFinish={handleFinish}>
         <Form.Item label={`Upload File (${maxMB}MB limit)`} name = "file">
           <Upload.Dragger
@@ -104,6 +109,7 @@ const AddCSVModal = ({ open, toggleAddCSVModalOpen, finishCSVForm }) => {
         </Form.Item>
       </Form>
     </Modal>
+    </>
   );
 };
 

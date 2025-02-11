@@ -150,10 +150,10 @@ export default () => {
   );
   
   const finishCSVForm = useCallback(
-    (formData) => {
+    async (formData) => {
       formData.append("course_id", courseId);
 
-      createEnrollmentCSV(formData)
+      return createEnrollmentCSV(formData)
         .then((res) => {
           if (res.status !== 200) {
             return res.data.then((error) => {
@@ -162,16 +162,7 @@ export default () => {
           }
           return res.data;
         })
-        .then(() => {
-          message.success("Enrollments processed.");
-          toggleAddCSVModalOpen();
-          getEnrollment();
-        })
-        .catch((error) => {
-          console.error("Error processing enrollments:", error);
-          message.error("An error occurred while processing enrollments.");
-        });
-  }, [courseId, getEnrollment, toggleAddCSVModalOpen]);
+  }, [courseId]);
   
   const finishMoreUsers = useCallback(
     (values) => {
@@ -308,6 +299,7 @@ export default () => {
         open={addCSVModalOpen} 
         toggleAddCSVModalOpen={toggleAddCSVModalOpen} 
         finishCSVForm={finishCSVForm} 
+        getEnrollment={getEnrollment}
       />
       <AddMoreUsersModal
         toggleAddMoreUsersModalOpen={toggleAddMoreUsersModalOpen}
