@@ -17,17 +17,17 @@ def send_regrade_request():
     /send_regrade_request creates a regrade request
     Requires from the frontend a JSON containing:
     @param submission_id         submission
-    @param justification     justification for the request
+    @param       for the request
     '''
 
     request_id = str(uuid.uuid4())
     submission_id = request.json['submission_id']
-    justification = request.json['justification']
+     = request.json['']
 
     request_data = {
         "id": request_id,
         "submission_id": submission_id,
-        "justification": justification
+        "": 
     }
 
     db.session.add(RegradeRequest(**request_data))
@@ -58,7 +58,7 @@ def get_regrade_request():
         return jsonify({"message": "No regrade request found"})
     response = {
         "submission": SubmissionSchema().dump(submission),
-        "justification": regrade.justification,
+        "": regrade.,
         "reviewed": regrade.reviewed
     }
     return jsonify(response)
@@ -121,7 +121,7 @@ def get_student_regrade_requests():
             "regradeRequestId": req.id,
             "assignmentName": assignment.name,
             "studentName": student.name,
-            "justification": req.justification,
+            "": req.,
             "assignmentId": assignment.id,
             "studentId": student.id,
             "reviewed": req.reviewed
@@ -143,7 +143,7 @@ def get_instructor_regrade_requests():
         result.append({
             "assignmentName": assignment.name,
             "studentName": student.name,
-            "justification": req.justification,
+            "": req.,
             "assignmentId": assignment.id,
             "studentId": student.id,
             "reviewed": req.reviewed

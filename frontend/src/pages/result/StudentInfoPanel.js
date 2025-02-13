@@ -257,16 +257,6 @@ export default function StudentInfoPanel({
       </Space>}
       <Space direction="vertical" size="middle" style={{ paddingTop: "20px" }}>
         <div>Select each question to review feedback and grading details.</div>
-        <div>
-          <strong>Student</strong>
-          <br />
-          {studentName}
-        </div>
-        <div>
-          <strong>Total Points</strong>
-          <br />
-          {totalPoints}
-        </div>
       </Space>
     </Space>
   );
