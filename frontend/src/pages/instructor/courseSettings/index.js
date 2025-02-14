@@ -26,27 +26,26 @@ export default () => {
   const { courseId } = useParams();
   const { updateCourseInfo, courseInfo } = useContext(GlobalContext);
   const [assignments, setAssignments] = useState([]);
-  const [formData, setFormData] = useState({});
-  const [placeholders, setPlaceholders] = useState({});
+
+  // Used to manage form state
+  const [form] = Form.useForm();
 
   useEffect(() => {
-    if (!courseInfo.id) {
-      updateCourseInfo({ id: courseId });
-    }
-    fetchCourseData(courseId);
-  }, [courseId, courseInfo.id, updateCourseInfo]);
+    fetchCourseData();
+  }, []);
 
-  const fetchCourseData = async (id) => {
+  const fetchCourseData = async () => {
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_course_info?course_id=${id}`
+        `${process.env.REACT_APP_API_URL}/get_course_info?course_id=${courseId}`
       );
       if (!response.ok) {
         throw new Error("Network response was not ok");
       }
       const data = await response.json();
-      setFormData(data[0]);
-      setPlaceholders(data[0]);
+
+      // update form state
+      form.setFieldsValue(data[0]);
     } catch (error) {
       console.error("Error fetching course data:", error);
     }
@@ -136,52 +135,47 @@ export default () => {
     navigate(`/instructorDashboard/${courseId}`);
   };
 
-  const handleCheckboxChange = (e) => {
-    const { name, checked } = e.target;
-    setFormData((prevFormData) => ({
-      ...prevFormData,
-      [name]: checked,
-    }));
-  };
-
-  const onFinish = () => {
+  const onFinish = async (values) => {
     const dataToSend = {
       course_id: courseId,
       ...Object.fromEntries(
-        Object.entries(formData).filter(([_, value]) => value !== undefined)
+        Object.entries(values).filter(([_, value]) => value !== undefined)
       ),
     };
-    updateCourseInfo({ ...dataToSend, id: courseId });
-    fetch(process.env.REACT_APP_API_URL + "/update_course", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(dataToSend),
-    })
-      .then((response) => {
-        response.json();
-      })
-      .then((data) => {
-        console.log(data);
-      })
-      .catch((error) => {
-        console.log(error);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/update_course`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(dataToSend),
       });
+  
+      if (!response.ok) {
+        throw new Error("Failed to update course");
+      }
+  
+      const updatedData = await response.json();
+      
+      updateCourseInfo(updatedData);
+      message.success("Course updated successfully");
+    } catch (error) {
+      console.error("Error updating course:", error);
+      message.error("Failed to update course");
+    }
+    navigateMainPage();
   };
 
   return (
     <Form
+      form={form} 
+      onFinish={onFinish}
       layout="vertical"
       wrapperCol={{
         lg: 12,
       }}
       style={{
         marginLeft: "20px",
-      }}
-      initialValues={formData}
-      onValuesChange={(changedValues, allValues) => {
-        setFormData(allValues);
       }}
     >
       <Space direction="vertical" style={{ width: "100%" }}>
@@ -193,33 +187,24 @@ export default () => {
           }}
         >
           <Form.Item label="ENTRY CODE" name="entryCode">
-            <Input placeholder={placeholders.entryCode || "Enter Entry Code"} />
+            <Input />
           </Form.Item>
-          <Form.Item label="ALLOW ENTRY CODE" wrapperCol={24}>
-            <Checkbox
-              name="allowEntryCode"
-              checked={formData.allowEntryCode}
-              onChange={handleCheckboxChange}
-            >
+          <Form.Item label="ALLOW ENTRY CODE" wrapperCol={24} name="allowEntryCode" valuePropName="checked" >
+            <Checkbox            >
               Allow students to enroll via course entry code
             </Checkbox>
           </Form.Item>
           <Form.Item label="COURSE NAME" name="name">
-            <Input placeholder={placeholders.name || "Enter Course Name"} />
+            <Input />
           </Form.Item>
           <Form.Item label="COURSE DESCRIPTION" name="description">
-            <Input.TextArea
-              placeholder={
-                placeholders.description || "Enter Course Description"
-              }
-            />
+            <Input.TextArea />
           </Form.Item>
           <Form.Item>
             <Row gutter={20}>
               <Col span={12}>
                 <Form.Item label="SEMESTER" name="semester" wrapperCol={24}>
                   <Select
-                    placeholder={placeholders.semester || "Select Semester"}
                     options={[
                       { value: "Spring" },
                       { value: "Summer" },
@@ -231,7 +216,7 @@ export default () => {
               </Col>
               <Col span={12}>
                 <Form.Item label="YEAR" name="year" wrapperCol={24}>
-                  <Input placeholder={placeholders.year || "Enter Year"} />
+                  <Input />
                 </Form.Item>
               </Col>
             </Row>
@@ -272,10 +257,7 @@ export default () => {
           <Space>
             <Button
               type="primary"
-              onClick={() => {
-                onFinish();
-                navigateMainPage();
-              }}
+              htmlType="submit"
             >
               Update Course
             </Button>
