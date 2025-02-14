@@ -70,7 +70,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     In your `.env` file, add your connection string:
 
     ```bash
-    DB_CONNECTION_STRING="postgresql://root:root@host.docker.internal:5432/codeassist"
+    DB_CONNECTION_STRING="postgresql://postgres:postgres@host.docker.internal:5432/codeassist"
     ```
 
 10. Start the frontend service -- will automatically open the webpage
