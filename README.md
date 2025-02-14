@@ -4,7 +4,7 @@
 
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
-Backend is hosted at `localhost:5000`  
+Backend is hosted at `localhost:5001`  
 Server is hosted at `localhost:5432`
 
 
