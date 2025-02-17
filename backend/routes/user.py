@@ -78,20 +78,22 @@ def user_login():
 
 
 
-@user.route('/get_users', methods = ["GET"])
+@user.route('/get_user_by_email', methods = ["GET"])
 @cross_origin()
-def get_users():
-    email = request.args.get("email")
-    # role = request.args.get("role")
+def get_user():
+    email = request.args['email']
 
-    res = db.session.query(User).filter_by(email_address=email)
-    result = UserSchema().dump(res, many=True)
-    # print(result)
+    res = db.session.query(User).with_entities(User.id, User.name, User.email_address, User.role).filter_by(email_address=email).first()
+    if not res:
+        return jsonify({"message": "User not found"}), 404
     
-    # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
-    if not(result):
-        return "No user found", 404
-    return jsonify(result)
+    user = {
+        "id": res.id,
+        "name": res.name,
+        "email_address": res.email_address,
+        "role": res.role
+    }
+    return jsonify(user), 200
 
     #It shows an error for this method but the user_login works
 

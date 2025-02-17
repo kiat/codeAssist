@@ -28,7 +28,7 @@ def create_course():
     /create_course creates a course in the database
     Requires from the frontend a JSON containing:
     @param name             name of the course
-    @param instructor_id    TODO: What does this map to? @
+    @param instructor_id    class owner (instructor) of the course
     @param semester         semester of the course
     @param year             year of the course
     @param entryCode        entryCode of the course
@@ -39,6 +39,13 @@ def create_course():
     semester = request.json["semester"]
     year = request.json["year"]
     entryCode = request.json["entryCode"]
+
+    if not name or not instructor_id or not semester or not year or not entryCode:
+        return jsonify({"message": "Missing required fields"}), 400
+
+    existing_course = db.session.query(Course).filter_by(entryCode=entryCode).first()
+    if existing_course:
+        return jsonify({"message": "Course with the provided entry code already exists"}), 409
 
     course_data = {
         "id": course_id,
@@ -55,14 +62,15 @@ def create_course():
         "role": "instructor",
     }
 
-    db.session.add(Course(**course_data))
-    db.session.add(Enrollment(**enrollment_data))
-    db.session.commit()
-
-    newCourse = db.session.query(Course).filter_by(id=course_id)
-    newCourse = CourseSchema().dump(newCourse, many=True)[0]
-
-    return jsonify(newCourse)
+    try:
+        db.session.add(Course(**course_data))
+        db.session.add(Enrollment(**enrollment_data))
+        db.session.commit()
+        newCourse = db.session.query(Course).filter_by(id=course_id)
+        newCourse = CourseSchema().dump(newCourse, many=True)[0]
+        return jsonify(newCourse), 201
+    except Exception as e:
+        return jsonify({"message": "An unexpected error occurred."}), 500
 
 
 @course.route("/enroll_course", methods=["POST", "GET"])
@@ -82,10 +90,7 @@ def enroll_course():
 
     # Check if the course exists
     if not enrolled_list:
-        return (
-            jsonify({"error": "Course with the provided entry code does not exist"}),
-            404,
-        )
+        return jsonify({"message": "Course with the provided entry code does not exist"}), 404
 
     enrollment_data = {
         "student_id": student_id,
@@ -202,22 +207,29 @@ def create_enrollment():
     course_id = request.json["course_id"]
     role = request.json["role"]
 
+    if not student_id or not course_id or not role:
+        return jsonify({"message": "Missing required fields"}), 400
+
     enrollment_data = {
         "student_id": student_id,
         "course_id": course_id,
         "role": role,
     }
 
-    db.session.add(Enrollment(**enrollment_data))
-    db.session.commit()
+    existing_enrollment = db.session.query(Enrollment).filter_by(student_id=student_id, course_id=course_id).first()
+    if existing_enrollment:
+        return jsonify({"message": "Enrollment already exists"}), 409
 
-    newEnrollment = db.session.query(Enrollment).filter_by(
-        student_id=student_id, course_id=course_id
-    )
-    newEnrollment = EnrollmentSchema().dump(newEnrollment, many=True)[0]
-
-    return jsonify(newEnrollment)
-
+    try:
+        db.session.add(Enrollment(**enrollment_data))
+        db.session.commit()
+        newEnrollment = db.session.query(Enrollment).filter_by(
+            student_id=student_id, course_id=course_id
+        )
+        newEnrollment = EnrollmentSchema().dump(newEnrollment, many=True)[0]
+        return jsonify(newEnrollment), 201
+    except Exception as e:
+        return jsonify({"message": "An unexpected error occurred"}), 500
 
 @course.route("/update_role", methods=["POST"])
 @cross_origin()
