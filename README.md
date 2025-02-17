@@ -4,7 +4,7 @@
 
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
-Backend is hosted at `localhost:5000`  
+Backend is hosted at `localhost:5001`  
 Server is hosted at `localhost:5432`
 
 
@@ -54,8 +54,8 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
 
 6. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
     `Host name/address: host.docker.internal`  
-    `Username: root`  
-    `Password: root`  
+    `Username: postgres`  
+    `Password: postgres`  
 
 7. In this newly created server, create a new database. Name it `codeassist`. This is important for init_db.py
 
@@ -70,7 +70,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     In your `.env` file, add your connection string:
 
     ```bash
-    DB_CONNECTION_STRING="postgresql://root:root@host.docker.internal:5432/codeassist"
+    DB_CONNECTION_STRING="postgresql://postgres:postgres@host.docker.internal:5432/codeassist"
     ```
 
 10. Start the frontend service -- will automatically open the webpage
