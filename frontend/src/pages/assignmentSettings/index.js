@@ -154,9 +154,12 @@ export default () => {
           navigateMainPage();
         }}
       >
-        <Card bordered={false} title='Basic Settings'>
+        <Card >
           {/* <Form.Item label='TITLE'> */}
           <Form.Item label={<span>TITLE</span>} name='name'>
+            <Input />
+          </Form.Item>
+          <Form.Item label='AUTOGRADER POINTS' name='autograderPoints'>
             <Input />
           </Form.Item>
           <Form.Item label='PUBLISHED' name='published'>
@@ -167,14 +170,15 @@ export default () => {
               ]}
             />
           </Form.Item>
-          <Form.Item label='SUBMISSION ANONYMIZATION'>
+          {/* NEED TO CONNECT TO BACKEND  */}
+          {/* <Form.Item label='SUBMISSION ANONYMIZATION'>
             <Checkbox>Enable Anonymous Grading</Checkbox>
             <div style={{ marginLeft: "24px", color: "grey" }}>
               Hide identifiable student information from being listed with
               submissions.
             </div>
-          </Form.Item>
-          <Form.Item label='CANVAS ASSIGNMENT'>
+          </Form.Item> */} 
+          {/* <Form.Item label='CANVAS ASSIGNMENT'>
             <Space>
               <Input style={{ width: "205px" }} />
               <Button>Change</Button>
@@ -182,7 +186,7 @@ export default () => {
                 Unlink
               </Button>
             </Space>
-          </Form.Item>
+          </Form.Item> */}
           <Form.Item>
             <Row gutter={20}>
               <Col>
@@ -203,7 +207,7 @@ export default () => {
               </Col>
             </Row>
           </Form.Item>
-          <Form.Item label='GROUP SUBMISSION'>
+          {/* <Form.Item label='GROUP SUBMISSION'>
             <Checkbox>Enable Group Submission</Checkbox>
           </Form.Item>
           <Form.Item label='LIMIT GROUP SIZE'>
@@ -228,12 +232,7 @@ export default () => {
           <Form.Item label='IGNORED FILES'>
             <Input.TextArea />
             <span style={{ color: "grey" }}>Follows gitignore format.</span>
-          </Form.Item>
-        </Card>
-        <Card bordered={false} title='Autograder Settings'>
-          <Form.Item label='AUTOGRADER POINTS' name='autograderPoints'>
-            <Input />
-          </Form.Item>
+          </Form.Item> */}
           {/* <Form.Item
             label={
               <Space direction='vertical'>

@@ -55,18 +55,6 @@ export default function Assignments() {
       sorter: (a, b) => moment(a.due_date).unix() - moment(b.due_date).unix(),
     },
     {
-      title: "LATE ALLOWED",
-      dataIndex: "late_submission",
-      key: "late_submission",
-      render: (value) => (value ? "Yes" : "No"),
-      sorter: (a, b) =>
-        a.late_submission === b.late_submission
-          ? 0
-          : a.late_submission
-          ? -1
-          : 1,
-    },
-    {
       title: "LATE DUE (CDT)",
       dataIndex: "late_due_date",
       key: "late_due_date",

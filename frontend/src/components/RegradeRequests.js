@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Table, Typography, message } from 'antd';
+import { Card, Descriptions, PageHeader, Table, Typography, message } from 'antd';
 import { CheckCircleOutlined } from '@ant-design/icons';
 import { GlobalContext } from '../App';
 
@@ -79,12 +79,14 @@ function RegradeRequests() {
 
   return (
     <div>
-      <Typography.Title level={3}>Regrade Requests</Typography.Title>
-      <Table
-        dataSource={requests}
-        columns={userInfo.isStudent ? studentColumns : columns}
-        rowKey="id"
-      />
+      <PageHeader title={"Regrade Requests"} style={{ borderBottom: "1px solid #f0f0f0" }}></PageHeader>
+      <Card bordered={false}>
+        <Table
+          dataSource={requests}
+          columns={userInfo.isStudent ? studentColumns : columns}
+          rowKey="id"
+        />
+      </Card>
     </div>
   );
 }
