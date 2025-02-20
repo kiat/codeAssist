@@ -14,6 +14,7 @@ import { PlusOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
 import { useCallback, useState, useContext } from "react";
 import {
+  getUserByEmail,
   createEnrollment,
   createEnrollmentCSV,
   getCourseEnrollment,
@@ -93,60 +94,26 @@ export default () => {
   const finishForm = useCallback(
     (values) => {
       const { email } = values;
-  
-      fetch(
-        process.env.REACT_APP_API_URL + "/get_users?" +
-          new URLSearchParams({
-            email: email,
-          })
-      )
+      
+      getUserByEmail({ email: email })
         .then((res) => {
-          if (!res.ok) {
-            if (res.status === 404) {
-              throw new Error("User not found");
-            } else {
-              return res.json().then((error) => {
-                throw new Error(error.error || "Something went wrong");
-              });
-            }
-          }
-          return res.json();
-        })
-        .then((student) => {
-          fetch(process.env.REACT_APP_API_URL + "/create_enrollment", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              student_id: student[0].id,
-              course_id: courseId,
-              role: values.role, // Include the role from form values
-            }),
+          createEnrollment({
+            student_id: res.data.id,
+            course_id: courseId,
+            role: values.role, // Include the role from form values
           })
-          .then((res) => {
-            if (!res.ok) {
-              return res.json().then((error) => {
-                throw new Error(error.error || "Something went wrong");
-              });
-            }
-            return res.json();
-          })
-          .then(() => {
-            toggleAddModalOpen();
-            getEnrollment();
-          })
-          .catch((error) => {
-            console.error("Error creating enrollment:", error);
-            message.error("An error occurred while creating enrollment.");
-          });
-        })
-        .catch((error) => {
-          console.error("Error fetching user:", error);
-          message.error(error.message);  // Display the error message
-        });
-    },
-    [courseId, getEnrollment, toggleAddModalOpen]
+            .then(() => {
+              toggleAddModalOpen();
+              getEnrollment();
+            })
+            .catch((error) => {
+              console.error("Error creating enrollment:", error);
+            });
+      })
+      .catch((error) => {
+        console.error("Error fetching user:", error);
+      });
+    }, [courseId, getEnrollment, toggleAddModalOpen]
   );
   
   const finishCSVForm = useCallback(

@@ -5,7 +5,7 @@ export async function signUpUser(params) {
 }
 
 export async function get_user(params) {
-  return service("get_users", params, "get");
+  return service("get_user", params, "get");
 }
 
 export async function userLogin(params) {

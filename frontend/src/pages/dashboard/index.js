@@ -109,22 +109,14 @@ export default function Dashboard() {
             year: values.year,
             entryCode: values.entryCode,
           };
-
+      
       addCourseFunction(params)
         .then(() => {
           toggleModal();
           fetchCourses();
         })
         .catch((error) => {
-          if (error.response && error.response.status === 404) {
-            // Display an error message if the entry code is not found
-            message.error(
-              "Error: Course with the provided entry code does not exist."
-            );
-          } else {
-            // Handle other errors
-            alert("An unexpected error occurred. Please try again.");
-          }
+          console.error("Error adding course:", error);
         });
     },
     [fetchCourses, toggleModal, userInfo]
