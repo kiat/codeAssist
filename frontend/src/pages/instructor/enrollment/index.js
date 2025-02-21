@@ -97,25 +97,6 @@ export default () => {
       catch(error) {
         console.error("Error creating enrollments: ", error);
       }
-      
-      // getUserByEmail({ email: email })
-      //   .then((res) => {
-      //     createEnrollment({
-      //       student_id: res.data.id,
-      //       course_id: courseId,
-      //       role: values.role, // Include the role from form values
-      //     })
-      //       .then(() => {
-      //         toggleAddModalOpen();
-      //         getEnrollment();
-      //       })
-      //       .catch((error) => {
-      //         console.error("Error creating enrollment:", error);
-      //       });
-      // })
-      // .catch((error) => {
-      //   console.error("Error fetching user:", error);
-      // });
     }, [courseId, getEnrollment, toggleAddModalOpen]
   );
   
