@@ -100,7 +100,7 @@ export default () => {
     const fetchCourseStudents = async () => {
       try {
         const studentsResponse = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`
+          `${process.env.REACT_APP_API_URL}/get_student_enrollment?course_id=${courseInfo.id}`
         );
         const studentsData = await studentsResponse.json();
         setCourseStudents(studentsData);

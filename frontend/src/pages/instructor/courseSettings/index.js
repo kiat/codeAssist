@@ -20,10 +20,11 @@ import { useEffect, useState, useCallback } from "react";
 import { useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../../App";
-import { getCourseAssignments, updateCourse , deleteCourse, deleteAllAssignments, getCourseInfo} from "../../../services/course";
+import { getCourseAssignments } from "../../../services/course";
 
 export default () => {
   const { courseId } = useParams();
+  const { updateCourseInfo, courseInfo } = useContext(GlobalContext);
   const [assignments, setAssignments] = useState([]);
 
   // Used to manage form state
@@ -35,11 +36,18 @@ export default () => {
 
   const fetchCourseData = async () => {
     try {
-      const res = await getCourseInfo({course_id: courseId});
-      form.setFieldsValue(res.data[0]);
-    }
-    catch(error) {
-      console.error("Error fetching course data: ", error)
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/get_course_info?course_id=${courseId}`
+      );
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      const data = await response.json();
+
+      // update form state
+      form.setFieldsValue(data[0]);
+    } catch (error) {
+      console.error("Error fetching course data:", error);
     }
   };
 
@@ -55,25 +63,68 @@ export default () => {
 
   const navigate = useNavigate();
 
-  const handleDeleteAllAssignments = async (courseId) => {
-    try {
-      await deleteAllAssignments({"course_id": courseId});
-      message.success("All assignments deleted successfully");
+  const handleDeleteAllAssignments = (courseId) => {
+    if (!courseId) {
+      console.error("Course ID is undefined");
+      message.error("Cannot delete assignments without an ID");
+      return Promise.reject(new Error("Course ID is undefined"));
     }
-    catch(error) {
-      console.error("Error deleting all assignments: ", error);
-    }
+
+    return fetch(
+      `${process.env.REACT_APP_API_URL}/delete_all_assignments?course_id=${courseId}`,
+      {
+        method: "DELETE",
+        mode: "cors",
+      }
+    )
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(
+            `Network response was not ok, status: ${response.status}`
+          );
+        }
+        return response.json();
+      })
+      .catch((error) => {
+        console.error(
+          "There has been a problem with the fetch operation:",
+          error
+        );
+        message.error("Failed to delete assignments");
+        return Promise.reject(error);
+      });
   };
 
-  const handleDeleteCourse = async (courseId) => {
-    try {
-      await deleteCourse({"course_id" : courseId});
-      message.success("Course deleted successfully");
-      navigateHome();
+  const handleDeleteCourse = (courseId) => {
+    if (!courseId) {
+      console.error("Course ID is undefined");
+      message.error("Cannot delete course without an ID");
+      return Promise.reject(new Error("Course ID is undefined"));
     }
-    catch (error) {
-      console.error("Error deleting course:", error);
-    }
+
+    return fetch(
+      `${process.env.REACT_APP_API_URL}/delete_course?course_id=${courseId}`,
+      {
+        method: "DELETE",
+        mode: "cors",
+      }
+    )
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(
+            `Network response was not ok, status: ${response.status}`
+          );
+        }
+        return response.json();
+      })
+      .catch((error) => {
+        console.error(
+          "There has been a problem with the fetch operation:",
+          error
+        );
+        message.error("Failed to delete course");
+        return Promise.reject(error);
+      });
   };
 
   const navigateHome = () => {
@@ -91,14 +142,28 @@ export default () => {
         Object.entries(values).filter(([_, value]) => value !== undefined)
       ),
     };
-
     try {
-      await updateCourse(dataToSend);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/update_course`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(dataToSend),
+      });
+  
+      if (!response.ok) {
+        throw new Error("Failed to update course");
+      }
+  
+      const updatedData = await response.json();
+      
+      updateCourseInfo(updatedData);
       message.success("Course updated successfully");
-      navigateMainPage();
-    } catch (error)  {
+    } catch (error) {
       console.error("Error updating course:", error);
+      message.error("Failed to update course");
     }
+    navigateMainPage();
   };
 
   return (
@@ -207,6 +272,18 @@ export default () => {
               title="Are you sure you want to delete this course?"
               onConfirm={() => {
                 handleDeleteCourse(courseId)
+                  .then(() => {
+                    message.success("Course deleted");
+                    // Only navigate away if deletion was successful
+                    navigateHome();
+                  })
+                  .catch((error) => {
+                    if (error.response && error.response.status === 410) {
+                      message.error("Assignments must be deleted first");
+                    } else {
+                      message.error("Failed to delete course");
+                    }
+                  });
               }}
               okText="Yes"
               cancelText="No"
@@ -219,6 +296,12 @@ export default () => {
               title="Are you sure you want to delete all assignments?"
               onConfirm={() => {
                 handleDeleteAllAssignments(courseId)
+                  .then(() => {
+                    message.success("All assignments deleted");
+                  })
+                  .catch((error) => {
+                    message.error("Failed to delete all assignments");
+                  });
               }}
               okText="Yes"
               cancelText="No"

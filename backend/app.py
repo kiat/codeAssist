@@ -5,7 +5,6 @@ from routes.course import course
 from routes.submission import submission
 from routes.user import user
 from routes.regrade_routes import regrade_requests
-from util.errors import register_error_handlers
 
 CORS(app)
 # @app.route('/', methods=["GET", "POST"])
@@ -22,8 +21,6 @@ app.register_blueprint(course)
 app.register_blueprint(submission)
 app.register_blueprint(user)
 app.register_blueprint(regrade_requests)
-
-register_error_handlers(app)
 
 if __name__ == "__main__":
     app.run()
