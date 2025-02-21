@@ -4,7 +4,7 @@ import json
 import sys
 from werkzeug.utils import secure_filename
 from functools import reduce
-from flask import Blueprint, request, jsonify, flash
+from flask import Blueprint, request, jsonify, flash, current_app
 from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
@@ -18,8 +18,8 @@ import zipfile
 import shutil
 import time
 from dotenv import load_dotenv
-# import asyncio
-# from openai import AsyncOpenAI
+from openai import OpenAI
+import threading
 
 from sqlalchemy import desc, func
 import base64
@@ -30,19 +30,19 @@ submission = Blueprint('submission', __name__)
 ALLOWED_EXTENSIONS = {'py','zip'}
 
 load_dotenv()
-# openai_api_key = os.getenv("OPENAI_API_KEY")
-# if not openai_api_key:
-#     raise ValueError("OPENAI_API_KEY environment variable is not set")
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
-# Async function to get OpenAI completion
-async def get_completion(message):
-    client = AsyncOpenAI(api_key=openai_api_key)
-    completion = await client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": message}],
-        max_tokens=50
-    )
-    return completion.choices[0].message.content
+# Represents if openAI code feedback should be generated
+generateCodeFeedback = True
+if not openai_api_key:
+    print("OPENAI_API_KEY environment variable is not set")
+    generateCodeFeedback = False
+else:
+    print("Successfully loaded openAI API Key")
+
+# openai.api_key = openai_api_key
+
+
 
 def allowed_file(filename):
     return "." in filename and \
@@ -77,7 +77,90 @@ def get_submissions():
     return jsonify(result)
 
 
+# Define a background task for obtaining and recording AI feedback.
+def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
+    ctx = app.app_context()
+    ctx.push()
+    try:
+        # Read the submitted code as text
+        with open(file_path, 'r') as code_file:
+            code_text = code_file.read()
+
+        # Prepare the prompt including both the code and autograder results.
+        prompt_message = (
+            "Please analyze the following Python code and its autograder results. "
+            "Provide constructive feedback as a JSON array of objects. Each object should have a 'pattern' field "
+            "(a regex pattern if applicable) and a 'comment' field with constructive criticism. Return only valid JSON.\n\n"
+            "Code:\n\n"
+            f"{code_text}\n\n"
+            "Autograder results:\n\n"
+            f"{results_json_content}\n\n"
+        )
+
+        # Use the new OpenAI API interface.
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        response = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system", 
+                    "content": "You are an AI that provides constructive criticism on submitted code."
+                },
+                {
+                    "role": "user", 
+                    "content": prompt_message
+                }
+            ],
+            model="gpt-4o",  # Use the appropriate model name
+            max_tokens=500,
+            temperature=0.5,
+        )
+
+        # Extract the AI feedback text from the response.
+        ai_feedback_text = response.choices[0].message.content
+
+        # Clean up markdown formatting.
+        cleaned_text = ai_feedback_text.strip()
+        if cleaned_text.startswith("```"):
+            # Split into lines and remove the first line if it is a markdown fence (e.g. ```json)
+            lines = cleaned_text.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            # Remove the last line if it is just the closing fence
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            cleaned_text = "\n".join(lines).strip()
+
+        # Replace literal "\n" sequences with actual newline characters.
+        cleaned_text = cleaned_text.replace("\\n", "\n")
+
+        try:
+            ai_feedback_json = json.loads(cleaned_text)
+            
+            print("AI FEEDBACK:")
+            print(ai_feedback_json)
+        except Exception as parse_error:
+            print("AI FEEDBACK FAILED")
+
+
+            ai_feedback_json = {
+                "error": "Failed to parse OpenAI response as JSON",
+                "response_text": cleaned_text
+            }
+            print(ai_feedback_json)
+    except Exception as openai_error:
+        ai_feedback_json = {"error": f"Failed to get AI feedback: {str(openai_error)}"}
+        print(cleaned_text)
+
+    # Update the submission record in the DB with the AI feedback.
+    # submission_record = Submission.query.get(submission_id)
+    # submission_record.ai_feedback = json.dumps(ai_feedback_json)
+    # db.session.commit()
+    ctx.pop()
+
     
+
+
+
 @submission.route('/upload_submission', methods=["POST"])
 @cross_origin()
 def upload_submission():
@@ -97,17 +180,17 @@ def upload_submission():
     for directory in [submissions_dir, results_dir]:
         os.makedirs(directory, exist_ok=True)
     
+    # Clean out old submission files in submissions_dir
     for filenames in os.listdir(submissions_dir):
-        file_path = os.path.join(submissions_dir, filenames)
+        file_path_del = os.path.join(submissions_dir, filenames)
         try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
+            if os.path.isfile(file_path_del) or os.path.islink(file_path_del):
+                os.unlink(file_path_del)
+            elif os.path.isdir(file_path_del):
+                shutil.rmtree(file_path_del)
         except Exception as e:
-            return jsonify({"error": f"Failed to delete {file_path}. Reason: {e}"}), 500
+            return jsonify({"error": f"Failed to delete {file_path_del}. Reason: {e}"}), 500
     file_path = os.path.join(submissions_dir, filename)
-
     file.save(file_path)
 
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
@@ -118,7 +201,6 @@ def upload_submission():
         os.chdir(current_dir)
         return jsonify({"error": "Failed to start Docker container", "details": start_proc.stderr.decode()}), 500
 
-    # copy the file into the correct place
     copy_proc = subprocess.run(f"docker cp {file_path} {container_name}:/autograder/submission/".split(), capture_output=True)
     if copy_proc.returncode != 0:
         os.chdir(current_dir)
@@ -136,16 +218,14 @@ def upload_submission():
 
     results_json_content = cat_proc.stdout.decode()
     host_results_json_path = os.path.join(results_dir, 'results.json')
-    with open(host_results_json_path, 'w') as file:
-        file.write(results_json_content)
+    with open(host_results_json_path, 'w') as file_obj:
+        file_obj.write(results_json_content)
 
-    # Query the database for the number of previous submissions
     submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
-    #implement removing the old active submission
     old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
     if old:
         old.update({'active': False})
-    # Create a new submission record
+    # Create a new submission record. Note that we add an initial value (e.g. None) for ai_feedback.
     new_submission = Submission(
         id=uuid.uuid4(),
         file_name=filename,
@@ -156,34 +236,38 @@ def upload_submission():
         score=json.loads(results_json_content)['score'],
         execution_time=float(json.loads(results_json_content).get('execution_time', 0)),
         submitted_at=datetime.now(),
-        #set the active to true for a newly submitted submission
         active=True,
         completed=True,
-        submission_number=submission_count + 1
+        submission_number=submission_count + 1,
+        # ai_feedback=None  # Initially no AI feedback
     )
     db.session.add(new_submission)
     db.session.commit()
 
-    # Remove the contents of the submission directory inside the Docker container
     clear_dir_proc = subprocess.run(f"docker exec {container_name} rm -rf /autograder/submission/{filename}".split(), capture_output=True)
     if clear_dir_proc.returncode != 0:
         return jsonify({"error": "Failed to clear submission directory in Docker container", "details": clear_dir_proc.stderr.decode()}), 500
 
-    # need to remove this file fropm teh source folder if it exists there
-    clear_dir_proc2 = subprocess.run(f"docker exec {container_name} rm -f /autograder/source/{filename}".split(),capture_output=True)
+    clear_dir_proc2 = subprocess.run(f"docker exec {container_name} rm -f /autograder/source/{filename}".split(), capture_output=True)
     if clear_dir_proc2.returncode != 0:
         return jsonify({"error": "Failed to clear submission directory in Docker container", "details": clear_dir_proc.stderr.decode()}), 500
 
     subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
-    # subprocess.run(f"docker rm {container_name}".split(), capture_output=True)
     os.chdir(current_dir)
 
-    #get openAI reponse
-    # completion = asyncio.run(get_completion("Say hi"))
-    # adding the submission id to return --> to be used to access assignment results
-    return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path, "submissionID": new_submission.id#, "openai_response": completion
-    }), 200
+    # Capture the app object and launch a background thread to get AI feedback asynchronously.
+    app_obj = current_app._get_current_object()
+    threading.Thread(
+        target=async_get_ai_feedback, 
+        args=(app_obj, new_submission.id, file_path, results_json_content)
+    ).start()
 
+    # Return the response. Note that ai_feedback might not be available immediately.
+    return jsonify({
+        "message": "Submission uploaded and autograded successfully",
+        "results_path": host_results_json_path,
+        "submissionID": str(new_submission.id)
+    }), 200
 
 
 @submission.route('/upload_assignment_autograder', methods=["POST"])
