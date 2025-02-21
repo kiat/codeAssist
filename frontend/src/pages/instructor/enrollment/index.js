@@ -14,11 +14,14 @@ import { PlusOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
 import { useCallback, useState, useContext } from "react";
 import {
-  getUserByEmail,
   createEnrollment,
   createEnrollmentCSV,
   getCourseEnrollment,
+  updateRole
 } from "../../../services/enrollment";
+import {
+  getUserByEmail,
+} from "../../../services/user";
 import { useParams } from "react-router-dom";
 import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
@@ -58,61 +61,42 @@ export default () => {
     });
   }, [courseId]);
 
-  const handleRoleChange = useCallback(
-    (newRole, studentId) => {
-      message.info("You are changing a student's role in the course.");
-
-      fetch(process.env.REACT_APP_API_URL + "/update_role", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          student_id: studentId,
-          course_id: courseId,
-          new_role: newRole,
-        }),
-      })
-        .then((res) => {
-          if (!res.ok) {
-            return res.json().then((error) => {
-              throw new Error(error.error || "Something went wrong");
-            });
-          }
-          return res.json();
-        })
-        .then(() => {
-          getEnrollment(); // Refresh the enrollment list
-        })
-        .catch((error) => {
-          console.error("Error updating role:", error);
+  const handleUpdateRole = useCallback(
+    async (newRole, studentId) => {
+      try {
+        await updateRole({
+          "student_id": studentId,
+          "course_id": courseId,
+          "new_role": newRole
         });
+        message.info("User role updated")
+        getEnrollment();
+      }
+      catch(error) {
+        console.error("Error updating role: ", error);
+      }
     },
     [courseId, getEnrollment]
   );
 
-  const finishForm = useCallback(
-    (values) => {
+  const finishForm =  useCallback(
+    async (values) => {
       const { email } = values;
-      
-      getUserByEmail({ email: email })
-        .then((res) => {
-          createEnrollment({
-            student_id: res.data.id,
-            course_id: courseId,
-            role: values.role, // Include the role from form values
-          })
-            .then(() => {
-              toggleAddModalOpen();
-              getEnrollment();
-            })
-            .catch((error) => {
-              console.error("Error creating enrollment:", error);
-            });
-      })
-      .catch((error) => {
-        console.error("Error fetching user:", error);
-      });
+
+      try {
+        const res = await getUserByEmail({ email: email });
+        await createEnrollment({
+          student_id: res.data.id,
+          course_id: courseId,
+          role: values.role,
+        });
+        message.success("Successfully created enrollment")
+        toggleAddModalOpen();
+        getEnrollment();
+      }
+      catch(error) {
+        console.error("Error creating enrollments: ", error);
+      }
     }, [courseId, getEnrollment, toggleAddModalOpen]
   );
   
@@ -203,7 +187,7 @@ export default () => {
                 <Select
                   defaultValue={text}
                   style={{ width: 120 }}
-                  onChange={(value) => handleRoleChange(value, record.id)}
+                  onChange={(value) => handleUpdateRole(value, record.id)}
                   disabled={text === "instructor"} // Disable dropdown if the role is instructor
                 >
                   <Select.Option value="student">Student</Select.Option>

@@ -4,6 +4,7 @@ from flask_cors import cross_origin
 from api import db
 from api.models import User
 from api.schemas import UserSchema
+from util.errors import BadRequestError, NotFoundError
 
 user = Blueprint('user', __name__)
 
@@ -81,11 +82,13 @@ def user_login():
 @user.route('/get_user_by_email', methods = ["GET"])
 @cross_origin()
 def get_user():
-    email = request.args['email']
+    email = request.args.get("email")
+    if not email or email == "":
+        raise BadRequestError("Missing email argument")
 
     res = db.session.query(User).with_entities(User.id, User.name, User.email_address, User.role).filter_by(email_address=email).first()
     if not res:
-        return jsonify({"message": "User not found"}), 404
+        raise NotFoundError("User not found")
     
     user = {
         "id": res.id,
