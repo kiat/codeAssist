@@ -8,8 +8,7 @@ import AddForm from "./addForm";
 import {
   createCourse,
   enrollCourse,
-  getInstructorCourses,
-  getStudentCourses,
+  getUserEnrollments,
 } from "../../services/dashboard";
 import { Button, message, Form, Modal, Upload } from "antd";
 
@@ -68,12 +67,8 @@ export default function Dashboard() {
 
   // Function to fetch courses based on the user's role
   const fetchCourses = useCallback(() => {
-    const fetchFunction = userInfo?.isStudent
-      ? getStudentCourses
-      : getInstructorCourses;
-    const params = userInfo?.isStudent
-      ? { student_id: userInfo.id }
-      : { instructor_id: userInfo.id };
+    const fetchFunction = getUserEnrollments;
+    const params = {user_id: userInfo.id};
     fetchFunction(params)
       .then((response) => {
         if (response && Array.isArray(response.data)) {
@@ -112,6 +107,7 @@ export default function Dashboard() {
       
       addCourseFunction(params)
         .then(() => {
+          message.success("Successfully added course");
           toggleModal();
           fetchCourses();
         })
