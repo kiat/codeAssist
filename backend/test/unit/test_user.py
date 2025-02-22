@@ -1,7 +1,7 @@
 import pytest
 from flask import Flask
 from routes.user import user
-from util.errors import register_error_handlers 
+from api import create_app
 
 from routes import user
 
@@ -9,12 +9,8 @@ from routes import user
 @pytest.fixture
 def app():
     """Create and configure a new app instance for each test."""
-    app = Flask(__name__)
-    register_error_handlers(app)
+    app = create_app(config_class="config.TestConfig")
     
-    app.config['TESTING'] = True
-    app.register_blueprint(user)
-
     with app.app_context():
         yield app
 

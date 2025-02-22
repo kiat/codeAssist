@@ -2,21 +2,12 @@ import pytest
 from flask import Flask
 from api.models import db
 from routes.user import user
-from util.errors import register_error_handlers
+from api import create_app
 
 @pytest.fixture
 def app():
     """Create an app instance for testing."""
-    app = Flask(__name__)
-    app.config['TESTING'] = True
-
-    # Use an in-memory DB for integration tests
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'  
-    
-    db.init_app(app)
-
-    app.register_blueprint(user)
-    register_error_handlers(app)
+    app = create_app(config_class="config.TestConfig")
 
     with app.app_context():
         db.create_all()  
