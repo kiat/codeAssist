@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - test-suite-init-with-github-actions-#123
   pull_request:
     branches:
       - main
