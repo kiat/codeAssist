@@ -34,6 +34,7 @@ jobs:
         run: |
           source .venv/bin/activate
           cd backend
+          export PYTHONPATH=$(pwd)
           pytest --cov-report=xml
 
       - name: Upload Coverage Report
