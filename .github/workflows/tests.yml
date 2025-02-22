@@ -3,7 +3,8 @@ name: Run Tests and Collect Coverage
 on:
   push:
     branches:
-      - main  # Change this if you want to run tests on other branches
+      - main
+      - test-suite-init-with-github-actions-#123
   pull_request:
     branches:
       - main
