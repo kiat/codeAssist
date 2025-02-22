@@ -1,10 +1,6 @@
 from flask_cors import CORS
 from api import app
-from routes.assignment import assignment
-from routes.course import course
-from routes.submission import submission
-from routes.user import user
-from routes.regrade_routes import regrade_requests
+from routes import register_routes
 from util.errors import register_error_handlers
 
 CORS(app)
@@ -17,11 +13,7 @@ CORS(app)
 #     '''
 #     return 'Hello World'
 
-app.register_blueprint(assignment)
-app.register_blueprint(course)
-app.register_blueprint(submission)
-app.register_blueprint(user)
-app.register_blueprint(regrade_requests)
+register_routes(app)
 
 register_error_handlers(app)
 

@@ -1,5 +1,5 @@
 import uuid
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
 from api import db
 from api.models import User
@@ -9,7 +9,7 @@ from util.errors import BadRequestError, NotFoundError
 user = Blueprint('user', __name__)
 
 # TODO THIS ROUTE IS NOT BEING USED AT THE MOMENT
-@user.route('/create_user', methods=["GET","POST"])
+@user.route('/create_user', methods=["POST"])
 @cross_origin()
 def create_user():
     '''
@@ -28,40 +28,35 @@ def create_user():
     '''
 
     # TODO Create new database tables to unify all users
-    if request.method != "POST":
-        return "all good"
     user_id = str(uuid.uuid4())
     name = request.json['name']
     password = request.json['password']
-    email_address = request.json['email']
+    email_address = request.json['email_address']
     sis_user_id = request.json['eid']
     role = request.json['role']
 
-    user_data = {
-        "id": user_id,
-        "name": name,
-        "email_address": email_address,
-        "password": password,
-        "sis_user_id": sis_user_id,
-        "role": role
-    }
+    user = User(
+        id=user_id,
+        name=name,
+        email_address=email_address,
+        password=password,
+        sis_user_id=sis_user_id,
+        role=role
+    )
 
     res = None
 
-    db.session.add(User(**user_data))
+    db.session.add(user)
     db.session.commit()
-    res = db.session.query(User).filter_by(id=user_id)
-    res = UserSchema().dump(res, many=True)[0]
+    res = UserSchema().dump(user)
 
     # if role == 2:
     #     db.session.add(Student(**user_data))
     #     db.session.commit()
     #     res = db.session.query(Student).filter_by(id=user_id)
     #     res = StudentSchema().dump(res, many=True)[0]
-
-
     response = jsonify(res)
-    return response
+    return response, 201
 
 @user.route('/user_login', methods = ["GET", "POST"])
 @cross_origin()
@@ -69,13 +64,13 @@ def user_login():
     email = request.json['email']
     password = request.json['password']
 
-    res = db.session.query(User).filter_by(email_address=email, password=password)
-    res = UserSchema().dump(res, many=True)
+    res = db.session.query(User).filter_by(email_address=email, password=password).first()
+    res = UserSchema().dump(res)
 
-    if len(res) == 0:
+    if not res:
         return "No user found", 404
 
-    return jsonify(res[0])
+    return jsonify(res)
 
 
 
@@ -120,6 +115,7 @@ def get_user_by_id():
 @user.route('/delete_user', methods=["DELETE"])
 @cross_origin()
 def delete_user():
+    assert current_app
     user_id = request.args.get("id")
     User.query.filter_by(id=user_id).delete()
     # user = UserSchema().dump(user)
