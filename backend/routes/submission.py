@@ -9,6 +9,7 @@ from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
+from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError
 from datetime import datetime, timezone
 import subprocess
 import os
@@ -82,12 +83,12 @@ def get_submissions():
 @cross_origin()
 def upload_submission():
     if "file" not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        raise BadRequestError("No file part")
     file = request.files["file"]
     assignment_id = request.form.get("assignment_id")
     student_id = request.form.get("student_id")
     if not assignment_id or not student_id or not file.filename:
-        return jsonify({"error": "Missing required parameters or file"}), 400
+        raise BadRequestError("Missing required parameters or file")
 
     filename = secure_filename(file.filename)
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -105,34 +106,44 @@ def upload_submission():
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
         except Exception as e:
-            return jsonify({"error": f"Failed to delete {file_path}. Reason: {e}"}), 500
+            raise InternalProcessingError("Failed to delete {file_path}. Reason: {e}")
     file_path = os.path.join(submissions_dir, filename)
 
     file.save(file_path)
 
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     container_name = assignment.container_id
-
+    autograder_timeout = assignment.autograder_timeout
     start_proc = subprocess.run(f"docker start {container_name}".split(), capture_output=True)
     if start_proc.returncode != 0:
         os.chdir(current_dir)
-        return jsonify({"error": "Failed to start Docker container", "details": start_proc.stderr.decode()}), 500
+        raise InternalProcessingError(f"error: Failed to start Docker container, details: {start_proc.stderr.decode()}")
+
 
     # copy the file into the correct place
     copy_proc = subprocess.run(f"docker cp {file_path} {container_name}:/autograder/submission/".split(), capture_output=True)
     if copy_proc.returncode != 0:
         os.chdir(current_dir)
-        return jsonify({"error": "Failed to copy file to Docker container", "details": copy_proc.stderr.decode()}), 500
+        raise InternalProcessingError(f"error: Failed to start Docker container, details: {copy_proc.stderr.decode()}")
 
-    exec_proc = subprocess.run(f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(), capture_output=True)
+
+    try:
+        exec_proc = subprocess.run(
+            f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(), 
+            capture_output=True, 
+            timeout=autograder_timeout)
+    except subprocess.TimeoutExpired:
+        os.chdir(current_dir)
+        raise ServerTimeoutError("Autograder execution timed out")
+
     if exec_proc.returncode != 0:
         os.chdir(current_dir)
-        return jsonify({"error": "Autograder execution failed", "details": exec_proc.stderr.decode()}), 500
+        raise InternalProcessingError(f"error: Failed to start Docker container, details: {exec_proc.stderr.decode()}")
 
     cat_proc = subprocess.run(f"docker exec {container_name} cat /autograder/results/results.json".split(), capture_output=True)
     if cat_proc.returncode != 0:
         os.chdir(current_dir)
-        return jsonify({"error": "Failed to read results.json", "details": cat_proc.stderr.decode()}), 500
+        raise InternalProcessingError(f"error: Failed to start Docker container, details: {cat_proc.stderr.decode()}")
 
     results_json_content = cat_proc.stdout.decode()
     host_results_json_path = os.path.join(results_dir, 'results.json')
@@ -167,12 +178,12 @@ def upload_submission():
     # Remove the contents of the submission directory inside the Docker container
     clear_dir_proc = subprocess.run(f"docker exec {container_name} rm -rf /autograder/submission/{filename}".split(), capture_output=True)
     if clear_dir_proc.returncode != 0:
-        return jsonify({"error": "Failed to clear submission directory in Docker container", "details": clear_dir_proc.stderr.decode()}), 500
+        raise InternalProcessingError(f"error: Failed to start Docker container, details: {clear_dir_proc.stderr.decode()}")
 
     # need to remove this file fropm teh source folder if it exists there
     clear_dir_proc2 = subprocess.run(f"docker exec {container_name} rm -f /autograder/source/{filename}".split(),capture_output=True)
     if clear_dir_proc2.returncode != 0:
-        return jsonify({"error": "Failed to clear submission directory in Docker container", "details": clear_dir_proc.stderr.decode()}), 500
+        raise InternalProcessingError(f"error: Failed to start Docker container, details: {clear_dir_proc2.stderr.decode()}")
 
     subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
     # subprocess.run(f"docker rm {container_name}".split(), capture_output=True)
@@ -191,9 +202,10 @@ def upload_submission():
 def upload_assignment_autograder():
     # Validate input file and parameters
     if "file" not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        return BadRequestError("No file part")
     file = request.files["file"]
     assignment_id = request.form.get("assignment_id")
+    autograder_timeout = request.form.get("autograder_timeout")
     if not assignment_id or not file.filename:
         return jsonify({"error": "Missing assignment ID or no selected file"}), 400
 
@@ -289,8 +301,9 @@ def upload_assignment_autograder():
     os.chdir(current_dir)
     subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
 
-    # Update the assignment record with the new container ID
+    # Update the assignment record with the new container ID and autograder timeout
     assignment.container_id = container_name
+    assignment.autograder_timeout = autograder_timeout
     db.session.commit()
 
     return jsonify({"message": "Autograder uploaded and Docker image generated successfully", "image_name": f"autograder-{assignment_id}"}), 200

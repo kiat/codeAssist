@@ -51,11 +51,15 @@ export default () => {
           <Form
             layout='vertical'
             form={form}
+            initialValues={{ autograderTimeout: "300" }}
             onFinish={values => {
+              console.log("Form Values:", values);
               setSaveLoading(true);
               const formData = new FormData();
               formData.append("assignment_id", assignmentId);
               formData.append("file", values.uploadFile?.file);
+              formData.append("autograder_timeout", values.autograderTimeout);
+              console.log("HERE" + values.autograderTimeout);
               uploadAssignmentAutograder(formData)
                 .then(() => {
                   message.success("Operation successful");
@@ -82,7 +86,7 @@ export default () => {
               {({ getFieldValue }) =>
                 getFieldValue("operation") !== "1" ? (
                   <>
-                    <Form.Item label='AUTOGRADER'>
+                    <Form.Item label='UPLOAD AUTOGRADER'>
                       <Space>
                         <Form.Item name='fileName' noStyle>
                           <Input
@@ -107,6 +111,15 @@ export default () => {
                         </Form.Item>
                       </Space>
                     </Form.Item>
+                    <Form.Item label="AUTOGRADER TIMEOUT" name="autograderTimeout">
+                      <Select defaultValue="300" style={{ width: 200 }}>
+                        <Select.Option value="300">5 minutes</Select.Option>
+                        <Select.Option value="600">10 minutes</Select.Option>
+                        <Select.Option value="1200">20 minutes</Select.Option>
+                        <Select.Option value="1800">30 minutes</Select.Option>
+                        <Select.Option value="2400">40 minutes</Select.Option>
+                      </Select>
+                    </Form.Item>
                     <Form.Item noStyle>
                       <Row gutter={30} style={{ width: "700px" }}>
                         <Col span={8}>
@@ -121,7 +134,7 @@ export default () => {
                         </Col>
                         <Col span={8}>
                           <Form.Item
-                            label='BASE IMAGE VESION'
+                            label='BASE IMAGE VERSION'
                             name='baseImageVersion'
                           >
                             <Select
