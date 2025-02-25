@@ -44,8 +44,8 @@ const service = (url, params, method = "get", options) =>
   instance({
     method: method,
     url,
-    params: method === "get" ? params : "",
-    data: method === "get" ? "" : params,
+    params: (method === "get" || method === "delete") ? params : undefined,
+    data: (method === "get" || method === "delete") ? undefined : params,
     ...options,
   });
 

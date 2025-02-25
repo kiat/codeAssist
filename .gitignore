@@ -135,5 +135,4 @@ dmypy.json
 backend/routes/upload_autograder/runs/
 
 /backend/runs
-
 node_modules
