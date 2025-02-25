@@ -88,7 +88,7 @@ def upload_submission():
     assignment_id = request.form.get("assignment_id")
     student_id = request.form.get("student_id")
     if not assignment_id or not student_id or not file.filename:
-        raise BadRequestError("Missing required parameters or file")
+        raise BadRequestError("Missing required fields")
 
     filename = secure_filename(file.filename)
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -106,7 +106,8 @@ def upload_submission():
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
         except Exception as e:
-            raise InternalProcessingError("Failed to delete {file_path}. Reason: {e}")
+            print(f"Failed to delete {file_path}. Reason: {e}")
+            raise InternalProcessingError("Failed to grade submission")
     file_path = os.path.join(submissions_dir, filename)
 
     file.save(file_path)
@@ -117,14 +118,16 @@ def upload_submission():
     start_proc = subprocess.run(f"docker start {container_name}".split(), capture_output=True)
     if start_proc.returncode != 0:
         os.chdir(current_dir)
-        raise InternalProcessingError(f"error: Failed to start Docker container, details: {start_proc.stderr.decode()}")
+        print(f"error: Failed to start Docker container, details: {start_proc.stderr.decode()}")
+        raise InternalProcessingError("Failed to grade submission")
 
 
     # copy the file into the correct place
     copy_proc = subprocess.run(f"docker cp {file_path} {container_name}:/autograder/submission/".split(), capture_output=True)
     if copy_proc.returncode != 0:
         os.chdir(current_dir)
-        raise InternalProcessingError(f"error: Failed to start Docker container, details: {copy_proc.stderr.decode()}")
+        print(f"error: Failed to start Docker container, details: {copy_proc.stderr.decode()}")
+        raise InternalProcessingError("Failed to grade submission")
 
 
     try:
@@ -134,16 +137,18 @@ def upload_submission():
             timeout=autograder_timeout)
     except subprocess.TimeoutExpired:
         os.chdir(current_dir)
-        raise ServerTimeoutError("Autograder execution timed out. Submitted program took too long to run.")
+        raise ServerTimeoutError("Submitted program took too long to run")
 
     if exec_proc.returncode != 0:
         os.chdir(current_dir)
-        raise InternalProcessingError(f"error: Failed to start Docker container, details: {exec_proc.stderr.decode()}")
+        print(f"error: Failed to start Docker container, details: {exec_proc.stderr.decode()}")
+        raise InternalProcessingError("Failed to grade submission")
 
     cat_proc = subprocess.run(f"docker exec {container_name} cat /autograder/results/results.json".split(), capture_output=True)
     if cat_proc.returncode != 0:
         os.chdir(current_dir)
-        raise InternalProcessingError(f"error: Failed to start Docker container, details: {cat_proc.stderr.decode()}")
+        print(f"error: Failed to start Docker container, details: {cat_proc.stderr.decode()}")
+        raise InternalProcessingError("Failed to grade submission")
 
     results_json_content = cat_proc.stdout.decode()
     host_results_json_path = os.path.join(results_dir, 'results.json')
@@ -178,12 +183,14 @@ def upload_submission():
     # Remove the contents of the submission directory inside the Docker container
     clear_dir_proc = subprocess.run(f"docker exec {container_name} rm -rf /autograder/submission/{filename}".split(), capture_output=True)
     if clear_dir_proc.returncode != 0:
-        raise InternalProcessingError(f"error: Failed to start Docker container, details: {clear_dir_proc.stderr.decode()}")
+        print(f"error: Failed to start Docker container, details: {clear_dir_proc.stderr.decode()}")
+        raise InternalProcessingError("Failed to grade submission")
 
     # need to remove this file fropm teh source folder if it exists there
     clear_dir_proc2 = subprocess.run(f"docker exec {container_name} rm -f /autograder/source/{filename}".split(),capture_output=True)
     if clear_dir_proc2.returncode != 0:
-        raise InternalProcessingError(f"error: Failed to start Docker container, details: {clear_dir_proc2.stderr.decode()}")
+        print(f"error: Failed to start Docker container, details: {clear_dir_proc2.stderr.decode()}")
+        raise InternalProcessingError("Failed to grade submission")
 
     subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
     # subprocess.run(f"docker rm {container_name}".split(), capture_output=True)
