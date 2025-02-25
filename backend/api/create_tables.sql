@@ -62,6 +62,7 @@ CREATE TABLE assignments (
     autograder_file bytea,
     -- new container_id column
     container_id varchar(),
+    autograder_timeout integer DEFAULT 300,
     FOREIGN KEY (course_id) REFERENCES courses (id)
 );
 

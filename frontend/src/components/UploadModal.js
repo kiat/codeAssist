@@ -4,6 +4,8 @@ import { useState, useContext, useEffect } from "react";
 import { GlobalContext } from "../App";
 import { useNavigate } from "react-router-dom";
 import LoadingOverlay from './LoadingOverlay'; // Import the LoadingOverlay component
+import { uploadSubmission } from "../services/assignmentResult";
+
 // changes made for resubmit functionality
 /**
  * file upload windows modal
@@ -133,25 +135,13 @@ export default function UploadModal({
       formData.append('assignment_id', assignmentID);
       
       setLoading(true); // Show loading overlay
-      const response = await fetch(process.env.REACT_APP_API_URL + "/upload_submission", {
-        method: "POST",
-        body: formData,
-      });
-
-
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
-
-
+      const response = await uploadSubmission(formData)
       const responseData = await response.json();
-      console.log(responseData);
+
       // Proceed to results page after successful upload
-      console.log(responseData);
       navigateToResults(responseData.submissionID);
     } catch (error) {
       console.error("Error uploading file:", error);
-      message.error("Failed to upload file. Please try again.");
     }
     finally {
       setLoading(false); // Hide loading overlay
