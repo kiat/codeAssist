@@ -136,6 +136,7 @@ def upload_submission():
             capture_output=True, 
             timeout=autograder_timeout)
     except subprocess.TimeoutExpired:
+        subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
         os.chdir(current_dir)
         raise ServerTimeoutError("Submitted program took too long to run")
 
