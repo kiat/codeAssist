@@ -53,13 +53,11 @@ export default () => {
             form={form}
             initialValues={{ autograderTimeout: "300" }}
             onFinish={values => {
-              console.log("Form Values:", values);
               setSaveLoading(true);
               const formData = new FormData();
               formData.append("assignment_id", assignmentId);
               formData.append("file", values.uploadFile?.file);
               formData.append("autograder_timeout", values.autograderTimeout);
-              console.log("HERE" + values.autograderTimeout);
               uploadAssignmentAutograder(formData)
                 .then(() => {
                   message.success("Operation successful");
