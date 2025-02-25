@@ -14,23 +14,23 @@ future will be used instead of the create_student and create_instructor routes.<
 
 Example input:
 
-{
-  name: "Ricky Woodruff",
-  email: "woodruffr@utexas.edu",
-  password: "password",
-  eid: "rick123",
-  role: "0"
-}
+    {
+      name: "Ricky Woodruff",
+      email: "woodruffr@utexas.edu",
+      password: "password",
+      eid: "rick123",
+      role: "0"
+    }
 
 Example Output(instructor):
 
-{
-  "email_address":"woodruffr@utexas.edu",
-  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-  "name":"Ricky Woodruff",
-  "password":"password",
-  "sis_user_id": "rick123"
-}
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }
 
 ## GET, POST /user_login
 
@@ -42,20 +42,20 @@ Example Output(instructor):
 
 Example input:
 
-{
-  email: "woodruffr@utexas.edu",
-  password: "password",
-}
+    {
+      email: "woodruffr@utexas.edu",
+      password: "password",
+    }
 
 Example Output:
 
-{
-  "email_address":"woodruffr@utexas.edu",
-  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-  "name":"Ricky Woodruff",
-  "password":"password",
-  "sis_user_id": "rick123"
-}
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }
 
 
 ## GET /get_users
@@ -68,26 +68,26 @@ Example Output:
 
 Example Input:
 
-{
-  "email": "woodruffr@utexas.edu"
-}
+    {
+      "email": "woodruffr@utexas.edu"
+    }
 
 Example Output:
 
-[{
-  "email_address":"woodruffr@utexas.edu",
-  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-  "name":"Ricky Woodruff",
-  "password":"password",
-  "sis_user_id": "rick123"
-}, 
-{
-  "email_address":"jeffross@utexas.edu",
-  "id":"a6984457-048a-44fb-8455-441jdnsk8b9847",
-  "name":"Jeff Ross",
-  "password":"password",
-  "sis_user_id": "at37810"
-}]
+    [{
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }, 
+    {
+      "email_address":"jeffross@utexas.edu",
+      "id":"a6984457-048a-44fb-8455-441jdnsk8b9847",
+      "name":"Jeff Ross",
+      "password":"password",
+      "sis_user_id": "at37810"
+    }]
 
 
 ## GET /get_user_by_id
@@ -100,19 +100,19 @@ Example Output:
 
 Example input:
 
-{
-  "id": "6025b3f6-ac5f-4ff9-9357-f5a7fc8a624b"
-}
+    {
+      "id": "6025b3f6-ac5f-4ff9-9357-f5a7fc8a624b"
+    }
 
 Example Output:
 
-{
-  "email_address":"woodruffr@utexas.edu",
-  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-  "name":"Ricky Woodruff",
-  "password":"password",
-  "sis_user_id": "rick123"
-}
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }
 
 ## PUT, POST /update_account
 
@@ -125,20 +125,20 @@ change. Only name and password can be changed for any user.</p>
 
 Example input:
 
-{
-  id:"a9872357-475a-47ab-8455-441cdd8b9744",
-  // Optionally include any fields to update
-}
+    {
+      id:"a9872357-475a-47ab-8455-441cdd8b9744",
+      // Optionally include any fields to update
+    }
 
 Example Output:
 
-{
-  "email_address":"woodruffr@utexas.edu",
-  "id":"a9872357-475a-47ab-8455-441cdd8b9744",
-  "name":"Ricky Woodruff",
-  "password":"password",
-  "sis_user_id": "rick123"
-}
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a9872357-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }
 
 
 ---
@@ -156,24 +156,24 @@ for the course</p>
 
 Example input:
 
-{
-  "name": "CS371L iOS Mobile Development",
-  "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
-  "semester" : "Spring",
-  "year" : "2024",
-  "entryCode": "ABC123"
-}
+    {
+      "name": "CS371L iOS Mobile Development",
+      "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
+      "semester" : "Spring",
+      "year" : "2024",
+      "entryCode": "ABC123"
+    }
 
 Example output:
 
-{
-  "id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
-  "name":"CS371L iOS Mobile Development",
-  "sis_course_id":null,
-  "semester" : "Spring",
-  "year" : "2024",
-  "entryCode": "ABC123"
-}
+    {
+      "id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+      "name":"CS371L iOS Mobile Development",
+      "sis_course_id":null,
+      "semester" : "Spring",
+      "year" : "2024",
+      "entryCode": "ABC123"
+    }
 
 ## POST /enroll_course
 
@@ -187,17 +187,17 @@ if they have the entry code.</p>
 
 Example input:
 
-{
-  student_id : "a6888457-475a-47ab-8455-441cdd8b9744",
-  entryCode: "ABC123"
-}
+    {
+      student_id : "a6888457-475a-47ab-8455-441cdd8b9744",
+      entryCode: "ABC123"
+    }
 
 Example Output(enrollment):
 
-{
-  "student_id": "a6888457-475a-47ab-8455-441cdd8b9744",
-  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-}
+    {
+      "student_id": "a6888457-475a-47ab-8455-441cdd8b9744",
+      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+    }
 
 ## POST /update_course
 
@@ -209,22 +209,22 @@ Example Output(enrollment):
 
 Example input:
 
-{
-  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-  // Optionally include any fields to update
-}
+    {
+      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+      // Optionally include any fields to update
+    }
 
 Example Output:
 
-{
-  "id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
-  "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
-  "name":"CS371L iOS Mobile Development",
-  "sis_course_id":null,
-  "semester" : "Spring",
-  "year" : "2024",
-  "entryCode": "ABC123"
-}
+    {
+      "id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+      "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
+      "name":"CS371L iOS Mobile Development",
+      "sis_course_id":null,
+      "semester" : "Spring",
+      "year" : "2024",
+      "entryCode": "ABC123"
+    }
 
 ## DELETE /delete_course
 
