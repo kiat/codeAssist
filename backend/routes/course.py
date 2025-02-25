@@ -1,6 +1,9 @@
 import uuid
-from flask import Blueprint, request, jsonify
+import os
+import csv
+from flask import Blueprint, request, jsonify, make_response
 from flask_cors import cross_origin
+from werkzeug.utils import secure_filename
 from api import db
 from api.models import (
     Assignment,
@@ -12,9 +15,12 @@ from api.models import (
     Enrollment,
 )
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
+from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
 
 course = Blueprint("course", __name__)
 
+ALLOWED_EXTENSIONS = {'csv'}
+UPLOAD_FOLDER = 'uploads'
 
 @course.route("/create_course", methods=["POST", "GET"])
 @cross_origin()
@@ -23,44 +29,41 @@ def create_course():
     /create_course creates a course in the database
     Requires from the frontend a JSON containing:
     @param name             name of the course
-    @param instructor_id    TODO: What does this map to? @
+    @param instructor_id    class owner (instructor) of the course
     @param semester         semester of the course
     @param year             year of the course
     @param entryCode        entryCode of the course
     """
-    course_id = str(uuid.uuid4())
-    name = request.json["name"]
-    instructor_id = request.json["instructor_id"]
-    semester = request.json["semester"]
-    year = request.json["year"]
-    entryCode = request.json["entryCode"]
+    data = request.json
+    required_fields = ["name", "instructor_id", "semester", "year", "entryCode"]
 
-    course_data = {
-        "id": course_id,
-        "name": name,
-        "instructor_id": instructor_id,
-        "semester": semester,
-        "year": year,
-        "entryCode": entryCode,
-    }
+    # validate request
+    if not all(field in data and data[field] for field in required_fields):
+        raise BadRequestError("Missing required fields")
 
-    enrollment_data = {
-        "student_id": instructor_id,
-        "course_id": course_id,
-        "role": "instructor",
-    }
+    # check for duplicate entryCode
+    if db.session.query(Course).filter_by(entryCode=data["entryCode"]).first():
+        raise ConflictError("Course with the provided entry code already exists")
 
-    db.session.add(Course(**course_data))
-    db.session.add(Enrollment(**enrollment_data))
-    db.session.commit()
+    course = Course(id = str(uuid.uuid4()), **data)
 
-    newCourse = db.session.query(Course).filter_by(id=course_id)
-    newCourse = CourseSchema().dump(newCourse, many=True)[0]
+    enrollment = Enrollment(
+        student_id=data["instructor_id"],
+        course_id=course.id,
+        role="instructor",
+    )
 
-    return jsonify(newCourse)
+    try:
+        db.session.add(course)
+        db.session.add(enrollment)
+        db.session.commit()
+        return jsonify(CourseSchema().dump(course)), 201
+    except Exception as e:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to create course")
 
 
-@course.route("/enroll_course", methods=["POST", "GET"])
+@course.route("/enroll_course", methods=["POST"])
 @cross_origin()
 def enroll_course():
     """
@@ -69,122 +72,153 @@ def enroll_course():
     @param entryCode        entryCode of the course
     @param user_id       id of the student
     """
-    student_id = request.json["user_id"]
-    entryCode = request.json["entryCode"]
+    data = request.json
+    required_fields = ["user_id", "entryCode"]
 
-    enrolledCourse = db.session.query(Course).filter_by(entryCode=entryCode)
-    enrolled_list = [enroll.id for enroll in enrolledCourse]
+    # validate request
+    if not all(field in data for field in required_fields):
+        raise BadRequestError("Missing required fields")
 
+    course = db.session.query(Course).filter_by(entryCode=data["entryCode"]).first()
+    
     # Check if the course exists
-    if not enrolled_list:
-        return (
-            jsonify({"error": "Course with the provided entry code does not exist"}),
-            404,
-        )
+    if not course:
+        raise NotFoundError("Course with the provided entry code does not exist")
+    
+    # Check if student is already enrolled
+    if db.session.query(Enrollment).filter_by(student_id=data["user_id"], course_id=course.id).first():
+        raise ConflictError("User is already enrolled in this course")
+    
+    # returning same error message b/c user probably shouldn't know about hidden classes existing
+    if course.allowEntryCode is False:
+        raise ForbiddenError("Course with the provided entry code does not exist")
 
-    enrollment_data = {
-        "student_id": student_id,
-        "course_id": enrolled_list[0],
-        "role": "student",
-    }
-    db.session.add(Enrollment(**enrollment_data))
-    db.session.commit()
+    enrollment = Enrollment(
+        student_id=data["user_id"],
+        course_id=course.id,
+        role="student",
+    )
+    try:
+        db.session.add(enrollment)
+        db.session.commit()
+        return jsonify(EnrollmentSchema().dump(enrollment)), 201
+    except Exception as e:
+        raise InternalProcessingError("Failed to enroll in course")
 
-    enrolledCourse = CourseSchema().dump(enrolledCourse, many=True)[0]
-
-    return jsonify(enrolledCourse)
-
-
-@course.route("/update_course", methods=["POST"])
+@course.route("/update_course", methods=["PUT"])
 @cross_origin()
 def update_course():
     """
     /update_course updates a course in the database
     Requires from the frontend a JSON containing
-    @param id               id of the course in database
+    @param course_id        id of the course in database
+    @param description      description of the course
+    @param name             name of the course
+    @param semester         semester of the course
+    @param year             year of the course
+    @param entryCode        entry code of the course
+    @param allowEntryCode   whether entry code is allowed
     """
-    course_id = request.json["course_id"]
     data = request.json
+    required_fields = ["course_id", "description", "name", "semester", "year", "entryCode", "allowEntryCode"]
+
+    if not all(field in data for field in required_fields):
+        raise BadRequestError("Missing required fields")
+    
+    # Check that updated entryCode is unique or already owned by the class
+    existing_class = db.session.query(Course).filter_by(entryCode=data["entryCode"]).first()
+    if existing_class and existing_class.id != data["course_id"]:
+        raise ConflictError("Course with the provided entry code already exists")
+    
+    course_id = data["course_id"]    
     del data["course_id"]
 
-    name, val = list(data.keys()), list(data.values())
-    updated_course_info = {getattr(Course, name): val for name, val in zip(name, val)}
+    updated_course_info = {getattr(Course, name): val for name, val in data.items()}
 
-    course = (
+    try:
         db.session.query(Course).filter_by(id=course_id).update(updated_course_info)
-    )
-    db.session.commit()
-
-    return jsonify({"message": "Success"}), 200
+        db.session.commit()
+        return jsonify({"message": "Course updated successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to update course")
 
 
 @course.route("/delete_course", methods=["DELETE"])
 @cross_origin()
 def delete_course():
     course_id = request.args.get("course_id")
+    
+    # Check for course_id
+    if not course_id:
+        raise BadRequestError("Missing required fields")
+    
+    course = db.session.query(Course).filter_by(id=course_id).first()
+    
+    if not course:
+        raise NotFoundError("Course not found")
+
     # Check if there are any assignments for this course
-    related_assignments = (
-        db.session.query(Assignment).filter_by(course_id=course_id).all()
-    )
-    if related_assignments:
-        print("410")
-        return jsonify("Assignments must be deleted"), 410
+    if db.session.query(Assignment).filter_by(course_id=course_id).first():
+        raise ConflictError("Cannot delete course with assignments")
 
-    enrollments = db.session.query(Enrollment).filter_by(course_id=course_id).all()
-    if enrollments:
-        for enrollment in enrollments:
-            db.session.delete(enrollment)
+    try:
+        # delete enrollments
+        enrollments = db.session.query(Enrollment).filter_by(course_id=course_id).all()
+        if enrollments:
+            for enrollment in enrollments:
+                db.session.delete(enrollment)
+            db.session.commit()
+
+        # delete course
+        db.session.delete(course)
         db.session.commit()
-
-    # actually delete course
-    course_to_delete = db.session.query(Course).get(course_id)
-    if course_to_delete:
-        db.session.delete(course_to_delete)
-        db.session.commit()
-        return jsonify("Course deleted successfully"), 200
-    else:
-        return jsonify("Course not found"), 404
-
+        return jsonify({"message": "Course deleted successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to delete course")
 
 @course.route("/delete_all_assignments", methods=["DELETE"])
 @cross_origin()
 def delete_all_assignments():
     course_id = request.args.get("course_id")
+    if not course_id or course_id == "":
+        raise BadRequestError("Missing course_id argument")
 
     # Check if there are any assignments for this course
-    related_assignments = (
-        db.session.query(Assignment).filter_by(course_id=course_id).all()
-    )
-    if related_assignments:
-        for assignment in related_assignments:
-            related_submissions = (
-                db.session.query(Submission)
-                .filter_by(assignment_id=assignment.id)
-                .all()
+    assignments = (db.session.query(Assignment).filter_by(course_id=course_id).all())
+
+    if not assignments:
+        raise NotFoundError("No assignments found for this course")
+    
+    assignment_ids = [a.id for a in assignments]
+
+    try:
+        db.session.query(RegradeRequest).filter(
+            RegradeRequest.submission_id.in_(
+                db.session.query(Submission.id).filter(
+                    Submission.assignment_id.in_(assignment_ids)
+                )
             )
-            if related_submissions:
-                for submission in related_submissions:
-                    related_requests = db.session.query(RegradeRequest).filter_by(
-                        submission_id=submission.id
-                    )
-                    if related_requests:
-                        for req in related_requests:
-                            db.session.delete(req)
-                    db.session.delete(submission)
-                db.session.commit()
-            db.session.delete(assignment)
+        ).delete(synchronize_session=False)
+
+        db.session.query(Submission).filter(
+            Submission.assignment_id.in_(assignment_ids)
+        ).delete(synchronize_session=False)
+
+        db.session.query(Assignment).filter(
+            Assignment.course_id == course_id
+        ).delete(synchronize_session=False)
+
         db.session.commit()
 
-    related_assignments = (
-        db.session.query(Assignment).filter_by(course_id=course_id).all()
-    )
-    if not related_assignments:
         return jsonify("Assignments deleted successfully"), 200
-    else:
-        return jsonify("Assignments not deleted"), 404
+    
+    except Exception as e:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to delete assignments")
 
-
-@course.route("/create_enrollment", methods=["POST", "GET"])
+@course.route("/create_enrollment", methods=["POST"])
 @cross_origin()
 def create_enrollment():
     """
@@ -193,98 +227,162 @@ def create_enrollment():
     @param student_id       the id of the student
     @param course_id        the id of the course
     """
-    student_id = request.json["student_id"]
-    course_id = request.json["course_id"]
-    role = request.json["role"]
+    data = request.json
+    required_fields = ["student_id", "course_id"]
 
-    enrollment_data = {
-        "student_id": student_id,
-        "course_id": course_id,
-        "role": role,
-    }
+    if not all(field in data for field in required_fields):
+        raise BadRequestError("Missing required fields")
 
-    db.session.add(Enrollment(**enrollment_data))
-    db.session.commit()
+    if db.session.query(Enrollment).filter_by(student_id=data["student_id"], course_id=data["course_id"]).first():
+        raise ConflictError("User is already enrolled in this course")
 
-    newEnrollment = db.session.query(Enrollment).filter_by(
-        student_id=student_id, course_id=course_id
+    role = data.get("role", "student")
+
+    enrollment = Enrollment(
+        student_id=data["student_id"],
+        course_id=data["course_id"],
+        role=role,
     )
-    newEnrollment = EnrollmentSchema().dump(newEnrollment, many=True)[0]
 
-    return jsonify(newEnrollment)
-
+    try:
+        db.session.add(enrollment)
+        db.session.commit()
+        newEnrollment = EnrollmentSchema().dump(enrollment, many=False)
+        return jsonify(newEnrollment), 201
+    except Exception as e:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to create enrollment")
 
 @course.route("/update_role", methods=["POST"])
 @cross_origin()
 def update_role():
-    data = request.get_json()
-    student_id = data.get("student_id")
-    course_id = data.get("course_id")
-    new_role = data.get("new_role")
+    data = request.json
+    required_fields = ["student_id", "course_id", "new_role"]
 
-    if not student_id or not course_id or not new_role:
-        return jsonify({"error": "Missing required fields"}), 400
+    if not all(field in data for field in required_fields):
+        raise BadRequestError("Missing required fields")
 
     # Update the role in the database
-    enrollment = (
-        db.session.query(Enrollment)
-        .filter_by(student_id=student_id, course_id=course_id)
-        .first()
-    )
-    if enrollment:
-        enrollment.role = new_role
+    enrollment = db.session.query(Enrollment).filter_by(student_id=data["student_id"], course_id=data["course_id"]).first()
+    if not enrollment:
+        raise NotFoundError("Enrollment not found")
+    
+    try:
+        enrollment.role = data["new_role"]
         db.session.commit()
-        return jsonify({"message": "Role updated successfully"}), 200
-    else:
-        return jsonify({"error": "Enrollment not found"}), 404
+        newEnrollment = EnrollmentSchema().dump(enrollment, many=False)
+        return jsonify(newEnrollment), 200
+    except Exception as e:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to update role")
 
-
-@course.route("/create_enrollment_bulk", methods=["POST", "GET"])
-@cross_origin()
-def create_enrollment_bulk():
+# converted to a helper as a part of issue #41, to facilitate create_enrollment_csv()
+def create_enrollment_bulk(data):
     """
     /create_enrollment_bulk mass enrolls students in a course
     Requires from the frontend a JSON containing:
     @param course_id        the id of the course
-    @parma student_ids      a list of student ids
+    @param student_ids      a list of student ids
     """
-    course_id = request.json["course_id"]
-    students = request.json["student_ids"]
+    course_id = data["course_id"]
+    students = data["student_ids"]
+    # default role to student if not present
+    role = data.get("role", "student")
 
-    students_to_add = [
-        Enrollment(
-            **{
-                "student_id": id,
-                "course_id": course_id,
-            }
-        )
-        for id in students
-    ]
+    if not course_id or not students:
+        raise BadRequestError("Missing required fields")
 
-    db.session.add_all(students_to_add)
-    db.session.commit()
+    # remove duplicates in students
+    students = list(set(students))
 
-    return jsonify({"message": "Success"}), 200
+    failed_enrollments = []
 
+    for student_id in students:
+        try:
+            enrollment = Enrollment(
+                student_id=student_id, 
+                course_id=course_id, 
+                role=role
+            )
+            db.session.add(enrollment)
+            db.session.commit()
+        except Exception:
+            failed_enrollments.append(student_id)
+    
+    return {
+        "failed_enrollments" : failed_enrollments
+    }
 
-@course.route("/get_student_enrollments", methods=["GET"])
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@course.route("/create_enrollment_csv", methods=["POST"])
 @cross_origin()
-def get_student_enrollments():
+def create_enrollment_csv():
+    if 'file' not in request.files:
+        raise BadRequestError("Missing file part")
+    
+    file = request.files['file']
+
+    if file.filename == '':
+        raise BadRequestError("No selected file")
+
+    if not allowed_file(file.filename):
+        raise BadRequestError("Invalid file type")
+
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
+
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    
+    try:
+        file.save(file_path)
+    except Exception:
+        raise InternalProcessingError("Failed to save file")
+
+    student_ids = []
+    course_id = request.form.get("course_id")
+
+    if not course_id:
+        raise BadRequestError("Missing course_id")
+    
+    try:
+        with open(file_path, newline='')  as csvfile:
+            csv_reader = csv.reader(csvfile, delimiter=',')
+            for row in csv_reader:
+                student_ids.append(row[0])
+    except Exception as e:
+        raise InternalProcessingError("Failed to process file")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+    response = create_enrollment_bulk({
+        "course_id": course_id,
+        "student_ids": student_ids
+        })
+
+    return jsonify(response), 200
+
+@course.route("/get_user_enrollments", methods=["GET"])
+@cross_origin()
+def get_user_enrollments():
     """
-    /get_student_enrollments gets all enrollments for a single student
+    /get_user_enrollments gets all enrollments for a single user
     Requires from the frontend a JSON containing:
-    @param student_id       the id of the student
+    @param user_id       the id of the user
     """
-    student_id = request.args.get("student_id")
+    user_id = request.args.get("user_id")
+    if not user_id or user_id == "":
+        raise BadRequestError("Missing user_id argument")
+    
+    enrollments = db.session.query(Enrollment).filter_by(student_id=user_id)
+    course_ids = [course.course_id for course in enrollments]
+    courses_query = db.session.query(Course).filter(Course.id.in_(course_ids))
+    courses = CourseSchema().dump(courses_query, many=True)
 
-    enrollments = db.session.query(Enrollment).filter_by(student_id=student_id)
-    # enrollments = EnrollmentSchema().dump(enrollments, many=True)
-    enrolled_list = [student_course.course_id for student_course in enrollments]
-    student_courses = db.session.query(Course).filter(Course.id.in_(enrolled_list))
-    student_courses = CourseSchema().dump(student_courses, many=True)
-    # return jsonify(enrollments)
-    return jsonify(student_courses)
-
+    return jsonify(courses), 200
 
 @course.route("/get_course_enrollment", methods=["GET"])
 @cross_origin()
@@ -295,6 +393,8 @@ def get_course_enrollment():
     @param course_id        the id of a course
     """
     course_id = request.args.get("course_id")
+    if not course_id or course_id == "":
+        raise BadRequestError("Missing course_id argument")
 
     students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id)
     students = EnrollmentSchema().dump(students, many=True)
@@ -318,64 +418,23 @@ def get_course_assignments():
     @param course_id        the id of a course
     """
     course_id = request.args.get("course_id")
-
-    assignments = db.session.query(Assignment).filter_by(course_id=course_id)
+    if not course_id or course_id == "":
+        raise BadRequestError("Missing course_id argument")
+    
+    assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
     assignments = AssignmentSchema().dump(assignments, many=True)
 
-    return jsonify(assignments)
-
-
-@course.route("/get_instructor_courses", methods=["GET"])
-@cross_origin()
-def get_instructor_courses():
-    """
-    /get_instructor_courses gets all the courses created by an instructor
-    Requires from the frontend a JSON containing:
-    @param instructor_id    the id of an instructor
-    """
-    instructor_id = request.args.get("instructor_id")
-
-    course = db.session.query(Enrollment.course_id).filter_by(student_id=instructor_id)
-    course = EnrollmentSchema().dump(course, many=True)
-
-    list_of_courses = [x["course_id"] for x in course]
-
-    courses = db.session.query(Course).filter(Course.id.in_(list_of_courses))
-    courses = CourseSchema().dump(courses, many=True)
-
-    return jsonify(courses)
-
+    return jsonify(assignments), 200
 
 @course.route("/get_course_info", methods=["GET"])
 @cross_origin()
 def get_course_info():
     course_id = request.args.get("course_id")
+
+    if not course_id or course_id == "":
+        raise BadRequestError("Missing course_id argument")
+
     course = db.session.query(Course).filter_by(id=course_id)
     course = CourseSchema().dump(course, many=True)
 
-    return jsonify(course)
-
-
-@course.route("/get_student_enrollment", methods=["GET"])
-@cross_origin()
-def get_student_enrollment():
-    """
-    /get_course_enrollment gets all students enrolled in a course
-    Requires from the frontend a JSON containing:
-    @param course_id        the id of a course
-    """
-    course_id = request.args.get("course_id")
-
-    students = db.session.query(Enrollment.student_id).filter_by(
-        course_id=course_id, role="student"
-    )
-    students = EnrollmentSchema().dump(students, many=True)
-
-    list_of_students = [x["student_id"] for x in students]
-
-    students = db.session.query(
-        User.name, User.email_address, User.id, User.role
-    ).filter(User.id.in_(list_of_students))
-    students = UserSchema().dump(students, many=True)
-
-    return jsonify(students)
+    return jsonify(course), 200

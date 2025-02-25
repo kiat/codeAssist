@@ -212,10 +212,12 @@ def upload_assignment_autograder():
     filepath = os.path.join(assignment_dir, filename)
     file.save(filepath)
 
-    # query teh db and find out if this assingnet in the db alreayd has an associated container or not
+    # Query the database for the assignment
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
         return jsonify({"error": "Assignment not found"}), 404
+    
+    # If the assignment already has an associated container, update it.
     if assignment.container_id:
         container = assignment.container_id
         # start up teh containerrmeove the old zip and source files form this container and copy in and unzip the new ones
@@ -254,14 +256,13 @@ def upload_assignment_autograder():
 
     # Write the Dockerfile
     dockerfile_content = """
-    FROM python:3.9
-    RUN apt-get update && apt-get install -y python3-pip python3-dev unzip && rm -rf /var/lib/apt/lists/*
+    FROM python:3.9-slim
+    RUN apt-get update && apt-get install -y --no-install-recommends python3-pip python3-dev unzip && rm -rf /var/lib/apt/lists/*
     COPY *.zip /autograder/
-    RUN unzip /autograder/*.zip -d /autograder/source
-    RUN chmod +x /autograder/source/setup.sh && /autograder/source/setup.sh
-    RUN chmod +x /autograder/source/run_autograder
-    RUN mkdir -p /autograder/results
-    RUN mkdir -p /autograder/submission
+    RUN unzip /autograder/*.zip -d /autograder/source && \\
+        chmod +x /autograder/source/setup.sh && /autograder/source/setup.sh && \\
+        chmod +x /autograder/source/run_autograder && \\
+        mkdir -p /autograder/results /autograder/submission
     WORKDIR /autograder
     CMD ["/bin/bash", "/autograder/source/run_autograder"]
     """
@@ -288,16 +289,9 @@ def upload_assignment_autograder():
     os.chdir(current_dir)
     subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
 
+    # Update the assignment record with the new container ID
     assignment.container_id = container_name
-    # assignment.container_id = container_id
     db.session.commit()
-
-    # Extract the contents of the uploaded ZIP file
-    # try:
-    #     with zipfile.ZipFile(filepath, 'r') as zip_ref:
-    #         zip_ref.extractall(os.path.join(assignment_dir, "source"))
-    # except zipfile.BadZipFile:
-    #     return jsonify({"error": "Uploaded file is not a valid zip file"}), 400
 
     return jsonify({"message": "Autograder uploaded and Docker image generated successfully", "image_name": f"autograder-{assignment_id}"}), 200
     

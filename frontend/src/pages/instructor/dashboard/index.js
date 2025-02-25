@@ -70,7 +70,6 @@ export default function InstructorDashboard() {
   const { courseId } = useParams();
   const [data, setData] = useState([]);
   const { courseInfo, updateCourseInfo, userInfo } = useContext(GlobalContext);
-  const [description, setDescription] = useState("");
 
   const fetchData = async (endpoint, params) => {
     try {
@@ -81,18 +80,17 @@ export default function InstructorDashboard() {
       console.error('There has been a problem with your fetch operation:', error);
     }
   };
-
+  
   useEffect(() => {
     const initFetch = async () => {
       const assignmentsData = await fetchData("/get_course_assignments", { course_id: courseId });
       setData(assignmentsData);
-
-      if (!courseInfo.id || !courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode) {
+      
+      if (!courseInfo.id || !courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode || !courseInfo.description) {
         const courseDetails = await fetchData("/get_course_info", { course_id: courseId });
         if (courseDetails && courseDetails.length > 0) {
           const [detail] = courseDetails;
           updateCourseInfo({ ...detail, id: courseId });
-          setDescription(detail.description);
         }
       }
     };
@@ -112,25 +110,20 @@ export default function InstructorDashboard() {
         <h3>DESCRIPTION</h3>
         <Divider style={{ marginTop: 0, marginBottom: "5px" }} />
         <div>
-          {description === "" ? (
+          {courseId.description === "" ? (
             <div>
               <span>Edit your course description on the </span>
               <Link to={`/courseSettings/${courseId}`}>Course Settings</Link>
               <span> page.</span>
             </div>
           ) : (
-            <span>{description}</span>
+            <span>{`${courseInfo.description}`}</span>
           )}
         </div>
       </Card>
       <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>
-        <h3>THINGS TO DO</h3>
+        <h3>ASSIGNMENTS</h3>
         <Divider style={{ marginTop: 0, marginBottom: "5px" }} />
-        <Space direction="vertical">
-          {texts.map((item, index) => (
-            <TextItem text={item} key={index} />
-          ))}
-        </Space>
       </Card>
       <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>
         <Table rowKey="id" columns={columns} dataSource={data} />

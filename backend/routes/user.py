@@ -4,6 +4,7 @@ from flask_cors import cross_origin
 from api import db
 from api.models import User
 from api.schemas import UserSchema
+from util.errors import BadRequestError, NotFoundError
 
 user = Blueprint('user', __name__)
 
@@ -78,20 +79,24 @@ def user_login():
 
 
 
-@user.route('/get_users', methods = ["GET"])
+@user.route('/get_user_by_email', methods = ["GET"])
 @cross_origin()
-def get_users():
+def get_user():
     email = request.args.get("email")
-    # role = request.args.get("role")
+    if not email or email == "":
+        raise BadRequestError("Missing email argument")
 
-    res = db.session.query(User).filter_by(email_address=email)
-    result = UserSchema().dump(res, many=True)
-    # print(result)
+    res = db.session.query(User).with_entities(User.id, User.name, User.email_address, User.role).filter_by(email_address=email).first()
+    if not res:
+        raise NotFoundError("User not found")
     
-    # TODO THIS IS A MAJOR SECURITY VULNERABILITY, IT SHOWS PASSWORDS!
-    if not(result):
-        return "No user found", 404
-    return jsonify(result)
+    user = {
+        "id": res.id,
+        "name": res.name,
+        "email_address": res.email_address,
+        "role": res.role
+    }
+    return jsonify(user), 200
 
     #It shows an error for this method but the user_login works
 

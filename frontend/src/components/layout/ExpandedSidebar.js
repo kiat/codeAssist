@@ -47,25 +47,25 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed }) {
             >
               <Space direction='vertical' className={styles.iconText}>
                 
-                <Link to={userInfo?.isStudent ? `/assignments/${courseInfo.id}` : `/instructorDashboard/${courseInfo.id}`} className={styles.linkText}>
+                <Link to={userInfo?.isStudent ? `/assignments/${courseInfo.id}` : `/instructorDashboard/${courseInfo.id}`} className={/instructorDashboard/i.test(pathname) || /assignments/i.test(pathname) ? "" : styles.linkText}>
                   <TableOutlined />
                   <span> Dashboard</span>
                 </Link>
-                <Link to={'/regradeRequests'} className={styles.linkText}>
+                <Link to={'/regradeRequests'} className={/regradeRequests/i.test(pathname) ? "" : styles.linkText}>
                   <RedoOutlined />
                   <span> Regrade Requests</span>
                 </Link>
                   {!userInfo?.isStudent &&
                   <>
-                    <Link to={`/instructorAssignments/${courseInfo.id}`} className={styles.linkText}>
+                    <Link to={`/instructorAssignments/${courseInfo.id}`} className={/instructorAssignments/i.test(pathname) ? "" : styles.linkText}>
                       <FileTextOutlined />
                       <span> Assignments</span>
                     </Link>
-                    <Link to={`/enrollment/${courseInfo.id}`} className={styles.linkText}>
+                    <Link to={`/enrollment/${courseInfo.id}`} className={/enrollment/i.test(pathname) ? "" : styles.linkText}>
                       <UsergroupAddOutlined />
                       <span> Enrollment</span>
                     </Link>
-                    <Link to={`/courseSettings/${courseInfo.id}`} className={styles.linkText}>
+                    <Link to={`/courseSettings/${courseInfo.id}`} className={/courseSettings/i.test(pathname) ? "" : styles.linkText}>
                       <SettingOutlined />
                       <span> Course Settings</span>
                     </Link>

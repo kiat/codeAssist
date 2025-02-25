@@ -20,35 +20,26 @@ import { useEffect, useState, useCallback } from "react";
 import { useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../../App";
-import { getCourseAssignments } from "../../../services/course";
+import { getCourseAssignments, updateCourse , deleteCourse, deleteAllAssignments, getCourseInfo} from "../../../services/course";
 
 export default () => {
   const { courseId } = useParams();
-  const { updateCourseInfo, courseInfo } = useContext(GlobalContext);
   const [assignments, setAssignments] = useState([]);
-  const [formData, setFormData] = useState({});
-  const [placeholders, setPlaceholders] = useState({});
+
+  // Used to manage form state
+  const [form] = Form.useForm();
 
   useEffect(() => {
-    if (!courseInfo.id) {
-      updateCourseInfo({ id: courseId });
-    }
-    fetchCourseData(courseId);
-  }, [courseId, courseInfo.id, updateCourseInfo]);
+    fetchCourseData();
+  }, []);
 
-  const fetchCourseData = async (id) => {
+  const fetchCourseData = async () => {
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_course_info?course_id=${id}`
-      );
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
-      const data = await response.json();
-      setFormData(data[0]);
-      setPlaceholders(data[0]);
-    } catch (error) {
-      console.error("Error fetching course data:", error);
+      const res = await getCourseInfo({course_id: courseId});
+      form.setFieldsValue(res.data[0]);
+    }
+    catch(error) {
+      console.error("Error fetching course data: ", error)
     }
   };
 
@@ -64,68 +55,25 @@ export default () => {
 
   const navigate = useNavigate();
 
-  const handleDeleteAllAssignments = (courseId) => {
-    if (!courseId) {
-      console.error("Course ID is undefined");
-      message.error("Cannot delete assignments without an ID");
-      return Promise.reject(new Error("Course ID is undefined"));
+  const handleDeleteAllAssignments = async (courseId) => {
+    try {
+      await deleteAllAssignments({"course_id": courseId});
+      message.success("All assignments deleted successfully");
     }
-
-    return fetch(
-      `${process.env.REACT_APP_API_URL}/delete_all_assignments?course_id=${courseId}`,
-      {
-        method: "DELETE",
-        mode: "cors",
-      }
-    )
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(
-            `Network response was not ok, status: ${response.status}`
-          );
-        }
-        return response.json();
-      })
-      .catch((error) => {
-        console.error(
-          "There has been a problem with the fetch operation:",
-          error
-        );
-        message.error("Failed to delete assignments");
-        return Promise.reject(error);
-      });
+    catch(error) {
+      console.error("Error deleting all assignments: ", error);
+    }
   };
 
-  const handleDeleteCourse = (courseId) => {
-    if (!courseId) {
-      console.error("Course ID is undefined");
-      message.error("Cannot delete course without an ID");
-      return Promise.reject(new Error("Course ID is undefined"));
+  const handleDeleteCourse = async (courseId) => {
+    try {
+      await deleteCourse({"course_id" : courseId});
+      message.success("Course deleted successfully");
+      navigateHome();
     }
-
-    return fetch(
-      `${process.env.REACT_APP_API_URL}/delete_course?course_id=${courseId}`,
-      {
-        method: "DELETE",
-        mode: "cors",
-      }
-    )
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(
-            `Network response was not ok, status: ${response.status}`
-          );
-        }
-        return response.json();
-      })
-      .catch((error) => {
-        console.error(
-          "There has been a problem with the fetch operation:",
-          error
-        );
-        message.error("Failed to delete course");
-        return Promise.reject(error);
-      });
+    catch (error) {
+      console.error("Error deleting course:", error);
+    }
   };
 
   const navigateHome = () => {
@@ -136,51 +84,33 @@ export default () => {
     navigate(`/instructorDashboard/${courseId}`);
   };
 
-  const handleCheckboxChange = (e) => {
-    const { name, checked } = e.target;
-    setFormData((prevFormData) => ({
-      ...prevFormData,
-      [name]: checked,
-    }));
-  };
-
-  const onFinish = () => {
+  const onFinish = async (values) => {
     const dataToSend = {
       course_id: courseId,
       ...Object.fromEntries(
-        Object.entries(formData).filter(([_, value]) => value !== undefined)
+        Object.entries(values).filter(([_, value]) => value !== undefined)
       ),
     };
-    fetch(process.env.REACT_APP_API_URL + "/update_course", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(dataToSend),
-    })
-      .then((response) => {
-        response.json();
-      })
-      .then((data) => {
-        console.log(data);
-      })
-      .catch((error) => {
-        console.log(error);
-      });
+
+    try {
+      await updateCourse(dataToSend);
+      message.success("Course updated successfully");
+      navigateMainPage();
+    } catch (error)  {
+      console.error("Error updating course:", error);
+    }
   };
 
   return (
     <Form
+      form={form} 
+      onFinish={onFinish}
       layout="vertical"
       wrapperCol={{
         lg: 12,
       }}
       style={{
         marginLeft: "20px",
-      }}
-      initialValues={formData}
-      onValuesChange={(changedValues, allValues) => {
-        setFormData(allValues);
       }}
     >
       <Space direction="vertical" style={{ width: "100%" }}>
@@ -192,33 +122,24 @@ export default () => {
           }}
         >
           <Form.Item label="ENTRY CODE" name="entryCode">
-            <Input placeholder={placeholders.entryCode || "Enter Entry Code"} />
+            <Input />
           </Form.Item>
-          <Form.Item label="ALLOW ENTRY CODE" wrapperCol={24}>
-            <Checkbox
-              name="allowEntryCode"
-              checked={formData.allowEntryCode}
-              onChange={handleCheckboxChange}
-            >
+          <Form.Item label="ALLOW ENTRY CODE" wrapperCol={24} name="allowEntryCode" valuePropName="checked" >
+            <Checkbox            >
               Allow students to enroll via course entry code
             </Checkbox>
           </Form.Item>
           <Form.Item label="COURSE NAME" name="name">
-            <Input placeholder={placeholders.name || "Enter Course Name"} />
+            <Input />
           </Form.Item>
           <Form.Item label="COURSE DESCRIPTION" name="description">
-            <Input.TextArea
-              placeholder={
-                placeholders.description || "Enter Course Description"
-              }
-            />
+            <Input.TextArea />
           </Form.Item>
           <Form.Item>
             <Row gutter={20}>
               <Col span={12}>
                 <Form.Item label="SEMESTER" name="semester" wrapperCol={24}>
                   <Select
-                    placeholder={placeholders.semester || "Select Semester"}
                     options={[
                       { value: "Spring" },
                       { value: "Summer" },
@@ -230,7 +151,7 @@ export default () => {
               </Col>
               <Col span={12}>
                 <Form.Item label="YEAR" name="year" wrapperCol={24}>
-                  <Input placeholder={placeholders.year || "Enter Year"} />
+                  <Input />
                 </Form.Item>
               </Col>
             </Row>
@@ -271,36 +192,10 @@ export default () => {
           <Space>
             <Button
               type="primary"
-              onClick={() => {
-                onFinish();
-                navigateMainPage();
-              }}
+              htmlType="submit"
             >
               Update Course
             </Button>
-            <Popover
-              trigger="click"
-              content={
-                assignments.length !== 0 && (
-                  <div style={{ width: "300px" }}>
-                    This course cannot be deleted, as it contains assignments.
-                    Delete the assignments and try again.
-                  </div>
-                )
-              }
-            >
-              <Button
-                type="primary"
-                icon={<DeleteOutlined />}
-                danger
-                onClick={() => {
-                  handleDeleteCourse();
-                  navigateHome();
-                }}
-              >
-                Delete Course
-              </Button>
-            </Popover>
             <Button type="primary">Deactivate</Button>
             <Button type="primary">Reactivate</Button>
           </Space>
@@ -312,18 +207,6 @@ export default () => {
               title="Are you sure you want to delete this course?"
               onConfirm={() => {
                 handleDeleteCourse(courseId)
-                  .then(() => {
-                    message.success("Course deleted");
-                    // Only navigate away if deletion was successful
-                    navigateHome();
-                  })
-                  .catch((error) => {
-                    if (error.response && error.response.status === 410) {
-                      message.error("Assignments must be deleted first");
-                    } else {
-                      message.error("Failed to delete course");
-                    }
-                  });
               }}
               okText="Yes"
               cancelText="No"
@@ -336,12 +219,6 @@ export default () => {
               title="Are you sure you want to delete all assignments?"
               onConfirm={() => {
                 handleDeleteAllAssignments(courseId)
-                  .then(() => {
-                    message.success("All assignments deleted");
-                  })
-                  .catch((error) => {
-                    message.error("Failed to delete all assignments");
-                  });
               }}
               okText="Yes"
               cancelText="No"

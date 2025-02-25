@@ -1,11 +1,8 @@
 import service from ".";
 
-export async function getInstructorCourses(params) {
-  return service("get_instructor_courses", params);
-}
-
-export async function getStudentCourses(params) {
-  return service("get_student_enrollments", params);
+// generalizable to both students and instructors
+export async function getUserEnrollments(params) {
+  return service("get_user_enrollments", params)
 }
 
 export async function createCourse(params) {
