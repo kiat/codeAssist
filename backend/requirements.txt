@@ -8,3 +8,6 @@ flask-marshmallow
 marshmallow-sqlalchemy
 Flask-Migrate
 openai
+pytest
+pytest-mock
+pytest-cov
