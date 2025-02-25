@@ -134,7 +134,7 @@ def upload_submission():
             timeout=autograder_timeout)
     except subprocess.TimeoutExpired:
         os.chdir(current_dir)
-        raise ServerTimeoutError("Autograder execution timed out")
+        raise ServerTimeoutError("Autograder execution timed out. Submitted program took too long to run.")
 
     if exec_proc.returncode != 0:
         os.chdir(current_dir)
