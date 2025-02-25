@@ -236,9 +236,9 @@ Example Output:
 
 Example input:
 
-{
-  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-}
+    {
+      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+    }
 
 ## DELETE /delete_all_assignments
 
@@ -250,9 +250,9 @@ Example input:
 
 Example input:
 
-{
-  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-}
+    {
+      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+    }
 
 ---
 
@@ -270,17 +270,17 @@ they were enrolled into.</p>
 
 Example input:
 
-{
-  "student_id": "a6888457-475a-47ab-8455-441cdd8b9744",
-  "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-}
+    {
+      "student_id": "a6888457-475a-47ab-8455-441cdd8b9744",
+      "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+    }
 
 Example output:
 
-{
-  "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
-  "student_id":"a6888457-475a-47ab-8455-441cdd8b9744"
-}
+    {
+      "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+      "student_id":"a6888457-475a-47ab-8455-441cdd8b9744"
+    }
 
 ## POST /update_role
 
@@ -292,20 +292,20 @@ Example output:
 
 Example input:
 
-{
-  "student_id": "ai38018",
-  "course_id": "840810"
-  "new_role": 1
-}
+    {
+      "student_id": "ai38018",
+      "course_id": "840810"
+      "new_role": 1
+    }
 
 Example output:
 
-{
-  "message": "Role update successfully"
-}
-{
-  "error": "Enrollment not found:
-}
+    {
+      "message": "Role update successfully"
+    }
+    {
+      "error": "Enrollment not found:
+    }
 
 ## POST, GET /create_enrollment_bulk
 
