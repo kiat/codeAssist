@@ -14,231 +14,138 @@ future will be used instead of the create_student and create_instructor routes.<
 
 Example input:
 
-    {
-      name: "Ricky Woodruff",
-      email: "woodruffr@utexas.edu",
-      password: "password",
-      eid: "rick123",
-      role: "0"
-    }
+{
+  name: "Ricky Woodruff",
+  email: "woodruffr@utexas.edu",
+  password: "password",
+  eid: "rick123",
+  role: "0"
+}
 
 Example Output(instructor):
 
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
+{
+  "email_address":"woodruffr@utexas.edu",
+  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+  "name":"Ricky Woodruff",
+  "password":"password",
+  "sis_user_id": "rick123"
+}
 
-## POST /update_account
+## GET, POST /user_login
+
+**Accepts JSON data**
+
+**Description**
+
+<p>Takes an email and password as input, and returns a 404 if no user is found, and returns all information related to the user.
+
+Example input:
+
+{
+  email: "woodruffr@utexas.edu",
+  password: "password",
+}
+
+Example Output:
+
+{
+  "email_address":"woodruffr@utexas.edu",
+  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+  "name":"Ricky Woodruff",
+  "password":"password",
+  "sis_user_id": "rick123"
+}
+
+
+## GET /get_users
+
+**Accepts Query String**
+
+**Description**
+
+<p>Returns JSON of attributes of a specified user given their email as a query paramter.<p>
+
+Example Input:
+
+{
+  "email": "woodruffr@utexas.edu"
+}
+
+Example Output:
+
+[{
+  "email_address":"woodruffr@utexas.edu",
+  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+  "name":"Ricky Woodruff",
+  "password":"password",
+  "sis_user_id": "rick123"
+}, 
+{
+  "email_address":"jeffross@utexas.edu",
+  "id":"a6984457-048a-44fb-8455-441jdnsk8b9847",
+  "name":"Jeff Ross",
+  "password":"password",
+  "sis_user_id": "at37810"
+}]
+
+
+## GET /get_user_by_id
+
+**Accepts Query String**
+
+**Description**
+
+<p>Returns JSON of attributes of a user given their id.<p>
+
+Example input:
+
+{
+  "id": "6025b3f6-ac5f-4ff9-9357-f5a7fc8a624b"
+}
+
+Example Output:
+
+{
+  "email_address":"woodruffr@utexas.edu",
+  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+  "name":"Ricky Woodruff",
+  "password":"password",
+  "sis_user_id": "rick123"
+}
+
+## PUT, POST /update_account
 
 **Accepts JSON data**
 
 **Description:**
 
 <p>Updates account details in the database based on what fields are inputted to
-change</p>
+change. Only name and password can be changed for any user.</p>
 
 Example input:
 
-    {
-      id:"a9872357-475a-47ab-8455-441cdd8b9744",
-      // Optionally include any fields to update
-    }
+{
+  id:"a9872357-475a-47ab-8455-441cdd8b9744",
+  // Optionally include any fields to update
+}
 
 Example Output:
 
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a9872357-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
+{
+  "email_address":"woodruffr@utexas.edu",
+  "id":"a9872357-475a-47ab-8455-441cdd8b9744",
+  "name":"Ricky Woodruff",
+  "password":"password",
+  "sis_user_id": "rick123"
+}
 
-# Student
 
-## POST /create_student
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Creates a student and generates an id in the database</p>
-
-Example input:
-
-    {
-      name: "Ricky Woodruff",
-      email: "woodruffr@utexas.edu",
-      password: "password",
-      eid: "rick123"
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-## POST /student_login
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Logs in a student that exists in the database into their account</p>
-
-Example input:
-
-    {
-      email: "woodruffr@utexas.edu",
-      password: "password",
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-## GET /get_student
-
-**Accepts Query String**
-
-**Description:**
-
-<p>Gets the student from the database based on the email put in</p>
-
-Example input:
-
-    {
-      email: "woodruffr@utexas.edu",
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-### GET /get_student_by_id
-
-**Accepts Query String**
-
-**Description:**
-
-<p>Gets the student from the database based on the student ID provided.</p>
-
-**Example Input:**
-
-    {
-      "id": "a6888457-475a-47ab-8455-441cdd8b9744"
-    }
-
-**Example Output:**
-
-    {
-      "email_address": "woodruffr@utexas.edu",
-      "id": "a6888457-475a-47ab-8455-441cdd8b9744",
-      "name": "Ricky Woodruff",
-      "sis_user_id": "rick123"
-    }
-
-# Instructor
-
-## POST /create_instructor
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Creates an instructor and generates an id in the database</p>
-
-Example input:
-
-    {
-      name: "Ricky Woodruff",
-      email: "woodruffr@utexas.edu",
-      password: "password",
-      eid: "rick123"
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-## POST /instructor_login
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Logs in an instructor that exists in the database to their account</p>
-
-Example input:
-
-    {
-      email: "woodruffr@utexas.edu",
-      password: "password",
-    }
-
-Example Output:
-
-    {
-      "email_address":"woodruffr@utexas.edu",
-      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "name":"Ricky Woodruff",
-      "password":"password",
-      "sis_user_id": "rick123"
-    }
-
-### GET /get_instructor_by_id
-
-**Accepts Query String**
-
-**Description:**
-
-<p>Gets the instructor from the database based on the instructor ID provided.</p>
-
-**Example Input:**
-
-    {
-      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
-    }
-
-**Example Output:**
-
-    {
-      "email_address": "woodruffr@utexas.edu",
-      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
-      "name": "Ricky Woodruff",
-      "sis_user_id": "rick123"
-    }
+---
 
 # Course
 
-## POST /create_course
+## POST, GET /create_course
 
 **Accepts JSON data**
 
@@ -249,24 +156,24 @@ for the course</p>
 
 Example input:
 
-    {
-      "name": "CS371L iOS Mobile Development",
-      "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
-      "semester" : "Spring",
-      "year" : "2024",
-      "entryCode": "ABC123"
-    }
+{
+  "name": "CS371L iOS Mobile Development",
+  "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
+  "semester" : "Spring",
+  "year" : "2024",
+  "entryCode": "ABC123"
+}
 
 Example output:
 
-    {
-      "id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
-      "name":"CS371L iOS Mobile Development",
-      "sis_course_id":null,
-      "semester" : "Spring",
-      "year" : "2024",
-      "entryCode": "ABC123"
-    }
+{
+  "id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+  "name":"CS371L iOS Mobile Development",
+  "sis_course_id":null,
+  "semester" : "Spring",
+  "year" : "2024",
+  "entryCode": "ABC123"
+}
 
 ## POST /enroll_course
 
@@ -280,17 +187,17 @@ if they have the entry code.</p>
 
 Example input:
 
-    {
-      student_id : "a6888457-475a-47ab-8455-441cdd8b9744",
-      entryCode: "ABC123"
-    }
+{
+  student_id : "a6888457-475a-47ab-8455-441cdd8b9744",
+  entryCode: "ABC123"
+}
 
 Example Output(enrollment):
 
-    {
-      "student_id": "a6888457-475a-47ab-8455-441cdd8b9744",
-      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-    }
+{
+  "student_id": "a6888457-475a-47ab-8455-441cdd8b9744",
+  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+}
 
 ## POST /update_course
 
@@ -302,22 +209,22 @@ Example Output(enrollment):
 
 Example input:
 
-    {
-      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-      // Optionally include any fields to update
-    }
+{
+  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+  // Optionally include any fields to update
+}
 
 Example Output:
 
-    {
-      "id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
-      "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
-      "name":"CS371L iOS Mobile Development",
-      "sis_course_id":null,
-      "semester" : "Spring",
-      "year" : "2024",
-      "entryCode": "ABC123"
-    }
+{
+  "id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+  "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
+  "name":"CS371L iOS Mobile Development",
+  "sis_course_id":null,
+  "semester" : "Spring",
+  "year" : "2024",
+  "entryCode": "ABC123"
+}
 
 ## DELETE /delete_course
 
@@ -329,9 +236,198 @@ Example Output:
 
 Example input:
 
+{
+  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+}
+
+## DELETE /delete_all_assignments
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Deletes all assignment from the database given a course ID.</p>
+
+Example input:
+
+{
+  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+}
+
+---
+
+# Enrollment
+
+## POST /create_enrollment
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Enrolls a student in a course by creating an enrollment in the database. 
+Enrollments in the database hold a student id and the matched id of the course
+they were enrolled into.</p>
+
+Example input:
+
+{
+  "student_id": "a6888457-475a-47ab-8455-441cdd8b9744",
+  "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+}
+
+Example output:
+
+{
+  "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+  "student_id":"a6888457-475a-47ab-8455-441cdd8b9744"
+}
+
+## POST /update_role
+
+**Accepts JSON data**
+
+**Description**
+
+<p>Updates the role of a user.<p>
+
+Example input:
+
+{
+  "student_id": "ai38018",
+  "course_id": "840810"
+  "new_role": 1
+}
+
+Example output:
+
+{
+  "message": "Role update successfully"
+}
+{
+  "error": "Enrollment not found:
+}
+
+## POST, GET /create_enrollment_bulk
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Mass enrolls multiple students in a course at once and creates enrollments in
+ the database for all of them.</p>
+
+Example input:
+
     {
-      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+      "course_id":"e575f3bc-bda6-4b14-a1aa-b93717425c59",
+      "student_ids": [
+        "177e9a44-8135-4b23-a99b-ad94e9694948",
+        "e5d5d204-f44f-4397-86a0-93ab49a5f817",
+        "70750539-1bce-400d-a5ee-2a580a96c0bd"
+      ]
     }
+
+Example output:
+
+    {
+      "message": "Success"
+    } // Check HTTP 200 response
+
+## GET /get_student_enrollments
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets all enrollments for a single student from the enrollments in the database.</p>
+
+Example input:
+
+    "student_id=a6888457-475a-47ab-8455-441cdd8b9744"
+
+Example output:
+
+    [
+      {
+        "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+        "student_id":"a6888457-475a-47ab-8455-441cdd8b9744"
+      }
+    ]
+
+## GET /get_course_enrollment
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets all students enrolled in a specific course and returns it in an array.</p>
+
+Example input:
+
+"course_id":"e575f3bc-bda6-4b14-a1aa-b93717425c59"
+
+Example output:
+
+    [
+      {
+        "email_address":"student@student.com",
+        "name":"Student 1"
+      },
+      {
+        "email_address":"student2@student.com",
+        "name":"Student 2"
+      },
+      {
+        "email_address":"student3@student.com",
+        "name":"Student 3"
+      }
+    ]
+
+## GET /get_course_assignments
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets all of the assignments for a course and returns them to the user in an array.</p>
+
+Example input:
+
+"course_id"="fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+
+Example output:
+
+[
+  {
+    "autograder_file":null,
+    "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+    "id":"dfbd967d-8951-4052-82aa-ce55b1d3d0e7",
+    "name":"Assignment 1"
+  }
+]
+
+## GET /get_instructor_courses
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets all the courses created by a certain instructor and returns it in an array</p>
+
+Example input:
+
+"instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
+
+Example output:
+
+[
+  {
+    "id":"a6b6b84e-5b4b-480b-8b75-5066e0c96d66",
+    "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
+    "name":"CS371L Mobile Computing",
+    "sis_course_id":null
+  }
+]
 
 ## GET /get_course_info
 
@@ -344,9 +440,9 @@ to the user.</p>
 
 Example Input:
 
-    {
-      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-    }
+{
+  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+}
 
 Example Output:
 
@@ -358,6 +454,39 @@ Example Output:
       "year" : "2024",
       "entryCode": "ABC123"
     }
+
+## GET /get_student_enrollment
+
+**Accepts Query String**
+
+**Description**
+
+Returns list of all students registered to a course given the course's unique id.
+
+Example Input:
+
+"course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+
+Example Output:
+
+[{
+  "email_address":"woodruffr@utexas.edu",
+  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+  "name":"Ricky Woodruff",
+  "password":"password",
+  "sis_user_id": "rick123"
+}, 
+{
+  "email_address":"jeffross@utexas.edu",
+  "id":"a6984457-048a-44fb-8455-441jdnsk8b9847",
+  "name":"Jeff Ross",
+  "password":"password",
+  "sis_user_id": "at37810"
+}]
+
+
+---
+
 
 # Assignment
 
@@ -462,79 +591,6 @@ Example output:
       "name":"A1",
       "published": false
     }
-
-# Enrollment
-
-## POST /create_enrollment
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Enrolls a student in a course by creating an enrollment in the database. 
-Enrollments in the database hold a student id and the matched id of the course
-they were enrolled into.</p>
-
-Example input:
-
-    {
-      "student_id": "a6888457-475a-47ab-8455-441cdd8b9744",
-      "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-    }
-
-Example output:
-
-    {
-      "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
-      "student_id":"a6888457-475a-47ab-8455-441cdd8b9744"
-    }
-
-## POST /create_enrollment_bulk
-
-**Accepts JSON data**
-
-**Description:**
-
-<p>Mass enrolls multiple students in a course at once and creates enrollments in
- the database for all of them.</p>
-
-Example input:
-
-    {
-      "course_id":"e575f3bc-bda6-4b14-a1aa-b93717425c59",
-      "student_ids": [
-        "177e9a44-8135-4b23-a99b-ad94e9694948",
-        "e5d5d204-f44f-4397-86a0-93ab49a5f817",
-        "70750539-1bce-400d-a5ee-2a580a96c0bd"
-      ]
-    }
-
-Example output:
-
-    {
-      "message": "Success"
-    } // Check HTTP 200 response
-
-## GET /get_student_enrollments
-
-**Accepts Query String**
-
-**Description:**
-
-<p>Gets all enrollments for a single student from the enrollments in the database.</p>
-
-Example input:
-
-    "student_id=a6888457-475a-47ab-8455-441cdd8b9744"
-
-Example output:
-
-    [
-      {
-        "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
-        "student_id":"a6888457-475a-47ab-8455-441cdd8b9744"
-      }
-    ]
 
 # Submissions
 
@@ -898,79 +954,160 @@ Example Output:
       "message": "Review updated successfully"
     }
 
-# Other
 
-## GET /get_course_assignments
+---
+
+# Old Endpoints Documentation
+
+# Student
+
+## POST /create_student
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Creates a student and generates an id in the database</p>
+
+Example input:
+
+    {
+      name: "Ricky Woodruff",
+      email: "woodruffr@utexas.edu",
+      password: "password",
+      eid: "rick123"
+    }
+
+Example Output:
+
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }
+
+## POST /student_login
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Logs in a student that exists in the database into their account</p>
+
+Example input:
+
+    {
+      email: "woodruffr@utexas.edu",
+      password: "password",
+    }
+
+Example Output:
+
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }
+
+## GET /get_student
 
 **Accepts Query String**
 
 **Description:**
 
-<p>Gets all of the assignments for a course and returns them to the user in an array.</p>
+<p>Gets the student from the database based on the email put in</p>
 
 Example input:
 
-    "course_id"="fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+{
+  email: "woodruffr@utexas.edu",
+}
 
-Example output:
+Example Output:
 
-    [
-      {
-        "autograder_file":null,
-        "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
-        "id":"dfbd967d-8951-4052-82aa-ce55b1d3d0e7",
-        "name":"Assignment 1"
-      }
-    ]
+{
+  "email_address":"woodruffr@utexas.edu",
+  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+  "name":"Ricky Woodruff",
+  "password":"password",
+  "sis_user_id": "rick123"
+}
 
-## GET /get_instructor_courses
+### GET /get_student_by_id
 
 **Accepts Query String**
 
 **Description:**
 
-<p>Gets all the courses created by a certain instructor and returns it in an array</p>
+<p>Gets the student from the database based on the student ID provided.</p>
+
+**Example Input:**
+
+{
+  "id": "a6888457-475a-47ab-8455-441cdd8b9744"
+}
+
+**Example Output:**
+
+{
+  "email_address": "woodruffr@utexas.edu",
+  "id": "a6888457-475a-47ab-8455-441cdd8b9744",
+  "name": "Ricky Woodruff",
+  "sis_user_id": "rick123"
+}
+
+# Instructor
+
+## POST /create_instructor
+
+**Accepts JSON data**
+
+**Description:**
+
+<p>Creates an instructor and generates an id in the database</p>
 
 Example input:
 
-    "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
+    {
+      name: "Ricky Woodruff",
+      email: "woodruffr@utexas.edu",
+      password: "password",
+      eid: "rick123"
+    }
 
-Example output:
+Example Output:
 
-    [
-      {
-        "id":"a6b6b84e-5b4b-480b-8b75-5066e0c96d66",
-        "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
-        "name":"CS371L Mobile Computing",
-        "sis_course_id":null
-      }
-    ]
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }
 
-## GET /get_course_enrollment
+### GET /get_instructor_by_id
 
 **Accepts Query String**
 
 **Description:**
 
-<p>Gets all students enrolled in a specific course and returns it in an array.</p>
+<p>Gets the instructor from the database based on the instructor ID provided.</p>
 
-Example input:
+**Example Input:**
 
-    "course_id":"e575f3bc-bda6-4b14-a1aa-b93717425c59"
+    {
+      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
+    }
 
-Example output:
+**Example Output:**
 
-    [
-      {
-        "email_address":"student@student.com",
-        "name":"Student 1"
-      },
-      {
-        "email_address":"student2@student.com",
-        "name":"Student 2"
-      },
-      {
-        "email_address":"student3@student.com",
-        "name":"Student 3"
-      }
-    ]
+    {
+      "email_address": "woodruffr@utexas.edu",
+      "id": "2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
+      "name": "Ricky Woodruff",
+      "sis_user_id": "rick123"
+    }
