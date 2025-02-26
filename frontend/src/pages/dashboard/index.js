@@ -9,7 +9,7 @@ import {
   createCourse,
   enrollCourse,
   getUserEnrollments,
-} from "../../services/dashboard";
+} from "../../services/course";
 import { Button, message, Form, Modal, Upload } from "antd";
 
 export default function Dashboard() {
