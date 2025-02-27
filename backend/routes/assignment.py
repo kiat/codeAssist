@@ -234,8 +234,6 @@ def delete_extension():
     else:
         return jsonify("Extension not deleted"), 404
 
-
-
 @assignment.route('/courses', methods=["GET"])
 @cross_origin()
 def get_courses():

@@ -10,15 +10,12 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const { courseInfo } = useContext(GlobalContext);
   
-  /** Fetch courses for the instructor */
   const getCourses = useCallback(async () => {
     try {
       const response = await axios.get(
         `${process.env.REACT_APP_API_URL}/courses?instructor_id=${courseInfo.instructor_id}`
       );
       setCourses(response.data);
-
-      // Automatically select a default course
       if (response.data.length > 0) {
         setSelectedCourseId(prevCourseId => prevCourseId || response.data[0].id);
       }
@@ -28,7 +25,6 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
     }
   }, [courseInfo.instructor_id]);
 
-  /** Fetch assignments for the selected course */
   const getAssignments = useCallback(async () => {
     if (!selectedCourseId) return;
 
@@ -41,19 +37,16 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
     }
   }, [selectedCourseId]);
 
-  /** When modal opens, load courses */
   useEffect(() => {
     if (open) {
       getCourses();
     }
   }, [open, getCourses]);
 
-  /** When selected course changes, load assignments */
   useEffect(() => {
     getAssignments();
   }, [selectedCourseId, getAssignments]);
 
-  /** Map courses & assignments to dropdown options */
   const courseOptions = courses.map(course => ({
     label: course.name,
     value: course.id,
@@ -64,7 +57,6 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
     value: assignment.id,
   }));
 
-  /** Handle form submission */
   const onFinish = async (values) => {
     try {
       const response = await axios.post(
@@ -78,7 +70,7 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
       console.log("Assignment duplicated successfully:", response.data);
       message.success("Assignment duplicated successfully");
       toggleCreateAssignmentModal();
-      getAssignments(); // Refresh the assignments list for the selected course
+      getAssignments();
       window.location.reload();
     } catch (error) {
       console.error("Error duplicating assignment:", error);
@@ -94,7 +86,6 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
       footer={null}
     >
       <Form layout="vertical" onFinish={onFinish}>
-        {/* Course selection dropdown */}
         <Form.Item label="Select Course">
           <Select
             style={{ width: "100%" }}
@@ -104,7 +95,6 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
           />
         </Form.Item>
 
-        {/* Assignment selection dropdown */}
         <Form.Item name="oldAssignment" label="Select Assignment to Duplicate">
           <Select
             style={{ width: "100%" }}
