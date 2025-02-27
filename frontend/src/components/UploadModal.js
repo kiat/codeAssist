@@ -4,7 +4,7 @@ import { useState, useContext, useEffect } from "react";
 import { GlobalContext } from "../App";
 import { useNavigate } from "react-router-dom";
 import LoadingOverlay from './LoadingOverlay'; // Import the LoadingOverlay component
-import { uploadSubmission } from "../services/assignmentResult";
+import { uploadSubmission } from "../services/submission";
 
 // changes made for resubmit functionality
 /**

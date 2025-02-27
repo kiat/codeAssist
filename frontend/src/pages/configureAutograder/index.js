@@ -19,7 +19,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
-import { uploadAssignmentAutograder } from "../../services/configureAutograder";
+import { uploadAssignmentAutograder } from "../../services/submission";
 import TestAutograder from "./TestAutograder";
 
 export default () => {
