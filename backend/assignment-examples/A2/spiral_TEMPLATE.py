@@ -8,7 +8,7 @@
   Partner Name:
   Partner UT EID:
 
-  Course Name: CS 313E
+  Course Name: 
   Unique Number: 
   Date Created:
   Date Last Modified:
