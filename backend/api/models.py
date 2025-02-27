@@ -48,6 +48,7 @@ class Assignment(db.Model):
     published_date = db.Column(TIMESTAMP, nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
     container_id = db.Column(db.String)
+    autograder_timeout = db.Column(db.Integer, default=300)
 
 class Submission(db.Model):
     __tablename__ = "submissions"

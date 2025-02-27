@@ -10,6 +10,11 @@ class InternalProcessingError(Exception):
     def __init__(self, message="Internal processing error"):
         super().__init__(message)
 
+class ServerTimeoutError(Exception):
+    status_code = 504
+    def __init__(self, message="Server timeout error"):
+        super().__init__(message)
+
 class ConflictError(Exception):
     status_code = 409
     def __init__(self, message="Conflict error"):
@@ -33,6 +38,10 @@ def register_error_handlers(app):
 
     @app.errorhandler(InternalProcessingError)
     def handle_file_processing_error(error):
+        return jsonify({"message": str(error)}), error.status_code
+    
+    @app.errorhandler(ServerTimeoutError)
+    def handle_server_timeout_error(error):
         return jsonify({"message": str(error)}), error.status_code
     
     @app.errorhandler(ConflictError)

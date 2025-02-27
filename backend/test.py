@@ -24,7 +24,7 @@ class APITestCase(unittest.TestCase):
         url = "http://localhost:5001/create_user"
         data = {
             "name": "Instructor Name",
-            "email": "instructor@email.com",
+            "email_address": "instructor@email.com",
             "password": "password",
             "eid": "unique-instructor-id",
             "role": "instructor"
@@ -38,7 +38,7 @@ class APITestCase(unittest.TestCase):
         url = "http://localhost:5001/create_user"
         data = {
             "name": "Ricky Woodruff",
-            "email": "ricky@student.com",
+            "email_address": "ricky@student.com",
             "password": "password",
             "eid": "unique-student-id",
             "role": "student"

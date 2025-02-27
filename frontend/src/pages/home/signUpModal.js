@@ -70,7 +70,7 @@ export default function SignUpModal({ open, onCancel }) {
         <Form.Item label="Name" name="name">
           <Input placeholder="Your Name" />
         </Form.Item>
-        <Form.Item label="Email" name="email">
+        <Form.Item label="Email" name="email_address">
           <Input placeholder="email@example.com" />
         </Form.Item>
         <Form.Item label="Password" name="password">
