@@ -94,6 +94,7 @@ def duplicate_assignment():
 
     old_assignment_ID = assignment_data.get("oldAssignmentId")
     new_name = assignment_data.get("newAssignmentTitle")
+    current_course_ID = assignment_data.get("currentCourseId")
 
     # Check old_assignment
     old_assignment = db.session.query(Assignment).filter_by(id=old_assignment_ID).one_or_none()
@@ -101,7 +102,7 @@ def duplicate_assignment():
         return jsonify({"error": "Old assignment not found"}), 404
     
     # Check for duplicate name
-    course_assignment = db.session.query(Assignment).filter_by(course_id=old_assignment.course_id, name=new_name).one_or_none()
+    course_assignment = db.session.query(Assignment).filter_by(course_id=current_course_ID, name=new_name).one_or_none()
     if course_assignment != None:
         return jsonify({"error": "An assignment with this name already exists in this course"}), 404
     
@@ -111,6 +112,7 @@ def duplicate_assignment():
     old_assignment_data = AssignmentSchema().dump(old_assignment)
     old_assignment_data['id'] = new_assignment_id
     old_assignment_data['name'] = new_name
+    old_assignment_data['course_id'] = current_course_ID
 
     new_assignment = Assignment(**old_assignment_data)
 
@@ -231,3 +233,17 @@ def delete_extension():
         return jsonify("Extension deleted successfully"), 200
     else:
         return jsonify("Extension not deleted"), 404
+
+
+
+@assignment.route('/courses', methods=["GET"])
+@cross_origin()
+def get_courses():
+    instructor_id = request.args.get("instructor_id")
+    if instructor_id:
+        courses = db.session.query(Course).filter_by(instructor_id=instructor_id).all()
+    else:
+        courses = db.session.query(Course).all()
+    
+    courses_data = CourseSchema().dump(courses, many=True)
+    return jsonify(courses_data)
