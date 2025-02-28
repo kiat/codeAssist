@@ -398,7 +398,7 @@ Example output:
 
 Example input:
 
-"course_id":"e575f3bc-bda6-4b14-a1aa-b93717425c59"
+    ?course_id=e575f3bc-bda6-4b14-a1aa-b93717425c59
 
 Example output:
 
@@ -427,7 +427,7 @@ Example output:
 
 Example input:
 
-"course_id"="fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+    ?course_id=fc8beca8-48b5-41ce-b89c-9b2b31103b72
 
 Example output:
 
@@ -451,9 +451,9 @@ to the user.</p>
 
 Example Input:
 
-    {
-      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-    }
+    
+      ?course_id=fc8beca8-48b5-41ce-b89c-9b2b31103b72
+    
 
 Example Output:
 
@@ -475,9 +475,9 @@ Example Output:
 <p>Returns list of all students registered to a course given the course's unique id.</p>
 
 Example Input:
-    {
-      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-    }
+    
+      ?course_id=fc8beca8-48b5-41ce-b89c-9b2b31103b72
+    
 
 Example Output:
 
@@ -608,9 +608,9 @@ Example Output:
 
 Example Input:
 
-    {
-      "assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
-    }
+    
+      ?assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7
+    
 
 Example Output:
 
@@ -627,9 +627,9 @@ Example Output:
 <p>Gets the assignment from the database and returns it</p>
 
 Example input:
-    {
-        "assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
-    }
+    
+        ?assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7
+    
 
 Example output:
 
@@ -680,10 +680,10 @@ Example Output:
 <p>Returns the extension for a student for a particular assingment.</p>
 
 Example Input:
-    {
-      assignment_id: "550e8400-e29b-41d4-a716-446655440000",
-      student_id: "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d"
-    }
+    
+      ?assignment_id=550e8400-e29b-41d4-a716-446655440000&
+      student_id=a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d
+    
 
 Example Output:
 
@@ -706,9 +706,9 @@ Example Output:
 <p>Returns the list of extension for an assignment.</p>
 
 Example Input:
-    {
-      "assignment_id": "770a0622-g41d-63f6-c938-668877662222"
-    }
+    
+      ?assignment_id=770a0622-g41d-63f6-c938-668877662222
+    
 
 
 Example Output:
@@ -742,9 +742,9 @@ Example Output:
 Example Input:
 
 Example Input:
-    {
-      "extension_id": "770a0622-g41d-63f6-c938-668877662222"
-    }
+    
+      ?extension_id=770a0622-g41d-63f6-c938-668877662222
+    
 
 Example Output:
     {
@@ -763,10 +763,10 @@ Example Output:
 
 Example Input:
 
-    {
-      "student_id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "assignment_id: "dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
-    }
+    
+      ?student_id=a6888457-475a-47ab-8455-441cdd8b9744&
+      assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7
+    
 
 Example Output:
 
@@ -796,10 +796,10 @@ Example Output:
 
 Example Input:
 
-    {
-      "student_id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "assignment_id: "dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
-    }
+    
+      ?student_id=a6888457-475a-47ab-8455-441cdd8b9744&
+      assignment_id: "dfbd967d-8951-4052-82aa-ce55b1d3d0e7
+    
 
 Example Output:
 
@@ -881,10 +881,10 @@ Example Output:
 
 Example Input:
 
-    {
-      "email":"tester123@example.com",
-      "assignment_id: "dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
-    }
+    
+      ?email=tester123@example.com&
+      assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7
+    
 
 Example Output:
 
@@ -910,10 +910,10 @@ Example Output:
 <p>Gets all latest submissions for an assignments based on course enrollement and assignment </p>
 
 Example Input:
-    {
-      "course_id"="fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-      "assignment_id"="dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
-    }
+    
+      ?course_id=fc8beca8-48b5-41ce-b89c-9b2b31103b72
+      assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7
+    
 
 Example Output:
     [
@@ -940,9 +940,9 @@ Example Output:
 <p>Returns all the submissions for a given assignment.</p>
 
 Example Input:
-    {
-      "assignment_id"="dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
-    }
+    
+      ?assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7
+    
   
 Example Output:
     [
@@ -984,9 +984,8 @@ Example Output:
 
 Example Input:
 
-    {
-      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c"
-    }
+      ?submission_id=176fafed-0a61-41fd-abf9-e055d58b950c
+    
 
 Example Output:
 
@@ -1006,9 +1005,9 @@ Example Output:
 
 Example Input:
 
-    {
-      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c"
-    }
+    
+      ?submission_id=176fafed-0a61-41fd-abf9-e055d58b950c
+    
 
 Example Output:
 
@@ -1036,10 +1035,10 @@ Example Output:
 
 Example Input:
 
-    {
-      "student_id":"a6888457-475a-47ab-8455-441cdd8b9744",
-      "assignmentId": "dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
-    }
+    
+      ?student_id=a6888457-475a-47ab-8455-441cdd8b9744&
+      assignmentId=dfbd967d-8951-4052-82aa-ce55b1d3d0e7
+    
 
 Example Output:
 
@@ -1115,9 +1114,9 @@ Example Output:
 
 Example input:
 
-    {
-      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c"
-    }
+    
+      ?submission_id=176fafed-0a61-41fd-abf9-e055d58b950c
+    
 
 Example Output:
 
@@ -1203,9 +1202,9 @@ Example Output:
 
 Example input:
 
-    {
-      "student_id": "a6888457-475a-47ab-8455-441cdd8b9744"
-    }
+    
+      ?student_id=a6888457-475a-47ab-8455-441cdd8b9744
+    
 
 Example Output:
 
@@ -1228,6 +1227,11 @@ Example Output:
 **Description:**
 
 <p>Gets all regrade requests for all assignments for an instructor.</p>
+
+Example Input:
+
+    ?course_id=a6888457-475a-47ab-8455-441cdd8b9744
+
 
 Example Output:
 
