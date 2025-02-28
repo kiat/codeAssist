@@ -32,7 +32,7 @@ Example Output(instructor):
       "sis_user_id": "rick123"
     }
 
-## GET, POST /user_login
+## GET /user_login
 
 **Accepts JSON data**
 
@@ -68,9 +68,7 @@ Example Output:
 
 Example Input:
 
-    {
-      "email": "woodruffr@utexas.edu"
-    }
+      ?email=woodruffr@utexas.edu
 
 Example Output:
 
@@ -100,9 +98,9 @@ Example Output:
 
 Example input:
 
-    {
-      "id": "6025b3f6-ac5f-4ff9-9357-f5a7fc8a624b"
-    }
+    
+      ?id=6025b3f6-ac5f-4ff9-9357-f5a7fc8a624b
+    
 
 Example Output:
 
@@ -145,7 +143,7 @@ Example Output:
 
 # Course
 
-## POST, GET /create_course
+## POST /create_course
 
 **Accepts JSON data**
 
@@ -236,9 +234,9 @@ Example Output:
 
 Example input:
 
-    {
-      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-    }
+    
+      ?course_id=fc8beca8-48b5-41ce-b89c-9b2b31103b72
+    
 
 ## DELETE /delete_all_assignments
 
@@ -250,9 +248,9 @@ Example input:
 
 Example input:
 
-    {
-      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-    }
+    
+      ?course_id=fc8beca8-48b5-41ce-b89c-9b2b31103b72
+    
 
 ---
 
@@ -307,7 +305,7 @@ Example output:
       "error": "Enrollment not found:
     }
 
-## POST, GET /create_enrollment_bulk
+## POST /create_enrollment_bulk
 
 **Accepts JSON data**
 
@@ -333,7 +331,43 @@ Example output:
       "message": "Success"
     } // Check HTTP 200 response
 
-## GET /get_student_enrollments
+
+## POST /create_enrollment_csv
+
+**Accepts Request File**
+
+**Description**
+
+Mass enrolls students using a csv file as input.
+
+Example Input:
+
+    File: "CS101-students.csv
+
+Example Output:
+
+    {
+      "success": true,
+      "enrolled_count": 3,
+      "course_id": "550e8400-e29b-41d4-a716-446655440000",
+      "enrolled_students": [
+        {
+          "student_id": "123456789",
+          "status": "enrolled"
+        },
+        {
+          "student_id": "987654321",
+          "status": "enrolled"
+        },
+        {
+          "student_id": "456789123",
+          "status": "enrolled"
+        }
+      ],
+      "message": "Successfully enrolled 3 students in the course."
+    }
+
+## GET /get_user_enrollments
 
 **Accepts Query String**
 
@@ -397,37 +431,14 @@ Example input:
 
 Example output:
 
-[
-  {
-    "autograder_file":null,
-    "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
-    "id":"dfbd967d-8951-4052-82aa-ce55b1d3d0e7",
-    "name":"Assignment 1"
-  }
-]
-
-## GET /get_instructor_courses
-
-**Accepts Query String**
-
-**Description:**
-
-<p>Gets all the courses created by a certain instructor and returns it in an array</p>
-
-Example input:
-
-"instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
-
-Example output:
-
-[
-  {
-    "id":"a6b6b84e-5b4b-480b-8b75-5066e0c96d66",
-    "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
-    "name":"CS371L Mobile Computing",
-    "sis_course_id":null
-  }
-]
+    [
+      {
+        "autograder_file":null,
+        "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+        "id":"dfbd967d-8951-4052-82aa-ce55b1d3d0e7",
+        "name":"Assignment 1"
+      }
+    ]
 
 ## GET /get_course_info
 
@@ -440,9 +451,9 @@ to the user.</p>
 
 Example Input:
 
-{
-  "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-}
+    {
+      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+    }
 
 Example Output:
 
@@ -461,28 +472,29 @@ Example Output:
 
 **Description**
 
-Returns list of all students registered to a course given the course's unique id.
+<p>Returns list of all students registered to a course given the course's unique id.</p>
 
 Example Input:
-
-"course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+    {
+      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+    }
 
 Example Output:
 
-[{
-  "email_address":"woodruffr@utexas.edu",
-  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-  "name":"Ricky Woodruff",
-  "password":"password",
-  "sis_user_id": "rick123"
-}, 
-{
-  "email_address":"jeffross@utexas.edu",
-  "id":"a6984457-048a-44fb-8455-441jdnsk8b9847",
-  "name":"Jeff Ross",
-  "password":"password",
-  "sis_user_id": "at37810"
-}]
+    [{
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }, 
+    {
+      "email_address":"jeffross@utexas.edu",
+      "id":"a6984457-048a-44fb-8455-441jdnsk8b9847",
+      "name":"Jeff Ross",
+      "password":"password",
+      "sis_user_id": "at37810"
+    }]
 
 
 ---
@@ -502,14 +514,14 @@ Example input:
 
     {
       "name":"Assignment 1",
-      "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+      "course_id":"CS101"
     }
 
 Example output:
 
     {
       "autograder_file": null,
-      "course_id":"fc8beca8-48b5-41ce-b89c-9b2b31103b72",
+      "course_id":"CS101",
       "id":"dfbd967d-8951-4052-82aa-ce55b1d3d0e7",
       "name":"Assignment 1",
       "published": false,
@@ -517,7 +529,7 @@ Example output:
       "autograder_points": null
     }
 
-## POST /update_assignment
+## POST, PUT /update_assignment
 
 **Accepts JSON data**
 
@@ -548,6 +560,44 @@ Example output:
       "autograder_points": 55.0
     }
 
+## POST /duplicate_assignment
+
+**Accepts JSON data**
+
+**Description**
+
+<p>Duplicates a pre-existing assignment with a new name.</p>
+
+Example Input:
+
+    {
+      "oldAssignmentId": "550e8400-e29b-41d4-a716-446655440000",
+      "newAssignmentTitle": "Duplicate of Assignment 1"
+    }
+
+Example Output:
+
+    {
+      "id": "660f9511-f30c-52e5-b827-557766551111",
+      "name": "Duplicate of Assignment 1",
+      "course_id": "98765432-abcd-efgh-ijkl-1234567890ab",
+      "due_date": "2025-03-15T23:59:59",
+      "anonymous_grading": false,
+      "enable_group": false,
+      "group_size": null,
+      "leaderboard": null,
+      "late_submission": true,
+      "late_due_date": "2025-03-20T23:59:59",
+      "manual_grading": false,
+      "autograder_points": 100.0,
+      "published": false,
+      "published_date": null,
+      "container_id": "docker-container-123",
+      "autograder_timeout": 300
+    }
+
+
+
 ## DELETE /delete_assignment
 
 **Accepts Query String**
@@ -577,8 +627,9 @@ Example Output:
 <p>Gets the assignment from the database and returns it</p>
 
 Example input:
-
-    "assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
+    {
+        "assignment_id=dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
+    }
 
 Example output:
 
@@ -590,6 +641,114 @@ Example output:
       "id":"dabe443b-b8b1-403a-92b6-003cfd0f4eb2",
       "name":"A1",
       "published": false
+    }
+
+## POST /create_extension
+
+**Accepts JSON Data**
+
+**Description**
+
+<p>Extends an assignment for a specific student.</p>
+
+Example Input:
+    {
+      "assignment_id": "550e8400-e29b-41d4-a716-446655440000",
+      "student_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+      "release_date_extension": "2025-03-01T00:00:00",
+      "due_date_extension": "2025-03-20T23:59:59",
+      "late_due_date_extension": "2025-03-25T23:59:59"
+    }
+
+
+Example Output:
+    {
+      "id": "770a0622-g41d-63f6-c938-668877662222",
+      "assignment_id": "550e8400-e29b-41d4-a716-446655440000",
+      "student_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+      "release_date_extension": "2025-03-01T00:00:00",
+      "due_date_extension": "2025-03-20T23:59:59",
+      "late_due_date_extension": "2025-03-25T23:59:59"
+    }
+
+## GET /get_extension
+
+**Accepts Query String**
+
+**Description**
+
+<p>Returns the extension for a student for a particular assingment.</p>
+
+Example Input:
+    {
+      assignment_id: "550e8400-e29b-41d4-a716-446655440000",
+      student_id: "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d"
+    }
+
+Example Output:
+
+    {
+      "id": "770a0622-g41d-63f6-c938-668877662222",
+      "assignment_id": "550e8400-e29b-41d4-a716-446655440000",
+      "student_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+      "release_date_extension": "2025-03-01T00:00:00",
+      "due_date_extension": "2025-03-20T23:59:59",
+      "late_due_date_extension": "2025-03-25T23:59:59"
+    }
+
+
+## GET /get_assignment_extensions
+
+**Accepts Query String**
+
+**Description**
+
+<p>Returns the list of extension for an assignment.</p>
+
+Example Input:
+    {
+      "assignment_id": "770a0622-g41d-63f6-c938-668877662222"
+    }
+
+
+Example Output:
+    [
+      {
+        "id": "770a0622-g41d-63f6-c938-668877662222",
+        "assignment_id": "550e8400-e29b-41d4-a716-446655440000",
+        "student_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+        "release_date_extension": "2025-03-01T00:00:00",
+        "due_date_extension": "2025-03-20T23:59:59",
+        "late_due_date_extension": "2025-03-25T23:59:59"
+      },
+      {
+        "id": "880b1733-h52e-74g7-d049-779988773333",
+        "assignment_id": "550e8400-e29b-41d4-a716-446655440000",
+        "student_id": "b2c3d4e5-f6g7-5b6c-9d0e-0f1a2b3c4d5e",
+        "release_date_extension": "2025-03-02T00:00:00",
+        "due_date_extension": "2025-03-22T23:59:59",
+        "late_due_date_extension": "2025-03-27T23:59:59"
+      }
+    ]
+
+## DELETE /delete_extension
+
+**Accepts Query String**
+
+**Description**
+
+<p>Deletes an extension from an assignment.</p>
+
+Example Input:
+
+Example Input:
+    {
+      "extension_id": "770a0622-g41d-63f6-c938-668877662222"
+    }
+
+Example Output:
+    {
+      "message": "Extension deleted successfully!"
     }
 
 # Submissions
@@ -611,7 +770,7 @@ Example Input:
 
 Example Output:
 
-    {
+    [
       {
         "id": "176fafed-0a61-41fd-abf9-e055d58b950c",
         "student_id":"a6888457-475a-47ab-8455-441cdd8b9744",
@@ -620,10 +779,12 @@ Example Output:
         "results": [binary data],
         "score": "90",
         "execution_time": "11.015512943267822",
-        "executed_at": "2023-08-09 04:39:27",
+        "submitted_at": "2023-08-09 04:39:27",
+        "submission_number": 1,
+        "active": "true"
         "completed": "true"
       }
-    }
+    ]
 
 ## GET /get_latest_submission
 
@@ -631,8 +792,7 @@ Example Output:
 
 **Description:**
 
-<p>Gets the latest submission by a student for an assignment based on the time 
-it was executed at.</p>
+<p>Gets the latest submission by a student for an assignment based on the time it was executed at.</p>
 
 Example Input:
 
@@ -661,8 +821,7 @@ Example Output:
 
 **Description:**
 
-<p>Uploads a submission by a student for an assignment into the database. A id 
-for the submission is generated.</p>
+<p>Uploads a submission by a student for an assignment into the database. A id for the submission is generated.</p>
 
 Example Input:
 
@@ -692,8 +851,7 @@ Example Output:
 
 **Description:**
 
-<p>Uploads an autograder for an assignment into the database. It is saved as one 
-of the parts of the assignment it is for in the database.</p>
+<p>Uploads an autograder for an assignment into the database. It is saved as one of the parts of the assignment it is for in the database.</p>
 
 Example Input:
 
@@ -719,8 +877,7 @@ Example Output:
 
 **Description:**
 
-<p>Gets the results of the latest submission by a student for an assignment for
-instructor use.</p>
+<p>Gets the results of the latest submission by a student for an assignment for instructor use.</p>
 
 Example Input:
 
@@ -746,31 +903,182 @@ Example Output:
 
 
 # GET /get_course_assignment_latest_submissions
+
 **Accepts Query String**
 
 **Description:**
 <p>Gets all latest submissions for an assignments based on course enrollement and assignment </p>
 
 Example Input:
-{
-  "course_id"="fc8beca8-48b5-41ce-b89c-9b2b31103b72"
-  "assignment_id"="dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
-}
+    {
+      "course_id"="fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+      "assignment_id"="dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
+    }
+
 Example Output:
-  [
-  {
-    "email_address": "test2@example.com",
-    "executed_at": "Thu, 30 Nov 2023 20:02:55 GMT",
-    "score": 90.0,
-    "student_name": "test 2"
-  },
-  {
-    "email_address": "tester123@example.com",
-    "executed_at": "Thu, 30 Nov 2023 19:48:13 GMT",
-    "score": 90.0,
-    "student_name": "Test"
-  }
-]
+    [
+      {
+        "email_address": "test2@example.com",
+        "executed_at": "Thu, 30 Nov 2023 20:02:55 GMT",
+        "score": 90.0,
+        "student_name": "test 2"
+      },
+      {
+        "email_address": "tester123@example.com",
+        "executed_at": "Thu, 30 Nov 2023 19:48:13 GMT",
+        "score": 90.0,
+        "student_name": "Test"
+      }
+    ]
+
+## GET /get_all_assignment_submissions
+
+**Accepts Query String**
+
+**Description**
+
+<p>Returns all the submissions for a given assignment.</p>
+
+Example Input:
+    {
+      "assignment_id"="dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
+    }
+  
+Example Output:
+    [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "file_name": "assignment1_solution.py",
+        "submission_number": 3,
+        "submitted_at": "2025-02-27T17:30:45",
+        "student_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+        "assignment_id": "98765432-abcd-efgh-ijkl-1234567890ab",
+        "score": 92.5,
+        "execution_time": 0.87,
+        "active": true,
+        "completed": true
+      },
+      {
+        "id": "660f9511-f30c-52e5-b827-557766551111",
+        "file_name": "assignment1_attempt2.py",
+        "submission_number": 2,
+        "submitted_at": "2025-02-27T16:45:30",
+        "student_id": "b2c3d4e5-f6g7-5b6c-9d0e-0f1a2b3c4d5e",
+        "assignment_id": "98765432-abcd-efgh-ijkl-1234567890ab",
+        "score": 85.0,
+        "execution_time": 1.02,
+        "active": false,
+        "completed": true
+      }
+    ]
+
+
+
+## DELETE /delete_submission
+
+**Accepts Query String**
+
+**Description**
+
+<p>Deletes a submission from the database.</p>
+
+Example Input:
+
+    {
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c"
+    }
+
+Example Output:
+
+    {
+      "message": "Submission successfully deleted"
+    }
+
+
+
+## GET /get_submission_details
+
+**Accepts Query String**
+
+**Description**
+
+<p>Retrieves submission details for a specific submisison given its submission id.</p>
+
+Example Input:
+
+    {
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c"
+    }
+
+Example Output:
+
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "file_name": "assignment2_solution.py",
+      "submission_number": 3,
+      "submitted_at": "2025-02-27T17:30:45",
+      "student_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+      "assignment_id": "98765432-abcd-efgh-ijkl-1234567890ab",
+      "score": 92.5,
+      "execution_time": 0.87,
+      "active": true,
+      "completed": true
+    }
+
+
+## GET /get_active_submission
+
+**Accepts Query String**
+
+**Description**
+
+<p>Gets the active submissions for a student for an assignment given their student id and their assingment id.</p>
+
+Example Input:
+
+    {
+      "student_id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "assignmentId": "dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
+    }
+
+Example Output:
+
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "file_name": "assignment1_solution.py",
+      "submission_number": 2,
+      "submitted_at": "2025-02-27T17:15:30",
+      "student_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+      "assignment_id": "98765432-abcd-efgh-ijkl-1234567890ab",
+      "score": 85.5,
+      "execution_time": 1.23,
+      "active": true,
+      "completed": true
+    }
+
+## POST /activate_submission
+
+**Accepts JSON data**
+
+**Description**
+
+<p>Activates a submission and deactivates any currently active submission for the same assignment and student. </p>
+
+Example Input:
+
+    {
+      "submission_id": "176fafed-0a61-41fd-abf9-e055d58b950c",
+      "student_id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "assignmentId": "dfbd967d-8951-4052-82aa-ce55b1d3d0e7"
+    }
+
+Example Output:
+
+    {
+      "message": "Submission activated successfully",
+      "error": "Error message"
+    }
+
 
 # Regrade Requests
 
@@ -1023,19 +1331,19 @@ Example Output:
 
 Example input:
 
-{
-  email: "woodruffr@utexas.edu",
-}
+    {
+      email: "woodruffr@utexas.edu",
+    }
 
 Example Output:
 
-{
-  "email_address":"woodruffr@utexas.edu",
-  "id":"a6888457-475a-47ab-8455-441cdd8b9744",
-  "name":"Ricky Woodruff",
-  "password":"password",
-  "sis_user_id": "rick123"
-}
+    {
+      "email_address":"woodruffr@utexas.edu",
+      "id":"a6888457-475a-47ab-8455-441cdd8b9744",
+      "name":"Ricky Woodruff",
+      "password":"password",
+      "sis_user_id": "rick123"
+    }
 
 ### GET /get_student_by_id
 
@@ -1047,18 +1355,18 @@ Example Output:
 
 **Example Input:**
 
-{
-  "id": "a6888457-475a-47ab-8455-441cdd8b9744"
-}
+    {
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744"
+    }
 
 **Example Output:**
 
-{
-  "email_address": "woodruffr@utexas.edu",
-  "id": "a6888457-475a-47ab-8455-441cdd8b9744",
-  "name": "Ricky Woodruff",
-  "sis_user_id": "rick123"
-}
+    {
+      "email_address": "woodruffr@utexas.edu",
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744",
+      "name": "Ricky Woodruff",
+      "sis_user_id": "rick123"
+    }
 
 # Instructor
 
@@ -1111,3 +1419,28 @@ Example Output:
       "name": "Ricky Woodruff",
       "sis_user_id": "rick123"
     }
+
+
+## GET /get_instructor_courses
+
+**Accepts Query String**
+
+**Description:**
+
+<p>Gets all the courses created by a certain instructor and returns it in an array</p>
+
+Example input:
+    {
+      "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8"
+    }
+
+Example output:
+
+    [
+      {
+        "id":"a6b6b84e-5b4b-480b-8b75-5066e0c96d66",
+        "instructor_id":"2398ef4a-6c1c-42be-8309-d77f3f7d75f8",
+        "name":"CS371L Mobile Computing",
+        "sis_course_id":null
+      }
+    ]
