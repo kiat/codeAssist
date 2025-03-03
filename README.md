@@ -16,12 +16,6 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
 - `docker` ([Install](https://docs.docker.com/get-docker/))
 - npm ([Install](https://nodejs.org/en/download))
 - `postgresql` ([Install](https://www.postgresql.org/download/)) (Hold off on downloading this into your system until seeing the steps below)
-- `pip3 install -r ./backend/requirements.txt`
-- `docker-compose`
-
-    ```bash
-    pip3 install docker-compose
-    ```
 
 ### Setup:
 
@@ -29,12 +23,9 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     ```bash
     git clone https://github.com/kiat/codeAssist.git
     ```
-2. Run the following:
-    ```bash
-    pip3 install -r ./backend/requirements.txt
+2. Run the following to install backend and frontend dependencies:    
     ```
-    ```bash
-    cd frontend; npm install; cd ..
+    make install
     ```
 3. Create a `.env` file in the frontend directory (don't forget to take out the curly braces)
     ```bash
@@ -42,7 +33,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     ```
     In your `.env` file, add this React environment variable:
 
-    ```bash
+    ```
     REACT_APP_API_URL={where your backend is hosted}
     ```
 
@@ -57,7 +48,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     `Username: postgres`  
     `Password: postgres`  
 
-7. In this newly created server, create a new database. Name it `codeassist`. This is important for init_db.py
+7. In this newly created server, create a new database. Name it `codeassist`. This is important for `init_db.py`
 
 8. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
 
@@ -90,6 +81,14 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
 Notes: 
 - Make sure Postgres is not running on your system (otherwise you will get errors launching the postgres container because the port will conflict). You can either uninstall postgres completely from your system or just kill the run
 - Once again, if you are on macOS, make sure to turn off Airplay because it also runs on `localhost:5000`, otherwise Flask won't run!
+
+## Testing
+**As of 3/3/2025, only backend tests have started being written.
+
+To run tests, run the the following from root directory:
+```
+make test
+```
 
 
 ## Using [Hoppscotch](https://docs.hoppscotch.io/documentation/getting-started/introduction)

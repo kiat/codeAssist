@@ -1,3 +1,4 @@
+# CodeAssist Error Handling
 *This document is currently a work in progress. However, all error handling standards that have already been established should be followed.*
 
 ### **Error Handling Frameworks in Use**
@@ -18,9 +19,9 @@
 
 ### **General Endpoint Guidelines**
 
-- Always check that all necessary response fields or arguments are present at the start of the method, otherwise raise 400 BadRequest
+- Always check that all necessary response fields or arguments are present at the start of the method, otherwise raise `400 BadRequest`
 - Whenever making changes to a database (create, delete, edit), remember to try/catch and rollback in the case of a failure
-- When adding with a unique field constraint(s), always query the database first to see if it already exists rather than falling through and allowing the add to fail. Raise 409 ConflictingError in this case.
+- When adding with a unique field constraint(s), always query the database first to see if it already exists rather than falling through and allowing the add to fail. Raise `409 ConflictError` in this case.
 - Make sure to use error and success codes consistently, [reference](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
 
 
