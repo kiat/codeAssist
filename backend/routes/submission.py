@@ -1,5 +1,4 @@
 import uuid
-import docker_client
 import json
 import sys
 from werkzeug.utils import secure_filename
