@@ -136,8 +136,8 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         try:
             ai_feedback_json = json.loads(cleaned_text)
             
-            print("AI FEEDBACK:")
-            print(ai_feedback_json)
+            print("AI Feedback:")
+            print(json.dumps(ai_feedback_json, indent=4))
         except Exception as parse_error:
             print("AI FEEDBACK FAILED")
 
@@ -152,9 +152,11 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         print(cleaned_text)
 
     # Update the submission record in the DB with the AI feedback.
-    # submission_record = Submission.query.get(submission_id)
-    # submission_record.ai_feedback = json.dumps(ai_feedback_json)
-    # db.session.commit()
+    submission_record = Submission.query.get(submission_id)
+    submission_record.ai_feedback = json.dumps(ai_feedback_json)
+    db.session.commit()
+
+    
     ctx.pop()
 
     
@@ -239,7 +241,7 @@ def upload_submission():
         active=True,
         completed=True,
         submission_number=submission_count + 1,
-        # ai_feedback=None  # Initially no AI feedback
+        ai_feedback=None  # Initially no AI feedback
     )
     db.session.add(new_submission)
     db.session.commit()
