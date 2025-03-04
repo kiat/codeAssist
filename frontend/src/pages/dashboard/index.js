@@ -21,29 +21,27 @@ export default function Dashboard() {
   const addCourseButtonStyle = {
     border: "1px dashed green",
     width: "230px",
-    height: "125px",
+    height: "138px",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     color: "green",
-    fontSize: "bold",
+    fontWeight: "bold", 
+    fontSize: "16px", 
     cursor: "pointer",
     boxSizing: "border-box",
-    padding: "10px",
-    margin: "0 10px 20px 0",
-    flex: "0 0 auto",
-  };
-
-  const courseContainerStyle = {
-    paddingTop: "30px",
+    flexShrink: 0, 
+    textAlign: "center",
   };
 
   const courseHeaderStyle = {
-    marginLeft: "25px",
     display: "flex",
     flexWrap: "wrap",
     gap: "20px",
     alignItems: "flex-start",
+    justifyContent: "flex-start", 
+    width: "100%", 
+    paddingLeft: "30px"
   };
 
   // Toggle the visibility of the course modal
@@ -56,7 +54,7 @@ export default function Dashboard() {
     const formattedCourses = {};
     coursesArray.forEach((course) => {
       const { semester, year, name, assignments, id } = course;
-      const key = `${year}${semester}`; // Assuming year and semester are always present
+      const key = `${year}${semester}`;
       if (!formattedCourses[key]) {
         formattedCourses[key] = [];
       }
@@ -122,23 +120,40 @@ export default function Dashboard() {
     <>
       <PageHeader title="Your Courses" />
       <div style={courseHeaderStyle}>
-        {Object.keys(courses)
-          .sort((a, b) => b.localeCompare(a))
-          .map((key, index) => (
-            <SemesterCourses
-              key={key}
-              yearInfo={key}
-              semesterInfo={courses[key]}
-              courseGroup={index}
-              numCourses={Object.keys(courses).length}
-            />
-          ))}
-        <div style={courseContainerStyle}>
-          <div style={addCourseButtonStyle} onClick={toggleModal}>
-            + Add a course
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "40px", paddingLeft: "30px", width: "100%" }}>
+          {Object.keys(courses)
+            .sort((a, b) => b.localeCompare(a))
+            .map((key, index) => {
+              // extract year and semester
+              const matches = key.match(/(\d{2,4})(Spring|Summer|Fall|Winter)/);
+              const year = matches ? matches[1] : key;
+              const semester = matches ? matches[2] : "";
+
+              return (
+                <div key={key} style={{ width: "100%" }}>
+                  <h3 style={{ fontWeight: "bold", fontSize: "20px", marginBottom: "10px" }}>
+                    {semester} {year} 
+                  </h3>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "center" }}>
+                    {courses[key].map((course, idx) => (
+                      <SemesterCourses
+                        key={idx}
+                        yearInfo={key}
+                        semesterInfo={[course]}
+                        courseGroup={index}
+                        numCourses={Object.keys(courses).length}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            <div style={addCourseButtonStyle} onClick={toggleModal}>
+              + Add a course
+            </div>
         </div>
       </div>
+
       <CourseModal title="ADD COURSE" open={isModalOpen} onCancel={toggleModal}>
         {userInfo?.isStudent ? (
           <RelationForm onFinish={handleAddCourse} onCancel={toggleModal} />

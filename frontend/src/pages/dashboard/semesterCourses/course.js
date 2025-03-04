@@ -2,26 +2,38 @@
   import { useNavigate } from "react-router-dom";
   import { GlobalContext } from "../../../App";
 
-  // Consider extracting styles for better maintainability and performance
-  const courseStyle = {
-      width: "230px",
-      marginRight: "15px",
-      marginBottom: "15px",
-      cursor: "pointer",
-  };
+const courseStyle = {
+    width: "230px",
+    height: "140px",
+    cursor: "pointer",
+    overflow: "hidden", 
+    boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.1)",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    backgroundColor: "#F5F5F5",
+};
 
-  const courseHeaderStyle = {
-      backgroundColor: "#f0f2f5",
-      height: "85px",
-      paddingLeft: "10px",
-  };
+const courseHeaderStyle = {
+    backgroundColor: "#f0f2f5",
+    height: "85px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    padding: "10px",
+    fontWeight: "bold",
+    fontSize: "16px",
+    color: "#333",
+};
 
-  const courseFooterStyle = {
-      backgroundColor: "#1b807c",
-      paddingLeft: "10px",
-      lineHeight: "40px",
-      color: "white",
-  };
+const courseFooterStyle = {
+    backgroundColor: "#1b807c",
+    color: "white",
+    textAlign: "center",
+    padding: "12px", 
+    fontSize: "14px",
+    fontWeight: "bold", 
+};
 
   /**
    * Displays a single course with navigation based on user role
@@ -47,15 +59,14 @@
           navigate(destination);
       }
 
-      return (
-          <div style={courseStyle} onClick={handleCourseClick}>
-              <div style={courseHeaderStyle}>
-                  <h3>{code}</h3>
-                  <span>{name}</span>
-              </div>
-              <div style={courseFooterStyle}>
-                  {assignments} assignments
-              </div>
-          </div>
-      );
-  }
+    return (
+        <div style={courseStyle} onClick={handleCourseClick}>
+            <div style={courseHeaderStyle}>
+                <span>{name}</span>
+            </div>
+            <div style={courseFooterStyle}>
+                {assignments} Assignments
+            </div>
+        </div>
+    );
+}
