@@ -1,16 +1,14 @@
 import pytest
-from unittest.mock import MagicMock
-from flask import Flask
-from routes.assignment import assignment
-from api.models import Assignment, Submission, RegradeRequest, AssignmentExtension, Course
+from api import create_app
+from api.models import Assignment, Submission, AssignmentExtension, Course
 
 @pytest.fixture
 def app():
     """Create a Flask app with the assignment blueprint for testing."""
-    app = Flask(__name__)
-    app.config["TESTING"] = True
-    app.register_blueprint(assignment, url_prefix="/")
-    return app
+    app = create_app(config_class="config.TestConfig")
+
+    with app.app_context():
+        yield app
 
 @pytest.fixture
 def client(app):
@@ -35,7 +33,7 @@ def test_update_assignment_success(client, mocker):
 
 def test_update_assignment_duplicate_name(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
-    mock_query.return_value.filter.return_value.first.return_value = MagicMock()
+    mock_query.return_value.filter.return_value.first.return_value = mocker.Mock()
 
     data = {
         "assignment_id": "some-uuid",
@@ -64,10 +62,14 @@ def test_get_assignment_success(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_assignment = Assignment(id="assignment-uuid", name="Test Assignment")
     mock_query.return_value.filter_by.return_value = mock_assignment
+
     resp = client.get("/get_assignment?assignment_id=assignment-uuid")
+
     assert resp.status_code == 200
     assert resp.json["id"] == "assignment-uuid"
     assert resp.json["name"] == "Test Assignment"
+
+    mock_query.return_value.filter_by.assert_called_once_with(id="assignment-uuid")
 
 def test_get_assignment_empty(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
@@ -97,7 +99,7 @@ def test_create_assignment_success(client, mocker):
 
 def test_create_assignment_duplicate(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
-    mock_query.return_value.filter_by.return_value.one_or_none.return_value = MagicMock()
+    mock_query.return_value.filter_by.return_value.one_or_none.return_value = mocker.Mock()
 
     data = {"name": "Duplicate", "course_id": "course-uuid"}
     resp = client.post("/create_assignment", json=data)
@@ -145,7 +147,7 @@ def test_duplicate_assignment_name_conflict(client, mocker):
     old_assignment = Assignment(id="old-id", name="Old")
     mock_query.return_value.filter_by.return_value.one_or_none.side_effect = [
         old_assignment,
-        MagicMock()
+        mocker.Mock()
     ]
     data = {
         "oldAssignmentId": "old-id",
