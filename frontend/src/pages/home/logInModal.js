@@ -33,9 +33,7 @@ export default function LogInModal({ open, onCancel, logIn }) {
         updateUserInfo(userInfo);
       } 
     } catch (error) {
-      if (error.response) {
-        alert('User authentication failed. Invalid Username/Password combination');
-      }
+      console.log("error", error);
     }
   };
   return (

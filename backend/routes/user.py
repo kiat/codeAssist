@@ -58,17 +58,21 @@ def create_user():
     response = jsonify(res)
     return response, 201
 
-@user.route('/user_login', methods = ["GET", "POST"])
+@user.route('/user_login', methods = ["POST"])
 @cross_origin()
 def user_login():
     email = request.json['email']
     password = request.json['password']
 
+    if not email or email == "" or not password or password == "":
+        raise BadRequestError("Missing email or password")
+
     res = db.session.query(User).filter_by(email_address=email, password=password).first()
-    res = UserSchema().dump(res)
 
     if not res:
-        return "No user found", 404
+        raise NotFoundError("Email and password combination not found")
+    
+    res = UserSchema().dump(res)
 
     return jsonify(res)
 
