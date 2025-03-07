@@ -1,10 +1,5 @@
 import pytest
-from flask import Flask
-from routes.user import user
 from api import create_app
-
-from routes import user
-
 
 @pytest.fixture
 def app():
@@ -57,7 +52,7 @@ def test_create_user_post(client, mocker):
     mock_add.assert_called_once()
 
 
-def test_user_login_success(client, mock_user_query):
+def test_user_login_success(client, mock_user_query, mocker):
     """Test the /user_login route with valid credentials."""
     mock_query, mock_user_schema = mock_user_query
     
