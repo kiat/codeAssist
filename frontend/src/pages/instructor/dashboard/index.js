@@ -95,7 +95,7 @@ export default function InstructorDashboard() {
       }
     };
     initFetch();
-  }, [courseId, courseInfo, updateCourseInfo]);
+  }, [courseId, courseInfo.id, courseInfo.name, courseInfo.year, courseInfo.semester, courseInfo.entryCode, courseInfo.description, updateCourseInfo]);
 
   if (!courseInfo.id) return null;
 
@@ -110,7 +110,7 @@ export default function InstructorDashboard() {
         <h3>DESCRIPTION</h3>
         <Divider style={{ marginTop: 0, marginBottom: "5px" }} />
         <div>
-          {courseId.description === "" ? (
+          {courseInfo.description === "" ? (
             <div>
               <span>Edit your course description on the </span>
               <Link to={`/courseSettings/${courseId}`}>Course Settings</Link>
