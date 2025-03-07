@@ -1,5 +1,6 @@
 import pytest
 from api import create_app
+from util.errors import BadRequestError, NotFoundError, ConflictError
 
 @pytest.fixture
 def app():
@@ -26,14 +27,15 @@ def mock_user_query(mocker):
 
 # Test cases
 
-def test_create_user_post(client, mocker):
+def test_create_user_success(client, mocker, mock_user_query):
     """Test the /create_user route."""
-    
+
+    mock_query, mock_user_schema = mock_user_query
     mock_commit = mocker.patch("routes.user.db.session.commit")
     mock_add = mocker.patch("routes.user.db.session.add")
-    mock_user_schema = mocker.patch("routes.user.UserSchema")
 
     mock_user_schema.return_value.dump.return_value = {"id": "123", "name": "John Doe"}
+    mock_query.return_value.filter_by.return_value.first.return_value = None
 
     payload = {
         "name": "John Doe",
@@ -51,8 +53,69 @@ def test_create_user_post(client, mocker):
     mock_commit.assert_called_once()
     mock_add.assert_called_once()
 
+    assert mock_query.return_value.filter_by.call_count == 2
 
-def test_user_login_success(client, mock_user_query, mocker):
+def test_create_user_missing_fields(client):
+    payload = {"name": "John Doe"}  # Missing 'password', 'email', etc.
+    
+    response = client.post("/create_user", json=payload)
+
+    assert response.status_code == 400
+    assert response.json["message"] == "Missing required fields"
+
+def test_create_user_duplicate_eid(client, mock_user_query):
+    """Test creating a user with a duplicate EID."""
+    mock_query, _ = mock_user_query
+
+    mock_query.return_value.fiter_by.return_value.first.side_effect = True
+    
+    payload = {
+        "name": "John Doe",
+        "password": "password123",
+        "email_address": "example@email.com",
+        "eid": "duplicate",
+        "role": "student",
+    }
+
+    response = client.post("/create_user", json=payload)
+
+    assert response.status_code == 409
+    assert response.json["message"] == "EID already in use"
+
+    mock_query.return_value.filter_by.assert_any_call(sis_user_id="duplicate")
+
+def test_create_user_duplicate_email(client, mock_user_query):
+    """Test creating a user with a duplicate email."""
+    mock_query, _ = mock_user_query
+
+    def filter_by_side_effect(**kwargs):
+        if kwargs == {"sis_user_id": "EID123"}:
+            return mock_query.return_value
+        elif kwargs == {"email_address": "duplicate@email.com"}:
+            return mock_query.return_value
+        return None
+
+    mock_query.return_value.filter_by.side_effect = filter_by_side_effect
+    mock_query.return_value.first.side_effect = [None, True]
+
+    payload = {
+        "name": "John Doe",
+        "password": "password123",
+        "email_address": "duplicate@email.com",
+        "eid": "EID123",
+        "role": "student",
+    }
+
+    response = client.post("/create_user", json=payload)
+
+    assert response.status_code == 409
+    assert response.json["message"] == "Email already in use"
+
+    mock_query.return_value.filter_by.assert_any_call(email_address="duplicate@email.com")
+    mock_query.return_value.filter_by.assert_any_call(sis_user_id="EID123")
+
+
+def test_user_login_success(client, mock_user_query):
     """Test the /user_login route with valid credentials."""
     mock_query, mock_user_schema = mock_user_query
     
@@ -80,9 +143,29 @@ def test_user_login_failure(client, mock_user_query):
     response = client.post("/user_login", json=payload)
 
     assert response.status_code == 404
-    assert response.data.decode() == "No user found"
     mock_query.assert_called_once()
 
+def test_user_login_missing_email(client):
+    """Test login with missing email."""
+    payload = {
+                "password": "password123"
+               }
+    
+    response = client.post("/user_login", json=payload)
+
+    assert response.status_code == 400
+    assert response.json["message"] == "Missing email or password"
+
+def test_user_login_missing_password(client):
+    """Test login with missing password."""
+    payload = {
+                "email": "example@email.com",
+                }
+
+    response = client.post("/user_login", json=payload)
+
+    assert response.status_code == 400
+    assert response.json["message"] == "Missing email or password"
 
 def test_get_user_by_email_success(client, mocker, mock_user_query):
     """Test the /get_user_by_email route with a valid email."""
@@ -159,34 +242,3 @@ def test_update_account(client, mocker):
     mock_query.assert_called_once()
     mock_query.return_value.filter_by.assert_called_once_with(id="123")
     mock_commit.assert_called_once()
-
-
-# Edge cases to add in route implementations
-
-# def test_create_user_missing_fields(client):
-#     """Test creating a user with missing required fields."""
-#     payload = {"name": "John Doe"}  # Missing 'password', 'email', etc.
-    
-#     response = client.post("/create_user", json=payload)
-
-#     assert response.status_code == 400
-#     assert b'Missing required fields' in response.data
-
-# def test_user_login_missing_email(client):
-#     """Test login with missing email."""
-#     payload = {"password": "password123"}
-    
-#     response = client.post("/user_login", json=payload)
-
-#     assert response.status_code == 400
-#     assert b'Missing email' in response.data
-
-
-# def test_user_login_missing_password(client):
-#     """Test login with missing password."""
-#     payload = {"email": "john@example.com"}
-    
-#     response = client.post("/user_login", json=payload)
-
-#     assert response.status_code == 400
-#     assert b'Missing password' in response.data

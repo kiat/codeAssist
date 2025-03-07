@@ -20,18 +20,16 @@ def create_user():
     @param eid          eid of the user
     @param role         role of the user
 
-    Roles have 3 categories:
-    0 = Instructor
-    1 = TA
-    2 = Student
+    Roles have 2 categories:
+    Instructor
+    Student
     '''
 
-    # TODO Create new database tables to unify all users
-    name = request.json['name']
-    password = request.json['password']
-    email_address = request.json['email_address']
-    sis_user_id = request.json['eid']
-    role = request.json['role']
+    name = request.json.get('name')
+    password = request.json.get('password')
+    email_address = request.json.get('email_address')
+    sis_user_id = request.json.get('eid')
+    role = request.json.get('role')
     if not name or name == "" or not password or password == "" or not email_address or email_address == "" or not sis_user_id or sis_user_id == "" or not role or role == "":
         raise BadRequestError("Missing required fields")
 
@@ -56,6 +54,7 @@ def create_user():
         db.session.add(user)
         db.session.commit()
     except Exception as e:
+        db.session.rollback()
         raise InternalProcessingError("Error creating user")
     
     res = UserSchema().dump(user)
@@ -65,8 +64,8 @@ def create_user():
 @user.route('/user_login', methods = ["POST"])
 @cross_origin()
 def user_login():
-    email = request.json['email']
-    password = request.json['password']
+    email = request.json.get('email')
+    password = request.json.get('password')
 
     if not email or email == "" or not password or password == "":
         raise BadRequestError("Missing email or password")
@@ -78,7 +77,7 @@ def user_login():
     
     res = UserSchema().dump(res)
 
-    return jsonify(res)
+    return jsonify(res), 200
 
 
 
