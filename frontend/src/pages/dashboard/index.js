@@ -1,4 +1,4 @@
-import { PageHeader } from "antd";
+import { PageHeader, message } from "antd";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { GlobalContext } from "../../App";
 import SemesterCourses from "./semesterCourses";
@@ -10,13 +10,14 @@ import {
   enrollCourse,
   getUserEnrollments,
 } from "../../services/course";
-import { Button, message, Form, Modal, Upload } from "antd";
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [courses, setCourses] = useState({});
   const { userInfo } = useContext(GlobalContext);
 
+  const semesterOrder = { Spring: 1, Summer: 2, Fall: 3, Winter: 4 };
+  
   // Inline styles for the component
   const addCourseButtonStyle = {
     border: "1px dashed green",
@@ -54,26 +55,39 @@ export default function Dashboard() {
   // Function to structure the courses data
   const formatCourses = (coursesArray) => {
     const formattedCourses = {};
+
     coursesArray.forEach((course) => {
       const { semester, year, name, assignments, id } = course;
-      const key = `${year}${semester}`; // Assuming year and semester are always present
+      const key = `${year}-${semester}`;
       if (!formattedCourses[key]) {
         formattedCourses[key] = [];
       }
       formattedCourses[key].push({ name, assignments, id });
     });
-    return formattedCourses;
+
+    return Object.keys(formattedCourses)
+      .sort((a, b) => {
+        const [yearA, semesterA] = a.split("-");
+        const [yearB, semesterB] = b.split("-");
+        return (
+          parseInt(yearA) - parseInt(yearB) || // Sort years in ascending order
+          (semesterOrder[semesterA] || 99) - (semesterOrder[semesterB] || 99) // Sort semesters chronologically
+        );
+      })
+      .reduce((sortedCourses, key) => {
+        sortedCourses[key] = formattedCourses[key];
+        return sortedCourses;
+      }, {});
   };
 
-  // Function to fetch courses based on the user's role
+  // Fetches courses for the user
   const fetchCourses = useCallback(() => {
-    const fetchFunction = getUserEnrollments;
-    const params = {user_id: userInfo.id};
-    fetchFunction(params)
+    if (!userInfo?.id) return; // Ensure user info is available
+
+    getUserEnrollments({ user_id: userInfo.id })
       .then((response) => {
         if (response && Array.isArray(response.data)) {
-          const formatted = formatCourses(response.data);
-          setCourses(formatted);
+          setCourses(formatCourses(response.data));
         } else {
           console.error("Expected an array, received:", response);
           setCourses({});
@@ -84,18 +98,16 @@ export default function Dashboard() {
       });
   }, [userInfo]);
 
-  // Fetch courses on mount and when userInfo changes
   useEffect(() => {
     fetchCourses();
-  }, [fetchCourses, userInfo]);
+  }, [fetchCourses]);
 
-  // Function to handle adding a new course
+  // Handles adding a course
   const handleAddCourse = useCallback(
     (values) => {
-      const addCourseFunction = userInfo?.isStudent
-        ? enrollCourse
-        : createCourse;
-      const params = userInfo?.isStudent
+      const isStudent = userInfo?.isStudent;
+      const addCourseFunction = isStudent ? enrollCourse : createCourse;
+      const params = isStudent
         ? { user_id: userInfo.id, entryCode: values.entryCode }
         : {
             name: values.courseName,
@@ -104,7 +116,7 @@ export default function Dashboard() {
             year: values.year,
             entryCode: values.entryCode,
           };
-      
+
       addCourseFunction(params)
         .then(() => {
           message.success("Successfully added course");
@@ -122,23 +134,31 @@ export default function Dashboard() {
     <>
       <PageHeader title="Your Courses" />
       <div style={courseHeaderStyle}>
-        {Object.keys(courses)
-          .sort((a, b) => b.localeCompare(a))
-          .map((key, index) => (
+        {/* Render semester groups */}
+        {Object.keys(courses).map((key, index) => {
+          const [year, semester] = key.split("-");
+
+          return (
             <SemesterCourses
               key={key}
-              yearInfo={key}
-              semesterInfo={courses[key]}
+              yearInfo={year} // Year as a string
+              semesterInfo={semester} // Semester as a string
+              courses={courses[key]} // Pass the list of courses
               courseGroup={index}
               numCourses={Object.keys(courses).length}
             />
-          ))}
+          );
+        })}
+
+        {/* Add Course Button */}
         <div style={courseContainerStyle}>
           <div style={addCourseButtonStyle} onClick={toggleModal}>
             + Add a course
           </div>
         </div>
       </div>
+
+      {/* Add Course Modal */}
       <CourseModal title="ADD COURSE" open={isModalOpen} onCancel={toggleModal}>
         {userInfo?.isStudent ? (
           <RelationForm onFinish={handleAddCourse} onCancel={toggleModal} />
@@ -149,3 +169,4 @@ export default function Dashboard() {
     </>
   );
 }
+
