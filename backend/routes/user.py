@@ -4,11 +4,10 @@ from flask_cors import cross_origin
 from api import db
 from api.models import User
 from api.schemas import UserSchema
-from util.errors import BadRequestError, NotFoundError
+from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError
 
 user = Blueprint('user', __name__)
 
-# TODO THIS ROUTE IS NOT BEING USED AT THE MOMENT
 @user.route('/create_user', methods=["POST"])
 @cross_origin()
 def create_user():
@@ -28,12 +27,22 @@ def create_user():
     '''
 
     # TODO Create new database tables to unify all users
-    user_id = str(uuid.uuid4())
     name = request.json['name']
     password = request.json['password']
     email_address = request.json['email_address']
     sis_user_id = request.json['eid']
     role = request.json['role']
+    if not name or name == "" or not password or password == "" or not email_address or email_address == "" or not sis_user_id or sis_user_id == "" or not role or role == "":
+        raise BadRequestError("Missing required fields")
+
+    eid_check = db.session.query(User).filter_by(sis_user_id=sis_user_id).first()
+    if eid_check:
+        raise ConflictError("EID already in use")
+    email_check = db.session.query(User).filter_by(email_address=email_address).first()
+    if email_check:
+        raise ConflictError("Email already in use")
+
+    user_id = str(uuid.uuid4())
 
     user = User(
         id=user_id,
@@ -43,20 +52,15 @@ def create_user():
         sis_user_id=sis_user_id,
         role=role
     )
-
-    res = None
-
-    db.session.add(user)
-    db.session.commit()
+    try:
+        db.session.add(user)
+        db.session.commit()
+    except Exception as e:
+        raise InternalProcessingError("Error creating user")
+    
     res = UserSchema().dump(user)
 
-    # if role == 2:
-    #     db.session.add(Student(**user_data))
-    #     db.session.commit()
-    #     res = db.session.query(Student).filter_by(id=user_id)
-    #     res = StudentSchema().dump(res, many=True)[0]
-    response = jsonify(res)
-    return response, 201
+    return jsonify(res), 201
 
 @user.route('/user_login', methods = ["POST"])
 @cross_origin()

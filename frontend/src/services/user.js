@@ -1,6 +1,6 @@
 import service from ".";
 
-export async function signUpUser(params) {
+export async function createUser(params) {
   return service("create_user", params, "post");
 }
 
