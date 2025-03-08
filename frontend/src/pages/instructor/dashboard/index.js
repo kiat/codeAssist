@@ -6,16 +6,15 @@ import {
   Divider,
   PageHeader,
   Progress,
-  Space,
   Table,
 } from "antd";
-import { texts } from "./constant";
-import TextItem from "./TextItem";
 import moment from "moment";
 import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
+import { getCourseAssignments } from "../../../services/course";
+
 //for now change this to a course_id you have in the database
 const columns = [
   {
@@ -68,31 +67,36 @@ const columns = [
 
 export default function InstructorDashboard() {
   const { courseId } = useParams();
-  const [data, setData] = useState([]);
-  const { courseInfo, updateCourseInfo, userInfo } = useContext(GlobalContext);
+  const [ data, setData] = useState([]);
+  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
 
-  const fetchData = async (endpoint, params) => {
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}?${new URLSearchParams(params)}`);
-      if (!response.ok) throw new Error('Network response was not ok.');
-      return await response.json();
-    } catch (error) {
-      console.error('There has been a problem with your fetch operation:', error);
-    }
-  };
+  // const fetchData = async (endpoint, params) => {
+  //   try {
+  //     const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}?${new URLSearchParams(params)}`);
+  //     if (!response.ok) throw new Error('Network response was not ok.');
+  //     return await response.json();
+  //   } catch (error) {
+  //     console.error('There has been a problem with your fetch operation:', error);
+  //   }
+  // };
   
   useEffect(() => {
     const initFetch = async () => {
-      const assignmentsData = await fetchData("/get_course_assignments", { course_id: courseId });
-      setData(assignmentsData);
-      
-      if (!courseInfo.id || !courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode || !courseInfo.description) {
-        const courseDetails = await fetchData("/get_course_info", { course_id: courseId });
-        if (courseDetails && courseDetails.length > 0) {
-          const [detail] = courseDetails;
-          updateCourseInfo({ ...detail, id: courseId });
-        }
+      try {
+        const res = await getCourseAssignments({ course_id: courseId });
+        setData(res.data);
+      } catch (error) {
+        console.error("Error fetching course assignments:", error);
       }
+      
+      // redundant call to get course info
+      // if (!courseInfo.id || !courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode || !courseInfo.description) {
+      //   const courseDetails = await fetchData("/get_course_info", { course_id: courseId });
+      //   if (courseDetails && courseDetails.length > 0) {
+      //     const [detail] = courseDetails;
+      //     updateCourseInfo({ ...detail, id: courseId });
+      //   }
+      // }
     };
     initFetch();
   }, [courseId, courseInfo.id, courseInfo.name, courseInfo.year, courseInfo.semester, courseInfo.entryCode, courseInfo.description, updateCourseInfo]);
