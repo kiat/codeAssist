@@ -12,6 +12,7 @@ import UploadModal from "../../components/UploadModal";
 import SubmissionHistoryModal from "./submissionHistoryModal";
 import FormattingModal from "./FormattingModal";
 
+import { getSubmissionDetails } from "../../services/submission";
 import { getAssignment, getExtension } from "../../services/assignment";
 import { getUserById } from "../../services/user";
 
@@ -27,8 +28,7 @@ export default function AssignmentResult() {
   const { submissionId } = useParams();
   const [assignmentId, setAssignmentId] = useState("");
   const [studentId, setStudentId] = useState("");
-  const { userInfo, assignmentInfo, updateAssignmentInfo } =
-    useContext(GlobalContext);
+  const { userInfo, assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
   const [toSend, setToSend] = useState();
   const [dueDate, setDueDate] = useState();
   const [lateDueDate, setLateDueDate] = useState();
@@ -39,15 +39,13 @@ export default function AssignmentResult() {
     const fetchIds = async () => {
       console.log("Fetching IDs based on submission ID:", submissionId);
       try {
-        const details = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`
-        );
-        const data = await details.json();
-        if (data) {
-          setToSend(data);
-          console.log("Fetched IDs:", data.assignment_id, data.student_id);
-          setAssignmentId(data.assignment_id);
-          setStudentId(data.student_id);
+        const res = await getSubmissionDetails({ submission_id: submissionId });
+        const details = await res.data;
+        if (details) {
+          setToSend(details);
+          console.log("Fetched IDs:", details.assignment_id, details.student_id);
+          setAssignmentId(details.assignment_id);
+          setStudentId(details.student_id);
         } else {
           console.log("No response data");
         }
