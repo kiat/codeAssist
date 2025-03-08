@@ -120,23 +120,21 @@ export default () => {
       console.log(values);
       values.forEach(enrollEntry);
 
-      function enrollEntry(item) {
-        fetch(
-          process.env.REACT_APP_API_URL + "/get_user_by_email?" +
-            new URLSearchParams({
-              email: item,
-            })
-        )
-          .then((res) => res.json())
-          .then((student) =>
-            createEnrollment({
-              'student_id': student.id,
-              'course_id': courseId,
-            }).then(() => {
-              toggleAddMoreUsersModalOpen();
-              getEnrollment();
-            })
-          );
+      async function enrollEntry(item) {
+        try {
+          const res = await getUserByEmail({ email: item });
+          await createEnrollment({
+            student_id: res.data.id,
+            course_id: courseId,
+          });
+        }
+        catch(error) {
+          console.error("Error creating enrollments: ", error);
+        }
+        finally {
+          toggleAddMoreUsersModalOpen();
+          getEnrollment();
+        }
       }
     },
     [courseId, getEnrollment, toggleAddMoreUsersModalOpen]

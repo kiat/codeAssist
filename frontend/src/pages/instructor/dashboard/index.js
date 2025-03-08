@@ -81,7 +81,7 @@ export default function InstructorDashboard() {
   // };
   
   useEffect(() => {
-    const initFetch = async () => {
+    const initCourseAssignments = async () => {
       try {
         const res = await getCourseAssignments({ course_id: courseId });
         setData(res.data);
@@ -98,7 +98,7 @@ export default function InstructorDashboard() {
       //   }
       // }
     };
-    initFetch();
+    initCourseAssignments();
   }, [courseId, courseInfo.id, courseInfo.name, courseInfo.year, courseInfo.semester, courseInfo.entryCode, courseInfo.description, updateCourseInfo]);
 
   if (!courseInfo.id) return null;
