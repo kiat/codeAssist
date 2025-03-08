@@ -1,15 +1,15 @@
 import service from ".";
 
-export async function signUpUser(params) {
+export async function createUser(params) {
   return service("create_user", params, "post");
 }
 
-export async function get_user(params) {
-  return service("get_user", params, "get");
+export async function getUserById(params) {
+  return service("get_user_by_id", params, "get");
 }
 
 export async function getUserByEmail(params) {
-  return service("get_user_by_email", params);
+  return service("get_user_by_email", params, "get");
 }
 
 export async function userLogin(params) {

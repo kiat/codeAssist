@@ -1,5 +1,5 @@
 import React, { useContext, useCallback, useEffect, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Card, PageHeader, Radio, message } from "antd";
 
 import { GlobalContext } from "../../App";
@@ -13,6 +13,8 @@ import SubmissionHistoryModal from "./submissionHistoryModal";
 import FormattingModal from "./FormattingModal";
 
 import { getAssignment, getExtension } from "../../services/assignment";
+import { getUserById } from "../../services/user";
+
 import moment from "moment";
 
 export default function AssignmentResult() {
@@ -22,13 +24,9 @@ export default function AssignmentResult() {
   const [formattingModalOpen, setFormattingOpen] = useState(false);
   const [autoGraderPoints, setAutograderPoints] = useState(0);
   const [assignmentName, setAssignmentName] = useState(""); // Placeholder value
-  //chnaging the whole file to use the submisison id in the params instead of teh assingment id and submission id passed in
   const { submissionId } = useParams();
   const [assignmentId, setAssignmentId] = useState("");
   const [studentId, setStudentId] = useState("");
-  //const { assignmentId, studentId } = useParams();
-  const location = useLocation();
-  //adding global context variable
   const { userInfo, assignmentInfo, updateAssignmentInfo } =
     useContext(GlobalContext);
   const [toSend, setToSend] = useState();
@@ -107,19 +105,15 @@ export default function AssignmentResult() {
 
     const fetchStudentName = async () => {
       try {
-        const response = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_student_by_id?id=${studentId}`
-        );
-        const studentData = await response.json();
+        const res = await getUserById({ id: studentId });
+        const studentData = res.data;
         if (studentData) {
-          console.log("im in");
           updateAssignmentInfo((prevInfo) => ({
             ...prevInfo,
             studentName: studentData.name,
             studentId: studentId,
           }));
         }
-        console.log(studentId);
       } catch (error) {
         console.error("Failed to fetch student data:", error);
       }

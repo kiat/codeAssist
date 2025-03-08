@@ -3,7 +3,7 @@ import { Button, Form, Input, Modal, Radio } from "antd";
 import { useState, useContext } from "react";
 import { GlobalContext } from "../../App";
 // import service from "../../services";
-import { signUpUser } from "../../services/user";
+import { createUser } from "../../services/user";
 
 /**
  * user signup window modal
@@ -20,7 +20,7 @@ export default function SignUpModal({ open, onCancel }) {
     // const isStudent = values.isStudent;
     let res;
     // let taRes;
-    res = await signUpUser({...restValue, role});
+    res = await createUser({...restValue, role});
 
     if (res) {
       const userInfo = {

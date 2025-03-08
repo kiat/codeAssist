@@ -12,7 +12,7 @@ import {
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
-import { useCallback, useState, useContext } from "react";
+import { useCallback, useState } from "react";
 import {
   createEnrollment,
   createEnrollmentCSV,
@@ -25,7 +25,6 @@ import {
 import { useParams } from "react-router-dom";
 import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
-import { GlobalContext } from "../../../App";
 import AddCSVModal from "./AddCSVModal";
 const columns = [
   { title: "NAME", dataIndex: "name" },
@@ -33,14 +32,12 @@ const columns = [
 ];
 
 export default () => {
-  const { userInfo } = useContext(GlobalContext);
   
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCSVModalOpen, setAddCSVModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
   const [enrollment, setEnrollment] = useState([]);
   const urlParams = useParams();
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const { courseId } = urlParams;
 
   const toggleAddModalOpen = useCallback(() => {
