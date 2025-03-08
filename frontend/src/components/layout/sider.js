@@ -3,6 +3,7 @@ import { useState, useContext, useEffect } from "react";
 import { GlobalContext } from "../../App";
 import CollapsedSidebar from "./CollapsedSidebar";
 import ExpandedSidebar from "./ExpandedSidebar";
+import { getCourseInfo } from "../../services/course";
 
 export default function RootSider({ pathname, courseInfo, userInfo, assignmentInfo }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -13,10 +14,12 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
   };
 
   useEffect(() => {
-    if (courseInfo.id && (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode)) {
-      fetch(process.env.REACT_APP_API_URL + "/get_course_info?" + new URLSearchParams({ course_id: courseInfo.id }))
-        .then((res) => res.json())
-        .then((data) => {
+    const fetchCourseInfo = async() => {
+      if (courseInfo.id && (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode)) {
+        try {
+          const response = await getCourseInfo({course_id: courseInfo.id});
+          const data = response.data;
+      
           data.forEach((element) => {
             if (element.id === courseInfo.id) {
               updateCourseInfo({
@@ -24,12 +27,16 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
                 name: element.name,
                 year: element.year,
                 semester: element.semester,
-                entryCode: element.entryCode
+                entryCode: element.entryCode,
               });
             }
           });
-        });
-    }
+        } catch (error) {
+          console.error("Error fetching course info:", error);
+        }
+      }
+    };
+    fetchCourseInfo();
   }, [courseInfo, updateCourseInfo]);
 
   return (
