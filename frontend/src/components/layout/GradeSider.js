@@ -10,9 +10,11 @@ import { Link } from "react-router-dom";
 import { GlobalContext } from "../../App";
 import styles from "./styles.module.css";
 
+import { getCourseAssignments } from "../../services/course";
+
 export default () => {
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+  const { courseInfo } = useContext(GlobalContext);
   const [assignmentInfoCurrent, setAssignmentInfoCurrent] = useState();
 
   const pathname = window.location.pathname;
@@ -23,32 +25,51 @@ export default () => {
       courseName: courseInfo.name,
       courseId: courseInfo.id,
     });
-  }, [pathname, updateAssignmentInfo]);
+  }, [pathname, updateAssignmentInfo, courseInfo.name, courseInfo.id]);
 
   useEffect(() => {
+    // not sure what the logic here is supposed to do, but should probably just have a method that directly gets assignment by id
+    const fetchAssignmentInfo = async () => {
+      try {
+        const res = await getCourseAssignments({ course_id: courseInfo.id });
+        const assignments = res.data;
+        assignments.forEach((element) => {
+          if (element.id === assignmentId) {
+            updateAssignmentInfo({
+              id: element.id,
+              name: element.name,
+            });
+          }
+        });
+      } catch (error) {
+        console.error("Failed to fetch assignment info:", error);
+      }
+    }
     if (!assignmentInfo.id) {
       updateAssignmentInfo((prevAssignmentInfo) => ({
         ...prevAssignmentInfo,
         id: assignmentId
       }));
     }
-    fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
-    new URLSearchParams({
-      course_id: courseInfo.id,
-    })
-    )
-    .then((res) => res.json())
-        .then((data) =>
-          data.forEach((element) => {
-            if (element.id === assignmentId) {
-              updateAssignmentInfo({
-                id: element.id,
-                name: element.name,
-              });
-            }
-          })
-        );
-    }, [assignmentInfo.id, assignmentInfo.name, updateAssignmentInfo])
+    fetchAssignmentInfo();
+
+    // fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
+    // new URLSearchParams({
+    //   course_id: courseInfo.id,
+    // })
+    // )
+    // .then((res) => res.json())
+    //     .then((data) =>
+    //       data.forEach((element) => {
+    //         if (element.id === assignmentId) {
+    //           updateAssignmentInfo({
+    //             id: element.id,
+    //             name: element.name,
+    //           });
+    //         }
+    //       })
+    //     );
+    }, [assignmentInfo.id, assignmentInfo.name, assignmentId, courseInfo.id, updateAssignmentInfo])
   
   return (
     <>
