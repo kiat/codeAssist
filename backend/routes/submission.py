@@ -88,9 +88,14 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
 
         # Prepare the prompt including both the code and autograder results.
         prompt_message = (
-            "Please analyze the following Python code and its autograder results. "
-            "Provide constructive feedback as a JSON array of objects. Each object should have a 'pattern' field "
-            "(a regex pattern if applicable) and a 'comment' field with constructive criticism. Return only valid JSON.\n\n"
+            "You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, and style/formatting"
+            "Pay special attention to the past insights of this student:\n"
+            "Student doesn't consider edge cases"
+
+            "Response should be JSON in the form:" \
+            "{ 'insights': <updated insights for this student's coding behavior, focused on areas of improvement>",
+                "'annotations': [{'pattern': <> , 'comment': <>}, ...]"
+            "}"
             "Code:\n\n"
             f"{code_text}\n\n"
             "Autograder results:\n\n"

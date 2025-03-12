@@ -11,6 +11,8 @@ class User(db.Model):
     email_address = db.Column(db.String, nullable=False, unique=True)
     sis_user_id = db.Column(db.String, nullable=False, unique=True)
     role = db.Column(db.String, nullable = False)
+    coding_insights = db.Column(db.String, default="No history.")
+
 
 class Course(db.Model):
     __tablename__ = "courses"
@@ -23,6 +25,7 @@ class Course(db.Model):
     entryCode = db.Column(db.String, nullable=False, unique=True)
     allowEntryCode = db.Column(db.Boolean, default=False)
     description = db.Column(db.String, default="")
+    openai_api_key = db.Column(db.String, default="")
 
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
@@ -48,6 +51,9 @@ class Assignment(db.Model):
     published_date = db.Column(TIMESTAMP, nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
     container_id = db.Column(db.String)
+    ai_feedback_prompt = db.Column(db.Text, nullable=True)
+    ai_feedback_model = db.Column(db.Text, nullable=True)
+    ai_feedback_temperature = db.Column(db.Float, nullable=True)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
