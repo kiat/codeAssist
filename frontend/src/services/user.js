@@ -15,3 +15,7 @@ export async function getUserByEmail(params) {
 export async function userLogin(params) {
   return service("user_login", params, "post");
 }
+
+export async function resetPasswordRequest(email) {
+  return service("reset_password", { email }, "post");
+}

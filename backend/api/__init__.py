@@ -4,11 +4,15 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_migrate import Migrate  # Import Migrate
 from dotenv import load_dotenv
+from flask_mail import Mail
+
 
 # Initialize extensions
 ma = Marshmallow()
 db = SQLAlchemy()
 migrate = Migrate()
+mail = Mail()
+
 
 def create_app(config_class='config.Config'):
     # Create the Flask app instance
@@ -26,6 +30,7 @@ def create_app(config_class='config.Config'):
     ma.init_app(app)
     db.init_app(app)
     migrate.init_app(app, db)
+    mail.init_app(app)
 
     # Register blueprints and routes (do it after app is initialized)
     from routes import register_routes

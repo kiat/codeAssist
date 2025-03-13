@@ -11,3 +11,4 @@ openai
 pytest
 pytest-mock
 pytest-cov
+Flask-Mail

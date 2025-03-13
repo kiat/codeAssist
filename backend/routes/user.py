@@ -1,10 +1,15 @@
 import uuid
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, url_for
 from flask_cors import cross_origin
 from api import db
 from api.models import User
 from api.schemas import UserSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError
+from itsdangerous import URLSafeTimedSerializer
+from flask_mail import Message
+from flask import current_app
+from api import mail  # Import mail from the main app
+
 
 user = Blueprint('user', __name__)
 
@@ -163,3 +168,77 @@ def update_account():
 
     # Return a success response
     return jsonify({"message": "Account updated successfully"}), 200
+
+# Reset password helpers
+PASSWORD_RESET_SALT = "password-reset-salt"
+def generate_reset_token(email):
+    s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    return s.dumps(email, salt=PASSWORD_RESET_SALT)
+
+def verify_reset_token(token, expiration=3600):
+    s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    try:
+        email = s.loads(token, salt=PASSWORD_RESET_SALT, max_age=expiration)
+    except:
+        return None
+    return email
+
+@user.route('/reset_password', methods=['POST'])
+@cross_origin()
+def reset_request():
+    '''
+    /reset_password allows users to request a password reset by email.
+    '''
+    email = request.json.get('email')
+    if not email or email == "":
+        raise BadRequestError("Missing email")
+
+    user = User.query.filter_by(email_address=email).first()
+    if not user:
+        raise NotFoundError("Email not found")
+
+    # Generate Token
+    token = generate_reset_token(user.email_address)
+    reset_url = url_for('user.reset_token', token=token, _external=True)
+
+    # Send Email
+    try:
+        msg = Message(
+            subject='Password Reset Request',
+            recipients=[email],
+            body=f'''To reset your password, visit the following link:
+{reset_url}
+
+If you did not request this, ignore this email.
+'''
+        )
+        mail.send(msg)
+    except Exception as e:
+        raise InternalProcessingError("Failed to send email")
+
+    return jsonify({"message": "An email has been sent with reset instructions"}), 200
+
+
+@user.route('/reset_password/<token>', methods=['POST'])
+@cross_origin()
+def reset_token(token):
+    '''
+    /reset_password/<token> allows users to reset their password.
+    '''
+    email = verify_reset_token(token)
+    if email is None:
+        raise BadRequestError("Invalid or expired token")
+
+    new_password = request.json.get('password')
+    if not new_password or new_password == "":
+        raise BadRequestError("Password required")
+
+    # Find User
+    user = User.query.filter_by(email_address=email).first()
+    if not user:
+        raise NotFoundError("User not found")
+
+    user.set_password(new_password)  # Hash password before storing
+    db.session.commit()
+
+    return jsonify({"message": "Password updated successfully"}), 200
