@@ -2,6 +2,8 @@ from marshmallow import Schema, fields
 from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
+from flask_bcrypt import generate_password_hash, check_password_hash
+
 
 class User(db.Model):
     __tablename__ = "user"
@@ -11,6 +13,12 @@ class User(db.Model):
     email_address = db.Column(db.String, nullable=False, unique=True)
     sis_user_id = db.Column(db.String, nullable=False, unique=True)
     role = db.Column(db.String, nullable = False)
+    
+    def set_password(self, password):
+        self.password = generate_password_hash(password).decode('utf-8')
+
+    def check_password(self, password):
+        return check_password_hash(self.password, password)
 
 class Course(db.Model):
     __tablename__ = "courses"

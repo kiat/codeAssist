@@ -46,10 +46,11 @@ def create_user():
         id=user_id,
         name=name,
         email_address=email_address,
-        password=password,
         sis_user_id=sis_user_id,
         role=role
     )
+    user.set_password(password) # Store hashed password
+
     try:
         db.session.add(user)
         db.session.commit()
@@ -70,8 +71,12 @@ def user_login():
     if not email or email == "" or not password or password == "":
         raise BadRequestError("Missing email or password")
 
-    res = db.session.query(User).filter_by(email_address=email, password=password).first()
+    res = db.session.query(User).filter_by(email_address=email).first()
 
+    # check hashed password
+    if not res or not res.check_password(password):
+        raise NotFoundError("Email and password combination not found")
+    
     if not res:
         raise NotFoundError("Email and password combination not found")
     
