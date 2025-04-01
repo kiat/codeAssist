@@ -1,6 +1,13 @@
 import uuid
 import json
 import sys
+import io
+import tarfile
+import subprocess
+import os
+import docker 
+import shutil
+from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from functools import reduce
 from flask import Blueprint, request, jsonify, flash
@@ -10,22 +17,13 @@ from api.models import Assignment, Submission, User, Enrollment, TestCaseResult,
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError
 from datetime import datetime, timezone
-import subprocess
-import os
-import hashlib
-import docker 
-import zipfile
-import shutil
-import time
-from dotenv import load_dotenv
+from sqlalchemy import desc, func
 # import asyncio
 # from openai import AsyncOpenAI
 
-from sqlalchemy import desc, func
-import base64
-
 
 submission = Blueprint('submission', __name__)
+docker_client = docker.from_env()
 
 ALLOWED_EXTENSIONS = {'py','zip'}
 
@@ -112,55 +110,51 @@ def upload_submission():
     file.save(file_path)
 
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
-    container_name = assignment.container_id
-    autograder_timeout = assignment.autograder_timeout
-    start_proc = subprocess.run(f"docker start {container_name}".split(), capture_output=True)
-    if start_proc.returncode != 0:
-        os.chdir(current_dir)
-        print(f"error: Failed to start Docker container, details: {start_proc.stderr.decode()}")
-        raise InternalProcessingError("Failed to grade submission")
-
+    container = docker_client.containers.get(assignment.container_id)
+    container.start()
 
     # copy the file into the correct place
-    copy_proc = subprocess.run(f"docker cp {file_path} {container_name}:/autograder/submission/".split(), capture_output=True)
-    if copy_proc.returncode != 0:
-        os.chdir(current_dir)
-        print(f"error: Failed to start Docker container, details: {copy_proc.stderr.decode()}")
-        raise InternalProcessingError("Failed to grade submission")
+    tar_stream = io.BytesIO()
+    with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+        tar.add(file_path, arcname=filename)
+    tar_stream.seek(0)
+    container.put_archive("/autograder/submission/", tar_stream)
 
-
+    # run autograder
     try:
+        # docker sdk exec function doesn't have timeout feature, so let's use subprocess for this
         exec_proc = subprocess.run(
-            f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(), 
+            f"docker exec {assignment.container_id} /bin/bash /autograder/source/run_autograder".split(), 
             capture_output=True, 
-            timeout=autograder_timeout)
+            timeout=assignment.autograder_timeout)
     except subprocess.TimeoutExpired:
-        subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
+        container.stop()
         os.chdir(current_dir)
         raise ServerTimeoutError("Submitted program took too long to run")
 
     if exec_proc.returncode != 0:
         os.chdir(current_dir)
-        print(f"error: Failed to start Docker container, details: {exec_proc.stderr.decode()}")
+        print(f"Error: Autograder failed, details: {exec_proc.output.decode()}")
         raise InternalProcessingError("Failed to grade submission")
 
-    cat_proc = subprocess.run(f"docker exec {container_name} cat /autograder/results/results.json".split(), capture_output=True)
-    if cat_proc.returncode != 0:
+    # get results
+    cat_result = container.exec_run("cat /autograder/results/results.json")
+    if cat_result.exit_code != 0:
         os.chdir(current_dir)
-        print(f"error: Failed to start Docker container, details: {cat_proc.stderr.decode()}")
+        print(f"Error: Failed to retrieve results.json, details: {cat_result.output.decode()}")
         raise InternalProcessingError("Failed to grade submission")
 
-    results_json_content = cat_proc.stdout.decode()
+    results_json_content = cat_result.output.decode()
     host_results_json_path = os.path.join(results_dir, 'results.json')
     with open(host_results_json_path, 'w') as file:
         file.write(results_json_content)
 
-    # Query the database for the number of previous submissions
+    # Update active submission in db
     submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
-    #implement removing the old active submission
     old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
     if old:
         old.update({'active': False})
+
     # Create a new submission record
     new_submission = Submission(
         id=uuid.uuid4(),
@@ -180,20 +174,11 @@ def upload_submission():
     db.session.add(new_submission)
     db.session.commit()
 
-    # Remove the contents of the submission directory inside the Docker container
-    clear_dir_proc = subprocess.run(f"docker exec {container_name} rm -rf /autograder/submission/{filename}".split(), capture_output=True)
-    if clear_dir_proc.returncode != 0:
-        print(f"error: Failed to start Docker container, details: {clear_dir_proc.stderr.decode()}")
-        raise InternalProcessingError("Failed to grade submission")
+    # Clean up container
+    container.exec_run(f"rm -rf /autograder/submission/{filename}")
+    container.exec_run(f"rm -f /autograder/source/{filename}")
 
-    # need to remove this file fropm teh source folder if it exists there
-    clear_dir_proc2 = subprocess.run(f"docker exec {container_name} rm -f /autograder/source/{filename}".split(),capture_output=True)
-    if clear_dir_proc2.returncode != 0:
-        print(f"error: Failed to start Docker container, details: {clear_dir_proc2.stderr.decode()}")
-        raise InternalProcessingError("Failed to grade submission")
-
-    subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
-    # subprocess.run(f"docker rm {container_name}".split(), capture_output=True)
+    container.stop()
     os.chdir(current_dir)
 
     #get openAI reponse
@@ -214,7 +199,7 @@ def upload_assignment_autograder():
     assignment_id = request.form.get("assignment_id")
     autograder_timeout = request.form.get("autograder_timeout")
     if not assignment_id or not file.filename:
-        return jsonify({"error": "Missing assignment ID or no selected file"}), 400
+        raise BadRequestError("Missing required fields")
 
     # Set up paths
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -238,40 +223,53 @@ def upload_assignment_autograder():
     
     # If the assignment already has an associated container, update it.
     if assignment.container_id:
-        container = assignment.container_id
-        # start up teh containerrmeove the old zip and source files form this container and copy in and unzip the new ones
-        start_proc = subprocess.run(f"docker start {container}".split(), capture_output=True)
-        if start_proc.returncode != 0:
-            os.chdir(current_dir)
-            return jsonify({"error": "Failed to start Docker container", "details": start_proc.stderr.decode()}), 500
-        
-        # Remove old zip file from Docker container
-        remove_old_zip_proc = subprocess.run(f"docker exec {container} find /autograder -type f -name '*.zip' -delete", shell=True, capture_output=True, text=True)
-        if remove_old_zip_proc.returncode != 0:
-            print(f"Failed to remove old zip files: {remove_old_zip_proc.stderr}")
-            return jsonify({"error": "Failed to remove old zip file from Docker container", "details": remove_old_zip_proc.stderr}), 501
-        else:
-            print("Old zip files removed successfully")
-        # Remove old source files from Docker container
-        remove_old_files_proc = subprocess.run(f"docker exec {container} rm -rf /autograder/source/", shell=True, capture_output=True, text=True)
-        if remove_old_files_proc.returncode != 0:
-            return jsonify({"error": "Failed to remove old source files from Docker container", "details": remove_old_files_proc.stderr}), 502
+        container_id = assignment.container_id
 
-        # Copy new files into Docker container
-        copy_proc = subprocess.run(f"docker cp {filepath} {container}:/autograder/", shell=True, capture_output=True, text=True)
-        if copy_proc.returncode != 0:
-            return jsonify({"error": "Failed to copy new files to Docker container", "details": copy_proc.stderr}), 503
+        try:
+            container = docker_client.containers.get(container_id)
+            container.start()
 
-        # Unzip the uploaded file into /autograder/source/ in the Docker container
-        unzip_proc = subprocess.run(f"docker exec {container} unzip /autograder/{filename} -d /autograder/source", shell=True, capture_output=True, text=True)
-        if unzip_proc.returncode != 0:
-            print(unzip_proc.stderr)
-            return jsonify({"error": "Failed to unzip uploaded file in Docker container", "details": unzip_proc.stderr}), 504
+            # Remove old zip file from Docker container
+            exit_code, output = container.exec_run("find /autograder -type f -name '*.zip' -delete")
+            if exit_code != 0:
+                print("Failed to remove old zip files: ", output.decode())
+                raise InternalProcessingError("Failed to upload assignment autograder")
+            
+            # Remove old source files from Docker container
+            exit_code, output = container.exec_run("rm -rf /autograder/source/")
+            if exit_code != 0:
+                print("Failed to remove old source files: ", output.decode())
+                raise InternalProcessingError("Failed to upload assignment autograder")
 
-        os.chdir(current_dir)
-        subprocess.run(f"docker stop {container}".split(), capture_output=True)
-        
-        return jsonify({"message": "Autograder uploaded and Docker image generated successfully", "image_name": f"autograder-{assignment_id}"}), 200
+
+            # Copy new files into Docker container. Docker's "put_archive" expects a tar
+            # create tar archive
+            tar_stream = io.BytesIO()
+            with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+                tar.add(file_path, arcname=file_path.split("/")[-1])
+            tar_stream.seek(0)
+
+            # copy tar archive into container
+            success = container.put_archive("/autograder/", tar_stream.read())
+            if not success:
+                print("Failed to copy new files into docker container")
+                raise InternalProcessingError("Failed to upload assignment autograder")
+
+
+            # Unzip the uploaded file into /autograder/source/ in the Docker container
+            exit_code, output = container.exec_run(f"unzip /autograder/{filename} -d /autograder/source")
+            if exit_code != 0:
+                print("Failed to unzip uploaded file in Docker container: ", output.decode())
+                raise InternalProcessingError("Failed to upload assignment autograder")
+
+            container.stop()
+            return jsonify({"message": "Autograder uploaded and Docker image generated successfully", "image_name": f"autograder-{assignment_id}"}), 200
+        except docker.errors.NotFound:
+            print("Container with specified container id was not found.")
+            raise NotFoundError("Failed to upload assignment autograder")
+        except Exception as e:
+            print("Unexpected error occurred when updating autograder container. ", str(e))
+            raise InternalProcessingError("Failed to upload assignment autograder")
 
     # Write the Dockerfile
     dockerfile_content = """
@@ -289,24 +287,27 @@ def upload_assignment_autograder():
         dockerfile.write(dockerfile_content)
 
     # Build Docker image
-    os.chdir(assignment_dir)
-    build_proc = subprocess.run(f"docker build -t autograder-{assignment_id} .".split(), capture_output=True)
-    if build_proc.returncode != 0:
-        os.chdir(current_dir)
-        print(build_proc.stderr.decode())
-        return jsonify({"error": "Failed to build Docker image", "details": build_proc.stderr.decode()}), 501
+    try:
+        image_name = f"autograder-{assignment_id}"
+        docker_client.images.build(path=assignment_dir, tag=image_name)
+    except docker.errors.BuildError as e:
+        print("Error occurred when building new image. ", str(e))
+        raise InternalProcessingError("Failed to upload assignment autograder")
 
     # Run Docker container
     container_name = f"ag_{assignment_id}"
-
-    run_proc = subprocess.run(f"docker run -d --name {container_name} autograder-{assignment_id} tail -f /dev/null".split(), capture_output=True)
-    if run_proc.returncode != 0:
-        os.chdir(current_dir)
-        return jsonify({"error": "Failed to start Docker container", "details": run_proc.stderr.decode()})
-
-    # container_id = run_proc.stdout.decode().strip()
-    os.chdir(current_dir)
-    subprocess.run(f"docker stop {container_name}".split(), capture_output=True)
+    try:
+        container = docker_client.containers.run(
+            image_name, 
+            name=container_name, 
+            detach=True, 
+            tty=True, 
+            command="tail -f /dev/null"
+        )
+        container.stop()
+    except docker.errors.ContainerError as e:
+        print("Error occurred when running new container. ", str(e))
+        raise InternalProcessingError("Failed to upload assignment autograder")
 
     # Update the assignment record with the new container ID and autograder timeout
     assignment.container_id = container_name
