@@ -51,10 +51,13 @@ def get_assignment():
     @param assignment_id    the id of the assignment
     '''
     assignment_id = request.args.get("assignment_id")
-    assignment = db.session.query(Assignment).filter_by(id=assignment_id)
-    assignment = AssignmentSchema().dump(assignment, many=True)[0]
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id)
 
-    return jsonify(assignment)
+    if not assignment_obj:
+        return jsonify({"message": "Assignment not found"}), 404
+
+    result = AssignmentSchema().dump(assignment_obj, many=False)
+    return jsonify(result), 200
 
 
 @assignment.route('/create_assignment', methods=["POST"])
