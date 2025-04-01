@@ -45,6 +45,7 @@ export default () => {
     try {
       const res = await getCourseInfo({course_id: courseId});
       form.setFieldsValue(res.data[0]);
+      setOpenAiKey(res.data[0].openai_api_key);
     }
     catch(error) {
       console.error("Error fetching course data: ", error)
@@ -193,7 +194,7 @@ export default () => {
 
         {/* OpenAI API Key Section */}
         <Card title="AI Integration">
-          <Form.Item label="OpenAI API Key">
+          <Form.Item label="OpenAI API Key" name="openai_api_key">
             <Input.Password
               value={openAiKey}
               onChange={(e) => setOpenAiKey(e.target.value)}

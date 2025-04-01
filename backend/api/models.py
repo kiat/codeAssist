@@ -25,6 +25,8 @@ class Course(db.Model):
     entryCode = db.Column(db.String, nullable=False, unique=True)
     allowEntryCode = db.Column(db.Boolean, default=False)
     description = db.Column(db.String, default="")
+
+    # -- AI Integration Settings -- 
     openai_api_key = db.Column(db.String, default="")
 
 class Enrollment(db.Model):
@@ -51,6 +53,9 @@ class Assignment(db.Model):
     published_date = db.Column(TIMESTAMP, nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
     container_id = db.Column(db.String)
+
+    # -- AI Integration Settings -- 
+    ai_feedback_enabled = db.Column(db.Boolean, default=False)
     ai_feedback_prompt = db.Column(db.Text, nullable=True)
     ai_feedback_model = db.Column(db.Text, nullable=True)
     ai_feedback_temperature = db.Column(db.Float, nullable=True)
@@ -69,6 +74,8 @@ class Submission(db.Model):
     execution_time = db.Column(db.Float, nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=False)
     completed = db.Column(db.Boolean, nullable=False)
+
+    # -- AI Integration Settings -- 
     ai_feedback = db.Column(db.Text, nullable=True)
     
 # Handling multiple submitters for a single submission

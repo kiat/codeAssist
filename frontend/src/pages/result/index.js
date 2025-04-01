@@ -60,6 +60,31 @@ export default function AssignmentResult() {
     fetchIds();
   }, [submissionId]);
 
+
+
+  useEffect(() => {
+    if (!toSend || !toSend.id || toSend.ai_feedback) return;
+  
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${toSend.id}`
+        );
+        const updated = await response.json();
+        if (updated?.ai_feedback) {
+          console.log("AI Feedback is now available.");
+          setToSend(updated);
+          clearInterval(interval);
+        }
+      } catch (err) {
+        console.error("Polling for AI feedback failed:", err);
+      }
+    }, 5000);
+  
+    return () => clearInterval(interval);
+  }, [toSend]);
+  
+
   useEffect(() => {
     if (!assignmentId || !studentId) {
       console.log(

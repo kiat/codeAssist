@@ -1,92 +1,140 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Tooltip, Button, Collapse } from 'antd';
+import { Tooltip, Button, Collapse, Spin, Tag } from 'antd';
 import { GlobalContext } from '../../App';
 import 'antd/dist/antd.css';
 
 const { Panel } = Collapse;
 
+const AI_FEEDBACK_ENABLED = true;
+
 const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data }) => {
   const { userInfo } = useContext(GlobalContext);
   const [studentCode, setStudentCode] = useState('');
-  const [highlightedLines, setHighlightedLines] = useState([]); // Lines to be highlighted
-  const [annotations, setAnnotations] = useState([]); // Annotations based on patterns
-
-  // console.log("AI ANNOTATIONS?? ", data["ai_feedback"])
-
-  // let aiAnnotations = data["ai_feedback"]
+  const [highlightedLines, setHighlightedLines] = useState([]);
+  const [annotations, setAnnotations] = useState([]);
+  const [loadingStatus, setLoadingStatus] = useState(null); // 'loading', 'success', 'error', or null
+  const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true);
 
   const getAiAnnotations = () => {
-    if (data && data.ai_feedback) {
+    if (!AI_FEEDBACK_ENABLED) {
+      setAiFeedbackEnabled(false);
+      setLoadingStatus(null);
+      return null;
+    }
+  
+    if (data && data.ai_feedback !== undefined && data.ai_feedback !== null) {
       if (typeof data.ai_feedback === 'string') {
         try {
-          return JSON.parse(data.ai_feedback);
+          const parsed = JSON.parse(data.ai_feedback);
+          return parsed;
         } catch (error) {
-          console.error('Error parsing ai_feedback:', error);
-          return [];
+          console.error('Error parsing ai_feedback from JSON:', error);
+          setLoadingStatus('error');
+          return null;
         }
       } else {
-        return data.ai_feedback;
+        console.error('AI Feedback is not a string', data.ai_feedback);
+        setLoadingStatus('error');
+        return null;
       }
+    } else {
+      // ai_feedback is still being generated or fetched
+      setLoadingStatus('loading');
+      return null;
     }
-    return [];
   };
-  // const aiAnnotations = data && data.ai_feedback ? data.ai_feedback : [];
 
-  // console.log("AI ANNOTATIONS?? ", aiAnnotations);
-
-// const aiAnnotations = [
-//   { pattern: "class CalculatorException\\(Exception\\):", comment: "Consider adding more detailed documentation for this exception class, specifying under which conditions it is raised, to improve clarity for users of the code." },
-//   { pattern: "DIGIT = re.compile\\('\\-?\\d+'\\)", comment: "The regex for `DIGIT` does not account for decimal numbers. Consider updating the pattern to handle floats if needed (e.g., `\\-?\\d+(\\.\\d+)?`)." },
-//   { pattern: "TOKEN_CLASSES = \\[DIGIT, WHITESPACE, OPERATOR, PAREN\\]", comment: "This variable `TOKEN_CLASSES` is defined but never used in the code. Consider removing it or utilizing it in `lex` for improved modularity." },
-//   { pattern: "raise CalculatorException\\(\"Unknown character\"\\.format\\(string\\[i\\]\\)\\)", comment: "The error message does not include the actual unknown character. Consider updating the message to `\"Unknown character: {}\".format(string[i])` to provide more useful feedback." },
-//   { pattern: "while len\\(operator_stack\\) > 0 and \\n                        precedence <= self\\.PRECEDENCES\\[operator_stack\\[-1\\]\\]:", comment: "The `while` loop does not account for parentheses correctly in operator precedence. Consider adding checks for '(' and ')' explicitly to avoid errors." },
-//   { pattern: "output\\.append\\(operator_stack\\.pop\\(\\)\\)", comment: "In `parse`, when appending operators from the stack to the output, ensure the stack doesn't contain mismatched parentheses. Add validation for robustness." },
-//   { pattern: "elif token == \"\\(\\)\":", comment: "This condition assumes parentheses are balanced. Consider validating the input for unbalanced parentheses before parsing." },
-//   { pattern: "if token == '\\+':", comment: "The `eval_rpn` method does not handle division by zero. Add a check to handle this case gracefully." },
-//   { pattern: "return input\\('> '\\)", comment: "Using `input` directly in `read` may make it harder to test the `Calculator` class. Consider allowing an optional input source for testing purposes." },
-//   { pattern: "while line != \"quit\":", comment: "Consider handling invalid inputs gracefully in the REPL loop, with meaningful error messages instead of crashing the program." },
-//   { pattern: "calc\\.loop\\(\\)", comment: "Add a way to handle keyboard interrupts (e.g., `Ctrl+C`) to exit the REPL loop cleanly, avoiding abrupt terminations." },
-//   { pattern: "class Calculator\\(object\\):", comment: "Using `object` as a base class is unnecessary in Python 3. You can simply write `class Calculator:`." },
-//   { pattern: "WHITESPACE = re.compile\\('\\s+'\\)", comment: "This pattern is redundant as whitespace is skipped in `lex`. Consider removing this regex for simplicity if unused." },
-//   { pattern: "output\\.append\\(operator_stack\\.pop\\(\\)\\)", comment: "At the end of `parse`, check for any remaining unmatched parentheses in the `operator_stack` to ensure input validity." },
-//   { pattern: "return self\\.D .* \\[tT][oO][kK][eE][nN]\\)", comment: "The `is_digit` and other `is_*` methods directly match tokens without null checks. Consider adding checks to avoid issues with invalid inputs." }
-// ];
-
-
-  // Function to find and highlight lines that match annotation patterns
   const findAnnotations = (code) => {
+    setLoadingStatus('loading');
+  
     const aiAnnotations = getAiAnnotations();
+    if (!aiAnnotations) {
+      setLoadingStatus('loading');
+      return;
+    }
+  
+    if (aiAnnotations.error) {
+      console.error("AI feedback error:", aiAnnotations.error);
+      setLoadingStatus('error');
+      return;
+    }
+  
+    const { annotations } = aiAnnotations;
+    if (!Array.isArray(annotations)) {
+      console.error("Missing or invalid 'annotations' array in AI feedback.");
+      setLoadingStatus('error');
+      return;
+    }
+
+    console.log("Ai annotations: ", annotations)
+ 
+  
     const lines = code.split('\n');
     const highlighted = [];
     const newAnnotations = [];
 
-    
-    aiAnnotations.forEach(({ pattern, comment }) => {
-      const regex = new RegExp(pattern);
+
+    const escapeRegExp = (string) =>
+      string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole match
+  
+    annotations.forEach(({ pattern, comment }) => {
+      let regex;
+      try {
+        const safePattern = escapeRegExp(pattern.trim());  // Escape special characters
+        regex = new RegExp(safePattern);
+      } catch (e) {
+        console.warn(`Invalid regex pattern skipped: ${pattern}`, e);
+        return;
+      }
+  
       lines.forEach((line, index) => {
         if (regex.test(line)) {
-          highlighted.push(index + 1); // Store the line number (1-based index)
+          highlighted.push(index + 1);
           newAnnotations.push({ line: index + 1, comment });
         }
       });
     });
-
+  
     setHighlightedLines(highlighted);
     setAnnotations(newAnnotations);
+    setLoadingStatus('success');
   };
 
   useEffect(() => {
     if (data) {
-      setStudentCode(data.student_code_file); // Assuming the student code is in this field
-      findAnnotations(data.student_code_file); // Find and highlight annotations
+      setStudentCode(data.student_code_file || '');
+      setAiFeedbackEnabled(true);
+      findAnnotations(data.student_code_file || '');
     }
   }, [data]);
 
   const displayCodeWithAnnotations = () => {
     const lines = studentCode.split('\n');
+
     return (
-      <div style={{ maxHeight: '400px', overflowY: 'scroll' }}>
-        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+      <div style={{ position: 'relative', maxHeight: '400px', overflowY: 'scroll', border: '1px solid #ccc', padding: '10px' }}>
+        {/* Loader/Status only if AI feedback is enabled */}
+        {aiFeedbackEnabled && (
+  <div style={{ position: 'absolute', top: 5, right: 10, display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <Tooltip title="Fetching AI feedback...">
+      {loadingStatus === 'loading' && <Spin size="small" />}
+    </Tooltip>
+
+    {loadingStatus === 'success' && (
+      <Tooltip title="AI feedback was successfully loaded and applied to matching code lines.">
+        <Tag color="green">AI Feedback Loaded</Tag>
+      </Tooltip>
+    )}
+
+    {loadingStatus === 'error' && (
+      <Tooltip title="An error occurred while parsing or loading AI feedback. Ensure the backend response is a valid JSON with an 'annotations' array.">
+        <Tag color="red">AI Feedback Error</Tag>
+      </Tooltip>
+    )}
+  </div>
+)}
+
+        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
           {lines.map((line, index) => {
             const lineNumber = index + 1;
             const isHighlighted = highlightedLines.includes(lineNumber);

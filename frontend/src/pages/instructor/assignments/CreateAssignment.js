@@ -288,9 +288,9 @@ export default ({
                 <Form.Item
                   label="AI FEEDBACK PROMPT"
                   name="ai_feedback_prompt"
-                  initialValue={"You are an AI used to provide constructive feedback to students on their coding assignments. \
-                     Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation,\
-                      error handling, style/formatting,\n\n"}
+                  initialValue={"You are an AI used to provide constructive feedback to students on their coding assignments.\
+    Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation,\
+    error handling, style/formatting.\n"}
                   rules={[{ required: enableAiFeedback, message: "Please enter a feedback prompt" }]}
                 >
                   <Input.TextArea
@@ -303,12 +303,12 @@ export default ({
                 <Form.Item
                   label="AI MODEL USED"
                   name="ai_feedback_model"
-                  initialValue="gpt-4"
+                  initialValue="gpt-4o"
                   rules={[{ required: enableAiFeedback, message: "Please select an AI model" }]}
                 >
                   <Select placeholder="Select AI model" disabled={!enableAiFeedback}>
                     <Select.Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Select.Option>
-                    <Select.Option value="gpt-4">GPT-4</Select.Option>
+                    <Select.Option value="gpt-4o">GPT-4o</Select.Option>
                     <Select.Option value="custom-model">Custom Model</Select.Option>
                   </Select>
                 </Form.Item>

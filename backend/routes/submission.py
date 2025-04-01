@@ -7,7 +7,7 @@ from functools import reduce
 from flask import Blueprint, request, jsonify, flash, current_app
 from flask_cors import cross_origin
 from api import db
-from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
+from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from datetime import datetime, timezone
 import subprocess
@@ -20,6 +20,8 @@ import time
 from dotenv import load_dotenv
 from openai import OpenAI
 import threading
+from sqlalchemy.orm import aliased
+
 
 from sqlalchemy import desc, func
 import base64
@@ -29,16 +31,16 @@ submission = Blueprint('submission', __name__)
 
 ALLOWED_EXTENSIONS = {'py','zip'}
 
-load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
+# load_dotenv()
+# openai_api_key = os.getenv("OPENAI_API_KEY")
 
-# Represents if openAI code feedback should be generated
-generateCodeFeedback = True
-if not openai_api_key:
-    print("OPENAI_API_KEY environment variable is not set")
-    generateCodeFeedback = False
-else:
-    print("Successfully loaded openAI API Key")
+# # Represents if openAI code feedback should be generated
+# generateCodeFeedback = True
+# if not openai_api_key:
+#     print("OPENAI_API_KEY environment variable is not set")
+#     generateCodeFeedback = False
+# else:
+#     print("Successfully loaded openAI API Key")
 
 # openai.api_key = openai_api_key
 
@@ -86,14 +88,38 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         with open(file_path, 'r') as code_file:
             code_text = code_file.read()
 
+        # alias for clarity
+        assignment_alias = aliased(Assignment)
+        course_alias = aliased(Course)
+        student_alias = aliased(User)
+
+        # query records for submission, assignment, course, and student that relate to this submission
+        result = (
+            db.session.query(Submission, assignment_alias, course_alias, student_alias)
+            .join(assignment_alias, Submission.assignment_id == assignment_alias.id)
+            .join(course_alias, assignment_alias.course_id == course_alias.id)
+            .join(student_alias, Submission.student_id == student_alias.id)
+            .filter(Submission.id == submission_id)
+            .first()
+        )
+
+        if result:
+            submission_record, assignment_record, course_record, student_profile = result
+
+
+
+
         # Prepare the prompt including both the code and autograder results.
+        # Original prompt:
+        # "You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, and style/formatting"
+
         prompt_message = (
-            "You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, and style/formatting"
+            f"{assignment_record.ai_feedback_prompt}"
             "Pay special attention to the past insights of this student:\n"
-            "Student doesn't consider edge cases"
+            f"{student_profile.coding_insights}"
 
             "Response should be JSON in the form:" \
-            "{ 'insights': <updated insights for this student's coding behavior, focused on areas of improvement>",
+            "{ 'insights': <concise array of bullet points which describe the overall deficiencies in this student's coding behavior across assignments>",
                 "'annotations': [{'pattern': <> , 'comment': <>}, ...]"
             "}"
             "Code:\n\n"
@@ -102,22 +128,37 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
             f"{results_json_content}\n\n"
         )
 
+
         # Use the new OpenAI API interface.
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        # Pull api key from course record
+        client = OpenAI(api_key=course_record.openai_api_key)
+
+        # helper to format message properly depending on model
+        def format_message(text, model="gpt-4o"):
+            if "gpt-4o" in model:
+                return [{ "type": "text", "text": str(text) }]
+            return text
+        
+        SELECTED_MODEL = assignment_record.ai_feedback_model
+        SELECTED_TEMPERATURE = assignment_record.ai_feedback_temperature
+
+        print(SELECTED_MODEL, SELECTED_TEMPERATURE, assignment_record.ai_feedback_prompt, student_profile.coding_insights)
+        
         response = client.chat.completions.create(
             messages=[
                 {
                     "role": "system", 
-                    "content": "You are an AI that provides constructive criticism on submitted code."
+                    "content": format_message("You are an AI that provides constructive criticism on submitted code."
+                                              , SELECTED_MODEL)
                 },
                 {
                     "role": "user", 
-                    "content": prompt_message
+                    "content": format_message(prompt_message, SELECTED_MODEL)
                 }
             ],
-            model="gpt-4o",  # Use the appropriate model name
-            max_tokens=500,
-            temperature=0.5,
+            model=SELECTED_MODEL,
+            max_tokens=700,
+            temperature=SELECTED_TEMPERATURE,
         )
 
         # Extract the AI feedback text from the response.
@@ -140,11 +181,15 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
 
         try:
             ai_feedback_json = json.loads(cleaned_text)
+
+            student_insights = ai_feedback_json.insights
             
-            print("AI Feedback:")
+            print("AI_FEEDBACK:")
             print(json.dumps(ai_feedback_json, indent=4))
+            print("Student insights:")
+            print(student_insights)
         except Exception as parse_error:
-            print("AI FEEDBACK FAILED")
+            print("AI_FEEDBACK: AI FEEDBACK FAILED")
 
 
             ai_feedback_json = {
@@ -154,17 +199,18 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
             print(ai_feedback_json)
     except Exception as openai_error:
         ai_feedback_json = {"error": f"Failed to get AI feedback: {str(openai_error)}"}
-        print(cleaned_text)
+        print("AI_FEEDBACK: Error in AI Feedback:")
+        print(str(openai_error))
+        # print(cleaned_text)
 
     # Update the submission record in the DB with the AI feedback.
     submission_record = Submission.query.get(submission_id)
     submission_record.ai_feedback = json.dumps(ai_feedback_json)
+    student_profile.coding_insights = str(student_insights)
     db.session.commit()
 
-    
     ctx.pop()
 
-    
 
 
 

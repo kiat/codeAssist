@@ -17,6 +17,10 @@ def update_assignment():
     @param assignment_id    the id of the assignment
     '''
     new_data = request.json
+
+    print("Received assignment update:", new_data)
+
+
     assignment_id = request.json["assignment_id"]
 
     del new_data["assignment_id"]
@@ -65,6 +69,9 @@ def create_assignment():
     id in the database
     '''
     assignment_data = request.json
+
+    print("Received assignment creation:", assignment_data)
+
     # Check for duplicate name
     assignment_name = assignment_data.get("name")
     course_id = assignment_data.get("course_id")
