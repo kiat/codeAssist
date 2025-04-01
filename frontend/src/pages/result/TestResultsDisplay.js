@@ -5,19 +5,19 @@ import 'antd/dist/antd.css';
 
 const { Panel } = Collapse;
 
-const AI_FEEDBACK_ENABLED = true;
+// const AI_FEEDBACK_ENABLED = true;
 
-const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data }) => {
+const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data, aiFeedbackEnabled}) => {
   const { userInfo } = useContext(GlobalContext);
   const [studentCode, setStudentCode] = useState('');
   const [highlightedLines, setHighlightedLines] = useState([]);
   const [annotations, setAnnotations] = useState([]);
-  const [loadingStatus, setLoadingStatus] = useState(null); // 'loading', 'success', 'error', or null
-  const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState('null'); // 'loading', 'success', 'error', or null
+  // const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true);
 
   const getAiAnnotations = () => {
-    if (!AI_FEEDBACK_ENABLED) {
-      setAiFeedbackEnabled(false);
+    if (!aiFeedbackEnabled) {
+      // setAiFeedbackEnabled(false);
       setLoadingStatus(null);
       return null;
     }
@@ -39,6 +39,8 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
       }
     } else {
       // ai_feedback is still being generated or fetched
+      console.log("ai_feedback is still being generated or fetched");
+      console.log(data, data.ai_feedback);
       setLoadingStatus('loading');
       return null;
     }
@@ -103,7 +105,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
   useEffect(() => {
     if (data) {
       setStudentCode(data.student_code_file || '');
-      setAiFeedbackEnabled(true);
+      // setAiFeedbackEnabled(true);
       findAnnotations(data.student_code_file || '');
     }
   }, [data]);

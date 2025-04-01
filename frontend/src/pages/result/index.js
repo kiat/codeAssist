@@ -22,19 +22,22 @@ export default function AssignmentResult() {
   const [formattingModalOpen, setFormattingOpen] = useState(false);
   const [autoGraderPoints, setAutograderPoints] = useState(0);
   const [assignmentName, setAssignmentName] = useState(""); // Placeholder value
-  //chnaging the whole file to use the submisison id in the params instead of teh assingment id and submission id passed in
+  // changing the whole file to use the submisison id in the params instead of teh assingment id and submission id passed in
   const { submissionId } = useParams();
   const [assignmentId, setAssignmentId] = useState("");
   const [studentId, setStudentId] = useState("");
-  //const { assignmentId, studentId } = useParams();
+  // const { assignmentId, studentId } = useParams();
   const location = useLocation();
-  //adding global context variable
+  // adding global context variable
   const { userInfo, assignmentInfo, updateAssignmentInfo } =
     useContext(GlobalContext);
   const [toSend, setToSend] = useState();
   const [dueDate, setDueDate] = useState();
   const [lateDueDate, setLateDueDate] = useState();
   const [lateAllowed, setLateAllowed] = useState();
+
+  // used to check if AI Feedback has been enabled on this assignment
+  const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true);
   
   useEffect(() => {
     // Fetching student and assignment IDs based on this submission ID
@@ -62,7 +65,19 @@ export default function AssignmentResult() {
 
 
 
+
+  // useEffect loop that continues to poll server every 5 seconds for updated
+  // AI Feedback until it successfully returns. This is because AI feedback can 
+  // take about 5-10 seconds to process. Loop is skipped if AI feedback is disabled
   useEffect(() => {
+    // AI Feedback is not enabled, skip
+    if (!aiFeedbackEnabled) {
+      console.log("AI Feedback Disabled.")
+      return;
+    } else {
+      console.log("AI Feedback Enabled.")
+    }
+
     if (!toSend || !toSend.id || toSend.ai_feedback) return;
   
     const interval = setInterval(async () => {
@@ -82,7 +97,7 @@ export default function AssignmentResult() {
     }, 5000);
   
     return () => clearInterval(interval);
-  }, [toSend]);
+  }, [toSend, aiFeedbackEnabled]);
   
 
   useEffect(() => {
@@ -94,6 +109,7 @@ export default function AssignmentResult() {
       );
       return;
     }
+
 
     const fetchAssignmentDetails = async () => {
       try {
@@ -109,6 +125,7 @@ export default function AssignmentResult() {
           setDueDate(moment(res.data.due_date).valueOf());
           setLateAllowed(res.data.late_submission);
           setLateDueDate(moment(res.data.late_due_date).valueOf());
+          setAiFeedbackEnabled(res.data.ai_feedback_enabled);
           if (extension?.data.due_date_extension) {
             setDueDate(moment(extension.data.due_date_extension).valueOf());
           }
@@ -223,6 +240,7 @@ export default function AssignmentResult() {
                   score={assignmentInfo?.score ?? "Unknown"} // Replace with actual score data as needed
                   totalPoints={autoGraderPoints}
                   data={toSend}
+                  aiFeedbackEnabled={aiFeedbackEnabled}
                 />
               )}
               {/* old calls */}

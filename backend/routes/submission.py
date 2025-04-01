@@ -31,20 +31,6 @@ submission = Blueprint('submission', __name__)
 
 ALLOWED_EXTENSIONS = {'py','zip'}
 
-# load_dotenv()
-# openai_api_key = os.getenv("OPENAI_API_KEY")
-
-# # Represents if openAI code feedback should be generated
-# generateCodeFeedback = True
-# if not openai_api_key:
-#     print("OPENAI_API_KEY environment variable is not set")
-#     generateCodeFeedback = False
-# else:
-#     print("Successfully loaded openAI API Key")
-
-# openai.api_key = openai_api_key
-
-
 
 def allowed_file(filename):
     return "." in filename and \
@@ -106,19 +92,21 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         if result:
             submission_record, assignment_record, course_record, student_profile = result
 
+        if not assignment_record.ai_feedback_enabled:
+            print(f"AI_FEEDBACK: Disabled for submission {submission_id}")
+            ctx.pop()
+            return
 
-
+        student_insights = student_profile.coding_insights
+        print("Initial Student Insights:", student_insights)
 
         # Prepare the prompt including both the code and autograder results.
-        # Original prompt:
-        # "You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, and style/formatting"
-
         prompt_message = (
             f"{assignment_record.ai_feedback_prompt}"
             "Pay special attention to the past insights of this student:\n"
-            f"{student_profile.coding_insights}"
+            f"{student_insights}"
 
-            "Response should be JSON in the form:" \
+            "Response should be strictly JSON, with no extra formatting, in the form:" \
             "{ 'insights': <concise array of bullet points which describe the overall deficiencies in this student's coding behavior across assignments>",
                 "'annotations': [{'pattern': <> , 'comment': <>}, ...]"
             "}"
@@ -164,25 +152,29 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         # Extract the AI feedback text from the response.
         ai_feedback_text = response.choices[0].message.content
 
-        # Clean up markdown formatting.
+        # Clean up markdown-style formatting
         cleaned_text = ai_feedback_text.strip()
+
+        # Remove surrounding ```json or ``` if present
         if cleaned_text.startswith("```"):
-            # Split into lines and remove the first line if it is a markdown fence (e.g. ```json)
             lines = cleaned_text.splitlines()
             if lines[0].startswith("```"):
                 lines = lines[1:]
-            # Remove the last line if it is just the closing fence
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             cleaned_text = "\n".join(lines).strip()
 
-        # Replace literal "\n" sequences with actual newline characters.
+        # Unescape literal newlines
         cleaned_text = cleaned_text.replace("\\n", "\n")
 
         try:
             ai_feedback_json = json.loads(cleaned_text)
 
-            student_insights = ai_feedback_json.insights
+            if isinstance(ai_feedback_json, str):
+                ai_feedback_json = json.loads(ai_feedback_json)
+            
+            # update student insights with new insights
+            student_insights = ai_feedback_json["insights"]
             
             print("AI_FEEDBACK:")
             print(json.dumps(ai_feedback_json, indent=4))
@@ -190,7 +182,6 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
             print(student_insights)
         except Exception as parse_error:
             print("AI_FEEDBACK: AI FEEDBACK FAILED")
-
 
             ai_feedback_json = {
                 "error": "Failed to parse OpenAI response as JSON",
@@ -201,7 +192,6 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         ai_feedback_json = {"error": f"Failed to get AI feedback: {str(openai_error)}"}
         print("AI_FEEDBACK: Error in AI Feedback:")
         print(str(openai_error))
-        # print(cleaned_text)
 
     # Update the submission record in the DB with the AI feedback.
     submission_record = Submission.query.get(submission_id)
@@ -210,8 +200,6 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
     db.session.commit()
 
     ctx.pop()
-
-
 
 
 @submission.route('/upload_submission', methods=["POST"])

@@ -11,6 +11,8 @@ class User(db.Model):
     email_address = db.Column(db.String, nullable=False, unique=True)
     sis_user_id = db.Column(db.String, nullable=False, unique=True)
     role = db.Column(db.String, nullable = False)
+
+    # -- AI Integration -- 
     coding_insights = db.Column(db.String, default="No history.")
 
 
