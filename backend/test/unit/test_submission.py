@@ -1,17 +1,19 @@
 import os
 import pytest
 from flask import json
-from api import create_app
+from api import create_app, db
+from api.models import Submission
+
 
 from routes.submission import submission
 
 @pytest.fixture
 def app():
-    """Create and configure a new app instance for each test."""
     app = create_app(config_class="config.TestConfig")
-
     with app.app_context():
+        db.create_all()  # Create the tables
         yield app
+        db.drop_all()    # Clean up after tests
 
 
 @pytest.fixture
@@ -241,44 +243,52 @@ def test_upload_submission_missing_file(client):
     assert response.status_code == 400
 
 
-# # FAILED TEST
-# def test_delete_submission_not_found(client, mocker):
-#     """Test /delete_submission returns 404 when the submission is not found."""
-#     # Patch the get method to return None.
-#     mocker.patch("routes.submission.Submission.query.get", return_value=None)
+# FAILED TEST
+def test_delete_submission_not_found(client, mocker):
+    """Test /delete_submission returns 404 when the submission is not found."""
+    # Patch the get method to return None.
+    mocker.patch("routes.submission.Submission.query.get", return_value=None)
     
-#     response = client.delete("/delete_submission?submission_id=123")
-#     assert response.status_code == 404
-#     data = response.get_json()
-#     assert data["message"] == "No submission found to delete"
+    response = client.delete("/delete_submission?submission_id=123")
+    assert response.status_code == 404
+    data = response.get_json()
+    assert data["message"] == "No submission found to delete"
 
 
-# # FAILED TEST
-# def test_upload_assignment_autograder_missing_file(client):
-#     """Test /upload_assignment_autograder returns error when file is missing."""
-#     response = client.post("/upload_assignment_autograder", data={})
-#     assert response.status_code == 400 or response.status_code == 500  # depending on error handling
+# FAILED TEST
+def test_upload_assignment_autograder_missing_file(client):
+    """Test /upload_assignment_autograder returns error when file is missing."""
+    response = client.post("/upload_assignment_autograder", data={})
+    # Expect a 400 Bad Request since the file key is missing in request.files
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data["error"] == "No file part"
 
-# # FAILED TEST
-# def test_delete_submission_success(client, mocker):
-#     """Test /delete_submission successfully deletes a submission."""
-#     fake_submission = object()  # a dummy submission object
-#     mock_get = mocker.patch("routes.submission.Submission.query.get", return_value=fake_submission)
-#     mock_delete = mocker.patch("routes.submission.db.session.delete")
-#     mock_commit = mocker.patch("routes.submission.db.session.commit")
 
-#     response = client.delete("/delete_submission?submission_id=123")
-#     assert response.status_code == 200
-#     data = response.get_json()
-#     assert data["message"] == "Submission successfully deleted"
-#     mock_get.assert_called_once_with("123")
-#     mock_delete.assert_called_once_with(fake_submission)
-#     mock_commit.assert_called_once()
+def test_delete_submission_success(client, mocker):
+    """Test /delete_submission successfully deletes a submission."""
+    fake_submission = object()  # a dummy submission object
 
-# # FAILED TEST
-# def test_get_active_submission_missing_params(client):
-#     """Test /get_active_submission returns error when required params are missing."""
-#     response = client.get("/get_active_submission")
-#     assert response.status_code == 400
-#     data = response.get_json()
-#     assert data["error"] == "not sufficient details"
+    # Patch the get method on the api.db.session instead of routes.submission.db.session.get
+    fake_get = mocker.patch("api.db.session.get", return_value=fake_submission)
+    mock_delete = mocker.patch("routes.submission.db.session.delete")
+    mock_commit = mocker.patch("routes.submission.db.session.commit")
+
+    response = client.delete("/delete_submission?submission_id=123")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["message"] == "Submission successfully deleted"
+    
+    fake_get.assert_called_once_with(Submission, "123")
+    mock_delete.assert_called_once_with(fake_submission)
+    mock_commit.assert_called_once()
+
+# FAILED TEST
+def test_get_active_submission_missing_params(client):
+    """Test /get_active_submission returns 400 when required parameters are missing."""
+    response = client.get("/get_active_submission")
+    # Expecting a 400 due to missing 'student_id' and 'assignment_id'
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data["error"] == "not sufficient details"
+    

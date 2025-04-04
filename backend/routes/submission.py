@@ -210,7 +210,7 @@ def upload_submission():
 def upload_assignment_autograder():
     # Validate input file and parameters
     if "file" not in request.files:
-        return BadRequestError("No file part")
+        return jsonify({"error": "No file part"}), 400
     file = request.files["file"]
     assignment_id = request.form.get("assignment_id")
     autograder_timeout = request.form.get("autograder_timeout")
@@ -397,7 +397,7 @@ def delete_submission():
         return jsonify({"error": "Missing submission_id"}), 400
 
     # Query for the submission to be deleted by submission_id
-    submission_to_delete = Submission.query.get(submission_id)
+    submission_to_delete = db.session.get(Submission, submission_id)
 
     if not submission_to_delete:
         # If no submission is found, return an error message
@@ -443,7 +443,7 @@ def get_active_submission():
     assignment = request.args.get("assignment_id")
 
     if not assignment or not student:
-        return jsonify({"error": "not sufficient details"})
+        return jsonify({"error": "not sufficient details"}), 400
     
     submission = db.session.query(Submission).filter_by(assignment_id=assignment, student_id=student, active=True).first()
 
