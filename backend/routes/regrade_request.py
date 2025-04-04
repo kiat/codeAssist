@@ -8,9 +8,9 @@ from api.schemas import SubmissionSchema, UserSchema
 # from openai import AsyncOpenAI
 
 
-regrade_requests = Blueprint('regrade_requests', __name__)
+regrade_request = Blueprint('regrade_request', __name__)
 
-@regrade_requests.route('/send_regrade_request', methods=["POST"])
+@regrade_request.route('/send_regrade_request', methods=["POST"])
 @cross_origin()
 def send_regrade_request():
     '''
@@ -38,7 +38,7 @@ def send_regrade_request():
     response = jsonify(res)
     return response
 
-@regrade_requests.route('/get_regrade_request', methods=["GET"])
+@regrade_request.route('/get_regrade_request', methods=["GET"])
 @cross_origin()
 def get_regrade_request():
     '''
@@ -63,7 +63,7 @@ def get_regrade_request():
     }
     return jsonify(response)
 
-@regrade_requests.route('/update_grade', methods=["POST"])
+@regrade_request.route('/update_grade', methods=["POST"])
 @cross_origin()
 def update_grade():
     '''
@@ -95,7 +95,7 @@ def update_grade():
     return jsonify({"message": "Grade updated successfully"}), 200
 
 
-@regrade_requests.route('/get_student_regrade_requests', methods=["GET"])
+@regrade_request.route('/get_student_regrade_requests', methods=["GET"])
 @cross_origin()
 def get_student_regrade_requests():
     student_id = request.args.get("student_id")
@@ -129,7 +129,7 @@ def get_student_regrade_requests():
 
     return jsonify(result), 200
 
-@regrade_requests.route('/get_instructor_regrade_requests', methods=["GET"])
+@regrade_request.route('/get_instructor_regrade_requests', methods=["GET"])
 @cross_origin()
 def get_instructor_regrade_requests():
     course_id = request.args.get("course_id")
@@ -151,7 +151,7 @@ def get_instructor_regrade_requests():
 
     return jsonify(result), 200
 
-@regrade_requests.route('/set_reviewed', methods=['POST'])
+@regrade_request.route('/set_reviewed', methods=['POST'])
 @cross_origin()
 def set_reviewed():
     submissionid = request.json["submission_id"]
@@ -161,7 +161,7 @@ def set_reviewed():
 
     return jsonify({"message": "Review updated successfully"}), 200
 
-@regrade_requests.route('/check_regrade_request', methods=["POST"])
+@regrade_request.route('/check_regrade_request', methods=["POST"])
 @cross_origin()
 def check_regrade_request():
     submission_id = request.json["submission_id"]
@@ -170,7 +170,7 @@ def check_regrade_request():
         return jsonify({"has_request": False}), 200
     return jsonify({"has_request": True}), 200
 
-@regrade_requests.route('/delete_regrade_request', methods=["POST"])
+@regrade_request.route('/delete_regrade_request', methods=["POST"])
 @cross_origin()
 def delete_regrade_request():
     submission_id = request.json["submission_id"]

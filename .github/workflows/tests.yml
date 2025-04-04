@@ -1,0 +1,46 @@
+name: Run Tests and Collect Coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Run Tests with Coverage
+        run: |
+          source .venv/bin/activate
+          cd backend
+          export PYTHONPATH=$(pwd)
+          pytest --cov-report=xml
+
+      # TODO: coverage report upload with codecov must be configured in the repository settings
+
+      # - name: Upload Coverage Report
+      #   uses: codecov/codecov-action@v4
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}  # Optional, only needed for private repos
+      #     files: ./coverage.xml
+      #     fail_ci_if_error: true

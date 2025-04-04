@@ -1,61 +1,78 @@
-  import { useContext } from "react";
-  import { useNavigate } from "react-router-dom";
-  import { GlobalContext } from "../../../App";
+import { useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import { GlobalContext } from "../../../App";
 
-  // Consider extracting styles for better maintainability and performance
-  const courseStyle = {
-      width: "230px",
-      marginRight: "15px",
-      marginBottom: "15px",
-      cursor: "pointer",
-  };
+const courseStyle = {
+    width: "230px",
+    minHeight: "138px", 
+    cursor: "pointer",
+    overflow: "hidden",
+    boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.1)",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    backgroundColor: "#F5F5F5",
+};
 
-  const courseHeaderStyle = {
-      backgroundColor: "#f0f2f5",
-      height: "85px",
-      paddingLeft: "10px",
-  };
+const courseHeaderContainer = {
+    display: "flex",
+    flexDirection: "column", 
+    padding: "10px",
+    borderTopLeftRadius: "3px",
+    borderTopRightRadius: "3px",
+};
 
-  const courseFooterStyle = {
-      backgroundColor: "#1b807c",
-      paddingLeft: "10px",
-      lineHeight: "40px",
-      color: "white",
-  };
+const courseHeaderStyle = {
+    fontWeight: "bold",
+    fontSize: "16px",
+    color: "#333",
+};
 
-  /**
-   * Displays a single course with navigation based on user role
-   * @param {Object} courseInfo Information about the course
-   */
-  export default function Course({ courseInfo }) {
-      const navigate = useNavigate();
-      const { userInfo, updateCourseInfo } = useContext(GlobalContext);
-      const { code, name, assignments, id, semester } = courseInfo;
+const descriptionStyle = {
+    fontSize: "13px",
+    color: "#555",
+    marginTop: "4px",
+};
 
-      function handleCourseClick() {
-          // Ensure all fields are updated correctly in context
-          updateCourseInfo({
-              id: id,
-              code: code,
-              name: name,
-              semester: semester,
-              year: courseInfo.year || ""  // Handle missing year if not provided
-          });
+const courseFooterStyle = {
+    backgroundColor: "#1b807c",
+    color: "white",
+    textAlign: "left",
+    padding: "10px",
+    fontSize: "14px",
+    fontWeight: "bold",
+    borderBottomLeftRadius: "3px",
+    borderBottomRightRadius: "3px",
+};
 
-          // Navigate based on user role
-          const destination = userInfo.isStudent ? `/assignments/${id}` : `/instructorDashboard/${id}`;
-          navigate(destination);
-      }
+export default function Course({ courseInfo }) {
+    const navigate = useNavigate();
+    const { userInfo, updateCourseInfo } = useContext(GlobalContext);
+    const { name, assignments, description, id, semester } = courseInfo;
 
-      return (
-          <div style={courseStyle} onClick={handleCourseClick}>
-              <div style={courseHeaderStyle}>
-                  <h3>{code}</h3>
-                  <span>{name}</span>
-              </div>
-              <div style={courseFooterStyle}>
-                  {assignments} assignments
-              </div>
-          </div>
-      );
-  }
+    function handleCourseClick() {
+        updateCourseInfo({
+            id,
+            name,
+            semester,
+            year: courseInfo.year || "",
+        });
+
+        const destination = userInfo.isStudent ? `/assignments/${id}` : `/instructorDashboard/${id}`;
+        navigate(destination);
+    }
+
+    return (
+        <div style={courseStyle} onClick={handleCourseClick}>
+            <div style={courseHeaderContainer}>
+                <div style={courseHeaderStyle}>{name}</div>
+                <div style={descriptionStyle}>
+                    {description}
+                </div>
+            </div>
+            <div style={courseFooterStyle}>
+                {assignments} Assignments
+            </div>
+        </div>
+    );
+}

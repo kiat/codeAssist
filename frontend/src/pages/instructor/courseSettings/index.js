@@ -37,6 +37,9 @@ export default () => {
   // Used to manage form state
   const [form] = Form.useForm();
 
+  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+
+
   useEffect(() => {
     fetchCourseData();
   }, []);
@@ -104,6 +107,10 @@ export default () => {
     try {
       await updateCourse(dataToSend);
       message.success("Course updated successfully");
+
+      const res = await getCourseInfo({course_id: courseId});
+      updateCourseInfo(res.data[0]);
+
       navigateMainPage();
     } catch (error)  {
       console.error("Error updating course:", error);

@@ -51,13 +51,16 @@ def get_assignment():
     @param assignment_id    the id of the assignment
     '''
     assignment_id = request.args.get("assignment_id")
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id)
 
-    assignment = db.session.query(Assignment).filter_by(id=assignment_id)
-    assignment = AssignmentSchema().dump(assignment, many=True)[0]
+    if not assignment_obj:
+        return jsonify({"message": "Assignment not found"}), 404
 
-    return jsonify(assignment)
+    result = AssignmentSchema().dump(assignment_obj, many=False)
+    return jsonify(result), 200
 
-@assignment.route('/create_assignment', methods=["POST", "GET"])
+
+@assignment.route('/create_assignment', methods=["POST"])
 @cross_origin()
 def create_assignment():
     '''
@@ -65,12 +68,12 @@ def create_assignment():
     id in the database
     '''
     assignment_data = request.json
-    # Check for duplicate name
     assignment_name = assignment_data.get("name")
     course_id = assignment_data.get("course_id")
 
-    course_assignment = db.session.query(Assignment).filter_by(course_id=course_id, name=assignment_name).one_or_none()
-    if course_assignment != None:
+    # Check if assignment already exists for the course
+    existing_assignment = db.session.query(Assignment).filter_by(course_id=course_id, name=assignment_name).one_or_none()
+    if existing_assignment:
         return jsonify({"message": "An assignment with this name already exists"}), 400
 
     assignment_id = str(uuid.uuid4())
@@ -80,9 +83,14 @@ def create_assignment():
     valid_assignment_data = {k: v for k,v in assignment_data.items() if v is not None}
     db.session.add(Assignment(**valid_assignment_data))
     db.session.commit()
-    newAssignment = db.session.query(Assignment).filter_by(id=assignment_id)
-    newAssignment = AssignmentSchema().dump(newAssignment, many=True)[0]
-    return jsonify(newAssignment)
+
+    # Fetch created assignment to return response
+    created_assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not created_assignment:
+        return jsonify({"message": "Assignment creation failed"}), 500  # Handle edge case
+
+    result = AssignmentSchema().dump(created_assignment)
+    return jsonify(result), 200
 
 @assignment.route('/duplicate_assignment', methods=["POST", "GET"])
 @cross_origin()
@@ -94,6 +102,7 @@ def duplicate_assignment():
 
     old_assignment_ID = assignment_data.get("oldAssignmentId")
     new_name = assignment_data.get("newAssignmentTitle")
+    current_course_ID = assignment_data.get("currentCourseId")
 
     # Check old_assignment
     old_assignment = db.session.query(Assignment).filter_by(id=old_assignment_ID).one_or_none()
@@ -101,7 +110,7 @@ def duplicate_assignment():
         return jsonify({"error": "Old assignment not found"}), 404
     
     # Check for duplicate name
-    course_assignment = db.session.query(Assignment).filter_by(course_id=old_assignment.course_id, name=new_name).one_or_none()
+    course_assignment = db.session.query(Assignment).filter_by(course_id=current_course_ID, name=new_name).one_or_none()
     if course_assignment != None:
         return jsonify({"error": "An assignment with this name already exists in this course"}), 404
     
@@ -111,6 +120,7 @@ def duplicate_assignment():
     old_assignment_data = AssignmentSchema().dump(old_assignment)
     old_assignment_data['id'] = new_assignment_id
     old_assignment_data['name'] = new_name
+    old_assignment_data['course_id'] = current_course_ID
 
     new_assignment = Assignment(**old_assignment_data)
 
@@ -231,3 +241,15 @@ def delete_extension():
         return jsonify("Extension deleted successfully"), 200
     else:
         return jsonify("Extension not deleted"), 404
+
+@assignment.route('/courses', methods=["GET"])
+@cross_origin()
+def get_courses():
+    instructor_id = request.args.get("instructor_id")
+    if instructor_id:
+        courses = db.session.query(Course).filter_by(instructor_id=instructor_id).all()
+    else:
+        courses = db.session.query(Course).all()
+    
+    courses_data = CourseSchema().dump(courses, many=True)
+    return jsonify(courses_data)

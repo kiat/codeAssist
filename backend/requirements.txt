@@ -9,3 +9,6 @@ marshmallow-sqlalchemy
 Flask-Migrate
 openai
 cryptography
+pytest
+pytest-mock
+pytest-cov

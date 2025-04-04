@@ -1,9 +1,7 @@
 import { Button, Form, Input, Modal, Radio } from "antd";
-// import axios from "axios";
-import { useState, useContext } from "react";
+import { useContext } from "react";
 import { GlobalContext } from "../../App";
-// import service from "../../services";
-import { signUpUser } from "../../services/user";
+import { createUser } from "../../services/user";
 
 /**
  * user signup window modal
@@ -12,25 +10,26 @@ import { signUpUser } from "../../services/user";
  */
 export default function SignUpModal({ open, onCancel }) {
   const { updateUserInfo } = useContext(GlobalContext);
-  // const [isStudent, setIsStudent] = useState(false);
 
   // action after successfully signup
   const finishSignUp = async (values) => {
     const {role, ...restValue } = values;
-    // const isStudent = values.isStudent;
-    let res;
-    // let taRes;
-    res = await signUpUser({...restValue, role});
+    
+    try {
+      const res = await createUser({...restValue, role});
 
-    if (res) {
-      const userInfo = {
-        name: res.data?.name,
-        id: res.data?.id,
-        isStudent: role === 'student',
-        role: role
-      };
-      localStorage.setItem("userInfo", JSON.stringify(userInfo));
-      updateUserInfo(userInfo);
+      if (res) {
+        const userInfo = {
+          name: res.data?.name,
+          id: res.data?.id,
+          isStudent: role === 'student',
+          role: role
+        };
+        localStorage.setItem("userInfo", JSON.stringify(userInfo));
+        updateUserInfo(userInfo);
+      }
+    } catch (error) {
+      console.log("Error creating user: ", error);
     }
 
   };  
@@ -45,22 +44,16 @@ export default function SignUpModal({ open, onCancel }) {
             style={{ width: "100%" }}
           >
             <Radio.Button
-              value='instructor'
-              style={{ width: "33%", textAlign: "center" }}
-            >
-              Instructor
-            </Radio.Button>
-            <Radio.Button
               value='student'
-              style={{ width: "33%", textAlign: "center" }}
+              style={{ width: "50%", textAlign: "center" }}
             >
               Student
             </Radio.Button>
             <Radio.Button
-              value='Reader'
-              style={{ width: "33%", textAlign: "center" }}
+              value='instructor'
+              style={{ width: "50%", textAlign: "center" }}
             >
-              Reader
+              Instructor
             </Radio.Button>
           </Radio.Group>
         </Form.Item>
@@ -70,7 +63,7 @@ export default function SignUpModal({ open, onCancel }) {
         <Form.Item label="Name" name="name">
           <Input placeholder="Your Name" />
         </Form.Item>
-        <Form.Item label="Email" name="email">
+        <Form.Item label="Email" name="email_address">
           <Input placeholder="email@example.com" />
         </Form.Item>
         <Form.Item label="Password" name="password">

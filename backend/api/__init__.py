@@ -4,23 +4,34 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_migrate import Migrate  # Import Migrate
 from dotenv import load_dotenv
-import os
 
-app = Flask(__name__)
-app.secret_key = 'codeassist'
-CORS(app)
+# Initialize extensions
+ma = Marshmallow()
+db = SQLAlchemy()
+migrate = Migrate()
 
-load_dotenv()
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_CONNECTION_STRING")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+def create_app(config_class='config.Config'):
+    # Create the Flask app instance
+    app = Flask(__name__)
+    app.secret_key = 'codeassist'
 
-UPLOAD_FOLDER = '/usr/app/files'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    # Load environment variables
+    load_dotenv()
+    
+    # Load the configuration
+    app.config.from_object(config_class)
+    
+    # Initialize the extensions with the app
+    CORS(app)
+    ma.init_app(app)
+    db.init_app(app)
+    migrate.init_app(app, db)
 
-ma = Marshmallow(app)
-db = SQLAlchemy(app)
+    # Register blueprints and routes (do it after app is initialized)
+    from routes import register_routes
+    from util.errors import register_error_handlers
 
-# Initialize Migrate with the Flask app and SQLAlchemy db instance
-migrate = Migrate(app, db)
+    register_routes(app)
+    register_error_handlers(app)
 
-from api import models
+    return app

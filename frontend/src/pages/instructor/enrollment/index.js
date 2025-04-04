@@ -18,7 +18,7 @@ import {
   createEnrollmentCSV,
   getCourseEnrollment,
   updateRole
-} from "../../../services/enrollment";
+} from "../../../services/course";
 import {
   getUserByEmail,
 } from "../../../services/user";
@@ -122,7 +122,7 @@ export default () => {
 
       function enrollEntry(item) {
         fetch(
-          process.env.REACT_APP_API_URL + "/get_users?" +
+          process.env.REACT_APP_API_URL + "/get_user_by_email?" +
             new URLSearchParams({
               email: item,
             })
