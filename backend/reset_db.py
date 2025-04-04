@@ -3,6 +3,8 @@ import psycopg2
 from dotenv import load_dotenv, set_key
 import os
 from cryptography.fernet import Fernet
+from init_encryption_keys import ensure_encryption_keys
+
 import secrets
 
 # Constant for the service account user which will be the owner of the database
@@ -14,23 +16,6 @@ load_dotenv()
 
 # Retrieve the connection string from the environment
 DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING")
-
-# Function to ensure encryption keys exist
-def ensure_encryption_keys():
-    """Check if API_SECRET_KEY and PASSWORD_SALT exist in .env; if not, generate and store them."""
-    api_secret_key = os.getenv("API_SECRET_KEY")
-    password_salt = os.getenv("PASSWORD_SALT")
-
-    # Check if keys exist
-    if not api_secret_key:
-        api_secret_key = Fernet.generate_key().decode()
-        set_key(ENV_FILE_PATH, "API_SECRET_KEY", api_secret_key)
-        print("Generated and stored API_SECRET_KEY.")
-
-    if not password_salt:
-        password_salt = secrets.token_hex(16)  # Generate a 16-byte salt in hex format
-        set_key(ENV_FILE_PATH, "PASSWORD_SALT", password_salt)
-        print("Generated and stored PASSWORD_SALT.")
 
 # Parse the connection string to get database credentials
 def parse_connection_string(conn_str):
