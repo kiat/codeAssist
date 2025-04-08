@@ -210,7 +210,7 @@ def upload_submission():
 def upload_assignment_autograder():
     # Validate input file and parameters
     if "file" not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        raise BadRequestError("No file part")
     file = request.files["file"]
     assignment_id = request.form.get("assignment_id")
     autograder_timeout = request.form.get("autograder_timeout")
@@ -443,7 +443,7 @@ def get_active_submission():
     assignment = request.args.get("assignment_id")
 
     if not assignment or not student:
-        return jsonify({"error": "not sufficient details"}), 400
+      raise BadRequestError("not sufficient details")
     
     submission = db.session.query(Submission).filter_by(assignment_id=assignment, student_id=student, active=True).first()
 
