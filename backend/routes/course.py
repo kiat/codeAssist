@@ -1,7 +1,7 @@
 import uuid
 import os
 import csv
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 from api import db
@@ -12,7 +12,6 @@ from api.models import (
     User,
     Submission,
     RegradeRequest,
-    Enrollment,
 )
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
