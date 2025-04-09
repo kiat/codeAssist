@@ -61,7 +61,8 @@ def test_update_assignment_not_found(client, mocker):
 def test_get_assignment_success(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_assignment = Assignment(id="assignment-uuid", name="Test Assignment")
-    mock_query.return_value.filter_by.return_value = mock_assignment
+    mock_filter_by = mock_query.return_value.filter_by
+    mock_filter_by.return_value.first.return_value = mock_assignment
 
     resp = client.get("/get_assignment?assignment_id=assignment-uuid")
 
@@ -69,13 +70,16 @@ def test_get_assignment_success(client, mocker):
     assert resp.json["id"] == "assignment-uuid"
     assert resp.json["name"] == "Test Assignment"
 
-    mock_query.return_value.filter_by.assert_called_once_with(id="assignment-uuid")
+    mock_filter_by.assert_called_once_with(id="assignment-uuid")
 
 def test_get_assignment_empty(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
-    mock_query.return_value.filter_by.return_value = []
+    mock_filter_by = mock_query.return_value.filter_by
+    mock_filter_by.return_value.first.return_value = None
+
     resp = client.get("/get_assignment?assignment_id=empty-uuid")
     assert resp.status_code == 404
+    assert resp.json["message"] == "Assignment not found"
 
 def test_create_assignment_success(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
