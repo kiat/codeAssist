@@ -136,7 +136,7 @@ export default function UploadModal({
       
       setLoading(true); // Show loading overlay
       const response = await uploadSubmission(formData)
-      const responseData = await response.json();
+      const responseData = response.data;
 
       // Proceed to results page after successful upload
       navigateToResults(responseData.submissionID);

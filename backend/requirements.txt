@@ -11,3 +11,6 @@ openai
 pytest
 pytest-mock
 pytest-cov
+cryptography
+psycopg2-binary
+dotenv

@@ -9,6 +9,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "dependencies": {
+    "react-scripts": "^5.0.1"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC"
