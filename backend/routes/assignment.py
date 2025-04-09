@@ -51,7 +51,7 @@ def get_assignment():
     @param assignment_id    the id of the assignment
     '''
     assignment_id = request.args.get("assignment_id")
-    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id)
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
 
     if not assignment_obj:
         return jsonify({"message": "Assignment not found"}), 404
