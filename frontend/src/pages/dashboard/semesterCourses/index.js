@@ -71,11 +71,6 @@ export default function SemesterCourses({ courses, toggleModal }) {
               {courses[semesterKey].map((course, index) => (
                 <Course key={index} courseInfo={course} />
               ))}
-              {index === 0 && (
-                <div style={addCourseButtonStyle} onClick={toggleModal}>
-                  + Add a course
-                </div>
-              )}
             </div>
           </div>
         );
