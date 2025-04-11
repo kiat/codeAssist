@@ -97,6 +97,13 @@ export default () => {
                             showUploadList={false}
                             maxCount={1}
                             beforeUpload={file => {
+                              const fileIsZip = file.name.toLowerCase().endsWith(".zip");
+                              
+                              if (!fileIsZip) {
+                                message.error("Autograder should be .zip");
+                                return Upload.LIST_IGNORE;
+                              }
+                              
                               form.setFieldValue("fileName", file.name);
                               return false;
                             }}
