@@ -58,28 +58,34 @@ export default function SemesterCourses({ courses, toggleModal }) {
 
   return (
     <div style={semesterContainerStyle}>
-      {sortedSemesters.map((semesterKey, index) => {
-        const regex = /(\d{1,4})(Spring|Summer|Fall|Winter)/;
-        const match = semesterKey.match(regex);
-        const semester = match ? match[2] : "";
-        const year = match ? match[1] : "";
-
-        return (
-          <div key={semesterKey} style={{ width: "100%" }}>
-            <h3 style={semesterHeaderStyle}>{`${semester} ${year}`}</h3>
-            <div style={courseGroupStyle}>
-              {courses[semesterKey].map((course, index) => (
-                <Course key={index} courseInfo={course} />
-              ))}
-              {index === 0 && (
-                <div style={addCourseButtonStyle} onClick={toggleModal}>
-                  + Add a course
-                </div>
-              )}
+      {sortedSemesters.length > 0 ? (
+        sortedSemesters.map((semesterKey, index) => {
+          const regex = /(\d{1,4})(Spring|Summer|Fall|Winter)/;
+          const match = semesterKey.match(regex);
+          const semester = match ? match[2] : "";
+          const year = match ? match[1] : "";
+  
+          return (
+            <div key={semesterKey} style={{ width: "100%" }}>
+              <h3 style={semesterHeaderStyle}>{`${semester} ${year}`}</h3>
+              <div style={courseGroupStyle}>
+                {courses[semesterKey].map((course, index) => (
+                  <Course key={index} courseInfo={course} />
+                ))}
+                {index === 0 && (
+                  <div style={addCourseButtonStyle} onClick={toggleModal}>
+                    + Add a course
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })
+      ) : (
+        <div style={addCourseButtonStyle} onClick={toggleModal}>
+          + Add a course
+        </div>
+      )}
     </div>
   );
 }
