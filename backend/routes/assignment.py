@@ -68,6 +68,8 @@ def create_assignment():
     id in the database
     '''
     assignment_data = request.json
+    print("Received assignment data:", assignment_data)
+
     assignment_name = assignment_data.get("name")
     course_id = assignment_data.get("course_id")
 
@@ -80,7 +82,7 @@ def create_assignment():
     assignment_data["id"] = assignment_id
     # not creating a container yet
     assignment_data["container_id"] = None
-    valid_assignment_data = {k: v for k,v in assignment_data.items() if v is not None}
+    valid_assignment_data = {k: v for k, v in assignment_data.items() if v is not None or isinstance(v, bool)}
     db.session.add(Assignment(**valid_assignment_data))
     db.session.commit()
 

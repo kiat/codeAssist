@@ -10,7 +10,7 @@ import shutil
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from functools import reduce
-from flask import Blueprint, request, jsonify, flash
+from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
@@ -18,29 +18,15 @@ from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, Enrollme
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
-# import asyncio
-# from openai import AsyncOpenAI
+from ai_integration import async_get_ai_feedback
+import threading
+import json
 
 
 submission = Blueprint('submission', __name__)
 docker_client = docker.from_env()
 
 ALLOWED_EXTENSIONS = {'py','zip'}
-
-load_dotenv()
-# openai_api_key = os.getenv("OPENAI_API_KEY")
-# if not openai_api_key:
-#     raise ValueError("OPENAI_API_KEY environment variable is not set")
-
-# Async function to get OpenAI completion
-async def get_completion(message):
-    client = AsyncOpenAI(api_key=openai_api_key)
-    completion = await client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": message}],
-        max_tokens=50
-    )
-    return completion.choices[0].message.content
 
 def allowed_file(filename):
     return "." in filename and \
@@ -155,7 +141,7 @@ def upload_submission():
     if old:
         old.update({'active': False})
 
-    # Create a new submission record
+    # Create a new submission record. Note that we add an initial value (e.g. None) for ai_feedback.
     new_submission = Submission(
         id=uuid.uuid4(),
         file_name=filename,
@@ -169,7 +155,8 @@ def upload_submission():
         #set the active to true for a newly submitted submission
         active=True,
         completed=True,
-        submission_number=submission_count + 1
+        submission_number=submission_count + 1,
+        ai_feedback=None  # Initially no AI feedback
     )
     db.session.add(new_submission)
     db.session.commit()
@@ -181,10 +168,18 @@ def upload_submission():
     container.stop()
     os.chdir(current_dir)
 
-    #get openAI reponse
-    # completion = asyncio.run(get_completion("Say hi"))
-    # adding the submission id to return --> to be used to access assignment results
-    return jsonify({"message": "Submission uploaded and autograded successfully", "results_path": host_results_json_path, "submissionID": new_submission.id#, "openai_response": completion
+    # Capture the app object and launch a background thread to get AI feedback asynchronously.
+    app_obj = current_app._get_current_object()
+    threading.Thread(
+        target=async_get_ai_feedback, 
+        args=(app_obj, new_submission.id, file_path, results_json_content)
+    ).start()
+
+    # Return the response. Note that ai_feedback might not be available immediately.
+    return jsonify({
+        "message": "Submission uploaded and autograded successfully",
+        "results_path": host_results_json_path,
+        "submissionID": str(new_submission.id)
     }), 200
 
 

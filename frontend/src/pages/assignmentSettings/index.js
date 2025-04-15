@@ -25,11 +25,15 @@ export default () => {
   const [courseId, setCourseId] = useState("");
   const [publishedBefore, setPubBefore] = useState(undefined);
   const [originalPublish, setOGPub] = useState(undefined);
+  const [enableAiFeedback, setEnableAiFeedback] = useState(false);
+
 
   const getAssignmentInfo = useCallback(() => {
     getAssignment({ assignment_id: assignmentId }).then(res => {
-      const { name, published, due_date, autograder_points, course_id, published_date } = res.data || {};
-      setPubBefore(published);
+      const { name, published, due_date, autograder_points, course_id, published_date, 
+        ai_feedback_enabled, ai_feedback_prompt, ai_feedback_model, ai_feedback_temperature } = res.data || {};      
+        setPubBefore(published);
+
       setOGPub(published_date);
       setCourseId(course_id)
       form.setFieldsValue({
@@ -37,8 +41,14 @@ export default () => {
         published,
         autograderPoints: autograder_points,
         dueDate: moment.utc(due_date).local(),
-        releaseDate: moment.utc(published_date).local()
+        releaseDate: moment.utc(published_date).local(),
+        enableAiFeedback: ai_feedback_enabled,
+        ai_feedback_prompt,
+        ai_feedback_model,
+        ai_feedback_temperature
       });
+
+      setEnableAiFeedback(ai_feedback_enabled);
     });
   }, [assignmentId, form]);
 
@@ -128,7 +138,13 @@ export default () => {
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
       published: values.published,
-      published_date: publishedDate
+      published_date: publishedDate,
+
+      // AI Feedback Config
+      ai_feedback_enabled: values.enableAiFeedback,
+      ai_feedback_prompt: values.ai_feedback_prompt,
+      ai_feedback_model: values.ai_feedback_model,
+      ai_feedback_temperature: values.ai_feedback_temperature
     };
     const validData = Object.fromEntries(
       Object.entries(newAssignmentData).filter(([_, value]) => value !== undefined)
@@ -268,6 +284,52 @@ export default () => {
               ]}
             />
           </Form.Item> */}
+
+        {/* AI Settings */}
+        <Form.Item label="ENABLE AI FEEDBACK" name="enableAiFeedback" valuePropName="checked">
+          <Checkbox onChange={(e) => setEnableAiFeedback(e.target.checked)}>
+            Enable AI Feedback
+          </Checkbox>
+        </Form.Item>
+
+        <Form.Item
+          label="AI FEEDBACK PROMPT"
+          name="ai_feedback_prompt"
+          rules={[{ required: enableAiFeedback, message: "Please enter a feedback prompt" }]}
+        >
+          <Input.TextArea
+            placeholder="Enter the feedback prompt for AI"
+            autoSize={{ minRows: 4, maxRows: 8 }}
+            disabled={!enableAiFeedback}
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="AI MODEL USED"
+          name="ai_feedback_model"
+          rules={[{ required: enableAiFeedback, message: "Please select an AI model" }]}
+        >
+          <Radio.Group disabled={!enableAiFeedback}>
+            <Space direction="vertical">
+              <Radio value="gpt-3.5-turbo">GPT-3.5 Turbo</Radio>
+              <Radio value="gpt-4o">GPT-4o</Radio>
+              <Radio value="custom-model">Custom Model</Radio>
+            </Space>
+          </Radio.Group>
+        </Form.Item>
+
+        <Form.Item
+          label="MODEL TEMPERATURE"
+          name="ai_feedback_temperature"
+          rules={[
+            { required: enableAiFeedback, message: "Please enter a temperature" },
+            { pattern: /^0(\.\d+)?|1$/, message: "Enter a value between 0 and 1" }
+          ]}
+        >
+          <Input placeholder="Enter temperature (0 to 1)" disabled={!enableAiFeedback} />
+        </Form.Item>
+
+
           <Form.Item>
             <Space>
               <Button type='primary' htmlType='submit'>

@@ -43,6 +43,13 @@ export default function InstructorAssignments() {
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
       published_date: values.releaseDate.toISOString(),
+      
+
+      // AI Settings
+      ai_feedback_enabled: values.ai_feedback_enabled,
+      ai_feedback_prompt: values.ai_feedback_prompt,
+      ai_feedback_model: values.ai_feedback_model,
+      ai_feedback_temperature: values.ai_feedback_temperature,
     };
     const validData = Object.fromEntries(
       Object.entries(assignmentData).filter(([_, value]) => value !== undefined)
