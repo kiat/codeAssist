@@ -33,7 +33,7 @@ export default function InstructorAssignments() {
     const assignmentData = {
       name: values.name, 
       course_id: courseId, 
-      due_date: values.dueDate._d, 
+      due_date: values.dueDate.toISOString(), 
       autograder_points: values.autograderPoints, 
       anonymous_grading: values.submissionAnonymization,
       manual_grading: values.manualGrading,
@@ -42,13 +42,14 @@ export default function InstructorAssignments() {
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
-      published_date: values.releaseDate._d,
+      published_date: values.releaseDate.toISOString(),
+      
 
       // AI Settings
       ai_feedback_enabled: values.ai_feedback_enabled,
       ai_feedback_prompt: values.ai_feedback_prompt,
       ai_feedback_model: values.ai_feedback_model,
-      ai_feedback_temperature: values.ai_feedback_temperature
+      ai_feedback_temperature: values.ai_feedback_temperature,
     };
     const validData = Object.fromEntries(
       Object.entries(assignmentData).filter(([_, value]) => value !== undefined)

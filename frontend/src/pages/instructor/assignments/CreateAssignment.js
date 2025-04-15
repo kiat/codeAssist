@@ -25,6 +25,8 @@ import {
   Switch
 } from "antd";
 import { useState } from "react";
+import dayjs from "dayjs";
+
 
 const { Sider, Content } = Layout;
 
@@ -126,14 +128,14 @@ export default ({
           </Sider>
           <Content>
             <Card bordered={false}>
-            <Form
-                layout="vertical"
-                form={form}
-                onFinish={(values) => {
-                  console.log("📤 Form submission values:", values);
+              <Form layout="vertical" form={form}
+                initialValues={{
+                  releaseDate: dayjs(), // current date
+                  dueDate: dayjs().add(7, "day"), // 7 days from now
+                  autograderPoints: "100",
                 }}
-              >                
-              <Form.Item
+                >
+                <Form.Item
                   label="ASSIGNMENT NAME"
                   name="name"
                   validateStatus={nameValidationStatus}
