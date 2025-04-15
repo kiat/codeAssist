@@ -9,8 +9,9 @@ import {
   createCourse,
   enrollCourse,
   getUserEnrollments,
+  getCourseAssignments,
 } from "../../services/course";
-import { Button, message, Form, Modal, Upload } from "antd";
+import {  message } from "antd";
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,32 +19,15 @@ export default function Dashboard() {
   const { userInfo } = useContext(GlobalContext);
 
   // Inline styles for the component
-  const addCourseButtonStyle = {
-    border: "1px dashed green",
-    width: "230px",
-    height: "125px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    color: "green",
-    fontSize: "bold",
-    cursor: "pointer",
-    boxSizing: "border-box",
-    padding: "10px",
-    margin: "0 10px 20px 0",
-    flex: "0 0 auto",
-  };
-
-  const courseContainerStyle = {
-    paddingTop: "30px",
-  };
 
   const courseHeaderStyle = {
-    marginLeft: "25px",
     display: "flex",
     flexWrap: "wrap",
     gap: "20px",
     alignItems: "flex-start",
+    justifyContent: "flex-start", 
+    width: "100%", 
+    paddingLeft: "30px"
   };
 
   // Toggle the visibility of the course modal
@@ -51,28 +35,47 @@ export default function Dashboard() {
     setIsModalOpen((prevState) => !prevState);
   }, []);
 
+  // Function to fetch assignments count for each course
+  const getAssignmentsCount = async (courseId) => {
+    try {
+      const res = await getCourseAssignments({ course_id: courseId });
+      return res.data.length;
+    } catch (error) {
+      console.error(`Error fetching assignments for course ${courseId}:`, error);
+      return 0; 
+    }
+  };
+
   // Function to structure the courses data
-  const formatCourses = (coursesArray) => {
+  const formatCourses = useCallback (async (coursesArray) => {
     const formattedCourses = {};
-    coursesArray.forEach((course) => {
-      const { semester, year, name, assignments, id } = course;
-      const key = `${year}${semester}`; // Assuming year and semester are always present
+
+    for (const course of coursesArray) {
+      const { semester, year, name, description, id } = course;
+      const key = `${year}${semester}`;
+
+      // Fetch assignments count for each course
+      const assignmentsCount = await getAssignmentsCount(id);
+
       if (!formattedCourses[key]) {
         formattedCourses[key] = [];
       }
-      formattedCourses[key].push({ name, assignments, id });
-    });
-    return formattedCourses;
-  };
 
-  // Function to fetch courses based on the user's role
+      formattedCourses[key].push({ name, description, assignments: assignmentsCount, id });
+    }
+
+    return formattedCourses;
+  }, []);
+
+  // Function to fetch courses and assignments
   const fetchCourses = useCallback(() => {
     const fetchFunction = getUserEnrollments;
-    const params = {user_id: userInfo.id};
+    const params = { user_id: userInfo.id };
+
     fetchFunction(params)
-      .then((response) => {
+      .then(async (response) => {
         if (response && Array.isArray(response.data)) {
-          const formatted = formatCourses(response.data);
+          const formatted = await formatCourses(response.data);
           setCourses(formatted);
         } else {
           console.error("Expected an array, received:", response);
@@ -82,7 +85,12 @@ export default function Dashboard() {
       .catch((error) => {
         console.error("Error fetching courses:", error);
       });
-  }, [userInfo]);
+  }, [userInfo, formatCourses]);
+
+  // Fetch courses on mount and when userInfo changes
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses, userInfo]);
 
   // Fetch courses on mount and when userInfo changes
   useEffect(() => {
@@ -122,21 +130,11 @@ export default function Dashboard() {
     <>
       <PageHeader title="Your Courses" />
       <div style={courseHeaderStyle}>
-        {Object.keys(courses)
-          .sort((a, b) => b.localeCompare(a))
-          .map((key, index) => (
-            <SemesterCourses
-              key={key}
-              courses={{ [key]: courses[key] }} // <-- rename and wrap correctly
-              toggleModal={toggleModal}
-            />
-          ))}
-        <div style={courseContainerStyle}>
-          <div style={addCourseButtonStyle} onClick={toggleModal}>
-            + Add a course
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "40px", width: "100%" }}>
+            <SemesterCourses courses={courses} toggleModal={toggleModal}/>
         </div>
       </div>
+
       <CourseModal title="ADD COURSE" open={isModalOpen} onCancel={toggleModal}>
         {userInfo?.isStudent ? (
           <RelationForm onFinish={handleAddCourse} onCancel={toggleModal} />

@@ -117,6 +117,7 @@ def get_structured_feedback_from_openai(client, prompt, model, temperature, past
         model=model,
         max_tokens=700,
         temperature=temperature,
+        timeout=30  # timeout in seconds
     )
 
     raw_response = response.choices[0].message.content.strip()

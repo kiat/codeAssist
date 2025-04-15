@@ -172,7 +172,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     )}
 
     {loadingStatus === 'error' && (
-      <Tooltip title="An error occurred while parsing or loading AI feedback. Ensure the backend response is a valid JSON with an 'annotations' array.">
+      <Tooltip title="An error occurred while parsing or loading AI feedback.">
         <Tag color="red">AI Feedback Error</Tag>
       </Tooltip>
     )}
