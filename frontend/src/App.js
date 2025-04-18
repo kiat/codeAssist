@@ -128,26 +128,32 @@ function App() {
                 path='/assignment/reviewGrades/:assignmentId'
                 element={<ReviewGrades />}
               />
+              {/**
               <Route
                 path='/assignment/editOutline/:assignmentId'
                 element={<EditOutline />}
-              />
+              /> 
+              */}
               <Route
                 path='/assignment/configureAutograder/:assignmentId'
                 element={<ConfigureAutograder />}
               />
+              {/** 
               <Route
                 path='/assignment/createRubric/:assignmentId'
                 element={<CreateRubric />}
               />
+              */}
               <Route
                 path='/assignment/manageSubmissions/:assignmentId'
                 element={<ManageSubmissions />}
               />
+              {/**
               <Route
                 path='/assignment/gradeSubmissions/:assignmentId'
                 element={<GradeSubmissions />}
               />
+              */}
               <Route
                 path='/assignment/extensions/:assignmentId'
                 element={<Extensions />}
