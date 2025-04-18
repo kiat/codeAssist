@@ -11,6 +11,7 @@
 * Ethan H Zhang <ethanhzhang15@utexas.edu>
 * Jayanth Vellanki <vellankijay@utexas.edu>
 * Tanish Gupta <tanish.gupta@utexas.edu>
+* Aidan Liu <aidanliu2023@gmail.com>
 
 
 
