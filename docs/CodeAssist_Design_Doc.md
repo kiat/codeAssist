@@ -1,10 +1,18 @@
 # CodeAssist Design Doc
+Adaptive AI‑Powered Feedback and Grading for Programming Education
+## Motivation
+Efficient, high‑quality feedback is critical in programming courses. Traditional manual grading is time‑intensive for instructors and slow for students who need rapid guidance. Auto‑graders (e.g., Gradescope) help—but they frequently provide static, task‑specific feedback that does not foster transferable problem‑solving strategies or metacognitive skills.
+CodeAssist aims to bridge this gap by delivering personalized, adaptive, and rapid feedback on debugging, efficiency, style, and design patterns—all while scaling to courses with hundreds of simultaneous submissions.
 
-# Motivation
-In any area of education, the ability to efficiently grade assignments and provide meaningful feedback to students is essential. In computer science education specifically, instructors can utilize auto-grading systems like Gradescope to auto-grade their assignments, manage course enrollments and grades, and give meaningful feedback to students. 
-CodeAssit is a system that can provide personalized detailed feedback about students' programming assignments including debugging, efficiency, style, and object-oriented design patterns, in various formats. 
+## Key Features
+* **AI‑Powered Feedback** – Line‑level suggestions on correctness, optimization, documentation, and style generated via a configurable Large Language Model (LLM).
+* **Adaptive Learning Loop** – Tracks each student’s recurring mistakes and feeds context into future prompts to encourage metacognitive growth.
+* **Autograder Integration** – Instructors can upload custom autograders to be executed in secure Docker containers.
+* **Real‑Time Results** – Students receive grades and AI feedback seconds after submission.
+* **Role‑Specific Dashboards** – Intuitive React interfaces for instructors (course / assignment management) and students (grades, submissions, feedback).
+* **Open Source & Self‑Hosted** – Simple Docker Compose deployment so individual instructors or entire universities can run CodeAssist on‑premises or in the cloud.
 
-# Summary
+## Summary
 CodeAssist is a free and open-source feedback system designed for programming courses. It can be used in computer science courses to provide automated and rapid feedback on students' programming assignment submissions. CodeAssist offers feedback on various aspects of students' code, including debugging, efficiency, style, and object-oriented design patterns, in various formats. While offering students static feedback on their code, as current systems do, proves helpful in addressing specific coding problems within particular tasks, it might fall short of enabling students to develop transferable strategies for other coding challenges. 
 
 Thus, our study focuses on the following research questions:
@@ -12,7 +20,14 @@ Thus, our study focuses on the following research questions:
   2. How can AI-assisted feedback systems support the reinforcement of students’ metacognition?
   3. How AI-assisted feedback systems should generate personalized feedback for CS education?
 
-
+## System Architecture
+### High‑Level Overview
+| Layer | Technology | Responsibilities |
+|-------|------------|------------------|
+| **Frontend** | React | Authentication, dashboards, submission UI |
+| **Backend** | Flask | REST APIs, auth |
+| **Database** | PostgreSQL | Courses, users, submissions, feedback |
+| **Sandbox** | Docker | Autograder & AI execution |
 
 
 To start, we will offer some basic functionality for both instructors and students:
@@ -31,13 +46,11 @@ To start, we will offer some basic functionality for both instructors and studen
 
 We plan to make CodeAssist simple to install so that universities or even university professors can easily install our software. 
 
-# System Design
+## System Design
 
-Over the course of the Fall 2022 semester, we designed and built the CodeAssist system. Our system consists of a React frontend, a Python/Flask backend, and a PostgreSQL database. The end-to-end flow for a student submitting an assignment is detailed below.
+The system’s design leverages a modular approach: a frontend plugin that captures student code submissions, a processing pipeline that analyzes syntax and semantics, and a backend service exposing REST endpoints for feedback retrieval. These API endpoints handle authentication, submission uploads, compilation checks, and retrieval of recommended improvements or error messages. Once the code is processed, a feedback report is generated and sent back to the user interface. This end-to-end flow is orchestrated by a microservices architecture, promoting easier maintenance and scalability across different programming languages.
 
-
-![Student submission flow](https://paper-attachments.dropboxusercontent.com/s_09C2C6457685AED4FCCA9A0FADFF67EF8DD44ED32ADBC94D9A4DCA550765B697_1670558151174_Blank+diagram.png)
-
+![6b321f1d87f6d4ec75be66a1978ea9f6](https://github.com/user-attachments/assets/a255db27-5e43-4564-a10e-b9854b8b945c)
 
 
 # Frontend
@@ -49,21 +62,22 @@ Our ReactJS frontend provides similar functionality to Gradescope. When users fi
 
 
 
-## Instructor View
+## Instructor Dashboard View
 
 After a successful login or register action, instructors will be redirected to their dashboard where they can see their existing courses and create new ones. For each course, instructors will be able to add students (using their CodeAssist-registered email), create assignments, and view each student’s submission history for all assignments.
 
-
-![Instructor home dashboard](https://paper-attachments.dropboxusercontent.com/s_09C2C6457685AED4FCCA9A0FADFF67EF8DD44ED32ADBC94D9A4DCA550765B697_1670562910050_Screenshot+2022-12-09+at+12.15.05+AM.png)
-
+![8bdf5a397cd021dc58d2641c4f2f6eba](https://github.com/user-attachments/assets/08463e93-779e-430b-8fc9-0837ef25a32d)
 
 
-## Student View
+## Student Dashboard View
 
 The student view is very similar to the instructor view with the caveat that the student’s dashboard will be empty until an instructor adds them to their course. Students will be able to view their courses, assignments, and grades all within the CodeAssist dashboard. They can also submit their solutions to assignments and receive immediate feedback.
 
 
-![Student home dashboard](https://paper-attachments.dropboxusercontent.com/s_09C2C6457685AED4FCCA9A0FADFF67EF8DD44ED32ADBC94D9A4DCA550765B697_1670563106747_Screenshot+2022-12-09+at+12.18.20+AM.png)
+![268a41728cd4ad1e2126d17538c6a244](https://github.com/user-attachments/assets/29ad9886-1bc2-4b28-b53c-20fb3ccee5b2)
+
+## Tailored AI Feedback:
+![2cd266287f2db66222ca6c09471dd3ba](https://github.com/user-attachments/assets/224c4163-06ad-46ab-89e5-7e9c0ff9726a)
 
 
 
@@ -160,48 +174,12 @@ After exploring SQL and NoSQL options for our database, I recommended we use a S
 ![](https://paper-attachments.dropboxusercontent.com/s_09C2C6457685AED4FCCA9A0FADFF67EF8DD44ED32ADBC94D9A4DCA550765B697_1670559611334_CodeAssist_UML.png)
 
 
-
-# Installation Instructions
-## How to install
-
-1. Clone the repository
-    `git clone git@github.com:kiat/codeAssist.git`
-2. Install Dependencies
-    - `python` ([Install](https://www.python.org/downloads/))
-    - `docker` ([Install](https://docs.docker.com/get-docker/))
-    - `postgresql` ([Install](https://www.postgresql.org/download/))
-    - `pip3 install -r ./backend/requirements.txt`
-    - `docker-compose`
-3. Create database 
-4. After you have successfully installed postgres, use it to create the database that you will use for this project.
-5. Create a `.env` file in the backend directory and add your DB connection string
-    `touch ./backend/.env`
-6. In your `.env` file, add your connection string:
-    `DB_CONNECTION_STRING="postgresql://{username}:{password}@localhost:5432/{database}"`
-7. Start Docker and Postgres
-    `sudo systemctl start docker`
-    `sudo systemctl start postgresql`
-8. (Optional) Enable Docker and Postgres to start on boot
-    `sudo systemctl enable docker`
-    `sudo systemctl enable postgresql`
-9. Create the required tables
-    `bash python3 ./backend/init_db.py`
-10. Start the backend service
-    `docker-compose up backend`
-11. Start the frontend service
-    `docker-compose up frontend`
-## Done!
-
-Your backend should now be running on `http://localhost:5001` and your frontend on `http://localhost:3000`.
-
 ----------
 # Future Work
-[ ] 60s timeout on submissions
 [ ] Add session authentication (using cookies)
 [ ] Look into potential web security vulnerabilities (XSS, CSRF, etc)
 [ ] Hash passwords in our database (use MD5?)
 [ ] Add TA roles
-[ ] Enable instructors to add manual grading components of assignments
 [ ] Kubernetes to horizontally scale web and backend servers
 [ ] Integrate with Canvas
 [ ] Add caching layer
