@@ -68,3 +68,57 @@ sequenceDiagram
 
 **Note:** Ensure the OpenAI key is configured at the course level before enabling AI feedback on any assignment. Tweak assignment-level parameters to optimize feedback quality and relevance.
 
+
+## Implementation Details
+
+The AI feedback engine is composed of several backend modules and frontend components:
+
+### Backend Integration (`backend/ai_integration.py`)
+
+- **Key Encryption**: Uses `encrypt_api_key` / `decrypt_api_key` with Fernet and the `API_SECRET_KEY` from `.env` to secure the OpenAI key. If the key is not defined in `.env`, it will just be saved as plaintext.
+- **Data Fetching**: `fetch_submission_data` performs SQLAlchemy joins across `Submission`, `Assignment`, `Course`, and `User` models to retrieve all objects relevant to a given submission. 
+- **Prompt Building**: `build_feedback_prompt` merges the assignment’s base prompt, the student’s past `coding_insights`, the submitted code, and autograder results into a single, structured prompt.
+- **LLM Invocation**: `get_structured_feedback_from_openai` calls `client.chat.completions.create`, passing a system message and the constructed prompt, then parses the JSON response via `clean_ai_response`.
+- **Asynchronous Execution**: `async_get_ai_feedback` runs in a background thread, pushes the Flask application context, reads the code and results, invokes the feedback pipeline, and calls `update_submission_feedback`.
+- **Database Updates**: `update_submission_feedback` writes the parsed `annotations` and aggregated `insights` back into the `Submission.ai_feedback` and `User.coding_insights` fields before committing.
+- **Model Response Format**: The model is expected to return a JSON response of the form:
+```
+"Response should be strictly JSON, with no extra formatting, in the form:\n"
+        "{ 'insights': [...], 'annotations': [{pattern: ..., comment: ...}, ...] }\n\n"
+```
+- `insights` is an array of insights (string), while `annotations` is a series of regex patterns (references to lines of code), and the associated comment.
+- This design is used in order to facilitate easily mapping comments back onto the code file in the frontend.
+
+### Submission Endpoint (`submission.py`)
+
+- Initiates the asynchronous AI feedback task after committing the submission record.
+- AI Feedback is initially set to None in the DB, and is populated when the feedback is generated.
+- The frontend will keep requesting information about the submission (approx. every 5 secs) until the AI Feedback is generated.
+
+### Frontend Components
+
+#### `frontend/src/pages/result/index.js`
+
+- This is the component that renders the test results and code feedback page.
+- Polls every 5 seconds for `ai_feedback` availability when AI Feedback is enabled, updating the component state once feedback is written to the backend.
+
+---
+
+#### `frontend/src/pages/result/TestResultsDisplay.js`
+
+- This is the component that renders the AI feedback on the code files.
+- Implements `getAiAnnotations` to parse and handle `data.ai_feedback`, updating UI state (`loadingStatus`, `annotations`, `highlightedLines`).
+- Uses regex-based matching of annotation `pattern`s against each code line, applying visual highlights and tooltips on hover.
+- Renders two views: a list of passed/failed tests and an interactive, annotated code panel with smooth scrolling to comments.
+
+
+
+**Note:** Ensure that all environment variables (`API_SECRET_KEY`, course-level `openai_api_key`) are correctly set before deploying. The assignment-level AI parameters should be tuned based on the desired feedback depth and style.
+
+## Next Steps
+
+1. Test other OpenAI models, currently only GPT-4o has been tested.
+2. Implement other types of models, such as LLama or Claude
+3. Explore other categories of feedback
+4. Create clear categories of feedback
+    - use this to label/distinguish them on the feedback page, and perhaps even give a score for each category (ex. 5/5 hygeine, 3/5 efficiency, etc.)
