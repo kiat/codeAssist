@@ -10,7 +10,7 @@ The autograder system is designed to handle the submission of student assignment
 ## API Endpoints
 
 ### Upload a Submission
-The `/upload_submission` endpoint allows students to submit their assignments. The server receives files and student metadata, and then proceeds to process and evaluate the submission inside a Docker container.
+The `/upload_submission` endpoint allows students to submit their assignments. The server receives files and student metadata, and then proceeds to process and evaluate the submission inside a Docker container. See ```./submission.md``` for a more detailed breakdown on this process.
 
 #### Steps:
 1. **File Upload**: A POST request is made with a multipart file upload including the student's work.
