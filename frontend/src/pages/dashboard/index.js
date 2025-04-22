@@ -111,6 +111,7 @@ export default function Dashboard() {
             semester: values.semester,
             year: values.year,
             entryCode: values.entryCode,
+            allowEntryCode: values.allowEntryCode,
           };
       
       addCourseFunction(params)

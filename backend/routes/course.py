@@ -35,7 +35,7 @@ def create_course():
     @param entryCode        entryCode of the course
     """
     data = request.json
-    required_fields = ["name", "instructor_id", "semester", "year", "entryCode"]
+    required_fields = ["name", "instructor_id", "semester", "year", "entryCode", "allowEntryCode"]
 
     # validate request
     if not all(field in data and data[field] for field in required_fields):

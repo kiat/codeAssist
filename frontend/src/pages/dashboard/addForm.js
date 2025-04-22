@@ -5,7 +5,7 @@ export default function AddForm({ onFinish, onCancel }) {
 
 
   return (
-    <Form layout='vertical' onFinish={onFinish}>
+    <Form layout='vertical' onFinish={onFinish} initialValues={{ allowEntryCode: true }}>
       {/* {formItemList.map(item => (
         <Form.Item label={item.label} name={item.name} key={item.name}>
           <Input />
@@ -29,6 +29,11 @@ export default function AddForm({ onFinish, onCancel }) {
       </Form.Item>
       <Form.Item label='COURSE ENTRY CODE' name='entryCode'>
         <Input />
+      </Form.Item>
+
+      {/* ensure allowEntryCode is included even without a visible field */}
+      <Form.Item name='allowEntryCode' initialValue={true} hidden>
+        <Input type='hidden' />
       </Form.Item>
       <Form.Item style={{ textAlign: "center" }}>
         <Button
