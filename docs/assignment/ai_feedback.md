@@ -60,7 +60,8 @@ sequenceDiagram
     BE->>LLM: Send combined prompt
     LLM-->>BE: Return JSON feedback
     BE->>DB: Store annotations & insights
-    FE->>DB: Fetch and display feedback
+    DB->>BE: Fetch feedback
+    BE-->>FE: Display feedback
 ```
 
 ---
