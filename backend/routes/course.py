@@ -40,6 +40,9 @@ def create_course():
     # validate request
     if not all(field in data and data[field] for field in required_fields):
         raise BadRequestError("Missing required fields")
+    
+    # set default value for allowEntryCode if not provided
+    data["allowEntryCode"] = data.get("allowEntryCode", True)
 
     # check for duplicate entryCode
     if db.session.query(Course).filter_by(entryCode=data["entryCode"]).first():
