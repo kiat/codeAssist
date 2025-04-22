@@ -12,6 +12,9 @@ class User(db.Model):
     sis_user_id = db.Column(db.String, nullable=False, unique=True)
     role = db.Column(db.String, nullable = False)
 
+    # -- AI Integration -- 
+    coding_insights = db.Column(db.String, default="No history.")
+
 class Course(db.Model):
     __tablename__ = "courses"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
@@ -23,6 +26,9 @@ class Course(db.Model):
     entryCode = db.Column(db.String, nullable=False, unique=True)
     allowEntryCode = db.Column(db.Boolean, default=False)
     description = db.Column(db.String, default="")
+
+    # -- AI Integration Settings -- 
+    openai_api_key = db.Column(db.String, default="")
 
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
@@ -50,6 +56,12 @@ class Assignment(db.Model):
     container_id = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
 
+    # -- AI Integration Settings -- 
+    ai_feedback_enabled = db.Column(db.Boolean, default=False)
+    ai_feedback_prompt = db.Column(db.Text, nullable=True)
+    ai_feedback_model = db.Column(db.Text, nullable=True)
+    ai_feedback_temperature = db.Column(db.Float, nullable=True)
+
 class Submission(db.Model):
     __tablename__ = "submissions"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
@@ -64,6 +76,9 @@ class Submission(db.Model):
     execution_time = db.Column(db.Float, nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=False)
     completed = db.Column(db.Boolean, nullable=False)
+
+    # -- AI Integration Settings -- 
+    ai_feedback = db.Column(db.Text, nullable=True)
     
 # Handling multiple submitters for a single submission
 class SubmissionSubmitter(db.Model):

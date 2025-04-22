@@ -21,8 +21,12 @@ import {
   Steps,
   Typography,
   Upload,
+  Select,
+  Switch
 } from "antd";
 import { useState } from "react";
+import dayjs from "dayjs";
+
 
 const { Sider, Content } = Layout;
 
@@ -34,6 +38,10 @@ export default ({
   form,
 }) => {
   const [assignmentType, setAssignmentType] = useState(0);
+  const [enableAiFeedback, setEnableAiFeedback] = useState(true);
+  const aiFeedbackEnabled = Form.useWatch("ai_feedback_enabled", form);
+
+
   return (
     <>
       <Steps
@@ -120,7 +128,13 @@ export default ({
           </Sider>
           <Content>
             <Card bordered={false}>
-              <Form layout="vertical" form={form}>
+              <Form layout="vertical" form={form}
+                initialValues={{
+                  releaseDate: dayjs(), // current date
+                  dueDate: dayjs().add(7, "day"), // 7 days from now
+                  autograderPoints: "100",
+                }}
+                >
                 <Form.Item
                   label="ASSIGNMENT NAME"
                   name="name"
@@ -271,6 +285,55 @@ export default ({
                     ]}>
                       <Input />
                     </Form.Item>
+
+                {/* AI Feedback Toggle */}
+                <Form.Item
+                  label="ENABLE AI FEEDBACK"
+                  name="ai_feedback_enabled"
+                  valuePropName="checked"
+                >
+                  <Switch />
+                </Form.Item>
+
+                {/* AI Feedback Settings (Disabled when switch is off) */}
+                <Form.Item
+                  label="AI FEEDBACK PROMPT"
+                  name="ai_feedback_prompt"
+                  initialValue={"You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, style/formatting."}
+                  rules={[{ required: aiFeedbackEnabled, message: "Please enter a feedback prompt" }]}
+                >
+                  <Input.TextArea
+                    placeholder="Enter the feedback prompt for AI"
+                    autoSize={{ minRows: 4, maxRows: 8 }}
+                    disabled={!aiFeedbackEnabled}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="AI MODEL USED"
+                  name="ai_feedback_model"
+                  initialValue="gpt-4o"
+                  rules={[{ required: aiFeedbackEnabled, message: "Please select an AI model" }]}
+                >
+                  <Select placeholder="Select AI model" disabled={!aiFeedbackEnabled}>
+                    <Select.Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Select.Option>
+                    <Select.Option value="gpt-4o">GPT-4o</Select.Option>
+                    <Select.Option value="custom-model">Custom Model</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  label="MODEL TEMPERATURE"
+                  name="ai_feedback_temperature"
+                  initialValue={0.5}
+                  rules={[
+                    { required: aiFeedbackEnabled, message: "Please enter a temperature" },
+                    { pattern: /^0(\.\d+)?|1$/, message: "Enter a value between 0 and 1" },
+                  ]}
+                >
+                  <Input placeholder="Enter temperature (0 to 1)" disabled={!aiFeedbackEnabled} />
+                </Form.Item>
+
                   </>
                 )}
                 {/* {assignmentType === "2" ? (

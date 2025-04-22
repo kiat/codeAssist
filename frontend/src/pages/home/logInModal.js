@@ -1,7 +1,6 @@
-import { Button, Form, Input, Modal, Radio } from "antd";
-import { useState, useContext } from "react";
+import { Button, Form, Input, Modal } from "antd";
+import { useContext } from "react";
 import { GlobalContext } from "../../App";
-// import axios from "axios";
 import { userLogin } from "../../services/user";
 
 /**
@@ -9,15 +8,13 @@ import { userLogin } from "../../services/user";
  * @param {*} param0
  * @returns
  */
-export default function LogInModal({ open, onCancel, logIn }) {
+export default function LogInModal({ open, onCancel }) {
   const { updateUserInfo } = useContext(GlobalContext);
 
   // login action
   const onSubmit = async (values) => {
-    // const isStudent = values.isStudent;
     const {...restValue } = values;
     let res;
-    // let ta_res;
     try {
 
       res = await userLogin(restValue);
@@ -33,9 +30,7 @@ export default function LogInModal({ open, onCancel, logIn }) {
         updateUserInfo(userInfo);
       } 
     } catch (error) {
-      if (error.response) {
-        alert('User authentication failed. Invalid Username/Password combination');
-      }
+      console.log("error", error);
     }
   };
   return (

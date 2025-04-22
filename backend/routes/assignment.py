@@ -51,7 +51,7 @@ def get_assignment():
     @param assignment_id    the id of the assignment
     '''
     assignment_id = request.args.get("assignment_id")
-    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id)
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
 
     if not assignment_obj:
         return jsonify({"message": "Assignment not found"}), 404
@@ -68,6 +68,8 @@ def create_assignment():
     id in the database
     '''
     assignment_data = request.json
+    print("Received assignment data:", assignment_data)
+
     assignment_name = assignment_data.get("name")
     course_id = assignment_data.get("course_id")
 
@@ -76,17 +78,12 @@ def create_assignment():
     if existing_assignment:
         return jsonify({"message": "An assignment with this name already exists"}), 400
 
-    # Generate assignment ID
     assignment_id = str(uuid.uuid4())
-
-    # Create assignment object
-    new_assignment = Assignment(
-        id=assignment_id,
-        name=assignment_name,
-        course_id=course_id,
-        container_id=None  # Placeholder for container ID
-    )
-    db.session.add(new_assignment)
+    assignment_data["id"] = assignment_id
+    # not creating a container yet
+    assignment_data["container_id"] = None
+    valid_assignment_data = {k: v for k, v in assignment_data.items() if v is not None or isinstance(v, bool)}
+    db.session.add(Assignment(**valid_assignment_data))
     db.session.commit()
 
     # Fetch created assignment to return response

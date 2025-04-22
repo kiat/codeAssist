@@ -1,7 +1,7 @@
 import uuid
 import os
 import csv
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 from api import db
@@ -12,10 +12,10 @@ from api.models import (
     User,
     Submission,
     RegradeRequest,
-    Enrollment,
 )
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
+from ai_integration import encrypt_api_key
 
 course = Blueprint("course", __name__)
 
@@ -438,3 +438,33 @@ def get_course_info():
     course = CourseSchema().dump(course, many=True)
 
     return jsonify(course), 200
+
+@course.route("/store_api_key", methods=["PUT"])
+def store_api_key():
+    """
+    /store_api_key stores an encrypted OpenAI API key for a course.
+    Requires:
+    @param course_id: The UUID of the course.
+    @param api_key: The plaintext OpenAI API key.
+    """
+    data = request.json
+    required_fields = ["course_id", "api_key"]
+
+    if not all(field in data and data[field] for field in required_fields):
+        raise BadRequestError("Missing required fields")
+
+    # Fetch the course
+    course = db.session.query(Course).filter_by(id=data["course_id"]).first()
+    if not course:
+        raise NotFoundError("Course not found")
+
+    # Encrypt API key before storing
+    encrypted_api_key = encrypt_api_key(data["api_key"])
+
+    try:
+        course.openai_api_key = encrypted_api_key
+        db.session.commit()
+        return jsonify({"message": "API key stored securely"}), 200
+    except Exception as e:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to store API key")

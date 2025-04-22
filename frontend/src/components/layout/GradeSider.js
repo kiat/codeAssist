@@ -75,6 +75,7 @@ export default () => {
         size='small'
       >
         <Space direction='vertical' className={styles.iconText}>
+          {/*
           <Link
             to={`/assignment/editOutline/${assignmentInfo?.id}`}
             className={/editOutline/i.test(pathname) ? "" : styles.linkText}
@@ -82,6 +83,7 @@ export default () => {
             <CheckCircleFilled />
             <span> Edit Outline</span>
           </Link>
+            */}
           <Link
             to={`/assignment/configureAutograder/${assignmentInfo?.id}`}
             className={
@@ -91,6 +93,7 @@ export default () => {
             <CheckCircleFilled />
             <span> Configure Autograder</span>
           </Link>
+          {/** 
           <Link
             to={`/assignment/createRubric/${assignmentInfo?.id}`}
             className={/createRubric/i.test(pathname) ? "" : styles.linkText}
@@ -98,6 +101,7 @@ export default () => {
             <CheckCircleFilled />
             <span> Create Rubric</span>
           </Link>
+          */}
           <Link
             to={`/assignment/manageSubmissions/${assignmentInfo?.id}`}
             className={
@@ -107,6 +111,7 @@ export default () => {
             <CheckCircleFilled />
             <span> Manage Submissions</span>
           </Link>
+          {/*
           <Link
             to={`/assignment/gradeSubmissions/${assignmentInfo?.id}`}
             className={
@@ -116,6 +121,7 @@ export default () => {
             <CheckCircleFilled />
             <span> Grade Submissions</span>
           </Link>
+          */}
           <Link
             to={`/assignment/reviewGrades/${assignmentInfo.id}`}
             className={/reviewGrades/i.test(pathname) ? "" : styles.linkText}
