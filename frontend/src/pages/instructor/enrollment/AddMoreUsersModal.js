@@ -7,16 +7,22 @@ export default function AddMoreUsersModal({
   open,
 }) {
   const [form] = Form.useForm();
+
+  const handleCancel = () => {
+    form.resetFields();
+    toggleAddMoreUsersModalOpen();
+  };
+
   return (
     <Modal
       title="Add more Users"
       open={open}
       onOk={() => {
         const values = form.getFieldsValue();
-        // console.log("values", values);
         finishMoreUsers(values.Email);
+        form.resetFields();
       }}
-      onCancel={toggleAddMoreUsersModalOpen}
+      onCancel={handleCancel}
     >
       <Form form={form}>
         <Form.List name="Email" initialValue={[""]}>
