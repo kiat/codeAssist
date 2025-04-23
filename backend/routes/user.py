@@ -79,8 +79,18 @@ def user_login():
     if not db_user:
         raise NotFoundError("Email and password combination not found")
 
+
+    # handle the case where the user is a dict (e.g., from a mock or test)
+    # or an ORM object
+    # If db_user is a dictionary, extract the password from it
+    # If db_user is an ORM object, extract the password attribute
+    if isinstance(db_user, dict):
+        stored_hash = db_user.get('password')
+    else:
+        stored_hash = getattr(db_user, 'password')
+
     # Verify the provided password against the stored (hashed) password
-    if not verify_password(password, db_user.password):
+    if not verify_password(password, stored_hash):
         raise NotFoundError("Email and password combination not found")
 
     # Serialize and return
