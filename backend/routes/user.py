@@ -5,6 +5,8 @@ from api import db
 from api.models import User
 from api.schemas import UserSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError
+from util.encryption_utils import hash_password, verify_password
+
 
 user = Blueprint('user', __name__)
 
@@ -42,11 +44,13 @@ def create_user():
 
     user_id = str(uuid.uuid4())
 
+    hashed_password = hash_password(password)
+
     user = User(
         id=user_id,
         name=name,
         email_address=email_address,
-        password=password,
+        password=hashed_password,
         sis_user_id=sis_user_id,
         role=role
     )
@@ -61,24 +65,27 @@ def create_user():
 
     return jsonify(res), 201
 
-@user.route('/user_login', methods = ["POST"])
+@user.route('/user_login', methods=["POST"])
 @cross_origin()
 def user_login():
     email = request.json.get('email')
     password = request.json.get('password')
 
-    if not email or email == "" or not password or password == "":
+    if not email or not password:
         raise BadRequestError("Missing email or password")
 
-    res = db.session.query(User).filter_by(email_address=email, password=password).first()
-
-    if not res:
+    # Fetch user by email only
+    user = db.session.query(User).filter_by(email_address=email).first()
+    if not user:
         raise NotFoundError("Email and password combination not found")
-    
-    res = UserSchema().dump(res)
 
-    return jsonify(res), 200
+    # Verify the provided password against the stored (hashed) password
+    if not verify_password(password, user.password):
+        raise NotFoundError("Email and password combination not found")
 
+    # Serialize and return
+    result = UserSchema().dump(user)
+    return jsonify(result), 200
 
 
 @user.route('/get_user_by_email', methods = ["GET"])

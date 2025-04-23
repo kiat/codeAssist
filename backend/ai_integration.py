@@ -19,6 +19,7 @@ import threading
 from sqlalchemy.orm import aliased
 import json
 
+from util.encryption_utils import decrypt_api_key
 
 
 DEFAULT_MODEL="gpt-4-turbo"
@@ -37,23 +38,6 @@ load_dotenv()
 # Load encryption key for decrypting API key
 SECRET_KEY = os.getenv("API_SECRET_KEY")
 cipher = Fernet(SECRET_KEY) if SECRET_KEY else None
-
-def encrypt_api_key(api_key: str) -> str:
-    """Encrypt the OpenAI API key before storing it in the database."""
-    if cipher:
-        return cipher.encrypt(api_key.encode()).decode()
-    else:
-        print("API_SECRET_KEY not set. Storing API key without encryption.")
-        return api_key
-
-def decrypt_api_key(encrypted_key: str) -> str:
-    """Decrypt the API key before using it."""
-    if cipher:
-        return cipher.decrypt(encrypted_key.encode()).decode()
-    else:
-        print("API_SECRET_KEY not set. Using API key without decryption.")
-        return encrypted_key
-    
 
 # --- helper functions for getting AI feedback ---
 
@@ -189,7 +173,9 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
 
         model = assignment.ai_feedback_model
         temperature = assignment.ai_feedback_temperature
-        client = OpenAI(api_key=course.openai_api_key)
+
+        decrypted_api_key = decrypt_api_key(course.openai_api_key)
+        client = OpenAI(api_key=decrypted_api_key)
 
         ai_feedback_json, new_insights = get_structured_feedback_from_openai(
             client, prompt, model, temperature, student.coding_insights

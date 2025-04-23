@@ -15,7 +15,7 @@ from api.models import (
 )
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
-from ai_integration import encrypt_api_key
+from util.encryption_utils import encrypt_api_key
 
 course = Blueprint("course", __name__)
 
