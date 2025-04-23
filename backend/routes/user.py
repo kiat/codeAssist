@@ -75,16 +75,16 @@ def user_login():
         raise BadRequestError("Missing email or password")
 
     # Fetch user by email only
-    user = db.session.query(User).filter_by(email_address=email).first()
-    if not user:
+    db_user = db.session.query(User).filter_by(email_address=email).first()
+    if not db_user:
         raise NotFoundError("Email and password combination not found")
 
     # Verify the provided password against the stored (hashed) password
-    if not verify_password(password, user.password):
+    if not verify_password(password, db_user.password):
         raise NotFoundError("Email and password combination not found")
 
     # Serialize and return
-    result = UserSchema().dump(user)
+    result = UserSchema().dump(db_user)
     return jsonify(result), 200
 
 
