@@ -64,7 +64,10 @@ export default () => {
                 })
                 .finally(() => {
                   setSaveLoading(false);
-                });
+                })
+                .catch(() => {
+                  // do nothing error handled in post
+                })
             }}
           >
             <Form.Item label='AUTOGRADER CONFIGURATION' name='operation'>
@@ -110,9 +113,6 @@ export default () => {
                           >
                             <Button>Replace Autograder (.zip)</Button>
                           </Upload>
-                        </Form.Item>
-                        <Form.Item noStyle>
-                          <Button>Download Autograder</Button>
                         </Form.Item>
                       </Space>
                     </Form.Item>
@@ -184,7 +184,7 @@ export default () => {
                 <Button loading={saveLoading} type='primary' htmlType='submit'>
                   Update Autograder
                 </Button>
-                <Button onClick={toggleModalOpen}>Test Autograder</Button>
+                {/*<Button onClick={toggleModalOpen}>Test Autograder</Button>*/}
               </Space>
             </Form.Item>
           </Form>
@@ -196,7 +196,7 @@ export default () => {
           <RightOutlined />
         </Button>
       </PageBottom>
-      <TestAutograder open={modalOpen} onCancel={toggleModalOpen} />
+      {/*<TestAutograder open={modalOpen} onCancel={toggleModalOpen} />*/}
     </>
   );
 };
