@@ -118,8 +118,15 @@ def test_user_login_success(client, mock_user_query):
     """Test the /user_login route with valid credentials."""
     mock_query, mock_user_schema = mock_user_query
     
+    # our stubbed DB row must include the password so verify_password(...) returns True
+    user_record = {
+        "id": "123",
+        "name": "John Doe",
+        "password": "password123"
+    }
+    # When we call UserSchema().dump(...) we still want only id/name in the JSON response
     mock_user_schema.return_value.dump.return_value = {"id": "123", "name": "John Doe"}
-    mock_query.return_value.filter_by.return_value.first.return_value = mock_user_schema.return_value.dump.return_value
+    mock_query.return_value.filter_by.return_value.first.return_value = user_record
 
     payload = {"email": "john@example.com", "password": "password123"}
 
