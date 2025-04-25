@@ -15,6 +15,12 @@ class ServerTimeoutError(Exception):
     def __init__(self, message="Server timeout error"):
         super().__init__(message)
 
+# subclass of ServerTimeoutError specific for submission timeouts
+class SubmissionTimeoutError(ServerTimeoutError):
+    def __init__(self, message="Submission timeout error", submission_id=None):
+        super().__init__(message)
+        self.submission_id = submission_id
+
 class ConflictError(Exception):
     status_code = 409
     def __init__(self, message="Conflict error"):
@@ -43,6 +49,16 @@ def register_error_handlers(app):
     @app.errorhandler(ServerTimeoutError)
     def handle_server_timeout_error(error):
         return jsonify({"message": str(error)}), error.status_code
+    
+    @app.errorhandler(SubmissionTimeoutError)
+    def handle_submission_timeout_error(error):
+        return (
+            jsonify({
+                "message": str(error),
+                "submission_id": getattr(error, "submission_id", None)
+            }),
+            error.status_code
+        )
     
     @app.errorhandler(ConflictError)
     def handle_conflict_error(error):

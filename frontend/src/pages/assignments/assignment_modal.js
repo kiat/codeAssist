@@ -3,10 +3,13 @@ import { InboxOutlined } from '@ant-design/icons';
 import { useState, useContext } from "react";
 import { GlobalContext } from "../../App";
 import { useNavigate } from "react-router-dom";
+import { uploadSubmission } from "../../services/submission";
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle }) {
   const [file, setFile] = useState(null);
   const { userInfo } = useContext(GlobalContext);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleFileChange = (info) => {
@@ -31,20 +34,21 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
     formData.append('assignment_id', assignmentID);
 
     try {
-      const response = await fetch(process.env.REACT_APP_API_URL + "/upload_submission", {
-        method: "POST",
-        body: formData,
-      });
-
-      // if (!response.ok) {
-      //   throw new Error("Network response was not ok");
-      // }
-
-      const responseData = await response.json();
+      setLoading(true);
+      const response = await uploadSubmission(formData)
+      const responseData = response.data;
       navigateToResults(responseData.submissionID);
     } catch (error) {
       console.error("Error uploading file:", error);
-      message.error("Failed to upload file. Please try again.");
+
+      // check if we had a submission timeout error
+      if (error.response && error.response.data.submission_id) {
+        // Navigate to results if submission_id is in the response data
+        navigateToResults(error.response.data.submission_id);
+      }
+    }
+    finally {
+      setLoading(false);
     }
   };
 
@@ -57,6 +61,8 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
   };
 
   return (
+    <>
+    <LoadingOverlay loading={loading}/> 
     <Modal title="Submit Assignment" open={open} onCancel={onCancel} footer={null}>
       <Form layout="vertical">
         <Form.Item name="upload">
@@ -83,5 +89,6 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
         </Form.Item>
       </Form>
     </Modal>
+    </>
   );
 }
