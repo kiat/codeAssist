@@ -64,7 +64,10 @@ export default () => {
                 })
                 .finally(() => {
                   setSaveLoading(false);
-                });
+                })
+                .catch(() => {
+                  // do nothing error handled in post
+                })
             }}
           >
             <Form.Item label='AUTOGRADER CONFIGURATION' name='operation'>
@@ -110,9 +113,6 @@ export default () => {
                           >
                             <Button>Replace Autograder (.zip)</Button>
                           </Upload>
-                        </Form.Item>
-                        <Form.Item noStyle>
-                          <Button>Download Autograder</Button>
                         </Form.Item>
                       </Space>
                     </Form.Item>

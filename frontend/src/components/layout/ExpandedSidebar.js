@@ -80,14 +80,16 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed }) {
                 <span> {userInfo?.name}</span>
               </div>
             </Card>
-            <Card title='COURSE ACTIONS' size='small' bordered={false}>
-              <div className={styles.iconText}>
-                <Link to='/dashboard' className={styles.linkText}>
-                  <LogoutOutlined />
-                  <span> Leave Course</span>
-                </Link>
-              </div>
+            {userInfo?.isStudent &&
+              <Card title='COURSE ACTIONS' size='small' bordered={false}> {}
+                <div className={styles.iconText}>
+                  <Link to='/dashboard' className={styles.linkText}>
+                    <LogoutOutlined />
+                    <span> Leave Course</span>
+                  </Link>
+                </div>
             </Card>
+            }
           </>
         )}
       </div>

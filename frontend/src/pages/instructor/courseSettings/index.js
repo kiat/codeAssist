@@ -265,8 +265,6 @@ export default () => {
             >
               Update Course
             </Button>
-            <Button type="primary">Deactivate</Button>
-            <Button type="primary">Reactivate</Button>
           </Space>
           <Typography.Title level={5} style={{ marginTop: "10px" }}>
             DANGER ZONE
