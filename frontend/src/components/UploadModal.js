@@ -142,6 +142,12 @@ export default function UploadModal({
       navigateToResults(responseData.submissionID);
     } catch (error) {
       console.error("Error uploading file:", error);
+      
+      // check if we had a submission timeout error
+      if (error.response && error.response.data.submission_id) {
+        // Navigate to results if submission_id is in the response data
+        navigateToResults(error.response.data.submission_id);
+      }
     }
     finally {
       setLoading(false); // Hide loading overlay

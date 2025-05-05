@@ -15,7 +15,7 @@ from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
-from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError
+from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ServerTimeoutError, SubmissionTimeoutError
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_integration import async_get_ai_feedback
@@ -114,9 +114,53 @@ def upload_submission():
             capture_output=True, 
             timeout=assignment.autograder_timeout)
     except subprocess.TimeoutExpired:
+        # clean up container
+        container.exec_run(f"rm -rf /autograder/submission/{filename}")
+        container.exec_run(f"rm -f /autograder/source/{filename}")
         container.stop()
         os.chdir(current_dir)
-        raise ServerTimeoutError("Submitted program took too long to run")
+
+        # upload failed submission to db
+        timeout_result = {
+            "tests": [
+                {
+                    "name": "Submission Timeout",
+                    "score": 0,
+                    "max_score": 0,
+                    "status": "failed",
+                    "output": "The submission did not complete within the time limit."
+                }
+            ],
+            "leaderboard": [],
+            "visibility": "visible",
+            "execution_time": f"{assignment.autograder_timeout:.2f}",
+            "score": 0
+        }
+
+        submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
+        old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
+        if old:
+            old.update({'active': False})
+        
+        failed_submission = Submission(
+            id=uuid.uuid4(),
+            file_name=filename,
+            student_id=uuid.UUID(student_id),
+            assignment_id=uuid.UUID(assignment_id),
+            student_code_file=open(file_path, 'rb').read(),
+            results=json.dumps(timeout_result).encode(),
+            score=0,
+            execution_time=float(assignment.autograder_timeout),
+            submitted_at=datetime.now(),
+            active=True,
+            completed=False,
+            submission_number=submission_count + 1,
+            ai_feedback=None
+        )
+        db.session.add(failed_submission)
+        db.session.commit()
+
+        raise SubmissionTimeoutError("Submitted program took too long to run", failed_submission.id)
 
     if exec_proc.returncode != 0:
         os.chdir(current_dir)
