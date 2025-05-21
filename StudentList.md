@@ -1,5 +1,15 @@
-# Spring 2025 
+# Summer 2025 
+* Yang Shao <yang.shao@utexas.edu>
+* Shreya Sharanya Varma <shreya.varma@utexas.edu>
+* Jim Duong <jimduong4568@gmail.com>
+* Azaan Waseem <aw42679@utexas.edu>
+* Aidan Liu <aidanliu2023@gmail.com>
+* Manaf Asif <manaf@utexas.edu>
 
+  
+# Spring 2025 
+* Aidan Liu <aidanliu2023@gmail.com>
+* Manaf Asif <manaf@utexas.edu>
 * Pranav N Sridhar <pranavs@utexas.edu>
 * Gio B Eloja <gioeloja@utexas.edu>
 * Maxim Gao <maxim.gao@utexas.edu>
