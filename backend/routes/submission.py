@@ -111,18 +111,12 @@ def upload_submission():
             student_id=uuid.UUID(student_id),
             assignment_id=uuid.UUID(assignment_id),
             student_code_file=open(file_path, 'rb').read(),  # ✅ this is all you *really* need
-            results=json.dumps({
-                "tests": [],
-                "score": None,
-                "visibility": "hidden",
-                "execution_time": 0,
-                "message": "No autograder was configured."
-            }).encode(),  # ✅ helps frontend treat it as a valid submission
+            results=None,
             score=None,
             execution_time=0.0,
             submitted_at=datetime.now(),
             active=True,
-            completed=True,
+            completed=False,
             submission_number=submission_count + 1,
             ai_feedback=None
         )
