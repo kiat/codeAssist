@@ -26,7 +26,7 @@ const FileUpload = () => {
 	return (
 		<div>
 			<div id="form">
-				<form onSubmit={uploadFile} encType="multipart/form-data">
+				<form aria-label="upload form" onSubmit={uploadFile} encType="multipart/form-data">
 					<div id="dockerfile">
 						<p className="inline">Select assignment</p>
 						<select
@@ -39,7 +39,8 @@ const FileUpload = () => {
 						</select>
 					</div>
 					<div id="file">
-						<p className="inline">Choose file</p>
+						{/* <p className="inline">Choose file</p> */}
+            <label htmlFor="fileUpload" className="inline">Choose file</label>
 						<input
 							id="fileUpload"
 							type="file"

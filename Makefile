@@ -7,10 +7,17 @@ install:
 	@cd ./frontend && npm install
 	@echo "Frontend dependencies installed."
 
-test:
+test: test-backend test-frontend  ## Run all tests
+
+test-backend:                     ## Backend unit / integration tests
 	@echo "Running backend tests..."
-	@cd ./backend && export PYTHONPATH=. && pytest
+	@cd ./backend && PYTHONPATH=. pytest
 	@echo "Backend tests passed."
+
+test-frontend:                    ## Front-end Jest tests
+	@echo "Running frontend tests..."
+	@cd ./frontend && npm test --silent
+	@echo "Frontend tests passed."
 
 clean:
 	@echo "Cleaning up..."
