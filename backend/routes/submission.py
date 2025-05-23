@@ -268,6 +268,12 @@ def upload_assignment_autograder():
             container = docker_client.containers.get(container_id)
             container.start()
 
+            # Force cleanup of all files in /autograder before uploading new ones
+            exit_code, output = container.exec_run("rm -rf /autograder/*")
+            if exit_code != 0:
+                print("Failed to clean /autograder directory: ", output.decode())
+                raise InternalProcessingError("Failed to clean autograder directory before upload")
+
             # Remove old zip file from Docker container
             exit_code, output = container.exec_run("find /autograder -type f -name '*.zip' -delete")
             if exit_code != 0:
@@ -284,12 +290,22 @@ def upload_assignment_autograder():
             # Copy new files into Docker container. Docker's "put_archive" expects a tar
             # create tar archive
             tar_stream = io.BytesIO()
+            with open(filepath, "rb") as f:
+                file_data = f.read()
+
+            tarinfo = tarfile.TarInfo(name=filename)
+            tarinfo.size = len(file_data)
+
             with tarfile.open(fileobj=tar_stream, mode="w") as tar:
-                tar.add(file_path, arcname=file_path.split("/")[-1])
+                tar.addfile(tarinfo, io.BytesIO(file_data))
             tar_stream.seek(0)
 
             # copy tar archive into container
-            success = container.put_archive("/autograder/", tar_stream.read())
+            tar_stream.seek(0)
+            success = container.put_archive("/autograder/", tar_stream)
+            exit_code, output = container.exec_run("ls -l /autograder/")
+            print("🧾 Files in /autograder/:")
+            print(output.decode())
             if not success:
                 print("Failed to copy new files into docker container")
                 raise InternalProcessingError("Failed to upload assignment autograder")
