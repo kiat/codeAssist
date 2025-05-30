@@ -116,7 +116,7 @@ def upload_submission():
             execution_time=0.0,
             submitted_at=datetime.now(),
             active=True,
-            completed=False,
+            completed=True,
             submission_number=submission_count + 1,
             ai_feedback=None
         )
