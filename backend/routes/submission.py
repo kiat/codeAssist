@@ -110,7 +110,7 @@ def upload_submission():
             file_name=filename,
             student_id=uuid.UUID(student_id),
             assignment_id=uuid.UUID(assignment_id),
-            student_code_file=open(file_path, 'rb').read(),  # ✅ this is all you *really* need
+            student_code_file=open(file_path, 'rb').read(),
             results=None,
             score=None,
             execution_time=0.0,
