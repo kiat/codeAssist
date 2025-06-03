@@ -24,6 +24,7 @@ import TestAutograder from "./TestAutograder";
 
 export default () => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [autograder, setAutograder] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [form] = Form.useForm();
   const { assignmentId } = useParams();
@@ -108,6 +109,7 @@ export default () => {
                               }
                               
                               form.setFieldValue("fileName", file.name);
+                              setAutograder(file);
                               return false;
                             }}
                           >
@@ -196,7 +198,7 @@ export default () => {
           <RightOutlined />
         </Button>
       </PageBottom>
-      <TestAutograder open={modalOpen} onCancel={toggleModalOpen} />
+      <TestAutograder open={modalOpen} onCancel={toggleModalOpen} autograderFile={autograder}/>
     </>
   );
 };
