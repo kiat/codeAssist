@@ -95,7 +95,42 @@ def upload_submission():
 
     file.save(file_path)
 
+    #get autograder if it exists
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+
+
+    if not assignment or not assignment.container_id or assignment.container_id.strip() == "":
+        submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
+        old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
+        if old:
+            old.update({'active': False})
+        
+        new_submission = Submission(
+            id=uuid.uuid4(),
+            file_name=filename,
+            student_id=uuid.UUID(student_id),
+            assignment_id=uuid.UUID(assignment_id),
+            student_code_file=open(file_path, 'rb').read(),
+            results=None,
+            score=None,
+            execution_time=0.0,
+            submitted_at=datetime.now(),
+            active=True,
+            completed=True,
+            submission_number=submission_count + 1,
+            ai_feedback=None
+        )
+
+        db.session.add(new_submission)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Submission uploaded. No autograder found.",
+            "submissionID": str(new_submission.id)
+        }), 200
+
+
+    # This will only run if both checks above pass
     container = docker_client.containers.get(assignment.container_id)
     container.start()
 

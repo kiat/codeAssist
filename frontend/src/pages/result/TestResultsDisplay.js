@@ -42,11 +42,19 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     }
     setIsLoading(true);
     if (data){
-      setStudScore(data.score);
-      const parsedResults = JSON.parse(data.results);
+      setStudScore(data?.score ?? 'UNGRADED');
+      const parsedResults = (() => {
+        try {
+          return data?.results ? JSON.parse(data.results) : { tests: [] };
+        } catch (e) {
+          console.error("Error parsing results:", e);
+          return { tests: [] };
+        }
+      })();
       setTestResults(parsedResults);
       setStudentCode(data.student_code_file);
       setStudentFileName(data.file_name);
+
       console.log("this submission is", data.active)
     } else {
       console.error("not available");
