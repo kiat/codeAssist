@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Button, Form, Modal, Radio, Select, Typography, Upload, message } from "antd";
+import { useNavigate } from "react-router-dom";
 
-export default ({ open, onCancel, autograderFile }) => {
+export default ({ open, onCancel, autograderFile, onSuccess}) => {
   const [uploadedSubmission, setUploadedSubmission] = useState(null);
   const [uploadedAutograder, setUploadedAutograder] = useState(null);
+  const navigate = useNavigate(); 
 
   const handleTestAutograder = async () => {
     if (!uploadedSubmission || !autograderFile) {
@@ -18,6 +20,31 @@ export default ({ open, onCancel, autograderFile }) => {
     const formData = new FormData();
     formData.append("submission_file", uploadedSubmission);
     formData.append("autograder_zip", autograderFile);
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/test_autograder_submission`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        if (onSuccess) {
+          onSuccess(data);   // <-- Call onSuccess, pass back data
+        }
+        else{
+          message.error(data?.error || "uh oh");
+        }
+        console.log("we got here!");
+        localStorage.setItem("testAutograderResults", JSON.stringify(data.results));
+        //window.location.href = "/test-results";
+      } else {
+        message.error(data?.error || "Autograder test failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      message.error("hihi");
+    }
   };
 
   return (
