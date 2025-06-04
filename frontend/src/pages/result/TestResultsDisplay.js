@@ -10,10 +10,10 @@ import StudentInfoPanel from "./StudentInfoPanel";
 
 const { Panel } = Collapse;
 
-const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data, aiFeedbackEnabled, isModal = false, submissionId: submissionIdFromProps}) => {
+const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data, aiFeedbackEnabled, isModal = false, submissionId: submissionIdFromProps, onCancel }) => {
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const params = useParams();
-  const submissionId = submissionIdFromProps || params.submissionId;  //const { assignmentId } = useParams();
+  const submissionId = submissionIdFromProps || params.submissionId; //const { assignmentId } = useParams();
   const navigate = useNavigate();
   const [testResults, setTestResults] = useState(null);
   const [studentCode, setStudentCode] = useState("");
@@ -21,7 +21,6 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [StudScore, setStudScore] = useState(score);
-  
 
   const [highlightedLines, setHighlightedLines] = useState([]);
   const [annotations, setAnnotations] = useState([]);
@@ -354,7 +353,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
       open={true}
       title="Test Results"
       footer={null}
-      onCancel={() => navigate(-1)} // click outside or X to close and go back
+      onCancel={onCancel} // click outside or X to close and go back
       width="80%"
     >
       {Content}

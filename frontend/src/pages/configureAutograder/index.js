@@ -28,6 +28,10 @@ export default () => {
     setResultsModalOpen(true); // Open TestResultsDisplay Modal
   };
 
+  const handleCloseResultsModal = () => {
+    setResultsModalOpen(false);
+  };
+
   return (
     <>
       <PageContent>
@@ -173,7 +177,7 @@ export default () => {
         </Button>
       </PageBottom>
       <TestAutograder open={modalOpen} onCancel={toggleModalOpen} autograderFile={autograder} onSuccess={handleAutograderSuccess} />
-      {resultsModalOpen && <TestResultsDisplay viewMode="Results" assignmentName="Assignment 1" studentName="John Doe" score={testResultsData?.score} totalPoints={100} data={testResultsData} aiFeedbackEnabled={true} isModal={true} submissionId="dummy-id-12345" />}
+      {resultsModalOpen && <TestResultsDisplay viewMode="Results" assignmentName="Assignment 1" studentName="John Doe" score={testResultsData?.score} totalPoints={100} data={testResultsData} aiFeedbackEnabled={true} isModal={true} submissionId="dummy-id-12345" onCancel={handleCloseResultsModal}/>}
     </>
   );
 };
