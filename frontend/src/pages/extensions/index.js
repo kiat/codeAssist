@@ -31,27 +31,27 @@ export default () => {
   const [searchQuery, setSearchQuery] = useState("");
   const { courseInfo } = useContext(GlobalContext);
   const finishForm = async () => {
-    const values = form.getFieldsValue();
-    const extensionData = {
-      assignment_id: assignmentId,
-      student_id: values.student,
-      release_date_extension: values.releaseDate || null,
-      due_date_extension: values.dueDate || null,
-      late_due_date_extension: values.lateDueDate || null,
-    };
-    createExtension(extensionData)
-      .then((res) => {
-        toggleExtensionModalOpen();
-        setForceUpdate((u) => u + 1);
-      })
-      .catch((err) => {
-        if (!values.student) {
-          message.error("Select a student");
-        } else {
-          message.error("Failed to create extension");
-        }
-      });
+  const values = form.getFieldsValue();
+
+  const extensionData = {
+    assignment_id: assignmentId,
+    student_id: values.student,
+    release_date_extension: values.releaseDate || null,
+    due_date_extension: values.dueDate || null,
+    late_due_date_extension: values.lateDueDate || null,
   };
+
+  createExtension(extensionData)
+    .then((res) => {
+      message.success("Extension created successfully");
+      toggleExtensionModalOpen();
+      setForceUpdate((u) => u + 1);
+    })
+    .catch((err) => {
+      console.error("Failed to create extension", err);
+      message.error("Failed to create extension. Please try again.");
+    });
+};
 
   const deleteExtension = async (record) => {
     console.log("ID", record.id);
