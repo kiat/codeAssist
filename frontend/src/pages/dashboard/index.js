@@ -1,12 +1,10 @@
 import { PageHeader } from "antd";
 import { useCallback, useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { GlobalContext } from "../../App";
 import SemesterCourses from "./semesterCourses";
 import CourseModal from "./courseModal";
 import RelationForm from "./relationForm";
 import AddForm from "./addForm";
-import ExpandedSidebar from '../../components/layout/ExpandedSidebar';
 import {
   createCourse,
   enrollCourse,
@@ -17,10 +15,7 @@ import {  message } from "antd";
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [courses, setCourses] = useState({});
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  console.log('selectedCourse:', selectedCourse);
   const { userInfo } = useContext(GlobalContext);
-  const navigate = useNavigate();
   // Inline styles for the component
 
   const courseHeaderStyle = {
@@ -135,7 +130,7 @@ export default function Dashboard() {
       <PageHeader title="Your Courses" />
       <div style={courseHeaderStyle}>
         <div style={{ display: "flex", flexDirection: "column", gap: "40px", width: "100%" }}>
-            <SemesterCourses courses={courses} toggleModal={toggleModal} setSelectedCourse={setSelectedCourse} />
+            <SemesterCourses courses={courses} toggleModal={toggleModal} />
         </div>
       </div>
 
