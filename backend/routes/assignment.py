@@ -48,10 +48,12 @@ def update_assignment():
             raise NotFoundError("Assignment not found")
         db.session.commit()
         return jsonify({"message": "Assignment updated successfully"}), 200
+    except (BadRequestError, NotFoundError) as e:
+        raise e
     except Exception:
         db.session.rollback()
         raise InternalProcessingError("Failed to update assignment")
-    
+        
 @assignment.route('/get_assignment', methods=["GET"])
 @cross_origin()
 def get_assignment():
@@ -183,21 +185,12 @@ def delete_assignment():
     if not assignment:
         raise NotFoundError("Assignment not found")
    
-    #check if there are regrade requests for this assignment
-    request = db.session.query(RegradeRequest).filter(
-            RegradeRequest.submission_id.in_(
-                db.session.query(Submission.id).filter(
-                    Submission.assignment_id == assignment_id
-                )
-            )
-        ).first()
-    if request:
-        raise ConflictError("Cannot delete assignment with regrade request")
     try:
-        #delete submissions first
+        #delete regrade requests and submissions first
         submissions = db.session.query(Submission).filter(Submission.assignment_id == assignment_id).all()
         if submissions:
             for submission in submissions:
+                db.session.query(RegradeRequest).filter_by(submission_id = submission.id).delete(synchronize_session=False)
                 db.session.delete(submission)
             db.session.commit()
 

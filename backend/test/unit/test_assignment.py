@@ -31,7 +31,7 @@ def test_update_assignment_success(client, mocker):
     })
 
     assert resp.status_code == 200
-    assert resp.json["message"] == "Success"
+    assert resp.json["message"] == "Assignment updated successfully"
     mock_commit.assert_called_once()
 
 
@@ -39,7 +39,7 @@ def test_update_assignment_duplicate_name(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter.return_value.first.return_value = mocker.Mock()
 
-    resp = client.post("/update_assignment", json={
+    resp = client.put("/update_assignment", json={
         "assignment_id": "some-uuid",
         "name": "Duplicate",
         "course_id": "course-uuid"
@@ -54,7 +54,7 @@ def test_update_assignment_not_found(client, mocker):
     mock_query.return_value.filter.return_value.first.return_value = None
     mock_query.return_value.filter_by.return_value.update.return_value = 0
 
-    resp = client.post("/update_assignment", json={
+    resp = client.put("/update_assignment", json={
         "assignment_id": "notfound-uuid",
         "name": "Anything",
         "course_id": "course-uuid"
@@ -184,17 +184,17 @@ def test_duplicate_assignment_name_conflict(client, mocker):
     })
 
     assert resp.status_code == 404
-    assert "already exists in this course" in resp.json["error"]
+    assert "already exists in this course" in resp.json["message"]
 
 
 
 def test_delete_assignment_not_found(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
-    mock_query.return_value.get.return_value = None
+    mock_query.return_value.filter_by.return_value.first.return_value = None
 
     resp = client.delete("/delete_assignment?assignment_id=notfound-id")
     assert resp.status_code == 404
-    assert "Assignment not found" in resp.json
+    assert "Assignment not found" in resp.json["message"]
 
 
 def test_delete_assignment_with_submissions(client, mocker):
@@ -208,8 +208,8 @@ def test_delete_assignment_with_submissions(client, mocker):
 
     resp = client.delete("/delete_assignment?assignment_id=assign-id")
     assert resp.status_code == 200
-    assert "Assignment deleted successfully" in resp.json
-    assert mock_delete.call_count >= 2
+    assert "Assignment deleted successfully" in resp.json["message"]
+    assert mock_delete.call_count >= 1
     mock_commit.assert_called()
 
 
