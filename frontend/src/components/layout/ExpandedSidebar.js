@@ -11,10 +11,6 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed, hand
     return str.toUpperCase();
   }
 
-  console.log('userInfo:', userInfo);
-  console.log('typeof handleLeaveCourse:', typeof handleLeaveCourse);
-  console.log('courseInfo:', courseInfo);
-
   return (
     <>
       <div>

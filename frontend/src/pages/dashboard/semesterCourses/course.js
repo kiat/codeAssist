@@ -45,28 +45,25 @@ const courseFooterStyle = {
     borderBottomRightRadius: "3px",
 };
 
-export default function Course({ courseInfo, setSelectedCourse }) {
+export default function Course({ courseInfo }) {
     const navigate = useNavigate();
     const { userInfo, updateCourseInfo } = useContext(GlobalContext);
     const { name, assignments, description, id, semester } = courseInfo;
 
     function handleCourseClick() {
-        setSelectedCourse(courseInfo);
         updateCourseInfo({
             id,
             name,
             semester,
             year: courseInfo.year || "",
         });
+
         const destination = userInfo.isStudent ? `/assignments/${id}` : `/instructorDashboard/${id}`;
-        setTimeout(() => navigate(destination), 0); // Let state update before navigating
+        navigate(destination);
     }
 
     return (
-        <div
-            style={courseStyle}
-            onClick={handleCourseClick}
-        >
+        <div style={courseStyle} onClick={handleCourseClick}>
             <div style={courseHeaderContainer}>
                 <div style={courseHeaderStyle}>{name}</div>
                 <div style={descriptionStyle}>
