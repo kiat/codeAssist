@@ -10,6 +10,7 @@ import StudentInfoPanel from "./StudentInfoPanel";
 
 const { Panel } = Collapse;
 
+//can also be displayed as a modal
 const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data, aiFeedbackEnabled, isModal = false, submissionId: submissionIdFromProps, onCancel }) => {
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const params = useParams();
@@ -40,23 +41,11 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     }
     setIsLoading(true);
     if (data) {
-      console.log("hiii im here");
-
       setStudScore(data?.score ?? "UNGRADED");
-      // const parsedResults = (() => {
-      //   try {
-      //     return data?.results ? JSON.parse(data.results) : { tests: [] };
-      //   } catch (e) {
-      //     console.error("Error parsing results:", e);
-      //     return { tests: [] };
-      //   }
-      // })();
       const parsedResults = typeof data?.results === "string" ? JSON.parse(data.results) : data?.results || { tests: [] };
       setTestResults(parsedResults);
       setStudentCode(data.student_code_file);
       setStudentFileName(data.file_name);
-
-      console.log("this submission is", data.active);
     } else {
       console.error("not available");
     }
@@ -305,23 +294,6 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
       </Collapse>
     </div>
   );
-
-  // return (
-  //   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-  //     <div style={{ flex: 1, minWidth: '60%' }}>
-  //       {viewMode === "Results" ? displayTests() : displayCode()}
-  //     </div>
-  //     <div style={{ marginLeft: '20px', flex: '0 1 auto' }}>
-  //       <StudentInfoPanel
-  //         assignmentName={assignmentName}
-  //         studentName={studentName}
-  //         score={StudScore}
-  //         totalPoints={totalPoints}
-  //         active={data.active}
-  //       />
-  //     </div>
-  //   </div>
-  // );
 
   // const
 

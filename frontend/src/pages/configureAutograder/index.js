@@ -23,10 +23,10 @@ export default () => {
   }, []);
 
   const handleAutograderSuccess = (data) => {
-    setTestResultsData(data); // Save the API results
+    setTestResultsData(data);
     console.log("score: ", testResultsData?.score);
-    setModalOpen(false); // Close TestAutograder Modal
-    setResultsModalOpen(true); // Open TestResultsDisplay Modal
+    setModalOpen(false);
+    setResultsModalOpen(true);
   };
 
   const handleCloseResultsModal = () => {

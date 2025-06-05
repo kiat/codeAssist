@@ -17,7 +17,7 @@ export default ({ open, onCancel, autograderFile, onSuccess }) => {
 
     console.log("Uploaded file is:", uploadedSubmission.name);
     console.log("uploaded autograder is:", autograderFile);
-    message.success(`Got the file: ${uploadedSubmission.name} 🎯`);
+    message.success(`Hang tight! Processing your submission`);
 
     const formData = new FormData();
     formData.append("submission_file", uploadedSubmission);
@@ -33,13 +33,11 @@ export default ({ open, onCancel, autograderFile, onSuccess }) => {
       const data = await response.json();
       if (response.ok) {
         if (onSuccess) {
-          onSuccess(data); // <-- Call onSuccess, pass back data
+          onSuccess(data);
         } else {
           message.error(data?.error || "uh oh");
         }
-        console.log("we got here!");
         localStorage.setItem("testAutograderResults", JSON.stringify(data.results));
-        //window.location.href = "/test-results";
       } else {
         message.error(data?.error || "Autograder test failed.");
       }
