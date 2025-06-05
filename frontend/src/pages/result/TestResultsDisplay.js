@@ -330,7 +330,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
       <div style={{ flex: 1, minWidth: "60%" }}>{viewMode === "Results" ? displayTests() : displayCode()}</div>
       <div style={{ marginLeft: "20px", flex: "0 1 auto" }}>
-        <StudentInfoPanel assignmentName={assignmentName} studentName={studentName} score={StudScore} totalPoints={totalPoints} active={data.active} />
+        <StudentInfoPanel assignmentName={assignmentName} studentName={studentName} score={StudScore} totalPoints={totalPoints} active={true} />
       </div>
     </div>
   );

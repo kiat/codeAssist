@@ -646,5 +646,9 @@ def test_autograder_submission():
         # Remove temp dir
         shutil.rmtree(temp_dir, ignore_errors=True)
 
-    return jsonify({"message": "Dry run successful", "results": result_json}), 200
-
+    return jsonify({
+        "message": "Dry run successful",
+        "results": result_json,
+        "score": result_json.get("score"),
+        "active": result_json.get("active")
+    }), 200

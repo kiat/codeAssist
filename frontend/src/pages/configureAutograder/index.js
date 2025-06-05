@@ -24,6 +24,7 @@ export default () => {
 
   const handleAutograderSuccess = (data) => {
     setTestResultsData(data); // Save the API results
+    console.log("score: ", testResultsData?.score);
     setModalOpen(false); // Close TestAutograder Modal
     setResultsModalOpen(true); // Open TestResultsDisplay Modal
   };
@@ -177,7 +178,9 @@ export default () => {
         </Button>
       </PageBottom>
       <TestAutograder open={modalOpen} onCancel={toggleModalOpen} autograderFile={autograder} onSuccess={handleAutograderSuccess} />
-      {resultsModalOpen && <TestResultsDisplay viewMode="Results" assignmentName="Assignment 1" studentName="John Doe" score={testResultsData?.score} totalPoints={100} data={testResultsData} aiFeedbackEnabled={true} isModal={true} submissionId="dummy-id-12345" onCancel={handleCloseResultsModal}/>}
+      {resultsModalOpen && (
+        <TestResultsDisplay viewMode="Results" assignmentName="Assignment 1" studentName="John Doe" score={testResultsData?.score} totalPoints={100} data={testResultsData} aiFeedbackEnabled={true} isModal={true} submissionId="dummy-id-12345" onCancel={handleCloseResultsModal} />
+      )}
     </>
   );
 };
