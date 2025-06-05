@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Button, Form, Modal, Radio, Select, Typography, Upload, message } from "antd";
 import { useNavigate } from "react-router-dom";
 
-export default ({ open, onCancel, autograderFile, onSuccess}) => {
+export default ({ open, onCancel, autograderFile, onSuccess }) => {
   const [uploadedSubmission, setUploadedSubmission] = useState(null);
   const [uploadedAutograder, setUploadedAutograder] = useState(null);
-  const navigate = useNavigate(); 
+  const [loading, setLoading] = useState(false);
+
+  const navigate = useNavigate();
 
   const handleTestAutograder = async () => {
     if (!uploadedSubmission || !autograderFile) {
@@ -21,6 +23,7 @@ export default ({ open, onCancel, autograderFile, onSuccess}) => {
     formData.append("submission_file", uploadedSubmission);
     formData.append("autograder_zip", autograderFile);
 
+    setLoading(true);
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/test_autograder_submission`, {
         method: "POST",
@@ -30,9 +33,8 @@ export default ({ open, onCancel, autograderFile, onSuccess}) => {
       const data = await response.json();
       if (response.ok) {
         if (onSuccess) {
-          onSuccess(data);   // <-- Call onSuccess, pass back data
-        }
-        else{
+          onSuccess(data); // <-- Call onSuccess, pass back data
+        } else {
           message.error(data?.error || "uh oh");
         }
         console.log("we got here!");
@@ -44,11 +46,13 @@ export default ({ open, onCancel, autograderFile, onSuccess}) => {
     } catch (err) {
       console.error(err);
       message.error("hihi");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Modal open={open} title="Submit Programming Assignment" onCancel={onCancel} onOk={handleTestAutograder}>
+    <Modal open={open} title="Submit Programming Assignment" onCancel={onCancel} onOk={handleTestAutograder} confirmLoading={loading}>
       <Form layout="vertical">
         <Form.Item label="SUBMISSION METHOD" name="submissionMethod">
           <Radio.Group
