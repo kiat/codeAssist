@@ -24,7 +24,7 @@ def test_update_assignment_success(client, mocker):
     mock_query.return_value.filter_by.return_value.update.return_value = 1
     mock_commit = mocker.patch("routes.assignment.db.session.commit")
 
-    resp = client.post("/update_assignment", json={
+    resp = client.put("/update_assignment", json={
         "assignment_id": "some-uuid",
         "name": "Updated",
         "course_id": "course-uuid"
@@ -166,7 +166,7 @@ def test_duplicate_assignment_old_not_found(client, mocker):
     })
 
     assert resp.status_code == 404
-    assert "Old assignment not found" in resp.json["error"]
+    assert "Old assignment not found" in resp.json["message"]
 
 
 def test_duplicate_assignment_name_conflict(client, mocker):
@@ -306,7 +306,7 @@ def test_delete_extension_found(client, mocker):
 
     resp = client.delete("/delete_extension?extension_id=ext-id")
     assert resp.status_code == 200
-    assert "Extension deleted successfully" in resp.json
+    assert resp.json["message"] == "Extension deleted successfully"
     mock_delete.assert_called_with(mock_ext)
     mock_commit.assert_called()
 
@@ -317,8 +317,8 @@ def test_delete_extension_not_found(client, mocker):
     mock_query.return_value.filter_by.return_value.all.return_value = []
 
     resp = client.delete("/delete_extension?extension_id=notfound-id")
-    assert resp.status_code == 200
-    assert "Extension deleted successfully" in resp.json
+    assert resp.status_code == 404
+    assert "Extension not found" in resp.json["message"]
 
 
 

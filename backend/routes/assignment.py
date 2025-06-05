@@ -4,7 +4,7 @@ from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, AssignmentExtension, Submission, RegradeRequest, Course
 from api.schemas import AssignmentSchema, CourseSchema, AssignmentExtensionSchema
-from util.errors import NotFoundError, BadRequestError, InternalProcessingError
+from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError
 
 assignment = Blueprint('assignment', __name__)
 
@@ -151,7 +151,7 @@ def duplicate_assignment():
         ).one_or_none()
 
         if course_assignment is not None:
-            raise BadRequestError("An assignment with this name already exists in this course")
+            raise NotFoundError("An assignment with this name already exists in this course")
 
         new_assignment_id = str(uuid.uuid4())
         old_assignment_data = AssignmentSchema().dump(old_assignment)
@@ -164,7 +164,7 @@ def duplicate_assignment():
         db.session.commit()
 
         new_assignment_data = AssignmentSchema().dump(new_assignment)
-        return jsonify(new_assignment_data), 201
+        return jsonify(new_assignment_data), 200
     
     except (BadRequestError, NotFoundError) as e:
         raise e
@@ -179,31 +179,34 @@ def delete_assignment():
     if not assignment_id:
         raise BadRequestError("Missing assignment ID")
     
-    #delete regrade requests, submissions, and assignment
-    try:
-        db.session.query(RegradeRequest).filter(
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+   
+    #check if there are regrade requests for this assignment
+    request = db.session.query(RegradeRequest).filter(
             RegradeRequest.submission_id.in_(
                 db.session.query(Submission.id).filter(
                     Submission.assignment_id == assignment_id
                 )
             )
-        ).delete(synchronize_session=False)
+        ).first()
+    if request:
+        raise ConflictError("Cannot delete assignment with regrade request")
+    try:
+        #delete submissions first
+        submissions = db.session.query(Submission).filter(Submission.assignment_id == assignment_id).all()
+        if submissions:
+            for submission in submissions:
+                db.session.delete(submission)
+            db.session.commit()
 
-        db.session.query(Submission).filter(
-            Submission.assignment_id == assignment_id
-        ).delete(synchronize_session=False)
-
-        deleted = db.session.query(Assignment).filter(
-            Assignment.id == assignment_id
-        ).delete(synchronize_session=False)
-
+        #delete assignment
+        db.session.delete(assignment)
         db.session.commit()
 
-        if deleted:
-            return jsonify("Assignment deleted successfully"), 200
-        else:
-            raise NotFoundError("Assignment not found")
-
+        return jsonify({"message": "Assignment deleted successfully"}), 200
+        
     except Exception:
         db.session.rollback()
         raise InternalProcessingError("Failed to delete assignment")
@@ -310,22 +313,11 @@ def get_extension():
 @cross_origin()
 def get_assignment_extensions():
     assignment_id = request.args.get("assignment_id")
-    
-    if not assignment_id:
-        raise BadRequestError("Missing assignment_id")
+    # Fetch extension for this assignment and student
+    extensions = db.session.query(AssignmentExtension).filter_by(assignment_id=assignment_id)
 
-    try:
-        extensions = db.session.query(AssignmentExtension).filter_by(
-            assignment_id=assignment_id
-        ).all()
-
-        extensions_data = AssignmentExtensionSchema().dump(extensions, many=True)
-        return jsonify(extensions_data), 200
-
-    except (BadRequestError, NotFoundError) as e:
-        raise e
-    except Exception:
-        raise InternalProcessingError("Failed to fetch assignment extensions")
+    extensions = AssignmentExtensionSchema().dump(extensions, many=True)
+    return jsonify(extensions)
     
 @assignment.route('/delete_extension', methods=["DELETE"])
 @cross_origin()
