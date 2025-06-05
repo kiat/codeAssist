@@ -1,4 +1,5 @@
-import { Layout } from "antd";
+import { Layout, message, Modal } from "antd";
+import axios from "axios";
 import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import Home from "./pages/home";
 import Dashboard from "./pages/dashboard";
@@ -22,6 +23,7 @@ import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
 import RegradeRequests from './components/RegradeRequests';
+import { leaveCourse } from "./services/course";
 
 const { Content } = Layout;
 
@@ -73,7 +75,24 @@ function App() {
       navigate("/");
     }
   }, [userInfo, location, navigate]);
-
+  
+  const handleLeaveCourse = async (courseId) => {
+  Modal.confirm({
+    title: "Are you sure you want to leave this course?",
+    content: "This action cannot be undone.",
+    okText: "Yes, leave",
+    cacnelText: "Cancel",
+    onOk: async () => {
+      try {
+        await leaveCourse({ user_id: userInfo.id, course_id: courseId });
+        navigate('/dashboard');
+      } catch (error) {
+        console.error(error);
+        message.error("Failed to leave course");
+      }
+    },
+  });
+};
   return (
     <GlobalContext.Provider value={{
       userInfo, updateUserInfo,
@@ -88,6 +107,7 @@ function App() {
             courseInfo={courseInfo}
             userInfo={userInfo}
             assignmentInfo={assignmentInfo}
+            onLeaveCourse={handleLeaveCourse}
           />
         )}
         <Layout style={{ height: "100vh" }}>

@@ -6,10 +6,14 @@ import AccountPopoverContent from './accountPopoverContent';
 import GradeSider from './GradeSider';
 import styles from './styles.module.css';
 
-function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed }) {
+function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed, handleLeaveCourse }) {
   const Capitalize = (str) =>{
     return str.toUpperCase();
   }
+
+  console.log('userInfo:', userInfo);
+  console.log('typeof handleLeaveCourse:', typeof handleLeaveCourse);
+  console.log('courseInfo:', courseInfo);
 
   return (
     <>
@@ -80,17 +84,19 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed }) {
                 <span> {userInfo?.name}</span>
               </div>
             </Card>
-            {userInfo?.isStudent &&
-              <Card title='COURSE ACTIONS' size='small' bordered={false}> {}
-                <div className={styles.iconText}>
-                  <Link to='/dashboard' className={styles.linkText}>
+              {userInfo?.isStudent && typeof handleLeaveCourse === "function" && courseInfo?.id &&
+                <Card title='COURSE ACTIONS' size='small' bordered={false}>
+                  <div
+                    className={styles.iconText}
+                    onClick={() => handleLeaveCourse(courseInfo.id)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <LogoutOutlined />
-                    <span> Leave Course</span>
-                  </Link>
-                </div>
-            </Card>
-            }
-          </>
+                    <span className={styles.linkText}> Leave Course</span>
+                  </div>
+                </Card>
+              }          
+            </>
         )}
       </div>
       <Popover content={<AccountPopoverContent />} placement='topLeft'>

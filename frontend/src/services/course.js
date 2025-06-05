@@ -20,6 +20,10 @@ export async function deleteCourse(params) {
   return service("delete_course", params, "delete");
 }
 
+export async function leaveCourse(params) {
+  return service("leave_course", params, "post");
+}
+
 export async function enrollCourse(params) {
   return service("enroll_course", params, "post");
 }

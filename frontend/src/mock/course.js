@@ -1,3 +1,4 @@
+import SemesterCourses from "../pages/dashboard/semesterCourses";
 import IMock from "./common";
 import { COURSES, SUCCESS } from "./constant";
 
@@ -31,3 +32,4 @@ IMock(
   },
   "post"
 );
+

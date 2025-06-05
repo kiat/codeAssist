@@ -1,7 +1,6 @@
 import Course from "./course";
 
-export default function SemesterCourses({ courses, toggleModal }) {
-  const semesterContainerStyle = {
+export default function SemesterCourses({ courses, toggleModal, setSelectedCourse }) {  const semesterContainerStyle = {
     display: "flex",
     flexDirection: "column",
     gap: "30px",
@@ -70,7 +69,7 @@ export default function SemesterCourses({ courses, toggleModal }) {
               <h3 style={semesterHeaderStyle}>{`${semester} ${year}`}</h3>
               <div style={courseGroupStyle}>
                 {courses[semesterKey].map((course, index) => (
-                  <Course key={index} courseInfo={course} />
+                    <Course key={course.id} courseInfo={course} setSelectedCourse={setSelectedCourse} />                    
                 ))}
                 {index === 0 && (
                   <div style={addCourseButtonStyle} onClick={toggleModal}>
