@@ -5,6 +5,8 @@
 * Azaan Waseem <aw42679@utexas.edu>
 * Aidan Liu <aidanliu2023@gmail.com>
 * Manaf Asif <manaf@utexas.edu>
+* KRISHA M PATEL <krisha.patel23@utexas.edu>
+* Wajeeh A Jafry <wajeehjafry@utexas.edu> 
 
   
 # Spring 2025 
