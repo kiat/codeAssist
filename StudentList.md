@@ -8,6 +8,8 @@
 * KRISHA M PATEL <krisha.patel23@utexas.edu>
 * Wajeeh A Jafry <wajeehjafry@utexas.edu>
 * Benjamin Anzaldua <benjamin.anzaldua@utexas.edu>
+* Makyra Kim <makyrakim@utexas.edu>
+
 
 
   
