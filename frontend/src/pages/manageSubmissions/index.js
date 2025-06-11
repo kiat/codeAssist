@@ -98,21 +98,27 @@ const SubmissionsManager = () => {
   //trying to take care of a bug whne navigating back from assignment =results screen and no data is diplayed
   useEffect(() => {
     const fetchAssignmentDetails = async () => {
-      if (assignmentId) {
-        const response = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`
-        );
-        const data = await response.json();
-        updateAssignmentInfo((prev) => ({
-          ...prev,
-          id: data.id,
-          name: data.name,
-        }));
+      try {
+        if (assignmentId) {
+          const response = await fetch(
+            `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`
+          );
+          if (!response.ok) throw new Error("Failed to fetch assignment");
+          const data = await response.json();
+          updateAssignmentInfo((prev) => ({
+            ...prev,
+            id: data.id,
+            name: data.name,
+          }));
+        }
+      } catch (err) {
+        message.error("Assignment not found or failed to load.");
+        console.error("Fetch assignment error:", err);
       }
     };
 
-    fetchAssignmentDetails();
-  }, [assignmentId, updateAssignmentInfo]);
+  fetchAssignmentDetails();
+}, [assignmentId, updateAssignmentInfo]);
 
   useEffect(() => {
     const fetchStudents = async () => {

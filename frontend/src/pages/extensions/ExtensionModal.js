@@ -41,7 +41,11 @@ export default ({
       title="Add an Extension"
     >
       <Form layout="vertical" form={form} onFinish={onFinish}>
-        <Form.Item label="STUDENT" name="student">
+        <Form.Item
+          label="STUDENT"
+          name="student"
+          rules={[{ required: true, message: "Please select a student" }]}
+        >
           <Select
             showSearch
             placeholder="Search students by name or email"

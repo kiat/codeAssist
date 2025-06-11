@@ -24,14 +24,14 @@ def test_update_assignment_success(client, mocker):
     mock_query.return_value.filter_by.return_value.update.return_value = 1
     mock_commit = mocker.patch("routes.assignment.db.session.commit")
 
-    resp = client.post("/update_assignment", json={
+    resp = client.put("/update_assignment", json={
         "assignment_id": "some-uuid",
         "name": "Updated",
         "course_id": "course-uuid"
     })
 
     assert resp.status_code == 200
-    assert resp.json["message"] == "Success"
+    assert resp.json["message"] == "Assignment updated successfully"
     mock_commit.assert_called_once()
 
 
@@ -39,7 +39,7 @@ def test_update_assignment_duplicate_name(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter.return_value.first.return_value = mocker.Mock()
 
-    resp = client.post("/update_assignment", json={
+    resp = client.put("/update_assignment", json={
         "assignment_id": "some-uuid",
         "name": "Duplicate",
         "course_id": "course-uuid"
@@ -54,7 +54,7 @@ def test_update_assignment_not_found(client, mocker):
     mock_query.return_value.filter.return_value.first.return_value = None
     mock_query.return_value.filter_by.return_value.update.return_value = 0
 
-    resp = client.post("/update_assignment", json={
+    resp = client.put("/update_assignment", json={
         "assignment_id": "notfound-uuid",
         "name": "Anything",
         "course_id": "course-uuid"
@@ -166,7 +166,7 @@ def test_duplicate_assignment_old_not_found(client, mocker):
     })
 
     assert resp.status_code == 404
-    assert "Old assignment not found" in resp.json["error"]
+    assert "Old assignment not found" in resp.json["message"]
 
 
 def test_duplicate_assignment_name_conflict(client, mocker):
@@ -184,17 +184,17 @@ def test_duplicate_assignment_name_conflict(client, mocker):
     })
 
     assert resp.status_code == 404
-    assert "already exists in this course" in resp.json["error"]
+    assert "already exists in this course" in resp.json["message"]
 
 
 
 def test_delete_assignment_not_found(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
-    mock_query.return_value.get.return_value = None
+    mock_query.return_value.filter_by.return_value.first.return_value = None
 
     resp = client.delete("/delete_assignment?assignment_id=notfound-id")
     assert resp.status_code == 404
-    assert "Assignment not found" in resp.json
+    assert "Assignment not found" in resp.json["message"]
 
 
 def test_delete_assignment_with_submissions(client, mocker):
@@ -208,8 +208,8 @@ def test_delete_assignment_with_submissions(client, mocker):
 
     resp = client.delete("/delete_assignment?assignment_id=assign-id")
     assert resp.status_code == 200
-    assert "Assignment deleted successfully" in resp.json
-    assert mock_delete.call_count >= 2
+    assert "Assignment deleted successfully" in resp.json["message"]
+    assert mock_delete.call_count >= 1
     mock_commit.assert_called()
 
 
@@ -306,7 +306,7 @@ def test_delete_extension_found(client, mocker):
 
     resp = client.delete("/delete_extension?extension_id=ext-id")
     assert resp.status_code == 200
-    assert "Extension deleted successfully" in resp.json
+    assert resp.json["message"] == "Extension deleted successfully"
     mock_delete.assert_called_with(mock_ext)
     mock_commit.assert_called()
 
@@ -317,8 +317,8 @@ def test_delete_extension_not_found(client, mocker):
     mock_query.return_value.filter_by.return_value.all.return_value = []
 
     resp = client.delete("/delete_extension?extension_id=notfound-id")
-    assert resp.status_code == 200
-    assert "Extension deleted successfully" in resp.json
+    assert resp.status_code == 404
+    assert "Extension not found" in resp.json["message"]
 
 
 

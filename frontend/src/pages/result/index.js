@@ -149,7 +149,7 @@ export default function AssignmentResult() {
     const fetchStudentName = async () => {
       try {
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_student_by_id?id=${studentId}`
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`
         );
         const studentData = await response.json();
         if (studentData) {

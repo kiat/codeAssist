@@ -15,8 +15,10 @@ import {
   Popconfirm
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
+import { useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getAssignment, updateAssignment } from "../../services/assignment";
+import { GlobalContext } from "../../App";
+import { deleteAssignment, deleteSubmissions, getAssignment, updateAssignment } from "../../services/assignment";
 import moment from "moment";
 
 export default () => {
@@ -26,6 +28,7 @@ export default () => {
   const [publishedBefore, setPubBefore] = useState(undefined);
   const [originalPublish, setOGPub] = useState(undefined);
   const [enableAiFeedback, setEnableAiFeedback] = useState(false);
+  const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
 
 
   const getAssignmentInfo = useCallback(() => {
@@ -56,58 +59,33 @@ export default () => {
     getAssignmentInfo();
   }, [getAssignmentInfo]);
 
-  const handleDeleteAssignment = (assignmentId) => {
-    if (!assignmentId) {
-      console.error('Assignment ID is undefined');
-      message.error('Cannot delete assignment without an ID');
-      return Promise.reject(new Error('Assignment ID is undefined'));
-    }
+  const handleDeleteAssignment = async (assignmentId) => {
+  if (!assignmentId) {
+    message.error('Assignment ID is undefined');
+    return;
+  }
+  try {
+    await deleteAssignment(assignmentId);
+    message.success("Assignment deleted successfully");
+  } catch (error) {
+    console.error("Failed to delete assignment:", error);
+    message.error("Failed to delete assignment");
+  }
+};
 
-    return fetch(`${process.env.REACT_APP_API_URL}/delete_assignment?assignment_id=${assignmentId}`, {
-      method: "DELETE",
-      mode: 'cors',
-    })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Network response was not ok, status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .catch(error => {
-        console.error('There has been a problem with the fetch operation:', error);
-        message.error('Failed to delete assignment');
-        return Promise.reject(error);
-      });
-  };
-
-  const handleDeleteSubmissions = (assignmentId) => {
-    if (!assignmentId) {
-      console.error('Assignment ID is undefined');
-      message.error('Cannot delete submissions without an ID');
-      return Promise.reject(new Error('Assignment ID is undefined'));
-    }
-
-    return fetch(`${process.env.REACT_APP_API_URL}/delete_submissions?assignment_id=${assignmentId}`, {
-      method: "DELETE",
-      mode: 'cors',
-    })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Network response was not ok, status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .catch(error => {
-        console.error('There has been a problem with the fetch operation:', error);
-        message.error('Failed to delete submissions');
-        return Promise.reject(error);
-      });
-  };
-
-
-
-
-
+const handleDeleteSubmissions = async (assignmentId) => {
+  if (!assignmentId) {
+    message.error('Assignment ID is undefined');
+    return;
+  }
+  try {
+    await deleteSubmissions(assignmentId);
+    message.success("All submissions deleted successfully");
+  } catch (error) {
+    console.error("Failed to delete submissions:", error);
+    message.error("Failed to delete submissions");
+  }
+};
 
   const currentDate = () => {
     const current = new Date();
@@ -115,7 +93,12 @@ export default () => {
     return formatDate
   }
 
-  const finishForm = () => {
+  const finishForm = async () => {
+      if (!assignmentId) {
+      message.error("Assignment ID is missing. Cannot update.");
+      return;
+    }
+
     const values = form.getFieldsValue();
     let publishedDate = undefined;
     if (values.published === true) {
@@ -149,10 +132,18 @@ export default () => {
     const validData = Object.fromEntries(
       Object.entries(newAssignmentData).filter(([_, value]) => value !== undefined)
     );
-    updateAssignment(validData).then(res => {
-      message.success("Successfully updated assignment");
-    });
+    try {
+    await updateAssignment(validData);
+    message.success("Successfully updated assignment");
+
+    const res = await getAssignment({ assignment_id: assignmentId });
+    updateAssignmentInfo(res.data);
+
+  } catch (err) {
+    message.error("Failed to update assignment. Please try again.");
+    console.error("Update error:", err);
   }
+};
 
   const navigate = useNavigate();
   const navigateMainPage = () => {
@@ -172,10 +163,16 @@ export default () => {
       >
         <Card >
           {/* <Form.Item label='TITLE'> */}
-          <Form.Item label={<span>TITLE</span>} name='name'>
+          <Form.Item 
+            label={<span>NAME</span>} 
+            name='name' 
+            rules={[{ required: true, message: 'Please enter a title' }]}>
             <Input />
           </Form.Item>
-          <Form.Item label='AUTOGRADER POINTS' name='autograderPoints'>
+          <Form.Item 
+            label='AUTOGRADER POINTS' 
+            name='autograderPoints' 
+            rules={[{ required: true, message: 'Please enter points' }]}>
             <Input />
           </Form.Item>
           <Form.Item label='PUBLISHED' name='published'>
@@ -206,7 +203,11 @@ export default () => {
           <Form.Item>
             <Row gutter={20}>
               <Col>
-                <Form.Item label='RELEASE DATE (CST)' name='releaseDate'>
+                <Form.Item
+                  label='RELEASE DATE (CST)'
+                  name='releaseDate'
+                  rules={[{ required: true, message: 'Please select a release date' }]}
+                >
                   <DatePicker showTime style={{ width: "100%" }} />
                 </Form.Item>
                 <Form.Item>
@@ -214,7 +215,11 @@ export default () => {
                 </Form.Item>
               </Col>
               <Col>
-                <Form.Item label='DUE DATE (CST)' name='dueDate'>
+                <Form.Item
+                  label='DUE DATE (CST)'
+                  name='dueDate'
+                  rules={[{ required: true, message: 'Please select a due date' }]}
+                >
                   <DatePicker showTime style={{ width: "100%" }} />
                 </Form.Item>
                 <Form.Item label='LATE DUE DATE (CST)' name='lateDueDate'>
@@ -337,17 +342,7 @@ export default () => {
               </Button>
               <Popconfirm
                 title="Are you sure you want to delete this assignment?"
-                onConfirm={() => {
-                  handleDeleteAssignment(assignmentId)
-                    .then(() => {
-                      message.success("Assignment deleted");
-                      // Only navigate away if deletion was successful
-                      navigateMainPage();
-                    })
-                    .catch((error) => {
-                      message.error('Failed to delete assignment');
-                    });
-                }}
+                onConfirm={() => handleDeleteAssignment(assignmentId).then(navigateMainPage)}
                 okText="Yes"
                 cancelText="No">
                 <Button 
@@ -360,12 +355,6 @@ export default () => {
                 title="Are you sure you want to delete all submissions?"
                 onConfirm={() => {
                   handleDeleteSubmissions(assignmentId)
-                    .then(() => {
-                      message.success("All submissions deleted");
-                    })
-                    .catch((error) => {
-                      message.error('Failed to delete assignment');
-                    });
                 }}
                 okText="Yes"
                 cancelText="No">

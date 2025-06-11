@@ -3,6 +3,7 @@ import { Button, Form, Input, Modal, Select, Space, Typography, message } from "
 import axios from "axios";
 import { GlobalContext } from "../../../App";
 import { getCourseAssignments } from "../../../services/course";
+import { duplicateAssignment } from "../../../services/assignment";
 
 export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentModal }) {
   const [courses, setCourses] = useState([]);
@@ -58,25 +59,34 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
   }));
 
   const onFinish = async (values) => {
-    try {
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/duplicate_assignment`,
-        {
-          oldAssignmentId: values.oldAssignment,
-          newAssignmentTitle: values.newAssignment,
-          currentCourseId: courseInfo.id,
-        }
-      );
-      console.log("Assignment duplicated successfully:", response.data);
-      message.success("Assignment duplicated successfully");
-      toggleCreateAssignmentModal();
-      getAssignments();
-      window.location.reload();
-    } catch (error) {
-      console.error("Error duplicating assignment:", error);
-      message.error("There was an error duplicating the assignment");
+  try {
+    const params = {
+      oldAssignmentId: values.oldAssignment,
+      newAssignmentTitle: values.newAssignment,
+      currentCourseId: courseInfo.id,
+    };
+
+    const response = await duplicateAssignment(params);
+
+    // Show a success message
+    message.success("Assignment duplicated successfully");
+    
+    // Refresh the assignment list
+    getAssignments();
+    toggleCreateAssignmentModal();
+    window.location.reload();
+
+  } catch (error) {
+    console.error("Error duplicating assignment:", error);
+    if (error.response && error.response.data) {
+      // If backend returned an error message in JSON, show it
+      message.error(error.response.data.message || "Failed to duplicate assignment.");
+    } else {
+      // Fallback error
+      message.error("An unexpected error occurred while duplicating the assignment.");
     }
-  };
+  }
+};
 
   return (
     <Modal
@@ -103,7 +113,11 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
           />
         </Form.Item>
 
-        <Form.Item label="COPIED ASSIGNMENT TITLE" name="newAssignment">
+        <Form.Item
+          label="COPIED ASSIGNMENT TITLE"
+          name="newAssignment"
+          rules={[{ required: true, message: "Please enter a title for the duplicated assignment" }]}
+        >
           <Input placeholder="e.g. Homework 1" />
         </Form.Item>
 

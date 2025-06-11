@@ -71,7 +71,8 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
     setEditGradeModalVisible(true);
   };
   const handleRequestSubmission = async () => {
-    if (TempJustification.trim() === "") {
+    //justification cannot be null or only spaces
+    if (!TempJustification || TempJustification.trim() === "") {
       message.error("Justification can't be blank");
       return;
     }
