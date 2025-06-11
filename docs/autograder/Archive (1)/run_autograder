@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+# Set up autograder files
+
+cp /autograder/submission/DNA.py /autograder/source/DNA.py
+
+cd /autograder/source
+
+apt-get install -y pip3 
+
+pip3 install pylint
+
+pip3 install python3
+
+pip3 install opencv-python
+
+python DNA.py
+
+pylint DNA.py > pylint.txt
+
+pyreverse -o png python3 DNA.py
+
+magick display classes.png
+
+python3 run_tests.py
+
