@@ -25,7 +25,7 @@ import {
   Switch
 } from "antd";
 import { useState } from "react";
-import dayjs from "dayjs";
+import moment from "moment";
 
 
 const { Sider, Content } = Layout;
@@ -130,8 +130,8 @@ export default ({
             <Card bordered={false}>
               <Form layout="vertical" form={form}
                 initialValues={{
-                  releaseDate: dayjs(), // current date
-                  dueDate: dayjs().add(7, "day"), // 7 days from now
+                  releaseDate: moment(), // current date
+                  dueDate: moment().add(7, "day"), // 7 days from now
                   autograderPoints: "100",
                 }}
                 >
