@@ -1,19 +1,5 @@
 import { FileTextOutlined, RightOutlined } from "@ant-design/icons";
-import {
-  Button,
-  Card,
-  Col,
-  Form,
-  Input,
-  message,
-  PageHeader,
-  Radio,
-  Row,
-  Select,
-  Space,
-  Typography,
-  Upload,
-} from "antd";
+import { Button, Card, Col, Form, Input, message, PageHeader, Radio, Row, Select, Space, Typography, Upload } from "antd";
 import { useCallback } from "react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
@@ -21,38 +7,45 @@ import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import { uploadAssignmentAutograder } from "../../services/submission";
 import TestAutograder from "./TestAutograder";
+import TestResultsDisplay from "../result/TestResultsDisplay";
 
 export default () => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [autograder, setAutograder] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [testResultsData, setTestResultsData] = useState(null);
+  const [resultsModalOpen, setResultsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const { assignmentId } = useParams();
 
   const toggleModalOpen = useCallback(() => {
-    setModalOpen(t => !t);
+    setModalOpen((t) => !t);
   }, []);
+
+  const handleAutograderSuccess = (data) => {
+    setTestResultsData(data);
+    console.log("score: ", testResultsData?.score);
+    setModalOpen(false);
+    setResultsModalOpen(true);
+  };
+
+  const handleCloseResultsModal = () => {
+    setResultsModalOpen(false);
+  };
 
   return (
     <>
       <PageContent>
-        <PageHeader title='Configure Autograder'>
-          <Typography.Paragraph>
-            Upload your autograder code and change settings here. You can also
-            come back to this step later, but submissions will not be
-            automatically graded until then. Please follow our guidelines for
-            structuring your autograder.
-          </Typography.Paragraph>
-          <Typography.Paragraph>
-            Note: Uploading an autograder zip file will automatically update
-            your Dockerhub image name once it is built successfully.
-          </Typography.Paragraph>
+        <PageHeader title="Configure Autograder">
+          <Typography.Paragraph>Upload your autograder code and change settings here. You can also come back to this step later, but submissions will not be automatically graded until then. Please follow our guidelines for structuring your autograder.</Typography.Paragraph>
+          <Typography.Paragraph>Note: Uploading an autograder zip file will automatically update your Dockerhub image name once it is built successfully.</Typography.Paragraph>
         </PageHeader>
         <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>
           <Form
-            layout='vertical'
+            layout="vertical"
             form={form}
             initialValues={{ autograderTimeout: "300" }}
-            onFinish={values => {
+            onFinish={(values) => {
               setSaveLoading(true);
               const formData = new FormData();
               formData.append("assignment_id", assignmentId);
@@ -67,10 +60,10 @@ export default () => {
                 })
                 .catch(() => {
                   // do nothing error handled in post
-                })
+                });
             }}
           >
-            <Form.Item label='AUTOGRADER CONFIGURATION' name='operation'>
+            <Form.Item label="AUTOGRADER CONFIGURATION" name="operation">
               <Radio.Group
                 // defaultValue='0'
                 options={[
@@ -87,27 +80,25 @@ export default () => {
               {({ getFieldValue }) =>
                 getFieldValue("operation") !== "1" ? (
                   <>
-                    <Form.Item label='UPLOAD AUTOGRADER'>
+                    <Form.Item label="UPLOAD AUTOGRADER">
                       <Space>
-                        <Form.Item name='fileName' noStyle>
-                          <Input
-                            prefix={<FileTextOutlined />}
-                            disabled={true}
-                          />
+                        <Form.Item name="fileName" noStyle>
+                          <Input prefix={<FileTextOutlined />} disabled={true} />
                         </Form.Item>
-                        <Form.Item name='uploadFile' noStyle>
+                        <Form.Item name="uploadFile" noStyle>
                           <Upload
                             showUploadList={false}
                             maxCount={1}
-                            beforeUpload={file => {
+                            beforeUpload={(file) => {
                               const fileIsZip = file.name.toLowerCase().endsWith(".zip");
-                              
+
                               if (!fileIsZip) {
                                 message.error("Autograder should be .zip");
                                 return Upload.LIST_IGNORE;
                               }
-                              
+
                               form.setFieldValue("fileName", file.name);
+                              setAutograder(file);
                               return false;
                             }}
                           >
@@ -128,7 +119,7 @@ export default () => {
                     <Form.Item noStyle>
                       <Row gutter={30} style={{ width: "700px" }}>
                         <Col span={8}>
-                          <Form.Item label='BASE IMAGE OS' name='baseImageOS'>
+                          <Form.Item label="BASE IMAGE OS" name="baseImageOS">
                             <Select
                               options={[
                                 { label: "Ubuntu1", value: "1" },
@@ -138,10 +129,7 @@ export default () => {
                           </Form.Item>
                         </Col>
                         <Col span={8}>
-                          <Form.Item
-                            label='BASE IMAGE VERSION'
-                            name='baseImageVersion'
-                          >
+                          <Form.Item label="BASE IMAGE VERSION" name="baseImageVersion">
                             <Select
                               options={[
                                 { label: "22.04", value: "1" },
@@ -151,10 +139,7 @@ export default () => {
                           </Form.Item>
                         </Col>
                         <Col span={8}>
-                          <Form.Item
-                            label='BASE IMAGE VARIANT'
-                            name='baseImageVariant'
-                          >
+                          <Form.Item label="BASE IMAGE VARIANT" name="baseImageVariant">
                             <Select
                               options={[
                                 { label: "Base", value: "1" },
@@ -164,15 +149,11 @@ export default () => {
                           </Form.Item>
                         </Col>
                       </Row>
-                      <Typography.Paragraph>
-                        Choose the base image that will be used to build your
-                        autograder. This determines the operating system version
-                        and packages available in your autograder.
-                      </Typography.Paragraph>
+                      <Typography.Paragraph>Choose the base image that will be used to build your autograder. This determines the operating system version and packages available in your autograder.</Typography.Paragraph>
                     </Form.Item>
                   </>
                 ) : (
-                  <Form.Item label='DOCKERHUB IMAGE NAME'>
+                  <Form.Item label="DOCKERHUB IMAGE NAME">
                     <Input />
                   </Form.Item>
                 )
@@ -181,7 +162,7 @@ export default () => {
 
             <Form.Item>
               <Space>
-                <Button loading={saveLoading} type='primary' htmlType='submit'>
+                <Button loading={saveLoading} type="primary" htmlType="submit">
                   Update Autograder
                 </Button>
                 <Button onClick={toggleModalOpen}>Test Autograder</Button>
@@ -196,7 +177,10 @@ export default () => {
           <RightOutlined />
         </Button>
       </PageBottom>
-      <TestAutograder open={modalOpen} onCancel={toggleModalOpen} />
+      <TestAutograder open={modalOpen} onCancel={toggleModalOpen} autograderFile={autograder} onSuccess={handleAutograderSuccess} />
+      {resultsModalOpen && (
+        <TestResultsDisplay viewMode="Results" assignmentName="Assignment 1" studentName="John Doe" score={testResultsData?.score} totalPoints={100} data={testResultsData} aiFeedbackEnabled={true} isModal={true} submissionId="dummy-id-12345" onCancel={handleCloseResultsModal} />
+      )}
     </>
   );
 };

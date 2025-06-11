@@ -577,3 +577,94 @@ def activate_submission():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+
+@submission.route('/test_autograder_submission', methods=["POST"])
+@cross_origin()
+def test_autograder_submission():
+    if "submission_file" not in request.files or "autograder_zip" not in request.files:
+        raise BadRequestError("Missing required files: submission_file and autograder_zip")
+
+    submission_file = request.files["submission_file"]
+    autograder_zip = request.files["autograder_zip"]
+
+    if not submission_file.filename or not autograder_zip.filename:
+        raise BadRequestError("Invalid filenames")
+
+    temp_id = str(uuid.uuid4())
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    temp_dir = os.path.join(current_dir, 'temp_autograder', temp_id)
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # Save files
+    submission_path = os.path.join(temp_dir, secure_filename(submission_file.filename))
+    autograder_path = os.path.join(temp_dir, secure_filename(autograder_zip.filename))
+    submission_file.save(submission_path)
+    autograder_zip.save(autograder_path)
+
+    # Write Dockerfile
+    dockerfile_content = f"""
+    FROM python:3.9-slim
+    RUN apt-get update && apt-get install -y --no-install-recommends python3-pip python3-dev unzip && rm -rf /var/lib/apt/lists/*
+    COPY {os.path.basename(autograder_path)} /autograder/
+    RUN unzip /autograder/{os.path.basename(autograder_path)} -d /autograder/source && \
+        chmod +x /autograder/source/setup.sh && /autograder/source/setup.sh && \
+        chmod +x /autograder/source/run_autograder && \
+        mkdir -p /autograder/results /autograder/submission
+    WORKDIR /autograder
+    CMD ["/bin/bash", "/autograder/source/run_autograder"]
+    """
+    with open(os.path.join(temp_dir, 'Dockerfile'), 'w') as f:
+        f.write(dockerfile_content)
+
+    image_tag = f"test-autograder:{temp_id}"
+
+    try:
+        # Build image
+        docker_client.images.build(path=temp_dir, tag=image_tag)
+
+        # Start container
+        container = docker_client.containers.run(
+            image_tag, detach=True, tty=True, command="tail -f /dev/null"
+        )
+
+        # Copy submission
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            tar.add(submission_path, arcname=os.path.basename(submission_path))
+        tar_stream.seek(0)
+        container.put_archive("/autograder/submission/", tar_stream)
+
+        # Run grading
+        exec_proc = container.exec_run("/bin/bash /autograder/source/run_autograder")
+
+        if exec_proc.exit_code != 0:
+            raise InternalProcessingError("Autograder run failed")
+
+        # Get results
+        cat_result = container.exec_run("cat /autograder/results/results.json")
+        if cat_result.exit_code != 0:
+            raise InternalProcessingError("Failed to retrieve results.json")
+
+        result_data = cat_result.output.decode()
+        result_json = json.loads(result_data)
+
+    finally:
+        # Cleanup container and image
+        try:
+            if 'container' in locals():
+                container.stop()
+                container.remove()
+            docker_client.images.remove(image=image_tag, force=True)
+        except Exception as cleanup_err:
+            print(f"Cleanup error: {cleanup_err}")
+
+        # Remove temp dir
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+    return jsonify({
+        "message": "Dry run successful",
+        "results": result_json,
+        "score": result_json.get("score"),
+        "active": result_json.get("active")
+    }), 200

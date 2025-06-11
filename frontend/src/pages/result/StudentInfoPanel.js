@@ -169,7 +169,6 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
           {active ? <div style={{ color: "green", border: "1px solid green", padding: "5px", display: "inline-block" }}>Active</div> : <div style={{ color: "red", border: "1px solid red", padding: "5px", display: "inline-block" }}>Not Active</div>}
         </div>
       </Space>
-      {/* <Typography.Title level={4}>{assignmentName}</Typography.Title> */}
       {score !== null && score !== undefined && score !== "UNGRADED" ? (
         <Space direction="horizontal" size="middle">
           <CheckCircleOutlined style={{ color: "green" }} />
