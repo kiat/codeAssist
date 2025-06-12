@@ -1,18 +1,8 @@
-/**
- * src/test/unit/pages/assignments/index.test.jsx
- *
- * Integration-y test for <Assignments/>.
- * ─ fetches a single assignment
- * ─ shows it as a link-button
- * ─ clicking (unsubmitted, not-past-due) opens AssignmentModal
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Assignments from '../../../../pages/assignments';
 import { GlobalContext } from '../../../../App';
 
-/* ───────────── lightweight antd stub ───────────── */
 jest.mock('antd', () => {
   const real = jest.requireActual('antd');
 
@@ -47,9 +37,6 @@ jest.mock('antd', () => {
   return { ...real, Button, Table, PageHeader, Descriptions, Card, message };
 });
 
-/* ───────────── AssignmentModal stub ─────────────
-   * declare inside factory → no hoisting issues
-   * later we pull it back via require() to assert calls           */
 jest.mock(
   '../../../../pages/assignments/assignment_modal',
   () => {
@@ -60,7 +47,6 @@ jest.mock(
   }
 );
 
-/* ───────────── react-router stubs ───────────── */
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
@@ -68,7 +54,6 @@ jest.mock('react-router-dom', () => ({
   useParams  : () => ({ courseId: 'CS101' }),
 }));
 
-/* ───────────── helper to queue fetches ───────────── */
 const fakeAssignment = {
   id: '1',
   name: 'Homework 1',
@@ -91,7 +76,6 @@ const queueFetches = () => {
     });
 };
 
-/* ───────────── global hooks ───────────── */
 beforeAll(() => {
   process.env.REACT_APP_API_URL = 'http://fake.api';
 });
@@ -100,7 +84,6 @@ afterEach(() => {
   mockNavigate.mockReset();
 });
 
-/* ───────────────────── TEST ───────────────────── */
 it('opens AssignmentModal when unsubmitted assignment clicked', async () => {
   queueFetches();
 
@@ -115,11 +98,9 @@ it('opens AssignmentModal when unsubmitted assignment clicked', async () => {
     </GlobalContext.Provider>
   );
 
-  /* wait for the assignment link to appear */
   const rowBtn = await screen.findByRole('button', { name: /homework 1/i });
   await userEvent.click(rowBtn);
 
-  /* grab the stub via require so it’s definitely initialised */
   const modalMock = require('../../../../pages/assignments/assignment_modal').default;
 
   expect(modalMock).toHaveBeenCalled();
