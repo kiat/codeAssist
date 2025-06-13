@@ -107,6 +107,35 @@ def enroll_course():
         return jsonify(EnrollmentSchema().dump(enrollment)), 201
     except Exception as e:
         raise InternalProcessingError("Failed to enroll in course")
+    
+@course.route("/leave_course", methods=["POST"])
+@cross_origin()
+def leave_course():
+    data = request.json
+    user_id = data.get("user_id")
+    course_id = data.get("course_id")
+
+    if not user_id or not course_id:
+        raise BadRequestError("Missing user_id or course_id")
+
+    enrollment = db.session.query(Enrollment).filter_by(
+        student_id=user_id,
+        course_id=course_id
+    ).first()
+
+    if not enrollment:
+        raise NotFoundError("Enrollment not found")
+
+    if enrollment.role == "instructor":
+        raise ForbiddenError("Instructors cannot leave their own course")
+
+    try:
+        db.session.delete(enrollment)
+        db.session.commit()
+        return jsonify({"message": "Left course successfully"}), 200
+    except:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to leave course")
 
 @course.route("/update_course", methods=["PUT"])
 @cross_origin()

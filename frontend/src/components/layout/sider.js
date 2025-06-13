@@ -4,7 +4,7 @@ import { GlobalContext } from "../../App";
 import CollapsedSidebar from "./CollapsedSidebar";
 import ExpandedSidebar from "./ExpandedSidebar";
 
-export default function RootSider({ pathname, courseInfo, userInfo, assignmentInfo }) {
+export default function RootSider({ pathname, courseInfo, userInfo, assignmentInfo, onLeaveCourse }) {
   const [collapsed, setCollapsed] = useState(false);
   const { updateCourseInfo } = useContext(GlobalContext);
   
@@ -46,7 +46,13 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
     >
       {collapsed ? 
         <CollapsedSidebar toggleCollapsed={toggleCollapsed} pathname={pathname} /> : 
-        <ExpandedSidebar courseInfo={courseInfo} userInfo={userInfo} pathname={pathname} toggleCollapsed={toggleCollapsed} />
+        <ExpandedSidebar
+          courseInfo={courseInfo}
+          userInfo={userInfo}
+          pathname={pathname}
+          toggleCollapsed={toggleCollapsed}
+          handleLeaveCourse={onLeaveCourse}
+        />
       }
     </Layout.Sider>
   );

@@ -2,7 +2,7 @@ import { mock, setup } from "mockjs";
 
 export default function IMock(url, func, type = "get") {
   setup({
-    titmeout: "100-600",
+    timeout: "100-600",
   });
 
   mock(url, type, options => {

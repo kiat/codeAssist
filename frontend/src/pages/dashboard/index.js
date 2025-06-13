@@ -12,12 +12,10 @@ import {
   getCourseAssignments,
 } from "../../services/course";
 import {  message } from "antd";
-
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [courses, setCourses] = useState({});
   const { userInfo } = useContext(GlobalContext);
-
   // Inline styles for the component
 
   const courseHeaderStyle = {
@@ -126,13 +124,13 @@ export default function Dashboard() {
     },
     [fetchCourses, toggleModal, userInfo]
   );
-
+  
   return (
     <>
       <PageHeader title="Your Courses" />
       <div style={courseHeaderStyle}>
         <div style={{ display: "flex", flexDirection: "column", gap: "40px", width: "100%" }}>
-            <SemesterCourses courses={courses} toggleModal={toggleModal}/>
+            <SemesterCourses courses={courses} toggleModal={toggleModal} />
         </div>
       </div>
 
@@ -145,4 +143,5 @@ export default function Dashboard() {
       </CourseModal>
     </>
   );
+
 }
