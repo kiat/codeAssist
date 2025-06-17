@@ -28,7 +28,7 @@ import { leaveCourse } from "./services/course";
 const { Content } = Layout;
 
 // Defining initial states as constants to avoid recreating objects on re-renders
-const initialUserInfo = { name: "", isStudent: 1 };
+const initialUserInfo = { name: "", isStudent: 1, isAdmin: 1 };
 const initialCourseInfo = { id: "", name: "", code: "", semester: "", year: "", description: ""};
 const initialAssignmentInfo = { id: "", score: "", results: null, code: null };
 

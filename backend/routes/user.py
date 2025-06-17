@@ -25,6 +25,7 @@ def create_user():
     Roles have 2 categories:
     Instructor
     Student
+    Admin
     '''
 
     name = request.json.get('name')

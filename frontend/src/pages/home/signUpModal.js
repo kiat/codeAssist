@@ -23,6 +23,7 @@ export default function SignUpModal({ open, onCancel }) {
           name: res.data?.name,
           id: res.data?.id,
           isStudent: role === "student",
+          isAdmin: role === "admin",
           role: role,
         };
         localStorage.setItem("userInfo", JSON.stringify(userInfo));
@@ -38,12 +39,16 @@ export default function SignUpModal({ open, onCancel }) {
       <Form layout="vertical" onFinish={finishSignUp}>
         <Form.Item name="role" initialValue="student">
           <Radio.Group optionType="button" buttonStyle="solid" style={{ width: "100%" }}>
-            <Radio.Button value="student" style={{ width: "50%", textAlign: "center" }}>
+            <Radio.Button value="student" style={{ width: "33.33%", textAlign: "center" }}>
               Student
             </Radio.Button>
-            <Radio.Button value="instructor" style={{ width: "50%", textAlign: "center" }}>
+            <Radio.Button value="instructor" style={{ width: "33.33%", textAlign: "center" }}>
               Instructor
             </Radio.Button>
+            <Radio.Button value="admin" style={{ width: "33.33%", textAlign: "center" }}>
+              Admin
+            </Radio.Button>
+
           </Radio.Group>
         </Form.Item>
         <Form.Item label="EID" name="eid" rules={[{ required: true, message: "Please enter your eid" }]}>

@@ -23,6 +23,7 @@ export default function LogInModal({ open, onCancel }) {
           name: res.data?.name,
           id: res.data?.id,
           isStudent: res.data?.role === "student",
+          isAdmin: res.data?.role === "admin",
           role: res.data?.role,
         };
         localStorage.setItem("userInfo", JSON.stringify(userInfo));
