@@ -35,10 +35,14 @@ def create_user():
     role = request.json.get('role')
     if not name or name == "" or not password or password == "" or not email_address or email_address == "" or not sis_user_id or sis_user_id == "" or not role or role == "":
         raise BadRequestError("Missing required fields")
+    
+    if not isinstance(role, str):
+        role = str(role)
 
-    # Validate role
+    role = role.lower()
+
     valid_roles = ["admin", "instructor", "student"]
-    if role.lower() not in valid_roles:
+    if role not in valid_roles:
         raise BadRequestError("Invalid role. Must be one of: admin, instructor, student")
 
     eid_check = db.session.query(User).filter_by(sis_user_id=sis_user_id).first()
@@ -58,7 +62,7 @@ def create_user():
         email_address=email_address,
         password=hashed_password,
         sis_user_id=sis_user_id,
-        role=role.lower()
+        role=role
     )
     try:
         db.session.add(user)

@@ -21,7 +21,7 @@ def client(app):
 
 def test_user_creation_integration(client):
     """Test user creation via the actual API (integration test)."""
-    payload = {"name": "John", "email_address": "john@example.com", "password": "password123", "eid": "EID123", "role": 1}
+    payload = {"name": "John", "email_address": "john@example.com", "password": "password123", "eid": "EID123", "role": "student"}
 
     response = client.post('/create_user', json=payload)
 
@@ -36,7 +36,7 @@ def test_user_login_integration(client):
         "email_address": "alice@example.com",
         "password": "alice123",
         "eid": "EID456",
-        "role": 1
+        "role": "student"
     })
 
     # Then, attempt login
@@ -51,19 +51,18 @@ def test_user_login_integration(client):
 
 def test_delete_user_integration(client):
     # First, create the user
-    client.post('/create_user', json={
+    res = client.post('/create_user', json={
         "name": "Bob",
         "email_address": "bob@example.com",
         "password": "bob123",
         "eid": "EID789",
-        "role": 1
+        "role": "student"
     })
 
-    # Delete the user
-    response = client.delete('/delete_user', json={
-        "eid": "EID789"
-    })
+    assert res.status_code == 201
+    user_id = res.get_json()["id"]
 
+    response = client.delete(f'/delete_user?id={user_id}')
     assert response.status_code == 200
 
 def test_update_user_account_integration(client):
@@ -73,7 +72,7 @@ def test_update_user_account_integration(client):
         "email_address": "charlie@example.com",
         "password": "charlie123",
         "eid": "EID999",
-        "role": 1
+        "role": "student"
     })
 
     # Update the user
