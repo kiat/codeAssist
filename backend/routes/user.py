@@ -2,8 +2,8 @@ import uuid
 from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
 from api import db
-from api.models import User
-from api.schemas import UserSchema
+from api.models import User, Course
+from api.schemas import UserSchema, CourseSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError
 from util.encryption_utils import hash_password, verify_password
 
@@ -14,7 +14,7 @@ user = Blueprint('user', __name__)
 @cross_origin()
 def create_user():
     '''
-    /create_user creates a student and generates a sis_user_id in the database
+    /create_user creates a user and generates a sis_user_id in the database
     Requires from the frontend a JSON containing:
     @param name         name of the user
     @param password     password for the user
@@ -22,10 +22,10 @@ def create_user():
     @param eid          eid of the user
     @param role         role of the user
 
-    Roles have 2 categories:
+    Roles have 3 categories:
+    Admin
     Instructor
     Student
-    Admin
     '''
 
     name = request.json.get('name')
@@ -35,6 +35,11 @@ def create_user():
     role = request.json.get('role')
     if not name or name == "" or not password or password == "" or not email_address or email_address == "" or not sis_user_id or sis_user_id == "" or not role or role == "":
         raise BadRequestError("Missing required fields")
+
+    # Validate role
+    valid_roles = ["admin", "instructor", "student"]
+    if role.lower() not in valid_roles:
+        raise BadRequestError("Invalid role. Must be one of: admin, instructor, student")
 
     eid_check = db.session.query(User).filter_by(sis_user_id=sis_user_id).first()
     if eid_check:
@@ -53,7 +58,7 @@ def create_user():
         email_address=email_address,
         password=hashed_password,
         sis_user_id=sis_user_id,
-        role=role
+        role=role.lower()
     )
     try:
         db.session.add(user)
@@ -140,12 +145,18 @@ def get_user_by_id():
 @user.route('/delete_user', methods=["DELETE"])
 @cross_origin()
 def delete_user():
-    assert current_app
+    """Delete a user from the system."""
     user_id = request.args.get("id")
-    User.query.filter_by(id=user_id).delete()
-    # user = UserSchema().dump(user)
+    if not user_id:
+        raise BadRequestError("Missing user_id")
+    
+    user = db.session.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise NotFoundError("User not found")
+    
+    db.session.delete(user)
     db.session.commit()
-    return "Success", 200
+    return jsonify({"message": "User deleted successfully"}), 200
 
 @user.route('/update_account', methods=["PUT", "POST"])
 @cross_origin()
@@ -176,3 +187,24 @@ def update_account():
 
     # Return a success response
     return jsonify({"message": "Account updated successfully"}), 200
+
+@user.route('/get_all_courses', methods=["GET"])
+@cross_origin()
+def get_all_courses():
+    """Get all courses in the system."""
+    courses = db.session.query(Course).all()
+    return jsonify(CourseSchema().dump(courses, many=True)), 200
+
+@user.route('/get_all_instructors', methods=["GET"])
+@cross_origin()
+def get_all_instructors():
+    """Get all instructors in the system."""
+    instructors = db.session.query(User).filter_by(role="instructor").all()
+    return jsonify(UserSchema().dump(instructors, many=True)), 200
+
+@user.route('/get_all_students', methods=["GET"])
+@cross_origin()
+def get_all_students():
+    """Get all students in the system."""
+    students = db.session.query(User).filter_by(role="student").all()
+    return jsonify(UserSchema().dump(students, many=True)), 200

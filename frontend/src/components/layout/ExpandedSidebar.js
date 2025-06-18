@@ -109,7 +109,7 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed, hand
           }}
         >
           <UserOutlined />
-          <span> {userInfo?.isAdmin ? "Admin Account" : "Account"}</span>
+          <span> Account</span>
         </div>
       </Popover>
     </>

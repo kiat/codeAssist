@@ -23,6 +23,8 @@ import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
 import RegradeRequests from './components/RegradeRequests';
+import AdminDashboard from "./pages/admin/dashboard";
+import AdminSidebar from "./components/layout/AdminSidebar";
 import { leaveCourse } from "./services/course";
 
 const { Content } = Layout;
@@ -51,6 +53,7 @@ function App() {
   const [assignmentInfo, setAssignmentInfo] = useState(initialAssignmentInfo);
   const navigate = useNavigate();
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
 
   // Effect for initializing courseInfo from localStorage
   useEffect(() => {
@@ -100,17 +103,24 @@ function App() {
       assignmentInfo, updateAssignmentInfo
     }}>
 
-      <Layout>
+      <Layout style={{ display: 'flex', height: '100vh', flexDirection: "row" }}>
         {location.pathname === "/" ? null : (
-          <RootSider
-            pathname={location.pathname}
-            courseInfo={courseInfo}
-            userInfo={userInfo}
-            assignmentInfo={assignmentInfo}
-            onLeaveCourse={handleLeaveCourse}
-          />
+          userInfo?.isAdmin ? (
+            <AdminSidebar
+              pathname={location.pathname}
+              toggleCollapsed={() => setCollapsed(!collapsed)}
+            />
+          ) : (
+            <RootSider
+              pathname={location.pathname}
+              courseInfo={courseInfo}
+              userInfo={userInfo}
+              assignmentInfo={assignmentInfo}
+              onLeaveCourse={handleLeaveCourse}
+            />
+          )
         )}
-        <Layout style={{ height: "100vh" }}>
+        <Layout style={{ flex: 1, overflow: 'hidden' }}>
           <Content
             style={{
               backgroundColor: "#fff",
@@ -122,6 +132,7 @@ function App() {
             <Routes>
               <Route path='/' element={<Home />} />
               <Route path='/dashboard' element={<Dashboard />} />
+              <Route path='/admin/dashboard' element={<AdminDashboard/>} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
                 ///reconfiguring to use submissionid for navigation

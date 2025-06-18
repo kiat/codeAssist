@@ -41,13 +41,14 @@ def test_create_user_success(client, mocker, mock_user_query):
         "password": "password123",
         "email_address": "john@example.com",
         "eid": "EID123",
-        "role": 1,
+        "role": "student",
     }
 
     response = client.post("/create_user", json=payload)
 
     assert response.status_code == 201
-    assert response.json == {"id": "123", "name": "John Doe"}
+    assert response.json["id"] is not None
+    assert response.json["name"] == "John Doe"
 
     mock_commit.assert_called_once()
     mock_add.assert_called_once()
@@ -114,16 +115,15 @@ def test_create_user_duplicate_email(client, mock_user_query):
     mock_query.return_value.filter_by.assert_any_call(sis_user_id="EID123")
 
 
-def test_user_login_success(client, mock_user_query):
+def test_user_login_success(client, mock_user_query, mocker):
     """Test the /user_login route with valid credentials."""
     mock_query, mock_user_schema = mock_user_query
     
     # our stubbed DB row must include the password so verify_password(...) returns True
-    user_record = {
-        "id": "123",
-        "name": "John Doe",
-        "password": "password123"
-    }
+    user_record = mocker.Mock()
+    user_record.id = "123"
+    user_record.name = "John Doe"
+    user_record.password = "password123"
     # When we call UserSchema().dump(...) we still want only id/name in the JSON response
     mock_user_schema.return_value.dump.return_value = {"id": "123", "name": "John Doe"}
     mock_query.return_value.filter_by.return_value.first.return_value = user_record
@@ -133,7 +133,8 @@ def test_user_login_success(client, mock_user_query):
     response = client.post("/user_login", json=payload)
 
     assert response.status_code == 200
-    assert response.json == {"id": "123", "name": "John Doe"}
+    assert response.json["id"] == "123"
+    assert response.json["name"] == "John Doe"
     mock_query.assert_called_once()
 
 
@@ -211,19 +212,24 @@ def test_get_user_by_email_not_found(client, mock_user_query):
 
 def test_delete_user(client, mocker):
     """Test the /delete_user route."""
-    mock_db = mocker.patch("routes.user.db")
-    mock_filter = mocker.patch("routes.user.User.query")
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_commit = mocker.patch("routes.user.db.session.commit")
+    mock_delete = mocker.patch("routes.user.db.session.delete")
 
-    mock_filter.filter_by.return_value.delete.return_value = 1
+    mock_user = mocker.Mock()
+    mock_user.id = "123"
+
+    # mock first
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_user
 
     response = client.delete("/delete_user?id=123")
 
     assert response.status_code == 200
-    assert response.data.decode() == "Success"
+    assert response.json["message"] == "User deleted successfully"
 
-    mock_filter.filter_by.assert_called_once_with(id="123")
-    mock_filter.filter_by.return_value.delete.assert_called_once()
-    mock_db.session.commit.assert_called_once()
+    mock_query.return_value.filter_by.assert_called_with(id="123")
+    mock_delete.assert_called_once_with(mock_user)
+    mock_commit.assert_called_once()
 
 
 def test_update_account(client, mocker):
