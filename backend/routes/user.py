@@ -5,7 +5,7 @@ import string
 from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
 from api import db
-from api.models import User, Course
+from api.models import User, Course, AdminEmail
 from api.schemas import UserSchema, CourseSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError
 from util.encryption_utils import hash_password, verify_password
@@ -180,20 +180,41 @@ def google_login():
     response = requests.get(url)
     data = response.json()
 
-    # or data['aud'] != google_client_id_link - maybe should be added as a precaution
     if 'error' in data:
         return "Invalid google token", 400
 
-    # Check the database if there is already a valid login in place
     email = data['email']
 
-    res = db.session.query(User).filter_by(email_address=email)
-    res = UserSchema().dump(res, many=True)
+    # Check if email is in admin_emails table
+    is_admin = db.session.query(AdminEmail).filter_by(email=email).first() is not None
 
-    if len(res) == 0:
-        return email, 202
+    user = db.session.query(User).filter_by(email_address=email).first()
 
-    return jsonify(res[0])
+    if not user:
+        if not is_admin:
+            return email, 202
+        # Create new admin user
+        user = User(
+            id=str(uuid.uuid4()),
+            name="admin",
+            email_address=email,
+            password='',
+            sis_user_id=email,  # Use email as a unique sis_user_id
+            role='admin',
+            coding_insights='No history.'
+        )
+        db.session.add(user)
+        db.session.commit()
+        user_data = UserSchema().dump(user)
+        return jsonify(user_data)
+
+    # Existing user logic (update role if needed)
+    if is_admin and user.role != "admin":
+        user.role = "admin"
+        db.session.commit()
+
+    user_data = UserSchema().dump(user)
+    return jsonify(user_data)
 
 @user.route('/get_user_by_email', methods = ["GET"])
 @cross_origin()

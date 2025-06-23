@@ -23,3 +23,5 @@ export async function googleSignUp(params) {
 export async function googleLogin(params) {
   return service("google_login", params, "post");
 }
+
+

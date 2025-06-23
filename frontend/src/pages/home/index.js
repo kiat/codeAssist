@@ -65,18 +65,26 @@ export default function Home() {
 
     const role = res.data?.role;
 
-    if (res.data?.name && role === "admin") {
-    // Admin: skip signup modal and go to admin dashboard
+  if (res.data?.name && role) {
+    // Existing user (admin, student, or instructor)
     const userInfo = {
       name: res.data.name,
       id: res.data.id,
       role: role,
-      isAdmin: true,
-      isStudent: false,
+      isAdmin: role === "admin",
+      isStudent: role === "student",
     };
     localStorage.setItem("userInfo", JSON.stringify(userInfo));
     updateUserInfo(userInfo);
-    navigate("/adminDashboard");
+
+    // Redirect based on role
+    if (role === "admin") {
+      navigate("/adminDashboard");
+    } else if (role === "student") {
+      navigate("/dashboard");
+    } else if (role === "instructor") {
+      navigate("/dashboard");
+    }
     return;
   }
 
