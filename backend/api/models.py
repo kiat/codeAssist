@@ -128,3 +128,11 @@ class AssignmentExtension(db.Model):
     assignment = db.relationship("Assignment", backref=db.backref("extensions", lazy="dynamic"))
     student = db.relationship("User", backref=db.backref("extensions", lazy="dynamic"))
 
+class AdminEmail(db.Model):
+    __tablename__ = 'admin_emails'
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f"<AdminEmail {self.email}>"   
+
