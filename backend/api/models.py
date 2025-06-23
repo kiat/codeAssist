@@ -2,7 +2,7 @@ from marshmallow import Schema, fields
 from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
-
+from dataclasses import dataclass
 class User(db.Model):
     __tablename__ = "user"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
@@ -30,6 +30,7 @@ class Course(db.Model):
     # -- AI Integration Settings -- 
     openai_api_key = db.Column(db.String, default="")
 
+@dataclass
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), primary_key=True, nullable=False)

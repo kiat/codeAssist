@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { GlobalContext } from "../../App";
 import LogInModal from "./logInModal";
 import SignUpModal from "./signUpModal";
+import { GoogleLogin } from '@react-oauth/google';
+import GoogleSignUp from "./googleSignUp";
+import { googleLogin } from "../../services/user";
 
 /**
  * home modal
@@ -12,12 +15,18 @@ import SignUpModal from "./signUpModal";
 export default function Home() {
   const [isModalOpen, setModalOpen] = useState(false);
   const [logInModalOpen, setlogInModalOpen] = useState(false);
-  const { userInfo } = useContext(GlobalContext);
+  const [googleModalOpen, setGoogleModalOpen] = useState(false);
+  const [googleValues, setGoogleValues] = useState({});
+  const { userInfo, updateUserInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
 
   // control login window modal
   const toggleLogInModal = useCallback(() => {
     setlogInModalOpen(logInModalOpen => !logInModalOpen);
+  }, []);
+
+  const toggleGoogleModal = useCallback(() => {
+    setGoogleModalOpen(googleModalOpen => !googleModalOpen);
   }, []);
 
   // open signup window
@@ -36,6 +45,49 @@ export default function Home() {
       return;
     }
   }, [userInfo, navigate]);
+
+  const handleOAuth = async (credentialResponse) => {
+    let res;
+    try {
+      res = await googleLogin(credentialResponse);
+    }
+    catch (error) {
+      if (!error.response) {
+        alert(`User authentication failed.`);
+        return;
+      };
+      if (error.response.status === 400) {
+        const errorType = error.response.data;
+        alert(`User authentication failed. ${errorType}`);
+        return;
+      };
+    }
+
+    const role = res.data?.role;
+
+    if (res.data?.name && role === "admin") {
+    // Admin: skip signup modal and go to admin dashboard
+    const userInfo = {
+      name: res.data.name,
+      id: res.data.id,
+      role: role,
+      isAdmin: true,
+      isStudent: false,
+    };
+    localStorage.setItem("userInfo", JSON.stringify(userInfo));
+    updateUserInfo(userInfo);
+    navigate("/adminDashboard");
+    return;
+  }
+
+  // For non-admins, store credential and show sign-up modal
+  setGoogleValues({
+    ...googleValues,
+    credential: credentialResponse.credential,
+    email: res.data?.email || "",
+  });
+  toggleGoogleModal();
+  };
 
   return (
     <div
@@ -82,6 +134,12 @@ export default function Home() {
             <div
               style={{
                 marginTop: "100px",
+                marginBottom: "15px",
+                paddingLeft: "475px",
+                paddingRight: "475px",
+                display: "flex",
+                justifyContent: "center",
+                gap: "20px",
               }}
             >
               <Button
@@ -89,8 +147,9 @@ export default function Home() {
                 type='primary'
                 size='large'
                 style={{
-                  marginRight: "20px",
-                  width: "150px",
+                  flex: 1,
+                  display: "flex",
+                  justifyContent: "center"
                 }}
               >
                 Sign Up
@@ -99,17 +158,40 @@ export default function Home() {
                 onClick={toggleLogInModal}
                 size='large'
                 style={{
-                  width: "150px",
+                  flex: 1,
+                  display: "flex",
+                  justifyContent: "center"
                 }}
               >
                 Log In
               </Button>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                textAlign: "center"
+              }}
+            >
+              <GoogleLogin
+                onSuccess={credentialResponse => {
+                  handleOAuth(credentialResponse);
+                }}
+                onError={() => {
+                  console.log('Login Failed');
+                }}
+                // style={{
+                //   flex: 1,
+                //   display: "flex",
+                // }}
+              />
             </div>
           </div>
         </div>
       </div>
       <SignUpModal open={isModalOpen} onCancel={closeModal} />
       <LogInModal open={logInModalOpen} onCancel={toggleLogInModal} />
+      <GoogleSignUp open={googleModalOpen} onCancel={toggleGoogleModal} googleValues={googleValues}/>
     </div>
   );
 }
