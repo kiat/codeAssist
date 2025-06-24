@@ -129,14 +129,22 @@ def get_user_by_id():
     Requires from the frontend a JSON containing:
     @param id    the instructor id
     '''
-    insid = request.args.get("id")
+
+    try:
+        insid = uuid.UUID(request.args.get("id"))
+    except (ValueError, TypeError):
+        raise BadRequestError("Invalid or missing UUID for user id")
 
     if not insid:
         raise BadRequestError("Missing user id")
 
 
-    instructor = db.session.query(User).filter_by(id=insid)
-    instructor = UserSchema().dump(instructor, many=True)[0]
+    instructor_obj = db.session.query(User).filter_by(id=insid).first() 
+    if not instructor_obj: 
+        raise NotFoundError("User does not exist")
+    
+    instructor = UserSchema().dump(instructor_obj)
+
 
     return jsonify(instructor)
 

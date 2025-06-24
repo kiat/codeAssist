@@ -1,5 +1,6 @@
 import pytest
 from api import create_app
+import uuid
 
 @pytest.fixture
 def app():
@@ -248,3 +249,46 @@ def test_update_account(client, mocker):
     mock_query.assert_called_once()
     mock_query.return_value.filter_by.assert_called_once_with(id="123")
     mock_commit.assert_called_once()
+
+
+
+def test_get_user_by_id(client, mocker):
+    """Test the /get_user_by_id route."""
+
+    random_uuid = uuid.uuid4() 
+    user_mock = mocker.Mock()
+    user_mock.id = random_uuid
+    user_mock.name = "Old Name"
+    user_mock.password = "oldpassword"
+    user_mock.coding_insights = "No history."
+    user_mock.email_address =  "user@gmail.com"
+    user_mock.role =  "student"
+    user_mock.sis_user_id = "123"
+
+
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = user_mock
+
+    response = client.get("/get_user_by_id", query_string={"id": str(random_uuid)})
+
+    assert response.status_code == 200
+    assert response.json == {
+        "id" : str(random_uuid),
+        "name": "Old Name",
+        "password": "oldpassword",
+        "coding_insights": "No history.",
+        "email_address":  "user@gmail.com",
+        "role":  "student",
+        "sis_user_id": "123"
+    }
+
+    mock_query.assert_called_once() 
+    mock_query.return_value.filter_by.assert_called_once_with(id=random_uuid)
+
+    
+
+
+
+
+    
+
