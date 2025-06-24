@@ -212,19 +212,34 @@ def test_get_user_by_email_not_found(client, mock_user_query):
 
 def test_delete_user(client, mocker):
     """Test the /delete_user route."""
-    mock_db = mocker.patch("routes.user.db")
-    mock_filter = mocker.patch("routes.user.User.query")
 
-    mock_filter.filter_by.return_value.delete.return_value = 1
+    random_uuid = uuid.uuid4()
+    user_mock = mocker.Mock() 
+    user_mock.id = random_uuid
+    
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = user_mock
 
-    response = client.delete("/delete_user?id=123")
+    # Mock db.session.delete and commit
+    mock_delete = mocker.patch("routes.user.db.session.delete")
+    mock_commit = mocker.patch("routes.user.db.session.commit")
+
+    response = client.delete("/delete_user", query_string={"id" : str(random_uuid)})
 
     assert response.status_code == 200
     assert response.data.decode() == "Success"
 
-    mock_filter.filter_by.assert_called_once_with(id="123")
-    mock_filter.filter_by.return_value.delete.assert_called_once()
-    mock_db.session.commit.assert_called_once()
+    # Check that filter_by was called with correct id
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
+
+    # Check that first() was called to fetch the user
+    mock_query.return_value.filter_by.return_value.first.assert_called_once()
+
+    # Check that delete was called with the mock user
+    mock_delete.assert_called_once_with(user_mock)
+
+    # Check that commit was called
+    mock_commit.assert_called_once()
 
 
 def test_update_account(client, mocker):
@@ -283,7 +298,7 @@ def test_get_user_by_id(client, mocker):
     }
 
     mock_query.assert_called_once() 
-    mock_query.return_value.filter_by.assert_called_once_with(id=random_uuid)
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
 
     
 

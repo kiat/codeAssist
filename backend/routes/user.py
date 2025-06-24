@@ -131,7 +131,7 @@ def get_user_by_id():
     '''
 
     try:
-        insid = uuid.UUID(request.args.get("id"))
+        insid = str(uuid.UUID(request.args.get("id")))
     except (ValueError, TypeError):
         raise BadRequestError("Invalid or missing UUID for user id")
 
@@ -152,17 +152,23 @@ def get_user_by_id():
 @cross_origin()
 def delete_user():
     assert current_app
-    user_id = request.args.get("id")
-    if not user_id:
-        raise BadRequestError("Missing user id")
+
+    user_id = request.args.get("id") 
+    if not user_id: 
+        raise BadRequestError("Missing User id")
+
+    try: 
+        user_id = str(uuid.UUID(user_id))
+    except(ValueError, TypeError):
+        raise BadRequestError("Invalid  user id") 
 
     
-    db_user = User.query.filter_by(id=user_id).first()
-    if not db_user:
+    user = db.session.query(User).filter_by(id=user_id).first()
+    if not user:
         raise NotFoundError("User Not Found")
     # user = UserSchema().dump(user)
     try:
-        db.session.delete(db_user)
+        db.session.delete(user)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
