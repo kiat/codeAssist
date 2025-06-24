@@ -7,9 +7,11 @@ import GradeSider from './GradeSider';
 import styles from './styles.module.css';
 
 function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed, handleLeaveCourse }) {
-  const Capitalize = (str) =>{
-    return str.toUpperCase();
+ 
+  const Capitalize = (str) => {
+    return typeof str === 'string' ? str.toUpperCase() : '';
   }
+  
 
   return (
     <>
