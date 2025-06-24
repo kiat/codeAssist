@@ -51,7 +51,7 @@ def test_user_login_integration(client):
 
 def test_delete_user_integration(client):
     # First, create the user
-    client.post('/create_user', json={
+    response = client.post('/create_user', json={
         "name": "Bob",
         "email_address": "bob@example.com",
         "password": "bob123",
@@ -59,16 +59,28 @@ def test_delete_user_integration(client):
         "role": 1
     })
 
+    assert response.status_code == 201 
+
+    data = response.get_json() 
+    user_id = data["id"]
+
     # Delete the user
-    response = client.delete('/delete_user', json={
-        "eid": "EID789"
+    response = client.delete('/delete_user', query_string={
+        "id": user_id
     })
 
     assert response.status_code == 200
 
+    # Confirm user is gone
+    get_again = client.get('/get_user_by_id', query_string={
+        "id": user_id
+    })
+
+    assert get_again.status_code == 404
+
 def test_update_user_account_integration(client):
     # First, create the user
-    client.post('/create_user', json={
+    response = client.post('/create_user', json={
         "name": "Charlie",
         "email_address": "charlie@example.com",
         "password": "charlie123",
@@ -76,11 +88,27 @@ def test_update_user_account_integration(client):
         "role": 1
     })
 
+    assert response.status_code == 201 
+
+    data = response.get_json() 
+    user_id = data["id"]
+
     # Update the user
     response = client.put('/update_account', json={
-        "eid": "EID999",
-        "new_name": "Charles",
-        "new_password": "charles@example.com"
+        "id": user_id, 
+        "name": "Charles",
+        "password": "charles123"
     })
 
     assert response.status_code == 200
+
+    get_again = client.get('/get_user_by_id', query_string={
+        "id": user_id
+    })
+
+    assert get_again.status_code == 200
+
+    data = get_again.get_json() 
+    assert data["name"] == "Charles" 
+    assert data["password"] == "charles123"
+

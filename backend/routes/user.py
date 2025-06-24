@@ -130,13 +130,15 @@ def get_user_by_id():
     @param id    the instructor id
     '''
 
-    try:
-        insid = str(uuid.UUID(request.args.get("id")))
-    except (ValueError, TypeError):
-        raise BadRequestError("Invalid or missing UUID for user id")
-
-    if not insid:
+    insid = request.args.get("id")
+    if not insid: 
         raise BadRequestError("Missing user id")
+
+    try:
+        insid = str(uuid.UUID(insid))
+    except (ValueError, TypeError):
+        raise BadRequestError("Invalid user id")
+
 
 
     instructor_obj = db.session.query(User).filter_by(id=insid).first() 
@@ -160,7 +162,7 @@ def delete_user():
     try: 
         user_id = str(uuid.UUID(user_id))
     except(ValueError, TypeError):
-        raise BadRequestError("Invalid  user id") 
+        raise BadRequestError("Invalid user id") 
 
     
     user = db.session.query(User).filter_by(id=user_id).first()
@@ -187,9 +189,15 @@ def update_account():
     '''
     # Extract required and optional data from the request
     user_id = request.json.get('id')
-
     if not user_id:
         raise BadRequestError("Missing user id")
+    
+    try: 
+        user_id = str(uuid.UUID(user_id))
+    except(ValueError, TypeError):
+        raise BadRequestError("Invalid  user id") 
+    
+
     
     new_name = request.json.get('name')
     new_password = request.json.get('password')
