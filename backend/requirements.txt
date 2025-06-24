@@ -1,0 +1,16 @@
+flask
+flask_cors
+docker
+psycopg2-binary
+python-dotenv
+flask-sqlalchemy
+flask-marshmallow
+marshmallow-sqlalchemy
+Flask-Migrate
+openai
+pytest
+pytest-mock
+pytest-cov
+cryptography
+psycopg2-binary
+dotenv
