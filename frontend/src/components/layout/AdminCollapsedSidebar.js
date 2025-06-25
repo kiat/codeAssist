@@ -43,9 +43,9 @@ function AdminCollapsedSidebar({ toggleCollapsed }) {
           style={{ border: 'none', backgroundColor: 'transparent' }}
           defaultSelectedKeys={['dashboard']}
         >
-          <Menu.Item key="courses" icon={<BookOutlined />} />
-          <Menu.Item key="students" icon={<UserOutlined />} />
-          <Menu.Item key="instructors" icon={<TeamOutlined />} />
+          <Menu.Item key="courses" icon={<BookOutlined />} onClick={() => navigate('/admin/courses')} />
+          <Menu.Item key="students" icon={<UserOutlined />} onClick={() => navigate('/admin/students')} />
+          <Menu.Item key="instructors" icon={<TeamOutlined />} onClick={() => navigate('/admin/instructors')} />
         </Menu>
       </div>
 

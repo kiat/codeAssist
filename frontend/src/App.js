@@ -26,6 +26,9 @@ import RegradeRequests from './components/RegradeRequests';
 import AdminDashboard from "./pages/admin/dashboard";
 import AdminSidebar from "./components/layout/AdminSidebar";
 import { leaveCourse } from "./services/course";
+import AdminCourses from "./pages/admin/courses";
+import AdminStudents from "./pages/admin/students";
+import AdminInstructors from "./pages/admin/instructors";
 
 const { Content } = Layout;
 
@@ -133,6 +136,9 @@ function App() {
               <Route path='/' element={<Home />} />
               <Route path='/dashboard' element={<Dashboard />} />
               <Route path='/admin/dashboard' element={<AdminDashboard/>} />
+              <Route path='/admin/courses' element={<AdminCourses />} />
+              <Route path='/admin/students' element={<AdminStudents />} />
+              <Route path='/admin/instructors' element={<AdminInstructors />} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
                 ///reconfiguring to use submissionid for navigation

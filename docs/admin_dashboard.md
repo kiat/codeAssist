@@ -9,14 +9,21 @@ The Admin Dashboard is designed for institution administrators to manage all asp
 ### OAuth2 Login
 Admin users log in via Google OAuth2. Upon authentication, the system checks the user's email against a list of pre-approved admin emails stored in the database. Only users with matching email addresses are granted admin privileges.
 
-### Inserting Admin Users into the Database
-With OAuth2 authentication, admin accounts must be explicitly added to the database ahead of time. This step ensures that only approved users can gain admin access upon their first login.
 
-**Todo**
-- Insert emails of developer team for them to gain access.
+**How to Use**
+1. Create a new project at https://console.cloud.google.com/welcome/new
+2. Click Oauth Consent Screen and make the app External
+3. Put your project name and emails for User Support Email and Developer Contact Information and click next
+4. Add the following scopes: ./auth/userinfo.email, auth/userinfo.profile, openid
+5. Add your own email/developer emails for the test users section
+6. Click Credentials on the side and create an Oauth Client ID for a web application (For the URLs make it the frontend host, e.g. http://localhost:3000 and http://localhost)
+7. Save the newly created Client ID in the frontend .env file as REACT_APP_CLIENT_ID
 
-**Method**
-- Run a Python script or use database management tools to insert admin emails and roles into the `Admin` table.
+**Example `.env`**
+```
+REACT_APP_API_URL=http://localhost:5001
+REACT_APP_CLIENT_ID=1039210497435-6hckku1vojl8ii7su5m1bhj0h1msligr.apps.googleusercontent.com
+```
 
 
 ## API Routes
@@ -40,7 +47,7 @@ With OAuth2 authentication, admin accounts must be explicitly added to the datab
 - Displays institutional data, including number of courses, students, and instructors.
 
 ### 3. `admin/courses` (In Progress)
-- Lists all courses, grouped by term.
+- Searchable list of all students (by CourseID, name, year, semester, or instructor name).
 - Admins can edit course details, similar to instructor access.
 
 ### 4. `admin/students` (In Progress)
@@ -59,4 +66,3 @@ With OAuth2 authentication, admin accounts must be explicitly added to the datab
 - **Student Management**: Search, edit, and delete student accounts.
 - **Instructor Management**: Search, edit, delete, and register instructors.
 - **Data Tables**: Filter, sort, and export data for courses, staff, and students.
-- **OAuth2 Integration**: Ensure all admin logins use Google OAuth2 for security.

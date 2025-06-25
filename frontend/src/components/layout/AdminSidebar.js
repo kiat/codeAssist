@@ -63,13 +63,13 @@ function AdminSidebar() {
         </div>
         <Menu mode="vertical" selectable={false}>
           <Menu.Item key="courses" icon={<BookOutlined />}>
-            Courses
+            <Link to="/admin/courses">Courses</Link>
           </Menu.Item>
           <Menu.Item key="students" icon={<UserOutlined />}>
-            Students
+            <Link to="/admin/students">Students</Link>
           </Menu.Item>
           <Menu.Item key="instructors" icon={<TeamOutlined />}>
-            Instructors
+            <Link to="/admin/instructors">Instructors</Link>
           </Menu.Item>
         </Menu>
       </div>
