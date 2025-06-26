@@ -1,5 +1,7 @@
 import requests
 import os
+import uuid
+
 
 BASE_URL = "http://localhost:5001"
 
@@ -26,7 +28,7 @@ def upload_autograder(assignment_id, zip_path, timeout="10"):
         return response.json()
 
 def delete_assignment(assignment_id):
-    url = f"{BASE_URL}/delete_assignment"
-    response = requests.post(url, json={"assignment_id": assignment_id})
+    url = f"{BASE_URL}/delete_assignment?assignment_id={assignment_id}"
+    response = requests.delete(url)
     response.raise_for_status()
     return response.json()

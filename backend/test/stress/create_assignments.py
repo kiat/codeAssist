@@ -3,9 +3,25 @@ import threading
 import uuid
 import json
 import os
-from utils import create_assignment, upload_autograder
+from utils import create_assignment, upload_autograder, delete_assignment, create_course, delete_course
 
-COURSE_ID = "a3eb254c-9030-4648-a0b3-b16ec2749787"  # Replace if needed
+"""
+This is a **stress test script** and will NOT be run with `make test`.
+
+- It does NOT follow pytest conventions (file doesn't start with `test_` or isn't in the default test path).
+- It is meant to be run manually to simulate high load.
+
+To run manually:
+$ python stress_create_assignments.py
+
+Make sure to:
+- Update the COURSE_ID in the file with a valid one before running.
+- Run `flask` or the backend server first.
+
+"""
+
+
+COURSE_ID = "13f225b9-46eb-498a-85b3-ff068836986c"  # Replace with working course id!
 ASSIGNMENT_IDS_FILE = "generated_assignments.json"
 AUTOGRADER_ZIP_PATH = os.path.abspath(os.path.join("..", "..", "assignment-examples", "A1", "A1.zip"))
 
@@ -30,7 +46,7 @@ def create_assignment_with_autograder(index):
 
 def main():
     threads = []
-    for i in range(2):  # Create 2 assignments
+    for i in range(100): #increase load here
         t = threading.Thread(target=create_assignment_with_autograder, args=(i,))
         t.start()
         threads.append(t)
@@ -38,10 +54,14 @@ def main():
     for t in threads:
         t.join()
 
-    # Save created assignment IDs
+    #save created assignment IDs
     with open(ASSIGNMENT_IDS_FILE, "w") as f:
         json.dump(created_assignments, f)
-    print(f"\n Finished. Assignments saved to {ASSIGNMENT_IDS_FILE}: {created_assignments}")
+    print(f"\n Passed! Assignments saved to {ASSIGNMENT_IDS_FILE}: {created_assignments}")
+
+    #delete created assignments
+    for assignment in created_assignments:
+        delete_assignment(assignment_id=assignment)
 
 if __name__ == "__main__":
     main()
