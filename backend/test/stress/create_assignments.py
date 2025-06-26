@@ -3,7 +3,7 @@ import threading
 import uuid
 import json
 import os
-from utils import create_assignment, upload_autograder, delete_assignment, create_course, delete_course
+from utils import create_assignment, upload_autograder, delete_assignment
 
 """
 This is a **stress test script** and will NOT be run with `make test`.
@@ -12,7 +12,7 @@ This is a **stress test script** and will NOT be run with `make test`.
 - It is meant to be run manually to simulate high load.
 
 To run manually:
-$ python stress_create_assignments.py
+$ python create_assignments.py
 
 Make sure to:
 - Update the COURSE_ID in the file with a valid one before running.
