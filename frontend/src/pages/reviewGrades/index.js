@@ -5,14 +5,14 @@ import {
   RightOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Button, PageHeader, Space, Table, Typography, Card } from "antd";
+import { Button, PageHeader, Space, Table, Typography, Card, Input } from "antd";
 import { useState, useEffect, useCallback, useContext, } from "react";
 import { formatDayTimeEn } from "../../common/format";
 import { GRADES } from "./mock";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import PopoverDownload from "../../components/download/PopoverDownload";
-import DownloadSubmissions from "./DownloadSubmissions";
+import ExportSubmissions from "./ExportSubmissions";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -25,6 +25,7 @@ export default () => {
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
   const { assignmentId } = useParams();
+  const [searchText, setSearchText] = useState("");
 
   const toggleDownloadModalOpen = useCallback(() => {
     setDownloadModalOpen(t => !t);
@@ -164,10 +165,28 @@ export default () => {
     navigate,
   ]);
 
+  const filteredSubmissions = submissions.filter((row) => {
+    const q = searchText.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      row.student_name.toLowerCase().includes(q) ||
+      row.email_address.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <>
       <PageContent>
-        <PageHeader title={`Review Grades for ${assignmentInfo?.name}`} />
+        <PageHeader title={`Review Grades for ${assignmentInfo?.name}`} 
+        extra={
+          <Input.Search
+            placeholder="Search by name or email address"
+            allowClear
+            onSearch={val => setSearchText(val)}
+            style={{ width: 300 }}
+            />
+        }
+        />
           <Card
             bordered={false}
             bodyStyle={{ padding: 0 }}
@@ -175,7 +194,7 @@ export default () => {
               <Space align="center">
                 <UserOutlined style={{ fontSize: 18 }} />
                 <Typography.Title level={4} style={{ margin: 0 }}>
-                  {submissions.length} students
+                  {filteredSubmissions.length} students
                 </Typography.Title>
               </Space>
             }
@@ -183,29 +202,29 @@ export default () => {
           <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>
             <Table
               columns={columns}
-              dataSource={submissions}
+              dataSource={filteredSubmissions}
               rowKey="email_address"
             />
           </Card>
       </PageContent>
       <PageBottom>
         <Space>
-          <Button icon={<DownloadOutlined />} onClick={DownloadSubmissions}>
+          {/* <Button icon={<DownloadOutlined />} >
             Download Grades
           </Button>
           <Button icon={<DownloadOutlined />} >
             Export Evaluations
-          </Button>
-          <Button icon={<DownloadOutlined />} >
+          </Button> */}
+          <Button icon={<DownloadOutlined />} onClick={toggleDownloadModalOpen}>
             Export Submissions
           </Button>
-          <Button>
+          {/* <Button>
             <span>Publish Grades</span>
             <RightOutlined />
-          </Button>
+          </Button> */}
         </Space>
       </PageBottom>
-      <DownloadSubmissions
+      <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
       />
