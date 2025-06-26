@@ -177,16 +177,7 @@ export default () => {
   return (
     <>
       <PageContent>
-        <PageHeader title={`Review Grades for ${assignmentInfo?.name}`} 
-        extra={
-          <Input.Search
-            placeholder="Search by name or email address"
-            allowClear
-            onSearch={val => setSearchText(val)}
-            style={{ width: 300 }}
-            />
-        }
-        />
+        <PageHeader title={`Review Grades for ${assignmentInfo?.name}`} />
           <Card
             bordered={false}
             bodyStyle={{ padding: 0 }}
@@ -197,6 +188,14 @@ export default () => {
                   {filteredSubmissions.length} students
                 </Typography.Title>
               </Space>
+            }
+            extra={
+              <Input.Search
+                placeholder="Search by name or email address"
+                allowClear
+                onSearch={val => setSearchText(val)}
+                style={{ width: 300 }}
+                />
             }
           />
           <Card bordered={false} bodyStyle={{ paddingTop: 0 }}>
@@ -209,19 +208,19 @@ export default () => {
       </PageContent>
       <PageBottom>
         <Space>
-          {/* <Button icon={<DownloadOutlined />} >
+          <Button icon={<DownloadOutlined />} >
             Download Grades
           </Button>
           <Button icon={<DownloadOutlined />} >
             Export Evaluations
-          </Button> */}
+          </Button>
           <Button icon={<DownloadOutlined />} onClick={toggleDownloadModalOpen}>
             Export Submissions
           </Button>
-          {/* <Button>
+          <Button>
             <span>Publish Grades</span>
             <RightOutlined />
-          </Button> */}
+          </Button>
         </Space>
       </PageBottom>
       <ExportSubmissions
