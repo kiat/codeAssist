@@ -10,7 +10,7 @@ with app.app_context():
 # python admin_emails.py
 
 emails = [
-    "Test@gmail.com",
+    "aw42679@utexas.edu",
     # Add more emails as needed
 ]
 

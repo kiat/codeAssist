@@ -57,7 +57,7 @@ export default function AdminAllCourses() {
         const [semB, yearB] = b.split(" ");
         const semesterOrder = { Spring: 1, Summer: 2, Fall: 3, Winter: 4 };
         if (yearA !== yearB) return parseInt(yearB) - parseInt(yearA);
-        return semesterOrder[semA] - semesterOrder[semB];
+        return semesterOrder[semB] - semesterOrder[semA];
       }).map(term => (
         <div key={term} style={{ marginBottom: 32 }}>
           <Divider orientation="left"><Typography.Title level={4}>{term}</Typography.Title></Divider>
@@ -71,4 +71,4 @@ export default function AdminAllCourses() {
       ))}
     </Card>
   );
-} 
+}
