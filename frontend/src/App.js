@@ -29,6 +29,7 @@ import { leaveCourse } from "./services/course";
 import AdminCourses from "./pages/admin/courses";
 import AdminStudents from "./pages/admin/students";
 import AdminInstructors from "./pages/admin/instructors";
+import AdminAllCourses from "./pages/admin/courses/all";
 
 const { Content } = Layout;
 
@@ -139,6 +140,7 @@ function App() {
               <Route path='/admin/courses' element={<AdminCourses />} />
               <Route path='/admin/students' element={<AdminStudents />} />
               <Route path='/admin/instructors' element={<AdminInstructors />} />
+              <Route path='/admin/courses/all' element={<AdminAllCourses />} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
                 ///reconfiguring to use submissionid for navigation
