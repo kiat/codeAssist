@@ -4,7 +4,7 @@ import { CheckCircleOutlined } from "@ant-design/icons";
 import { GlobalContext } from "../../App";
 import { useParams } from "react-router-dom";
 
-export default function StudentInfoPanel({ assignmentName, studentName, score, totalPoints, active }) {
+export default function StudentInfoPanel({ assignmentName, studentName, score, totalPoints, active, onGradeUpdate }) {
   //if it is a student I want to display a button to submit a regrade request --> will take them to the add justification modal
   //if it is an instructor i want to be able to see the regarde request if it exists --> should have an edit butotn somewhere that opens a modal to chnage th student's grade
   const { userInfo } = useContext(GlobalContext);
@@ -20,6 +20,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
   const [TempJustification, setTempJustification] = useState(null);
   const { submissionId } = useParams();
   const [infoShown, SetInfoShown] = useState(false);
+  const [displayedScore, setDisplayedScore] = useState(score);
 
   useEffect(() => {
     const fetchJustificationDetails = async () => {
@@ -119,20 +120,32 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
           new_grade: parseFloat(Grade), // Ensure the grade is a float
         }),
       });
-      const response2 = await fetch(`${process.env.REACT_APP_API_URL}/set_reviewed`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          submission_id: submissionId,
-        }),
-      });
 
-      if (response.ok && response2.ok) {
+      let reviewedSuccess = true;
+      if (Justification && Justification.trim() !== "") {
+        const response2 = await fetch(`${process.env.REACT_APP_API_URL}/set_reviewed`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            submission_id: submissionId,
+          }),
+        });
+
+        reviewedSuccess = response2.ok;
+        if (reviewedSuccess) {
+          SetCheckColor("green");
+        } else {
+          message.warning("Grade updated, but failed to mark as reviewed.");
+        }
+      }
+
+      if (response.ok) {
         SetCheckColor("green");
         message.success("Grade Updated");
         setEditGradeModalVisible(false);
+        onGradeUpdate?.();
         console.log(`Grade updated to ${Grade}`);
       } else {
         message.error("Failed to update grade");
@@ -142,6 +155,10 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
       message.error("An error occurred while updating grade");
     }
   };
+
+  useEffect(() => {
+    setDisplayedScore(score);
+  }, [score]);
 
   const justificationStyle = highlight
     ? {
@@ -162,7 +179,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
         <div>
           <strong>Score Received</strong>
           <br />
-          {score}
+          {displayedScore}
         </div>
         <div>
           <strong>Status</strong>
