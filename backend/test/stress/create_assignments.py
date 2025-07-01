@@ -3,6 +3,7 @@ import threading
 import uuid
 import json
 import os
+import argparse
 from utils import create_assignment, upload_autograder, delete_assignment
 
 """
@@ -12,7 +13,7 @@ This is a **stress test script** and will NOT be run with `make test`.
 - It is meant to be run manually to simulate high load.
 
 To run manually:
-$ python create_assignments.py
+$ python create_assignments.py num_threads valid_course_id
 
 Make sure to:
 - Update the COURSE_ID in the file with a valid one before running.
@@ -20,17 +21,16 @@ Make sure to:
 
 """
 
-
-COURSE_ID = "13f225b9-46eb-498a-85b3-ff068836986c"  # Replace with working course id!
 ASSIGNMENT_IDS_FILE = "generated_assignments.json"
 AUTOGRADER_ZIP_PATH = os.path.abspath(os.path.join("..", "..", "assignment-examples", "A1", "A1.zip"))
 
 created_assignments = []
 
-def create_assignment_with_autograder(index):
+def create_assignment_with_autograder(index, course_id):
+    print(f"course id in method: {course_id}")
     try:
         name = f"Stress Assignment {index}"
-        assignment_id = create_assignment(name, COURSE_ID)
+        assignment_id = create_assignment(name, course_id)
         print(f"[Assignment {index}] Created → {assignment_id}")
         created_assignments.append(assignment_id)
 
@@ -45,9 +45,24 @@ def create_assignment_with_autograder(index):
         print(f"[Assignment {index}] Error: {e}")
 
 def main():
+    parser = argparse.ArgumentParser(description="Stress test for creating assignments.")
+    parser.add_argument(
+        "num_threads",
+        type=int,
+        help="Number of concurrent assignment creations"
+    )
+    parser.add_argument(
+        "course_id",
+        type=str,
+        help="valid course id under which assignments will be created"
+    )
+    args = parser.parse_args()
+    num_threads = args.num_threads
+    print(f"Running stress test with {num_threads} threads...")
+
     threads = []
-    for i in range(100): #increase load here
-        t = threading.Thread(target=create_assignment_with_autograder, args=(i,))
+    for i in range(num_threads):
+        t = threading.Thread(target=create_assignment_with_autograder, args=(i, args.course_id))
         t.start()
         threads.append(t)
 
@@ -57,7 +72,7 @@ def main():
     #save created assignment IDs
     with open(ASSIGNMENT_IDS_FILE, "w") as f:
         json.dump(created_assignments, f)
-    print(f"\n Passed! Assignments saved to {ASSIGNMENT_IDS_FILE}: {created_assignments}")
+    print(f"\n Assignments saved to {ASSIGNMENT_IDS_FILE}: {created_assignments}")
 
     #delete created assignments
     for assignment in created_assignments:
