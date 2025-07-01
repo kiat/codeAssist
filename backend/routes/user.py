@@ -320,3 +320,47 @@ def get_all_students():
     """Get all students in the system."""
     students = db.session.query(User).filter_by(role="student").all()
     return jsonify(UserSchema().dump(students, many=True)), 200
+
+@user.route('/admin_update_account', methods=["PUT", "POST"])
+@cross_origin()
+def admin_update_account():
+    '''
+    /admin_update_account allows admins to update user account details.
+    Requires from the frontend a JSON containing:
+    @param id              the user id (required)
+    @param name            the name for the user (optional)
+    @param email_address   the email for the user (optional)
+    @param sis_user_id     the EID for the user (optional)
+    '''
+    user_id = request.json.get('id')
+    new_name = request.json.get('name')
+    new_email = request.json.get('email_address')
+    new_sis_user_id = request.json.get('sis_user_id')
+
+    if not user_id:
+        raise BadRequestError("Missing user id")
+
+    user = db.session.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise NotFoundError("User not found")
+
+    if new_email and new_email != user.email_address:
+        existing_user = db.session.query(User).filter_by(email_address=new_email).first()
+        if existing_user:
+            raise ConflictError("Email already in use")
+
+    if new_sis_user_id and new_sis_user_id != user.sis_user_id:
+        existing_user = db.session.query(User).filter_by(sis_user_id=new_sis_user_id).first()
+        if existing_user:
+            raise ConflictError("EID already in use")
+
+    if new_name:
+        user.name = new_name
+    if new_email:
+        user.email_address = new_email
+    if new_sis_user_id:
+        user.sis_user_id = new_sis_user_id
+
+    db.session.commit()
+
+    return jsonify({"message": "Account updated successfully"}), 200

@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Input, Table, PageHeader, Card, Space, message } from "antd";
+import { Input, Table, PageHeader, Card, Space, Button, message } from "antd";
+import { useNavigate } from "react-router-dom";
 
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const navigate = useNavigate();
 
   const handleSearch = async () => {
     if (!search.trim()) {
@@ -34,21 +36,33 @@ export default function AdminStudents() {
     { title: "Name", dataIndex: "name", key: "name" },
     { title: "EID", dataIndex: "sis_user_id", key: "eid" },
     { title: "Email", dataIndex: "email_address", key: "email" },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_, record) => (
+        <Button type="primary" onClick={() => navigate(`/admin/students/manage/${record.id}`)}>
+          Manage
+        </Button>
+      ),
+    },
   ];
 
   return (
     <Card>
       <PageHeader title="Search Students" />
       <Space direction="vertical" style={{ width: "100%" }}>
-        <Input.Search
-          placeholder="Search by name or EID"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          enterButton
-          style={{ maxWidth: 400 }}
-          loading={loading}
-          onSearch={handleSearch}
-        />
+        <Space>
+          <Input.Search
+            placeholder="Search by name or EID"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            enterButton
+            style={{ width: 500 }}
+            loading={loading}
+            onSearch={handleSearch}
+          />
+          <Button type="default" onClick={() => navigate("/admin/students/add")}>Add Student</Button>
+        </Space>
         <Table rowKey="id" columns={columns} dataSource={searched ? students : []} loading={loading} />
       </Space>
     </Card>

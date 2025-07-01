@@ -30,6 +30,8 @@ import AdminCourses from "./pages/admin/courses";
 import AdminStudents from "./pages/admin/students";
 import AdminInstructors from "./pages/admin/instructors";
 import AdminAllCourses from "./pages/admin/courses/all";
+import AdminStudentManage from "./pages/admin/students/manage";
+import AdminStudentAdd from "./pages/admin/students/add";
 
 const { Content } = Layout;
 
@@ -206,6 +208,8 @@ function App() {
                 element={<EditAccount />} 
               />
               <Route path="/regradeRequests" element={<RegradeRequests />} />
+              <Route path='/admin/students/manage/:studentId' element={<AdminStudentManage />} />
+              <Route path='/admin/students/add' element={<AdminStudentAdd />} />
             </Routes>
           </Content>
         </Layout>
