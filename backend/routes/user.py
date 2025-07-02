@@ -129,10 +129,24 @@ def get_user_by_id():
     Requires from the frontend a JSON containing:
     @param id    the instructor id
     '''
-    insid = request.args.get("id")
 
-    instructor = db.session.query(User).filter_by(id=insid)
-    instructor = UserSchema().dump(instructor, many=True)[0]
+    insid = request.args.get("id")
+    if not insid: 
+        raise BadRequestError("Missing user id")
+
+    try:
+        insid = str(uuid.UUID(insid))
+    except (ValueError, TypeError):
+        raise BadRequestError("Invalid user id")
+
+
+
+    instructor_obj = db.session.query(User).filter_by(id=insid).first() 
+    if not instructor_obj: 
+        raise NotFoundError("User does not exist")
+    
+    instructor = UserSchema().dump(instructor_obj)
+
 
     return jsonify(instructor)
 
@@ -140,10 +154,27 @@ def get_user_by_id():
 @cross_origin()
 def delete_user():
     assert current_app
-    user_id = request.args.get("id")
-    User.query.filter_by(id=user_id).delete()
+
+    user_id = request.args.get("id") 
+    if not user_id: 
+        raise BadRequestError("Missing User id")
+
+    try: 
+        user_id = str(uuid.UUID(user_id))
+    except(ValueError, TypeError):
+        raise BadRequestError("Invalid user id") 
+
+    
+    user = db.session.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise NotFoundError("User Not Found")
     # user = UserSchema().dump(user)
-    db.session.commit()
+    try:
+        db.session.delete(user)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        raise InternalProcessingError("Error deleting user")
     return "Success", 200
 
 @user.route('/update_account', methods=["PUT", "POST"])
@@ -158,11 +189,25 @@ def update_account():
     '''
     # Extract required and optional data from the request
     user_id = request.json.get('id')
+    if not user_id:
+        raise BadRequestError("Missing user id")
+    
+    try: 
+        user_id = str(uuid.UUID(user_id))
+    except(ValueError, TypeError):
+        raise BadRequestError("Invalid  user id") 
+    
+
+    
     new_name = request.json.get('name')
     new_password = request.json.get('password')
 
+
     # Find the user in the database
     user = db.session.query(User).filter_by(id=user_id).first()
+
+    if not user:
+        raise NotFoundError("User Not Found")
 
     # Update the fields if provided
     if new_name:
@@ -171,7 +216,11 @@ def update_account():
         user.password = new_password
 
     # Commit changes to the database
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        raise InternalProcessingError("Error updating account")
 
     # Return a success response
     return jsonify({"message": "Account updated successfully"}), 200
