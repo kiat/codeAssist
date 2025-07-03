@@ -82,3 +82,9 @@ def add_user(name="Stress Student", email=None, password="test123", eid=None, ro
     response.raise_for_status()
     return response.json()["id"]
 
+def delete_user(user_id):
+    url = f"{BASE_URL}/delete_user"
+    response = requests.delete(url, params={"id": user_id})
+    if response.status_code != 200:
+        raise Exception(f"Failed to delete user {user_id}: {response.text}")
+
