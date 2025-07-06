@@ -228,7 +228,7 @@ def test_delete_user(client, mocker):
     response = client.delete("/delete_user", query_string={"id" : str(random_uuid)})
 
     assert response.status_code == 200
-    assert response.json["message"] == "User deleted successfully"
+    assert response.data.decode() == "Success"
 
     # Check that filter_by was called with correct id
     mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
