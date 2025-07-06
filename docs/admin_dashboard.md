@@ -7,16 +7,14 @@ The Admin Dashboard is designed for institution administrators to manage all asp
 ## Setup
 
 ### Create AdminEmail Table
-1. Add your email address to `admin_emails.py` inside the `emails` list:
+1. Start your Docker containers
+```bash
+docker compose up
 ```
-emails = [
-    # Add more emails as needed
-]
-```
-2. Run the following commands in the terminal to create the AdminEmail table and insert your emails:
-```
+2. Run the following commands in a new terminal window to create the AdminEmail table and insert your emails (Replace `your_email@example.com` with the email addresses you want to add.):
+```bash
 docker exec -it flask_container sh
-python admin_emails.py
+python admin_emails.py your_email@example.com
 ```
 
 ### Setup `frontend/.env`
