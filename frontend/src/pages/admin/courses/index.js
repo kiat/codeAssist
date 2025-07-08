@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Input, Table, PageHeader, Card, Space, Button, message } from "antd";
+import { Input, Table, PageHeader, Card, Space, Button, message, } from "antd";
 import { useNavigate } from "react-router-dom";
 
 export default function AdminCourses() {
@@ -55,6 +55,13 @@ export default function AdminCourses() {
     { title: "Semester", dataIndex: "semester", key: "semester" },
     { title: "Year", dataIndex: "year", key: "year" },
     { title: "Instructor", dataIndex: "instructor_name", key: "instructor_name" },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_, record) => (
+        <Button type="link" onClick={() => navigate(`/admin/courses/${record.id}/manage`)}>Manage</Button>
+      ),
+    },
   ];
 
   return (

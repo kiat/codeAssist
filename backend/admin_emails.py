@@ -1,28 +1,27 @@
+import sys
 from app import app
 from api import db
 from api.models import AdminEmail
 
+#To add emails, run the following commands in terminal
+#docker exec -it flask_container sh
+#python admin_emails.py your_email@example.com
+
 with app.app_context():
     db.create_all()  # Ensure all tables exist
 
-# To add these emails, run the following commands in the terminal
-# docker exec -it flask_container sh
-# python admin_emails.py
+if len(sys.argv) < 2:
+    print("Usage: python admin_emails.py email1@example.com") #correct usage if no email provided
+    sys.exit(1)
 
-emails = [
-    "aw42679@utexas.edu",
-    # Add more emails as needed
-]
+email_args = sys.argv[1:]
 
 with app.app_context():
-    # Remove emails not in the list
-    AdminEmail.query.filter(~AdminEmail.email.in_(emails)).delete(synchronize_session=False)
-    db.session.commit()
-
-    # Add new emails if not already present
-    for email in emails:
-        if not AdminEmail.query.filter_by(email=email).first():
-            admin = AdminEmail(email=email)
+    for email_arg in email_args:
+        if not AdminEmail.query.filter_by(email=email_arg).first():
+            admin = AdminEmail(email=email_arg)
             db.session.add(admin)
+            print(f"Admin email '{email_arg}' added.")
+        else:
+            print(f"Admin email '{email_arg}' already exists.")
     db.session.commit()
-    print("Admin emails updated!")

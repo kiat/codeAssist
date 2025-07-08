@@ -1,5 +1,6 @@
 import pytest
 from api import create_app
+import uuid
 
 @pytest.fixture
 def app():
@@ -212,32 +213,106 @@ def test_get_user_by_email_not_found(client, mock_user_query):
 
 def test_delete_user(client, mocker):
     """Test the /delete_user route."""
+
+    random_uuid = uuid.uuid4()
+    user_mock = mocker.Mock() 
+    user_mock.id = random_uuid
+    
     mock_query = mocker.patch("routes.user.db.session.query")
-    mock_commit = mocker.patch("routes.user.db.session.commit")
+    mock_query.return_value.filter_by.return_value.first.return_value = user_mock
+
+    # Mock db.session.delete and commit
     mock_delete = mocker.patch("routes.user.db.session.delete")
+    mock_commit = mocker.patch("routes.user.db.session.commit")
 
-    mock_user = mocker.Mock()
-    mock_user.id = "123"
-
-    # mock first
-    mock_query.return_value.filter_by.return_value.first.return_value = mock_user
-
-    response = client.delete("/delete_user?id=123")
+    response = client.delete("/delete_user", query_string={"id" : str(random_uuid)})
 
     assert response.status_code == 200
-    assert response.json["message"] == "User deleted successfully"
+    assert response.data.decode() == "Success"
 
-    mock_query.return_value.filter_by.assert_called_with(id="123")
-    mock_delete.assert_called_once_with(mock_user)
+    # Check that filter_by was called with correct id
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
+
+    # Check that first() was called to fetch the user
+    mock_query.return_value.filter_by.return_value.first.assert_called_once()
+
+    # Check that delete was called with the mock user
+    mock_delete.assert_called_once_with(user_mock)
+
+    # Check that commit was called
     mock_commit.assert_called_once()
 
 
+def test_delete_user_missing_id(client, mocker):
+    """Test the /delete_user route."""
+
+
+    response = client.delete("/delete_user")
+
+    assert response.status_code == 400
+    data = response.get_json() 
+    assert data['message'] == "Missing User id"
+
+def test_delete_user_invalid_id(client, mocker):
+    """Test the /delete_user route."""
+
+
+    response = client.delete("/delete_user", query_string={"id" : "123"})
+
+    assert response.status_code == 400
+    data = response.get_json() 
+    assert data['message'] == "Invalid user id"
+
+def test_delete_user_not_found(client, mocker):
+    """Test the /delete_user route."""
+
+    random_uuid = random_uuid = uuid.uuid4() 
+
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+
+    response = client.delete("/delete_user", query_string={"id" : str(random_uuid)})
+
+    assert response.status_code == 404
+    data = response.get_json() 
+    assert data['message'] == "User Not Found"
+
+    mock_query.assert_called_once() 
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
+
+
+def test_delete_user_rolls_back_on_exception(client, mocker):
+    random_uuid = uuid.uuid4()
+    user_mock = mocker.Mock() 
+    user_mock.id = random_uuid
+
+    mock_session = mocker.patch("routes.user.db.session")
+
+    
+    mock_session.query.return_value.filter_by.return_value.first.return_value = user_mock
+
+    mock_session.delete.return_value = None
+    mock_session.commit.side_effect = Exception("Simulated DB failure")
+
+
+    response = client.delete("/delete_user", query_string={"id" : str(random_uuid)})
+
+    assert response.status_code == 500
+    data = response.get_json()
+    assert data["message"] == "Error deleting user"
+
+    mock_session.rollback.assert_called_once()
+
 def test_update_account(client, mocker):
     """Test the /update_account route."""
-    payload = {"id": "123", "name": "Updated Name", "password": None}
+
+    random_uuid = uuid.uuid4()
+
+    payload = {"id": str(random_uuid), "name": "Updated Name", "password": "Updated Password"}
     
     user_mock = mocker.Mock()
-    user_mock.id = "123"
+    user_mock.id = str(random_uuid)
     user_mock.name = "Old Name"
     user_mock.password = "oldpassword"
     
@@ -252,5 +327,192 @@ def test_update_account(client, mocker):
     assert response.json["message"] == "Account updated successfully"
 
     mock_query.assert_called_once()
-    mock_query.return_value.filter_by.assert_called_once_with(id="123")
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
     mock_commit.assert_called_once()
+
+def test_update_account_only_user(client, mocker):
+    """Test the /update_account route."""
+
+    random_uuid = uuid.uuid4()
+
+    payload = {"id": str(random_uuid), "name": "Updated Name"}
+    
+    user_mock = mocker.Mock()
+    user_mock.id = str(random_uuid)
+    user_mock.name = "Old Name"
+    user_mock.password = "oldpassword"
+    
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = user_mock
+
+    mock_commit = mocker.patch("routes.user.db.session.commit")
+    
+    response = client.put("/update_account", json=payload)
+    
+    assert response.status_code == 200
+    assert response.json["message"] == "Account updated successfully"
+
+    mock_query.assert_called_once()
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
+    mock_commit.assert_called_once()
+
+
+def test_update_account_only_password(client, mocker):
+    """Test the /update_account route."""
+
+    random_uuid = uuid.uuid4()
+
+    payload = {"id": str(random_uuid), "password": "Updated Password"}
+    
+    user_mock = mocker.Mock()
+    user_mock.id = str(random_uuid)
+    user_mock.name = "Old Name"
+    user_mock.password = "oldpassword"
+    
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = user_mock
+
+    mock_commit = mocker.patch("routes.user.db.session.commit")
+    
+    response = client.put("/update_account", json=payload)
+    
+    assert response.status_code == 200
+    assert response.json["message"] == "Account updated successfully"
+
+    mock_query.assert_called_once()
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
+    mock_commit.assert_called_once()
+
+def test_update_account_missing_id(client, mocker):
+    """Test the /update_account route."""
+
+    response = client.put("/update_account", json={})
+
+    assert response.status_code == 400
+    data = response.get_json() 
+    assert data['message'] == "Missing user id"
+
+
+def test_update_account_missing_user(client, mocker):
+    """Test the /update_account route."""
+
+    
+    random_uuid = random_uuid = uuid.uuid4() 
+
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+
+    response = client.put("/update_account", json={"id" : str(random_uuid)})
+
+    assert response.status_code == 404
+    data = response.get_json() 
+    assert data['message'] == "User Not Found"
+
+    mock_query.assert_called_once() 
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
+
+def test_update_user_rolls_back_on_exception(client, mocker):
+    random_uuid = uuid.uuid4()
+    user_mock = mocker.Mock() 
+    user_mock.id = random_uuid
+
+    payload = {"id": str(random_uuid), "password": "Updated Password"}
+
+    mock_session = mocker.patch("routes.user.db.session")
+    mock_session.query.return_value.filter_by.return_value.first.return_value = user_mock
+
+    mock_session.commit.side_effect = Exception("Simulated DB failure")
+
+
+    response = client.put("/update_account", json=payload)
+
+    assert response.status_code == 500
+    data = response.get_json()
+    assert data["message"] == "Error updating account"
+
+    mock_session.rollback.assert_called_once()
+
+
+
+
+def test_get_user_by_id(client, mocker):
+    """Test the /get_user_by_id route."""
+
+    random_uuid = uuid.uuid4() 
+    user_mock = mocker.Mock()
+    user_mock.id = random_uuid
+    user_mock.name = "Old Name"
+    user_mock.password = "oldpassword"
+    user_mock.coding_insights = "No history."
+    user_mock.email_address =  "user@gmail.com"
+    user_mock.role =  "student"
+    user_mock.sis_user_id = "123"
+
+
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = user_mock
+
+    response = client.get("/get_user_by_id", query_string={"id": str(random_uuid)})
+
+    assert response.status_code == 200
+    assert response.json == {
+        "id" : str(random_uuid),
+        "name": "Old Name",
+        "password": "oldpassword",
+        "coding_insights": "No history.",
+        "email_address":  "user@gmail.com",
+        "role":  "student",
+        "sis_user_id": "123"
+    }
+
+    mock_query.assert_called_once() 
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
+
+
+def test_get_user_by_id_not_found(client, mocker):
+    """Test the /get_user_by_id route."""
+
+    random_uuid = uuid.uuid4() 
+
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.get("/get_user_by_id", query_string={"id": str(random_uuid)})
+
+    assert response.status_code == 404
+    data = response.get_json() 
+    assert data['message'] == "User does not exist"
+
+    mock_query.assert_called_once() 
+    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
+
+
+def test_get_user_by_id_missing_id(client, mocker):
+    """Test the /get_user_by_id route."""
+
+    response = client.get("/get_user_by_id")
+
+    assert response.status_code == 400
+    data = response.get_json() 
+    assert data['message'] == "Missing user id"
+
+
+
+def test_get_user_by_id_non_uuid(client, mocker):
+    """Test the /get_user_by_id route."""
+
+    response = client.get("/get_user_by_id", query_string={"id" : "123"})
+
+    assert response.status_code == 400
+    data = response.get_json() 
+    assert data['message'] == "Invalid user id"
+
+
+    
+
+
+
+
+    
+

@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from functools import reduce
 from flask import Blueprint, request, jsonify, current_app
-from flask_cors import cross_origin
+from flask_cors import CORS, cross_origin
 from api import db
 from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema

@@ -34,6 +34,7 @@ import AdminInstructorManage from "./pages/admin/instructors/manage"; // <-- Add
 import AdminAllCourses from "./pages/admin/courses/all";
 import AdminStudentManage from "./pages/admin/students/manage";
 import AdminStudentAdd from "./pages/admin/students/add";
+import AdminCourseManage from "./pages/admin/courses/manage";
 
 const { Content } = Layout;
 
@@ -214,6 +215,7 @@ function App() {
               <Route path="/regradeRequests" element={<RegradeRequests />} />
               <Route path='/admin/students/manage/:studentId' element={<AdminStudentManage />} />
               <Route path='/admin/students/add' element={<AdminStudentAdd />} />
+              <Route path='/admin/courses/:courseId/manage' element={<AdminCourseManage />} />
             </Routes>
           </Content>
         </Layout>
