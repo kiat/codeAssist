@@ -242,17 +242,11 @@ def get_user():
 @user.route('/get_user_by_id', methods=["GET"])
 @cross_origin()
 def get_user_by_id():
-    '''
-    /get_instructor_by_id gets the student from the database
-    Requires from the frontend a JSON containing:
-    @param id    the instructor id
-    '''
     insid = request.args.get("id")
-
-    instructor = db.session.query(User).filter_by(id=insid)
-    instructor = UserSchema().dump(instructor, many=True)[0]
-
-    return jsonify(instructor)
+    user = db.session.query(User).filter_by(id=insid).first()
+    if not user:
+        raise NotFoundError("User not found")
+    return jsonify(UserSchema().dump(user)), 200
 
 @user.route('/delete_user', methods=["DELETE"])
 @cross_origin()
