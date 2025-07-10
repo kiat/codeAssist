@@ -35,6 +35,8 @@ import AdminAllCourses from "./pages/admin/courses/all";
 import AdminStudentManage from "./pages/admin/students/manage";
 import AdminStudentAdd from "./pages/admin/students/add";
 import AdminCourseManage from "./pages/admin/courses/manage";
+import AdminCourseAdd from "./pages/admin/courses/add"; // <-- Add this line
+
 
 const { Content } = Layout;
 
@@ -148,6 +150,7 @@ function App() {
               <Route path='/admin/instructors/add' element={<AdminInstructorAdd />} />
               <Route path='/admin/instructors/manage/:instructorId' element={<AdminInstructorManage />} /> {/* <-- Add this route */}
               <Route path='/admin/courses/all' element={<AdminAllCourses />} />
+              <Route path='/admin/courses/create' element={<AdminCourseAdd />} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
                 ///reconfiguring to use submissionid for navigation

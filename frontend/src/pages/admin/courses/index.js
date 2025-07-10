@@ -49,20 +49,27 @@ export default function AdminCourses() {
     }
   };
 
+
   const columns = [
     { title: "Course Name", dataIndex: "name", key: "name" },
     { title: "Course ID", dataIndex: "id", key: "id" },
     { title: "Semester", dataIndex: "semester", key: "semester" },
     { title: "Year", dataIndex: "year", key: "year" },
-    { title: "Instructor", dataIndex: "instructor_name", key: "instructor_name" },
+    { title: "Instructor", dataIndex: "instructor_name", key: "instructor" }, // adjust key if needed
     {
       title: "Actions",
       key: "actions",
       render: (_, record) => (
-        <Button type="link" onClick={() => navigate(`/admin/courses/${record.id}/manage`)}>Manage</Button>
+        <Button
+          type="primary"
+          onClick={() => navigate(`/admin/courses/${record.id}/manage`)}
+        >
+          Manage
+        </Button>
       ),
     },
   ];
+  
 
   return (
     <Card>
@@ -78,7 +85,8 @@ export default function AdminCourses() {
             loading={loading}
             onSearch={handleSearch}
           />
-          <Button type="default" onClick={() => navigate("/admin/courses/all")}>View All Courses</Button>
+          <Button type="default" onClick={() => navigate("/admin/courses/create")}>Add Course</Button>
+          <Button type="primary" onClick={() => navigate("/admin/courses/all")}>View All Courses</Button>
         </Space>
         <Table rowKey="id" columns={columns} dataSource={searched ? courses : []} loading={loading} />
       </Space>
