@@ -2,7 +2,7 @@ from marshmallow import Schema, fields
 from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
-
+from dataclasses import dataclass
 class User(db.Model):
     __tablename__ = "user"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
@@ -30,6 +30,7 @@ class Course(db.Model):
     # -- AI Integration Settings -- 
     openai_api_key = db.Column(db.String, default="")
 
+@dataclass
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
     student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), primary_key=True, nullable=False)
@@ -127,4 +128,12 @@ class AssignmentExtension(db.Model):
 
     assignment = db.relationship("Assignment", backref=db.backref("extensions", lazy="dynamic"))
     student = db.relationship("User", backref=db.backref("extensions", lazy="dynamic"))
+
+class AdminEmail(db.Model):
+    __tablename__ = 'admin_emails'
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f"<AdminEmail {self.email}>"   
 

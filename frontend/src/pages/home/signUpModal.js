@@ -23,6 +23,7 @@ export default function SignUpModal({ open, onCancel }) {
           name: res.data?.name,
           id: res.data?.id,
           isStudent: role === "student",
+          isAdmin: role === "admin",
           role: role,
         };
         localStorage.setItem("userInfo", JSON.stringify(userInfo));

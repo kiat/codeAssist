@@ -23,6 +23,7 @@ export default function LogInModal({ open, onCancel }) {
           name: res.data?.name,
           id: res.data?.id,
           isStudent: res.data?.role === "student",
+          isAdmin: res.data?.role === "admin",
           role: res.data?.role,
         };
         localStorage.setItem("userInfo", JSON.stringify(userInfo));
@@ -34,6 +35,18 @@ export default function LogInModal({ open, onCancel }) {
   };
   return (
     <Modal title="LOG IN" open={open} footer={null} onCancel={onCancel}>
+      {/* <Button
+        style={{ width: "100%", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center" }}
+        type="default"
+        onClick={() => window.location.href = "http://localhost:5000/login/google"}
+      >
+        <img
+          src="https://developers.google.com/identity/images/g-logo.png"
+          alt="Google"
+          style={{ width: 20, height: 20, marginRight: 8 }}
+        />
+        Login with Google
+      </Button> */}
       <Form layout="vertical" onFinish={onSubmit}>
         <Form.Item
           label="Email"

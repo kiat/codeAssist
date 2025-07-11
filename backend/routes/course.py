@@ -500,3 +500,24 @@ def store_api_key():
     except Exception as e:
         db.session.rollback()
         raise InternalProcessingError("Failed to store API key")
+
+@course.route("/get_courses_by_instructor", methods=["GET"])
+@cross_origin()
+def get_courses_by_instructor():
+    """
+    /get_courses_by_instructor gets all courses where the user is an instructor
+    Requires from the frontend a query param:
+    @param instructor_id    the id of the instructor
+    """
+    instructor_id = request.args.get("instructor_id")
+    if not instructor_id or instructor_id == "":
+        raise BadRequestError("Missing instructor_id argument")
+    
+    # Find all enrollments where this user is an instructor
+    enrollments = db.session.query(Enrollment).filter_by(student_id=instructor_id, role="instructor").all()
+    course_ids = [enrollment.course_id for enrollment in enrollments]
+    if not course_ids:
+        return jsonify([]), 200
+
+    courses = db.session.query(Course).filter(Course.id.in_(course_ids)).all()
+    return jsonify(CourseSchema(many=True).dump(courses)), 200
