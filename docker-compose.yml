@@ -25,13 +25,6 @@ services:
         build: 
             context: "./backend/"
             dockerfile: Dockerfile
-        security-opt:
-            - no-new-privileges:true
-        cap_drop:
-            - ALL
-        read-only: true
-        tmpfs: 
-            - /tmp 
         environment:
             FLASK_APP: app.py
             FLASK_DEBUG: 1
