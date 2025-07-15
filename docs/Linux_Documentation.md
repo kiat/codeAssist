@@ -49,14 +49,17 @@ For production deployment, do not locally host the backend
     REACT_APP_API_URL=http://localhost:5001
     ```
 
-4. run `docker compose up`
+4. run `docker compose up` and then give user permissions to access the volumes with 
+'''sudo chown -R 1000:1000 ./backend
+sudo chmod -R u+rwx ./backend'''
+
 
 5. Visit the pgadmin website via the url in the container. login with the default login:  
     `user: admin@admin.com`  
     `password: 12345`
 
 6. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
-    `Host name/address: postgres:5432`  
+    `Host name/address: db`  
     `Username: postgres`  
     `Password: postgres`  
 
@@ -73,7 +76,7 @@ For production deployment, do not locally host the backend
     In your `.env` file, add your connection string:
 
     ```bash
-    DB_CONNECTION_STRING="postgresql://postgres:postgres@postgres:5432/codeassist"
+    DB_CONNECTION_STRING="postgresql://postgres:postgres@db:5432/codeassist"
     ```
 
 10. Start the frontend service -- will automatically open the webpage
