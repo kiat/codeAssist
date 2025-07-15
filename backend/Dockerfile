@@ -1,5 +1,11 @@
 FROM alpine:latest
 
+# Ensure that we are not running as root user 
+RUN addgroup -S username && adduser -S -G username username
+
+# Utilize the new user 
+USER username
+
 # Install Python, pip, and Docker
 RUN apk add --no-cache python3 py3-pip docker
 

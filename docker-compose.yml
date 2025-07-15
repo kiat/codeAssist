@@ -25,6 +25,13 @@ services:
         build: 
             context: "./backend/"
             dockerfile: Dockerfile
+        security-opt:
+            - no-new-privileges:true
+        cap_drop:
+            - ALL
+        read-only: true
+        tmpfs: 
+            - /tmp 
         environment:
             FLASK_APP: app.py
             FLASK_DEBUG: 1
@@ -33,6 +40,8 @@ services:
             - "5001:5001"
         extra_hosts:
               - "host.docker.internal:host-gateway"
+        networks:
+            - shared_net
         volumes:
             - ./backend/:/usr/src/app
             - /var/run/docker.sock:/var/run/docker.sock
@@ -45,8 +54,8 @@ services:
             POSTGRES_USER: postgres
             POSTGRES_PASSWORD: postgres
             POSTGRES_DB: codeassist
-        ports:
-            - "5432:5432"
+        networks:
+            - shared_net
         volumes: 
             - db:/var/lib/postgresql/data
 
@@ -57,10 +66,17 @@ services:
       environment:
         PGADMIN_DEFAULT_EMAIL: admin@admin.com
         PGADMIN_DEFAULT_PASSWORD: 12345
+      networks: 
+        - shared_net 
       ports:
-        - "5050:80"
+        - "127.0.0.1:5050:80"
       volumes:
         - pgadmin:/var/lib/pgadmin
+
+
+networks:
+  shared_net:
+    driver: bridge
 
 volumes:
   db:
