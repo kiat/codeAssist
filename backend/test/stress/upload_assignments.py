@@ -7,7 +7,7 @@ from utils import create_assignment, upload_autograder, upload_submission, add_u
 Stress test script for multi-student submissions.
 
 Usage:
-    python stress_upload.py <course_id> [--num_threads N] [--cleanup]
+    python upload_assignments.py <course_id> [--num_threads N] [--cleanup]
 
 Example:
     python stress_upload.py 123e4567-e89b-12d3-a456-426614174000 --num_threads 10 --cleanup
