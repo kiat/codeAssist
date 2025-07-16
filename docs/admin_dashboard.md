@@ -45,51 +45,12 @@ REACT_APP_CLIENT_ID=1039210497435-6hckku1vojl8ii7su5m1bhj0h1msligr.apps.googleus
 
 ## Authentication
 
-### OAuth2 Login
+
 Admin users log in via Google OAuth2. Upon authentication, the system checks the user's email against a list of pre-approved admin emails stored in the database. Only users with matching email addresses are granted admin privileges.
-
-
-
-## API Routes
-
-- `GET /get_all_courses`: Retrieve all courses in the institution.
-- `GET /get_all_instructors`: Retrieve all instructor accounts.
-- `GET /get_all_students`: Retrieve all student accounts.
-- `POST /admin_update_account`: Allow admins to update the name, EID, or email of an existing instructor or student account.
-
-(Additional endpoints for editing, deleting, and creating users/courses are planned or in progress.)
-
-## Frontend Pages & Components
-
-### 1. `AdminSidebar.js`
-- Navigation includes:
-  - **Courses**: View and manage all courses.
-  - **Students**: View, search, and manage all students.
-  - **Instructors**: View, search, manage, and register instructors.
-
-### 2. `admin/dashboard`
-- The main dashboard page for administrators.
-- Displays institutional data, including number of courses, students, and instructors.
-
-### 3. `admin/courses` (In Progress)
-- Searchable list of all courses (by CourseID, name, year, semester, or instructor name).
-- Admins can edit course details, similar to instructor access.
-
-### 4. `admin/students` (In Progress)
-- Searchable list of all students (by EID or name).
-- Admins can edit or delete student accounts.
-- Display courses each student is enrolled in.
-
-### 5. `admin/instructors` (In Progress)
-- Searchable list of all instructors (by EID or name).
-- Admins can edit or delete instructor accounts.
-- Admins can register new instructors directly (no self-enrollment required).
-- Display Courses each instructor teaches.
 
 
 ## Planned Features
 
-- **Course Management**: Edit, delete, and create courses with full instructor-level access.
-- **Student Management**: Search, edit, and delete student accounts.
-- **Instructor Management**: Search, edit, delete, and register instructors.
-- **Data Tables**: Filter, sort, and export data for courses, staff, and students.
+- **Instructor Account Enrollment**: remove self-enrollment for instructors; instructor accounts will be created by admins only
+- **Login Restrictions**: Allow login only for emails with authorized institution domains
+- **Email Verification**: send a verification code to new users for additional validation
