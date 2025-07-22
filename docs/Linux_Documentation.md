@@ -46,12 +46,10 @@ For production deployment, do not locally host the backend
     In your `.env` file, add this React environment variable:
 
     ```
-    REACT_APP_API_URL=http://localhost:5001
+    REACT_APP_API_URL=/api
     ```
 
-4. run `docker compose up` and then give user permissions to access the volumes with 
-'''sudo chown -R 1000:1000 ./backend
-sudo chmod -R u+rwx ./backend'''
+4. run `docker compose up` 
 
 
 5. Visit the pgadmin website via the url in the container. login with the default login:  
@@ -67,7 +65,7 @@ sudo chmod -R u+rwx ./backend'''
 
 8. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
 
-9. Create a `.env` file in the backend directory and add your DB connection string
+9. Create a `.env` file in the backend directory and add your DB connection string and restart containers 
 
     ```bash
     touch ./backend/.env
@@ -79,18 +77,46 @@ sudo chmod -R u+rwx ./backend'''
     DB_CONNECTION_STRING="postgresql://postgres:postgres@db:5432/codeassist"
     ```
 
-10. Start the frontend service -- will automatically open the webpage
-    In a NEW terminal  
-    cd into the frontend folder and run:
-    ```bash
-    cd frontend
-    ```
+10. Compile the frontend using npm run build
 
-    ```bash
-    npm start 
-    ```
+11. install nginx:
+    sudo apt update
+    sudo apt install nginx
 
-11. If you can access the website and can create a user, you can now begin development :bowtie:
+12. check that it is running with sudo systemctl status nginx
+
+13. create a /var/www/<ip-address> and give nginx permissions to read it using 
+    "sudo chown -R www-data:www-data /var/www/97.178.45.235
+    sudo chmod -R 755 /var/www/97.178.45.235"
+14. copy the build file compiled on your local machine to this file 
+
+15. Create a config file that nginx can use in /etc/nginx/conf.d/ and add this to it
+    ```
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+
+        root /var/www/<ip-address>/build;
+        index index.html;
+
+        location / {
+            try_files $uri /index.html;
+        }
+
+        location /api/ {
+            proxy_pass http://localhost:5000/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+        }
+    }
+
+
+    ```
+16. run sudo rm /etc/nginx/sites-enabled/default to unlink the default website on port 80 
 
 
 Notes: 
