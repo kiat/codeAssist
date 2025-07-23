@@ -421,3 +421,22 @@ def get_instructor_by_eid():
         raise NotFoundError("Instructor with this EID not found")
 
     return jsonify(UserSchema().dump(user)), 200
+
+@user.route('/get_user_by_eid', methods=["GET"])
+@cross_origin()
+def get_user_by_eid():
+    eid = request.args.get("eid")
+    if not eid:
+        raise BadRequestError("Missing EID")
+    
+    print(f"Received EID: '{eid}'")
+
+    # Log all EIDs in the database for comparison
+    all_eids = [f"'{u.sis_user_id}'" for u in db.session.query(User).all()]
+    print("All DB EIDs:", all_eids)
+
+    user = db.session.query(User).filter_by(sis_user_id=eid).first()
+    if not user:
+        raise NotFoundError("User with this EID not found")
+
+    return jsonify(UserSchema().dump(user)), 200
