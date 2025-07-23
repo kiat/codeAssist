@@ -26,8 +26,8 @@ services:
             context: "./backend/"
             dockerfile: Dockerfile
         environment:
-            FLASK_APP: app.py
-            FLASK_DEBUG: 1
+            # FLASK_APP: app.py
+            # FLASK_DEBUG: 1
             PYTHONUNBUFFERED: 1
         ports:
             - "5001:5001"
@@ -35,9 +35,9 @@ services:
               - "host.docker.internal:host-gateway"
         networks:
             - shared_net
-        volumes:
-            - ./backend/:/usr/src/app
-            - /var/run/docker.sock:/var/run/docker.sock
+        # volumes:
+        #     - ./backend/:/usr/src/app
+        #     - /var/run/docker.sock:/var/run/docker.sock
 
     db:
         container_name: postgres_container

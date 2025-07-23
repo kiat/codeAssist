@@ -31,4 +31,4 @@ EXPOSE 5001
 ENV PYTHONPATH /usr/src/app
 
 # Command to run the application
-CMD ["flask", "run", "--host=0.0.0.0" , "--port=5001"]
+CMD ["gunicorn", "backend.app:app", "--bind", "0.0.0.0:5001", "--workers", "3"]

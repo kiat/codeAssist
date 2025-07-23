@@ -9,11 +9,9 @@ Backend is hosted at `localhost:5001`
 ### Notes: 
 Ensured that backend container is run as a non-root user, with no admin 
 capabilities, and no way to increase the amount of privileges that it has
-Removed access to editing filesystem, instead created a temp folder for things like 
-logging 
 Removed the port for postgres (no longer exposed)
 Created a network that all the containers can communicate with each other on 
-For production deployment, do not locally host the backend 
+Added gunicorn and removed the volumes the backend normally use for development
 
 
 
