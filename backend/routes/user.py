@@ -407,3 +407,17 @@ def admin_update_account():
     db.session.commit()
 
     return jsonify({"message": "Account updated successfully"}), 200
+
+# New route to retrieve an instructor's id using their EID
+@user.route('/get_instructor_by_eid', methods=["GET"])
+@cross_origin()
+def get_instructor_by_eid():
+    eid = request.args.get("eid")
+    if not eid:
+        raise BadRequestError("Missing EID")
+
+    user = db.session.query(User).filter_by(sis_user_id=eid, role="instructor").first()
+    if not user:
+        raise NotFoundError("Instructor with this EID not found")
+
+    return jsonify(UserSchema().dump(user)), 200

@@ -30,7 +30,7 @@ export default function AdminCourseManage() {
     async function fetchData() {
       try {
         setLoading(true);
-
+    
         // Fetch course info
         const res = await fetch(
           `${process.env.REACT_APP_API_URL}/get_course_info?course_id=${courseId}`
@@ -38,16 +38,26 @@ export default function AdminCourseManage() {
         const data = await res.json();
         const courseObj = data[0];
         if (!courseObj) throw new Error("Course not found");
-
+    
         setCourse(courseObj);
+    
+        // Fetch instructor EID using instructor_id
+        const eidRes = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_user_by_id?id=${courseObj.instructor_id}`
+        );
+        if (!eidRes.ok) throw new Error("Failed to fetch instructor EID");
+        const eidData = await eidRes.json();
+        const instructorEid = eidData.sis_user_id;
+    
+        // Set form fields
         form.setFieldsValue({
           ...courseObj,
           description: courseObj.description || "",
           entryCode: courseObj.entryCode || "",
           allowEntryCode: courseObj.allowEntryCode ?? true,
+          instructor_eid: instructorEid,  // pre-fill EID here
         });
-
-        // Fetch instructors
+    
         const instRes = await fetch(
           `${process.env.REACT_APP_API_URL}/get_all_instructors`
         );
@@ -60,23 +70,31 @@ export default function AdminCourseManage() {
         setLoading(false);
       }
     }
-
+    
     fetchData();
   }, [courseId, form]);
 
   const handleSave = async (values) => {
     try {
       setSaving(true);
-
+  
+      // Get instructor ID from EID
+      const eid = values.instructor_eid;
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/get_instructor_by_eid?eid=${eid}`);
+      if (!res.ok) throw new Error("Instructor not found");
+      const instructor = await res.json();
+  
       const payload = {
         ...values,
         course_id: courseId,
+        instructor_id: instructor.id,
         description: values.description || "",
         entryCode: values.entryCode || "",
         allowEntryCode: values.allowEntryCode ?? true,
       };
-
-      const res = await fetch(
+      delete payload.instructor_eid;
+  
+      const updateRes = await fetch(
         `${process.env.REACT_APP_API_URL}/update_course`,
         {
           method: "PUT",
@@ -84,9 +102,9 @@ export default function AdminCourseManage() {
           body: JSON.stringify(payload),
         }
       );
-
-      if (!res.ok) throw new Error("Failed to update course");
-
+  
+      if (!updateRes.ok) throw new Error("Failed to update course");
+  
       message.success("Course updated successfully!");
       navigate("/admin/courses");
     } catch (err) {
@@ -96,7 +114,7 @@ export default function AdminCourseManage() {
       setSaving(false);
     }
   };
-
+  
   const [removing, setRemoving] = useState(false);
 
   const handleRemove = async () => {
@@ -118,8 +136,6 @@ export default function AdminCourseManage() {
     }
   };
   
-
-
   return (
     <Spin spinning={loading}>
       <Card>
@@ -152,18 +168,13 @@ export default function AdminCourseManage() {
           </Form.Item>
 
           <Form.Item
-            label="Instructor"
-            name="instructor_id"
-            rules={[{ required: true }]}
+            label="Instructor EID"
+            name="instructor_eid"
+            rules={[{ required: true, message: "Please enter the instructor EID" }]}
           >
-            <Select placeholder="Select instructor">
-              {instructors.map((inst) => (
-                <Select.Option key={inst.id} value={inst.id}>
-                  {inst.name}
-                </Select.Option>
-              ))}
-            </Select>
+            <Input placeholder="e.g. abc123" />
           </Form.Item>
+
 
           <Form.Item label="Description" name="description">
             <Input.TextArea rows={3} />
