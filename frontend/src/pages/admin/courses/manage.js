@@ -345,45 +345,7 @@ export default function AdminCourseManage() {
       >
         <Form
           layout="vertical"
-          onFinish={async (values) => {
-            try {
-              // You need the student's ID, so you may want to search by EID or email
-              // For this example, let's assume you enroll by EID:
-              const res = await fetch(
-                `${process.env.REACT_APP_API_URL}/get_user_by_eid?eid=${values.eid}`
-              );
-              if (!res.ok) throw new Error("Student not found");
-              const student = await res.json();
-
-              // Enroll the student
-              const enrollRes = await fetch(
-                `${process.env.REACT_APP_API_URL}/create_enrollment`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    student_id: student.id,
-                    course_id: courseId,
-                    role: "student", // <-- add this line
-                  }),
-                }
-              );
-              if (!enrollRes.ok) throw new Error("Failed to enroll student");
-              message.success("Student enrolled!");
-              setShowAddStudent(false);
-
-              // Refresh enrolled students
-              const studentsRes = await fetch(
-                `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseId}`
-              );
-              if (studentsRes.ok) {
-                const studentsData = await studentsRes.json();
-                setEnrolledStudents(studentsData);
-              }
-            } catch (err) {
-              message.error("Failed to enroll student.");
-            }
-          }}
+onFinish={handleEnrollStudent}
         >
           <Form.Item
             label="Student EID"
