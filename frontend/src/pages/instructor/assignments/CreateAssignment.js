@@ -1,49 +1,28 @@
-import {
-  BookOutlined,
-  CodeOutlined,
-  FileTextOutlined,
-  LeftCircleFilled,
-  UploadOutlined,
-} from "@ant-design/icons";
-import {
-  Button,
-  Card,
-  Checkbox,
-  Col,
-  DatePicker,
-  Form,
-  Input,
-  Layout,
-  Menu,
-  Radio,
-  Row,
-  Space,
-  Steps,
-  Typography,
-  Upload,
-  Select,
-  Switch
-} from "antd";
+import { BookOutlined, CodeOutlined, FileTextOutlined, LeftCircleFilled, UploadOutlined } from "@ant-design/icons";
+import { Button, Card, Checkbox, Col, DatePicker, Form, Input, Layout, Menu, Radio, Row, Space, Steps, Typography, Upload, Select, Switch } from "antd";
 import { useState } from "react";
 import moment from "moment";
-
+import AITriggerButton from "../../testGenerationAI/AITriggerButton";
 
 const { Sider, Content } = Layout;
 
-export default ({
-  currentStep,
-  updateCurrentStep,
-  toggleIsCreate,
-  nameValidationStatus,
-  form,
-}) => {
+export default ({ currentStep, updateCurrentStep, toggleIsCreate, nameValidationStatus, form }) => {
   const [assignmentType, setAssignmentType] = useState(0);
   const [enableAiFeedback, setEnableAiFeedback] = useState(true);
   const aiFeedbackEnabled = Form.useWatch("ai_feedback_enabled", form);
 
-
   return (
     <>
+    {currentStep === 1 && (
+      <div style={{
+        position: "fixed",
+        top: "100px",   // Adjust based on your layout
+        right: "32px",
+        zIndex: 9999
+      }}>
+        <AITriggerButton />
+      </div>
+    )}
       <Steps
         current={currentStep}
         type="navigation"
@@ -128,33 +107,26 @@ export default ({
           </Sider>
           <Content>
             <Card bordered={false}>
-              <Form layout="vertical" form={form}
+              <Form
+                layout="vertical"
+                form={form}
                 initialValues={{
                   releaseDate: moment(), // current date
                   dueDate: moment().add(7, "day"), // 7 days from now
                   autograderPoints: "100",
                 }}
-                >
-                <Form.Item
-                  label="ASSIGNMENT NAME"
-                  name="name"
-                  validateStatus={nameValidationStatus}
-                  rules={[{ required: true, message: "Please enter a name" }]}
-                >
+              >
+                <Form.Item label="ASSIGNMENT NAME" name="name" validateStatus={nameValidationStatus} rules={[{ required: true, message: "Please enter a name" }]}>
                   <Input placeholder="Name your assignment" />
                 </Form.Item>
                 {assignmentType !== "2" ? (
-                  <Form.Item
-                    label="TEMPLATE"
-                    name="template"
-                    valuePropName="fileList"
-                  >
+                  <Form.Item label="TEMPLATE" name="template" valuePropName="fileList">
                     <Upload>
                       <Button icon={<UploadOutlined />}>select PDF</Button>
                     </Upload>
                   </Form.Item>
                 ) : null}
-                 {/* <Form.Item
+                {/* <Form.Item
                   label="SUBMISSION ANONYMIZATION"
                   name="submissionAnonymization"
                   valuePropName="checked"
@@ -173,19 +145,12 @@ export default ({
                     >
                       <Input />
                     </Form.Item>
-                    <Form.Item
-                      label="MANUAL GRADING"
-                      name="manualGrading"
-                      valuePropName="checked"
-                    >
+                    <Form.Item label="MANUAL GRADING" name="manualGrading" valuePropName="checked">
                       <Checkbox>Enable Manual Grading</Checkbox>
                     </Form.Item>
                   </>
                 ) : (
-                  <Form.Item
-                    label="WHO WILL UPLOAD SUBMISSIONS?"
-                    name="identify"
-                  >
+                  <Form.Item label="WHO WILL UPLOAD SUBMISSIONS?" name="identify">
                     <Radio.Group options={["Instructor", "Student"]} />
                   </Form.Item>
                 )}
@@ -195,11 +160,7 @@ export default ({
                     <Form.Item wrapperCol={{ xl: 12 }}>
                       <Row gutter={20}>
                         <Col span={24} md={12}>
-                          <Form.Item
-                            label="RELEASE DATE (CDT)"
-                            name="releaseDate"
-                            rules={[{ required: true, message: "Please select a release date" }]}
-                          >
+                          <Form.Item label="RELEASE DATE (CDT)" name="releaseDate" rules={[{ required: true, message: "Please select a release date" }]}>
                             <DatePicker showTime style={{ width: "100%" }} />
                           </Form.Item>
                         </Col>
@@ -209,10 +170,7 @@ export default ({
                           </Form.Item>
                         </Col>
                         <Col span={24} md={12}>
-                          <Form.Item
-                            name="allowLateSubmissions"
-                            valuePropName="checked"
-                          >
+                          <Form.Item name="allowLateSubmissions" valuePropName="checked">
                             <Checkbox>Allow Late Submissions</Checkbox>
                           </Form.Item>
                         </Col>
@@ -238,22 +196,13 @@ export default ({
                         {assignmentType === "1" ? (
                           <>
                             <Col span={24} md={12}>
-                              <Form.Item
-                                name="enforceTimeLimit"
-                                valuePropName="checked"
-                              >
+                              <Form.Item name="enforceTimeLimit" valuePropName="checked">
                                 <Checkbox>Enforce time limit</Checkbox>
                               </Form.Item>
                             </Col>
                             <Col span={24} md={12}>
-                              <Form.Item
-                                label="MAXIMUM TIME PERMITTED (MINUTES)"
-                                name="maximumTimePermitted"
-                              >
-                                <DatePicker
-                                  showTime
-                                  style={{ width: "100%" }}
-                                />
+                              <Form.Item label="MAXIMUM TIME PERMITTED (MINUTES)" name="maximumTimePermitted">
+                                <DatePicker showTime style={{ width: "100%" }} />
                               </Form.Item>
                             </Col>
                           </>
@@ -270,70 +219,47 @@ export default ({
                         </Radio.Group>
                       </Form.Item>
                     )}
-                    <Form.Item
-                      label="GROUP SUBMISSION"
-                      name="groupSubmission"
-                      valuePropName="checked"
-                    >
+                    <Form.Item label="GROUP SUBMISSION" name="groupSubmission" valuePropName="checked">
                       <Checkbox>Enable Group Submission</Checkbox>
                     </Form.Item>
-                    <Form.Item label="LIMIT GROUP SIZE" 
-                    name="limitGroupSize" 
-                    rules={[
-                      { required: false},
-                      { pattern: /^\d+$/, message: "Only numeric values allowed" },
-                    ]}>
+                    <Form.Item label="LIMIT GROUP SIZE" name="limitGroupSize" rules={[{ required: false }, { pattern: /^\d+$/, message: "Only numeric values allowed" }]}>
                       <Input />
                     </Form.Item>
 
-                {/* AI Feedback Toggle */}
-                <Form.Item
-                  label="ENABLE AI FEEDBACK"
-                  name="ai_feedback_enabled"
-                  valuePropName="checked"
-                >
-                  <Switch />
-                </Form.Item>
+                    {/* AI Feedback Toggle */}
+                    <Form.Item label="ENABLE AI FEEDBACK" name="ai_feedback_enabled" valuePropName="checked">
+                      <Switch />
+                    </Form.Item>
 
-                {/* AI Feedback Settings (Disabled when switch is off) */}
-                <Form.Item
-                  label="AI FEEDBACK PROMPT"
-                  name="ai_feedback_prompt"
-                  initialValue={"You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, style/formatting."}
-                  rules={[{ required: aiFeedbackEnabled, message: "Please enter a feedback prompt" }]}
-                >
-                  <Input.TextArea
-                    placeholder="Enter the feedback prompt for AI"
-                    autoSize={{ minRows: 4, maxRows: 8 }}
-                    disabled={!aiFeedbackEnabled}
-                  />
-                </Form.Item>
+                    {/* AI Feedback Settings (Disabled when switch is off) */}
+                    <Form.Item
+                      label="AI FEEDBACK PROMPT"
+                      name="ai_feedback_prompt"
+                      initialValue={"You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, style/formatting."}
+                      rules={[{ required: aiFeedbackEnabled, message: "Please enter a feedback prompt" }]}
+                    >
+                      <Input.TextArea placeholder="Enter the feedback prompt for AI" autoSize={{ minRows: 4, maxRows: 8 }} disabled={!aiFeedbackEnabled} />
+                    </Form.Item>
 
-                <Form.Item
-                  label="AI MODEL USED"
-                  name="ai_feedback_model"
-                  initialValue="gpt-4o"
-                  rules={[{ required: aiFeedbackEnabled, message: "Please select an AI model" }]}
-                >
-                  <Select placeholder="Select AI model" disabled={!aiFeedbackEnabled}>
-                    <Select.Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Select.Option>
-                    <Select.Option value="gpt-4o">GPT-4o</Select.Option>
-                    <Select.Option value="custom-model">Custom Model</Select.Option>
-                  </Select>
-                </Form.Item>
+                    <Form.Item label="AI MODEL USED" name="ai_feedback_model" initialValue="gpt-4o" rules={[{ required: aiFeedbackEnabled, message: "Please select an AI model" }]}>
+                      <Select placeholder="Select AI model" disabled={!aiFeedbackEnabled}>
+                        <Select.Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Select.Option>
+                        <Select.Option value="gpt-4o">GPT-4o</Select.Option>
+                        <Select.Option value="custom-model">Custom Model</Select.Option>
+                      </Select>
+                    </Form.Item>
 
-                <Form.Item
-                  label="MODEL TEMPERATURE"
-                  name="ai_feedback_temperature"
-                  initialValue={0.5}
-                  rules={[
-                    { required: aiFeedbackEnabled, message: "Please enter a temperature" },
-                    { pattern: /^0(\.\d+)?|1$/, message: "Enter a value between 0 and 1" },
-                  ]}
-                >
-                  <Input placeholder="Enter temperature (0 to 1)" disabled={!aiFeedbackEnabled} />
-                </Form.Item>
-
+                    <Form.Item
+                      label="MODEL TEMPERATURE"
+                      name="ai_feedback_temperature"
+                      initialValue={0.5}
+                      rules={[
+                        { required: aiFeedbackEnabled, message: "Please enter a temperature" },
+                        { pattern: /^0(\.\d+)?|1$/, message: "Enter a value between 0 and 1" },
+                      ]}
+                    >
+                      <Input placeholder="Enter temperature (0 to 1)" disabled={!aiFeedbackEnabled} />
+                    </Form.Item>
                   </>
                 )}
                 {/* {assignmentType === "2" ? (
@@ -378,6 +304,7 @@ export default ({
           </Content>
         </Layout>
       )}
+
     </>
   );
 };
