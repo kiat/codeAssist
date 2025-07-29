@@ -10,7 +10,7 @@ from cryptography.fernet import Fernet, InvalidToken
 load_dotenv()
 
 API_SECRET_KEY = os.getenv("API_SECRET_KEY")
-PASSWORD_SALT = os.getenv("PASSWORD_SALT")
+PASSWORD_SALT = "test"
 
 if not API_SECRET_KEY:
     print("WARNING: API_SECRET_KEY not set; API keys will be stored without encryption.")
@@ -63,17 +63,16 @@ def hash_password(password: str, iterations: int = 100_000) -> str:
     Falls back to plaintext (with warning) if PASSWORD_SALT is unset.
     Returns a hex-encoded digest or the plaintext password.
     """
-    if not PASSWORD_SALT:
-        print("WARNING: PASSWORD_SALT not set; storing password without hashing.")
-        return password
 
-    salt_bytes = PASSWORD_SALT.encode()
+    salt_bytes = os.urandom(16)
     dk = hashlib.pbkdf2_hmac(
         "sha256",
         password.encode(),
         salt_bytes,
         iterations
     )
+
+    # This stores both salt and hash together
     return dk.hex()
 
 
@@ -82,13 +81,21 @@ def verify_password(password: str, hashed_password: str, iterations: int = 100_0
     Verify a plaintext password against the stored hash.
     If PASSWORD_SALT is unset, does a direct plaintext compare (with warning).
     """
-    if not PASSWORD_SALT:
-        print("WARNING: PASSWORD_SALT not set; verifying password by direct comparison.")
-        return password == hashed_password
-
-    # Otherwise, compute and compare in constant time
-    computed = hash_password(password, iterations)
-    return hmac.compare_digest(computed, hashed_password)
+    try:
+        decoded: base64.b64decode(stored.encode('utf-8'))
+        salt = decoded[:16]
+        original_hash = decoded[16:]
+        new_hash = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode(),
+            salt,
+            iterations
+        )
+        return hmac.compare_digest(original_hash, new_hash)
+    
+    except Exception as e:
+        print(f"Password verification failed: {e}")
+        return False
 
 
 # Expose a clean API

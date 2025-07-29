@@ -331,7 +331,7 @@ def update_account():
     if new_name:
         user.name = new_name
     if new_password:
-        user.password = new_password
+        user.password = hash_password(new_password)
 
     # Commit changes to the database
     try:
