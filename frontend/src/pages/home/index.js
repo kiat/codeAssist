@@ -1,9 +1,6 @@
-import { Button } from "antd";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GlobalContext } from "../../App";
-import LogInModal from "./logInModal";
-import SignUpModal from "./signUpModal";
 import { GoogleLogin } from '@react-oauth/google';
 import GoogleSignUp from "./googleSignUp";
 import { googleLogin } from "../../services/user";
@@ -13,31 +10,14 @@ import { googleLogin } from "../../services/user";
  * @returns
  */
 export default function Home() {
-  const [isModalOpen, setModalOpen] = useState(false);
-  const [logInModalOpen, setlogInModalOpen] = useState(false);
   const [googleModalOpen, setGoogleModalOpen] = useState(false);
   const [googleValues, setGoogleValues] = useState({});
   const { userInfo, updateUserInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
 
-  // control login window modal
-  const toggleLogInModal = useCallback(() => {
-    setlogInModalOpen(logInModalOpen => !logInModalOpen);
-  }, []);
-
   const toggleGoogleModal = useCallback(() => {
     setGoogleModalOpen(googleModalOpen => !googleModalOpen);
   }, []);
-
-  // open signup window
-  const openModal = () => {
-    setModalOpen(true);
-  };
-
-  // close signup window
-  const closeModal = () => {
-    setModalOpen(false);
-  };
 
   useEffect(() => {
     if (userInfo?.name) {
@@ -142,40 +122,6 @@ export default function Home() {
             <div
               style={{
                 marginTop: "100px",
-                marginBottom: "15px",
-                paddingLeft: "475px",
-                paddingRight: "475px",
-                display: "flex",
-                justifyContent: "center",
-                gap: "20px",
-              }}
-            >
-              <Button
-                onClick={openModal}
-                type='primary'
-                size='large'
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  justifyContent: "center"
-                }}
-              >
-                Sign Up
-              </Button>
-              <Button
-                onClick={toggleLogInModal}
-                size='large'
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  justifyContent: "center"
-                }}
-              >
-                Log In
-              </Button>
-            </div>
-            <div
-              style={{
                 display: "flex",
                 justifyContent: "center",
                 textAlign: "center"
@@ -197,8 +143,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-      <SignUpModal open={isModalOpen} onCancel={closeModal} />
-      <LogInModal open={logInModalOpen} onCancel={toggleLogInModal} />
       <GoogleSignUp open={googleModalOpen} onCancel={toggleGoogleModal} googleValues={googleValues}/>
     </div>
   );
