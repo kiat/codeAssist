@@ -35,22 +35,25 @@ services:
               - "host.docker.internal:host-gateway"
         networks:
             - shared_net
-        # volumes:
-        #     - ./backend/:/usr/src/app
-        #     - /var/run/docker.sock:/var/run/docker.sock
+        volumes:
+            - ./backend/:/usr/src/app
+            - /var/run/docker.sock:/var/run/docker.sock
 
     db:
         container_name: postgres_container
         image: postgres:15.3-alpine3.18
         restart: always
         environment:
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-            POSTGRES_DB: codeassist
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DB: ${PG_DB}
+            POSTGRES_INITDB_ARGS: "-c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf"
         networks:
             - shared_net
         volumes: 
             - db:/var/lib/postgresql/data
+            - ./postgres_security/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+            - ./postgres_security/postgresql.conf:/etc/postgresql/postgresql.conf:ro
 
     pgadmin:
       container_name: pgadmin4_container
