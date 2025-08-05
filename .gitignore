@@ -112,6 +112,8 @@ venv.bak/
 .DS_Store
 backend/.env
 frontend/.env
+postgres/.env
+.env
 
 # Spyder project settings
 .spyderproject
