@@ -47,23 +47,25 @@ Added gunicorn and removed the volumes the backend normally use for development
     REACT_APP_API_URL=/api
     ```
 
-4. run `docker compose up` 
+4. go to postgres security and execute create_user.sh
+
+5. run `docker compose up` 
 
 
-5. Visit the pgadmin website via the url in the container. login with the default login:  
+6. Visit the pgadmin website via the url in the container. login with the default login:  
     `user: admin@admin.com`  
     `password: 12345`
 
-6. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
+7. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
     `Host name/address: db`  
     `Username: postgres`  
     `Password: postgres`  
 
-7. In this newly created server, create a new database. Name it `codeassist`. This is important for `init_db.py`
+8. In this newly created server, create a new database. Name it `codeassist`. This is important for `init_db.py`
 
-8. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
+9. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
 
-9. Create a `.env` file in the backend directory and add your DB connection string and restart containers 
+10. Create a `.env` file in the backend directory and add your DB connection string and restart containers 
 
     ```bash
     touch ./backend/.env
@@ -75,20 +77,21 @@ Added gunicorn and removed the volumes the backend normally use for development
     DB_CONNECTION_STRING="postgresql://postgres:postgres@db:5432/codeassist"
     ```
 
-10. Compile the frontend using npm run build
+11. Compile the frontend using npm run build
 
-11. install nginx:
+12. install nginx:
     sudo apt update
     sudo apt install nginx
 
-12. check that it is running with sudo systemctl status nginx
+13. check that it is running with sudo systemctl status nginx
 
-13. create a /var/www/<ip-address> and give nginx permissions to read it using 
+14. create a /var/www/<ip-address> and give nginx permissions to read it using 
     "sudo chown -R www-data:www-data /var/www/97.178.45.235
     sudo chmod -R 755 /var/www/97.178.45.235"
-14. copy the build file compiled on your local machine to this file 
+    
+15. copy the build file compiled on your local machine to this file 
 
-15. Create a config file that nginx can use in /etc/nginx/conf.d/ and add this to it
+16. Create a config file that nginx can use in /etc/nginx/conf.d/ and add this to it
     ```
     server {
         listen 80 default_server;
@@ -114,7 +117,7 @@ Added gunicorn and removed the volumes the backend normally use for development
 
 
     ```
-16. run sudo rm /etc/nginx/sites-enabled/default to unlink the default website on port 80 
+17. run sudo rm /etc/nginx/sites-enabled/default to unlink the default website on port 80 
 
 
 Notes: 
