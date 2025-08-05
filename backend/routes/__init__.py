@@ -13,3 +13,4 @@ def register_routes(app):
     app.register_blueprint(assignment)
     app.register_blueprint(regrade_request)
     app.register_blueprint(submission)
+
