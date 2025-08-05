@@ -10,11 +10,40 @@ export default function AITestModal({ open, onClose }) {
 
   if (!open) return null;
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages((prev) => [...prev, input]);
-    setInput("");
-  };
+  const handleSend = async () => {
+  if (!input.trim()) return;
+
+  const userMsg = input.trim();
+  setMessages((prev) => [...prev, `🧑 You: ${userMsg}`, "🧠 AI is thinking..."]);
+  setInput("");
+
+  try {
+    const res = await fetch("http://localhost:5002/generate-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: userMsg }),
+    });
+
+    const data = await res.json();
+    console.log("AI response data:", data); // ✅ useful for debugging
+
+    const aiResponse = data.output || data.response || "⚠️ No valid response from model";
+
+    // Replace "🧠 AI is thinking..." with actual AI response
+    setMessages((prev) => [
+      ...prev.slice(0, -1),
+      `🤖 AI: ${aiResponse}`,
+    ]);
+  } catch (error) {
+    console.error("Error calling /generate-test:", error);
+    setMessages((prev) => [
+      ...prev.slice(0, -1),
+      "❌ Error: Failed to get response from AI.",
+    ]);
+  }
+};
+
+
 
   const startDrag = (e) => {
     isDragging.current = true;
