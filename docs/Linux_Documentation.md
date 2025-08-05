@@ -47,7 +47,7 @@ Added gunicorn and removed the volumes the backend normally use for development
     REACT_APP_API_URL=/api
     ```
 
-4. go to postgres security and execute create_user.sh
+4. get .env files for root folder and postgres security folder and then go to postgres security and execute create_user.sh
 
 5. run `docker compose up` 
 
