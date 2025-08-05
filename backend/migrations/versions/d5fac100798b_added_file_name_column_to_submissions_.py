@@ -7,6 +7,7 @@ Create Date: 2024-04-12 00:41:19.764147
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.engine import reflection
 
 
 # revision identifiers, used by Alembic.
@@ -17,7 +18,11 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('submissions', sa.Column('file_name', sa.String(length=255), nullable=True))
+    bind = op.get_bind()
+    inspector = reflection.Inspector.from_engine(bind)
+    # Add only if it doesn't already exist
+    if 'file_name' not in [col['name'] for col in inspector.get_columns('submissions')]:
+        op.add_column('submissions', sa.Column('file_name', sa.String(length=255), nullable=True))
 
 
 
