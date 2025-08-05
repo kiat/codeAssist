@@ -7,11 +7,15 @@ Frontend is hosted at `localhost:3000`
 Backend is hosted at `localhost:5001`  
 
 ### Notes: 
-Ensured that backend container is run as a non-root user, with no admin 
-capabilities, and no way to increase the amount of privileges that it has
+Ensured that backend container is run as a non-root user
+Created a separate user to execute postgres commands on instead of root user 
+Ensured that only services hosted on the local machine and communicate with the database via pg_hba.conf
+Changed credentials for postgres superuser and added for the separate user and put them under a sha_256 scheme
 Removed the port for postgres (no longer exposed)
 Created a network that all the containers can communicate with each other on 
-Added gunicorn and removed the volumes the backend normally use for development
+Added gunicorn
+
+
 
 
 
