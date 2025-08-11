@@ -10,7 +10,8 @@ from cryptography.fernet import Fernet, InvalidToken
 load_dotenv()
 
 API_SECRET_KEY = os.getenv("API_SECRET_KEY")
-PASSWORD_SALT = "test"
+
+PASSWORD_SALT = os.getenv("PASSWORD_SALT", "")
 
 if not API_SECRET_KEY:
     print("WARNING: API_SECRET_KEY not set; API keys will be stored without encryption.")
@@ -56,6 +57,11 @@ def decrypt_api_key(encrypted_key: str) -> str:
         # print("WARNING: API_SECRET_KEY not set; using API key without decryption.")
         return encrypted_key
 
+def pepper() -> bytes:
+    if PASSWORD_SALT:
+        return PASSWORD_SALT.encode("utf-8")
+    else:
+        return b""
 
 def hash_password(password: str, iterations: int = 100_000) -> str:
     """
@@ -63,17 +69,19 @@ def hash_password(password: str, iterations: int = 100_000) -> str:
     Falls back to plaintext (with warning) if PASSWORD_SALT is unset.
     Returns a hex-encoded digest or the plaintext password.
     """
-
+    # Similar to before, this just helps verify passwords for unit tests
+    if not PASSWORD_SALT:
+        return password 
+    
     salt_bytes = os.urandom(16)
     dk = hashlib.pbkdf2_hmac(
         "sha256",
-        password.encode(),
-        salt_bytes,
+        password.encode("utf-8"),
+        salt_bytes + pepper(),
         iterations
     )
 
-    # This stores both salt and hash together
-    return dk.hex()
+    return base64.b64encode(salt_bytes + dk).decode("utf-8")
 
 
 def verify_password(password: str, hashed_password: str, iterations: int = 100_000) -> bool:
@@ -82,16 +90,19 @@ def verify_password(password: str, hashed_password: str, iterations: int = 100_0
     If PASSWORD_SALT is unset, does a direct plaintext compare (with warning).
     """
     try:
-        decoded: base64.b64decode(stored.encode('utf-8'))
+        if not PASSWORD_SALT:
+            return hmac.compare_digest(password, hashed_password)
+
+        decoded: base64.b64decode(hashed_password.encode("utf-8"))
         salt = decoded[:16]
         original_hash = decoded[16:]
-        new_hash = hashlib.pbkdf2_hmac(
+        candidate = hashlib.pbkdf2_hmac(
             "sha256",
-            password.encode(),
-            salt,
+            password.encode("utf-8"),
+            salt + pepper(),
             iterations
         )
-        return hmac.compare_digest(original_hash, new_hash)
+        return hmac.compare_digest(original_hash, candidate)
     
     except Exception as e:
         print(f"Password verification failed: {e}")

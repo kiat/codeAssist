@@ -153,7 +153,7 @@ def create_google_user():
         "id": user_id,
         "name": name,
         "email_address": email_address,
-        "password": password,
+        "password": hash_password(password),
         "sis_user_id": sis_user_id,
         "role": role
     }
