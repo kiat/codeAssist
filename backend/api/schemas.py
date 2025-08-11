@@ -6,7 +6,6 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = User
         include_fk = True
-        exclude = ("password",)
     
 class CourseSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
