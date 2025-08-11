@@ -39,7 +39,8 @@ services:
 
   testgen:
     container_name: testgen
-    image: shreyavarma327/testgen_image:v3
+    image: shreyavarma327/testgen:latest
+    pull_policy: always
     ports:
       - "5002:5002"
       - "11434:11434"
