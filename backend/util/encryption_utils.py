@@ -66,8 +66,8 @@ def pepper() -> bytes:
 def hash_password(password: str, iterations: int = 100_000) -> str:
     """
     Hash a user password using PBKDF2-HMAC-SHA256 with PASSWORD_SALT.
-    Falls back to plaintext (with warning) if PASSWORD_SALT is unset.
-    Returns a hex-encoded digest or the plaintext password.
+    If PASSWORD_SALT is unset, returns the plaintext (for tests/dev).
+    Returns a base64-encoded string of (salt || derived_key).
     """
     # Similar to before, this just helps verify passwords for unit tests
     if not PASSWORD_SALT:
@@ -93,7 +93,7 @@ def verify_password(password: str, hashed_password: str, iterations: int = 100_0
         if not PASSWORD_SALT:
             return hmac.compare_digest(password, hashed_password)
 
-        decoded: base64.b64decode(hashed_password.encode("utf-8"))
+        decoded = base64.b64decode(hashed_password.encode("utf-8"))
         salt = decoded[:16]
         original_hash = decoded[16:]
         candidate = hashlib.pbkdf2_hmac(
@@ -107,6 +107,25 @@ def verify_password(password: str, hashed_password: str, iterations: int = 100_0
     except Exception as e:
         print(f"Password verification failed: {e}")
         return False
+    
+# These methods will update accounts by hashing their passwords that were stored in plaintext   
+def is_hashed(stored: str) -> bool:
+    """
+    This method verifies a password is stored in our
+    base64 hash + salt format
+    """
+    try:
+        raw_pass = base64.b64decode(stored.encode("utf-8"))
+        return len(raw_pass) >= 48
+    except Exception:
+        return False
+    
+def needs_rehash(stored: str) -> bool:
+    """
+    Ensures a password should be rehashed in the case of
+    it being stored in plaintext or it being outdated
+    """
+    return bool(PASSWORD_SALT) and not is_hashed(stored)
 
 
 # Expose a clean API
