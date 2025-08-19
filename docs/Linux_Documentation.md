@@ -121,7 +121,11 @@ Added gunicorn
 
 
     ```
-17. run sudo rm /etc/nginx/sites-enabled/default to unlink the default website on port 80 
+17. run sudo rm /etc/nginx/sites-enabled/default to unlink the default website on port 80
+
+
+# Running the server 
+You can create a separate tmux session with tmux new -t session and run the docker container in there, but restarts are enabled so should not be required. 
 
 
 Notes: 
