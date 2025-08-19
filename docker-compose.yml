@@ -38,6 +38,7 @@ services:
         volumes:
             - ./backend/:/usr/src/app
             - /var/run/docker.sock:/var/run/docker.sock
+        restart: unless-stopped
 
     db:
         container_name: postgres_container
