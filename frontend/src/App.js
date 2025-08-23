@@ -23,12 +23,25 @@ import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
 import RegradeRequests from './components/RegradeRequests';
+import AdminDashboard from "./pages/admin/dashboard";
+import AdminSidebar from "./components/layout/AdminSidebar";
 import { leaveCourse } from "./services/course";
+import AdminCourses from "./pages/admin/courses";
+import AdminStudents from "./pages/admin/students";
+import AdminInstructors from "./pages/admin/instructors";
+import AdminInstructorAdd from "./pages/admin/instructors/add";
+import AdminInstructorManage from "./pages/admin/instructors/manage"; // <-- Add this import
+import AdminAllCourses from "./pages/admin/courses/all";
+import AdminStudentManage from "./pages/admin/students/manage";
+import AdminStudentAdd from "./pages/admin/students/add";
+import AdminCourseManage from "./pages/admin/courses/manage";
+import AdminCourseAdd from "./pages/admin/courses/add"; // <-- Add this line
+
 
 const { Content } = Layout;
 
 // Defining initial states as constants to avoid recreating objects on re-renders
-const initialUserInfo = { name: "", isStudent: 1 };
+const initialUserInfo = { name: "", isStudent: 1, isAdmin: 1 };
 const initialCourseInfo = { id: "", name: "", code: "", semester: "", year: "", description: ""};
 const initialAssignmentInfo = { id: "", score: "", results: null, code: null };
 
@@ -51,6 +64,7 @@ function App() {
   const [assignmentInfo, setAssignmentInfo] = useState(initialAssignmentInfo);
   const navigate = useNavigate();
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
 
   // Effect for initializing courseInfo from localStorage
   useEffect(() => {
@@ -100,17 +114,24 @@ function App() {
       assignmentInfo, updateAssignmentInfo
     }}>
 
-      <Layout>
+      <Layout style={{ display: 'flex', height: '100vh', flexDirection: "row" }}>
         {location.pathname === "/" ? null : (
-          <RootSider
-            pathname={location.pathname}
-            courseInfo={courseInfo}
-            userInfo={userInfo}
-            assignmentInfo={assignmentInfo}
-            onLeaveCourse={handleLeaveCourse}
-          />
+          userInfo?.isAdmin ? (
+            <AdminSidebar
+              pathname={location.pathname}
+              toggleCollapsed={() => setCollapsed(!collapsed)}
+            />
+          ) : (
+            <RootSider
+              pathname={location.pathname}
+              courseInfo={courseInfo}
+              userInfo={userInfo}
+              assignmentInfo={assignmentInfo}
+              onLeaveCourse={handleLeaveCourse}
+            />
+          )
         )}
-        <Layout style={{ height: "100vh" }}>
+        <Layout style={{ flex: 1, overflow: 'hidden' }}>
           <Content
             style={{
               backgroundColor: "#fff",
@@ -122,6 +143,14 @@ function App() {
             <Routes>
               <Route path='/' element={<Home />} />
               <Route path='/dashboard' element={<Dashboard />} />
+              <Route path='/admin/dashboard' element={<AdminDashboard/>} />
+              <Route path='/admin/courses' element={<AdminCourses />} />
+              <Route path='/admin/students' element={<AdminStudents />} />
+              <Route path='/admin/instructors' element={<AdminInstructors />} />
+              <Route path='/admin/instructors/add' element={<AdminInstructorAdd />} />
+              <Route path='/admin/instructors/manage/:instructorId' element={<AdminInstructorManage />} /> {/* <-- Add this route */}
+              <Route path='/admin/courses/all' element={<AdminAllCourses />} />
+              <Route path='/admin/courses/create' element={<AdminCourseAdd />} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route
                 ///reconfiguring to use submissionid for navigation
@@ -187,6 +216,9 @@ function App() {
                 element={<EditAccount />} 
               />
               <Route path="/regradeRequests" element={<RegradeRequests />} />
+              <Route path='/admin/students/manage/:studentId' element={<AdminStudentManage />} />
+              <Route path='/admin/students/add' element={<AdminStudentAdd />} />
+              <Route path='/admin/courses/:courseId/manage' element={<AdminCourseManage />} />
             </Routes>
           </Content>
         </Layout>

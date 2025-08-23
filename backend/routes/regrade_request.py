@@ -151,11 +151,17 @@ def get_instructor_regrade_requests():
 
     return jsonify(result), 200
 
-@regrade_request.route('/set_reviewed', methods=['POST'])
+@regrade_request.route('/set_reviewed', methods=['POST', 'OPTIONS'])
 @cross_origin()
 def set_reviewed():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200  # Preflight response
     submissionid = request.json["submission_id"]
     entry = db.session.query(RegradeRequest).filter_by(submission_id=submissionid).first()
+    
+    if entry is None:
+        return jsonify({"error": f"No regrade request found for submission_id: {submissionid}"}), 404
+    
     entry.reviewed = True
     db.session.commit()
 

@@ -26,6 +26,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
   const [highlightedLines, setHighlightedLines] = useState([]);
   const [annotations, setAnnotations] = useState([]);
   const [loadingStatus, setLoadingStatus] = useState("null"); // 'loading', 'success', 'error', or null
+  const [submissionDetails, setSubmissionDetails] = useState("null");
 
   // used to store the line references for scrolling to
   const lineRefs = useRef({});
@@ -145,6 +146,20 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
       findAnnotations(data.student_code_file || "");
     }
   }, [data]);
+
+  const fetchSubmissionDetails = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`);
+      const data = await response.json();
+      setStudScore(data.score ?? "UNGRADED");
+    } catch (error) {
+      console.error("Failed to fetch updated submission details:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubmissionDetails();
+  }, [submissionId]);
 
   const displayCodeWithAnnotations = () => {
     const lines = studentCode.split("\n");
@@ -302,7 +317,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
       <div style={{ flex: 1, minWidth: "60%" }}>{viewMode === "Results" ? displayTests() : displayCode()}</div>
       <div style={{ marginLeft: "20px", flex: "0 1 auto" }}>
-        <StudentInfoPanel assignmentName={assignmentName} studentName={studentName} score={StudScore} totalPoints={totalPoints} active={true} />
+        <StudentInfoPanel assignmentName={assignmentName} studentName={studentName} score={StudScore} totalPoints={totalPoints} active={true} onGradeUpdate={fetchSubmissionDetails}/>
       </div>
     </div>
   );

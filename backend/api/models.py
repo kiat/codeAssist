@@ -2,9 +2,9 @@ from marshmallow import Schema, fields
 from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
-
+from dataclasses import dataclass
 class User(db.Model):
-    __tablename__ = "user"
+    __tablename__ = "users"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     password = db.Column(db.String, nullable=False)
     name = db.Column(db.String, nullable=False)
@@ -19,7 +19,7 @@ class Course(db.Model):
     __tablename__ = "courses"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     name = db.Column(db.String, nullable=False)
-    instructor_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), nullable=False)
+    instructor_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id"), nullable=False)
     sis_course_id = db.Column(db.String, nullable=True)
     semester = db.Column(db.String, nullable=False)
     year = db.Column(db.String, nullable=False)
@@ -30,9 +30,10 @@ class Course(db.Model):
     # -- AI Integration Settings -- 
     openai_api_key = db.Column(db.String, default="")
 
+@dataclass
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
-    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id"), primary_key=True, nullable=False)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id"), primary_key=True, nullable=False)
     role = db.Column(db.String, nullable = False)
 
@@ -53,7 +54,8 @@ class Assignment(db.Model):
     published = db.Column(db.Boolean, default=False)
     published_date = db.Column(TIMESTAMP, nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
-    container_id = db.Column(db.String)
+    # container_id = db.Column(db.String)
+    autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
 
     # -- AI Integration Settings -- 
@@ -68,7 +70,7 @@ class Submission(db.Model):
     file_name = db.Column(db.String, nullable=False)
     submission_number = db.Column(db.Integer, nullable=False)
     submitted_at = db.Column(TIMESTAMP, nullable=True)
-    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), nullable=False, index=True)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id"), nullable=False, index=True)
     assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False, index=True)
     student_code_file = db.Column(LargeBinary, nullable=False)
     results = db.Column(LargeBinary, nullable=True)
@@ -84,7 +86,7 @@ class Submission(db.Model):
 class SubmissionSubmitter(db.Model):
     __tablename__ = "submission_submitters"
     submission_id = db.Column(UUID(as_uuid=False), db.ForeignKey("submissions.id"), primary_key=True, nullable=False)
-    submitter_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), primary_key=True, nullable=False)
+    submitter_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id"), primary_key=True, nullable=False)
     
 class TestCase(db.Model):
     __tablename__ = "test_cases"
@@ -120,11 +122,19 @@ class AssignmentExtension(db.Model):
     __tablename__ = "assignment_extensions"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False)
-    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("user.id"), nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id"), nullable=False)
     release_date_extension = db.Column(TIMESTAMP, nullable=True)
     due_date_extension = db.Column(TIMESTAMP, nullable=True)
     late_due_date_extension = db.Column(TIMESTAMP, nullable=True)
 
     assignment = db.relationship("Assignment", backref=db.backref("extensions", lazy="dynamic"))
     student = db.relationship("User", backref=db.backref("extensions", lazy="dynamic"))
+
+class AdminEmail(db.Model):
+    __tablename__ = 'admin_emails'
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f"<AdminEmail {self.email}>"   
 

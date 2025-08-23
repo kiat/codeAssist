@@ -10,7 +10,9 @@ import { Link, useNavigate} from "react-router-dom";
 export default function AccountPopoverContent() {
   const { updateUserInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
-  const userId = JSON.parse(localStorage.getItem("userInfo"))?.id;
+  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+  const userId = userInfo?.id;
+  const isAdmin = userInfo?.isAdmin;
   
   return (
     <div
@@ -22,13 +24,17 @@ export default function AccountPopoverContent() {
         <QuestionCircleFilled />
         <span> Help</span>
       </div>
-      <hr />
-      <div>
-        <Link to={`/editAccount/${userId}`}>
-          <UserOutlined />
-          <span> Edit Account</span>
-        </Link>
-      </div>
+      {!isAdmin && (
+        <>
+          <hr />
+          <div>
+            <Link to={`/editAccount/${userId}`}>
+              <UserOutlined />
+              <span> Edit Account</span>
+            </Link>
+          </div>
+        </>
+      )}
       <hr />
       <div
         style={{
