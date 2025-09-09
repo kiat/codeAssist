@@ -37,22 +37,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     REACT_APP_API_URL={where your backend is hosted}
     ```
 
-4. run `docker compose up`
-
-5. Visit the pgadmin website via the url in the container. login with the default login:  
-    `user: admin@admin.com`  
-    `password: 12345`
-
-6. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
-    `Host name/address: host.docker.internal`  
-    `Username: postgres`  
-    `Password: postgres`  
-
-7. In this newly created server, create a new database. Name it `codeassist`. This is important for `init_db.py`
-
-8. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
-
-9. Create a `.env` file in the backend directory and add your DB connection string
+4. Create a `.env` file in the backend directory and add your DB connection string
 
     ```bash
     touch ./backend/.env
@@ -63,6 +48,22 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     ```bash
     DB_CONNECTION_STRING="postgresql://postgres:postgres@host.docker.internal:5432/codeassist"
     ```
+
+
+5. run `docker compose up`
+
+6. Visit the pgadmin website via the url in the container. login with the default login:  
+    `user: admin@admin.com`  
+    `password: 12345`
+
+7. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
+    `Host name/address: host.docker.internal`  
+    `Username: postgres`  
+    `Password: postgres`  
+
+8. In this newly created server, create a new database. Name it `codeassist`. This is important for `init_db.py`
+
+9. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
 
 10. Start the frontend service -- will automatically open the webpage
     In a NEW terminal  
