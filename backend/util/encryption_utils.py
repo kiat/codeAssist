@@ -10,7 +10,8 @@ from cryptography.fernet import Fernet, InvalidToken
 load_dotenv()
 
 API_SECRET_KEY = os.getenv("API_SECRET_KEY")
-PASSWORD_SALT = os.getenv("PASSWORD_SALT")
+
+PASSWORD_SALT = os.getenv("PASSWORD_SALT", "")
 
 if not API_SECRET_KEY:
     print("WARNING: API_SECRET_KEY not set; API keys will be stored without encryption.")
@@ -56,25 +57,31 @@ def decrypt_api_key(encrypted_key: str) -> str:
         # print("WARNING: API_SECRET_KEY not set; using API key without decryption.")
         return encrypted_key
 
+def pepper() -> bytes:
+    if PASSWORD_SALT:
+        return PASSWORD_SALT.encode("utf-8")
+    else:
+        return b""
 
 def hash_password(password: str, iterations: int = 100_000) -> str:
     """
     Hash a user password using PBKDF2-HMAC-SHA256 with PASSWORD_SALT.
-    Falls back to plaintext (with warning) if PASSWORD_SALT is unset.
-    Returns a hex-encoded digest or the plaintext password.
+    If PASSWORD_SALT is unset, returns the plaintext (for tests/dev).
+    Returns a base64-encoded string of (salt || derived_key).
     """
+    # Similar to before, this just helps verify passwords for unit tests
     if not PASSWORD_SALT:
-        print("WARNING: PASSWORD_SALT not set; storing password without hashing.")
-        return password
-
-    salt_bytes = PASSWORD_SALT.encode()
+        return password 
+    
+    salt_bytes = os.urandom(16)
     dk = hashlib.pbkdf2_hmac(
         "sha256",
-        password.encode(),
-        salt_bytes,
+        password.encode("utf-8"),
+        salt_bytes + pepper(),
         iterations
     )
-    return dk.hex()
+
+    return base64.b64encode(salt_bytes + dk).decode("utf-8")
 
 
 def verify_password(password: str, hashed_password: str, iterations: int = 100_000) -> bool:
@@ -82,13 +89,43 @@ def verify_password(password: str, hashed_password: str, iterations: int = 100_0
     Verify a plaintext password against the stored hash.
     If PASSWORD_SALT is unset, does a direct plaintext compare (with warning).
     """
-    if not PASSWORD_SALT:
-        print("WARNING: PASSWORD_SALT not set; verifying password by direct comparison.")
-        return password == hashed_password
+    try:
+        if not PASSWORD_SALT:
+            return hmac.compare_digest(password, hashed_password)
 
-    # Otherwise, compute and compare in constant time
-    computed = hash_password(password, iterations)
-    return hmac.compare_digest(computed, hashed_password)
+        decoded = base64.b64decode(hashed_password.encode("utf-8"))
+        salt = decoded[:16]
+        original_hash = decoded[16:]
+        candidate = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            salt + pepper(),
+            iterations
+        )
+        return hmac.compare_digest(original_hash, candidate)
+    
+    except Exception as e:
+        print(f"Password verification failed: {e}")
+        return False
+    
+# These methods will update accounts by hashing their passwords that were stored in plaintext   
+def is_hashed(stored: str) -> bool:
+    """
+    This method verifies a password is stored in our
+    base64 hash + salt format
+    """
+    try:
+        raw_pass = base64.b64decode(stored.encode("utf-8"))
+        return len(raw_pass) >= 48
+    except Exception:
+        return False
+    
+def needs_rehash(stored: str) -> bool:
+    """
+    Ensures a password should be rehashed in the case of
+    it being stored in plaintext or it being outdated
+    """
+    return bool(PASSWORD_SALT) and not is_hashed(stored)
 
 
 # Expose a clean API
