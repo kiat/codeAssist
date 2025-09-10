@@ -8,7 +8,7 @@ from api import db
 from api.models import User, Course, AdminEmail
 from api.schemas import UserSchema, CourseSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError
-from util.encryption_utils import hash_password, verify_password
+from util.encryption_utils import hash_password, verify_password, needs_rehash, is_hashed
 
 
 user = Blueprint('user', __name__)
@@ -102,9 +102,18 @@ def user_login():
     else:
         stored_hash = getattr(db_user, 'password')
 
-    # Verify the provided password against the stored (hashed) password
-    if not verify_password(password, stored_hash):
-        raise NotFoundError("Email and password combination not found")
+    if is_hashed(stored_hash):
+        # Verify the provided password against the stored (hashed) password
+        if not verify_password(password, stored_hash):
+            raise NotFoundError("Email and password combination not found")
+    else:
+        if password != stored_hash:
+            raise NotFoundError("Email and password combination not found") 
+        
+        # Updates accounts that had their passwords stored in plaintext
+        if not isinstance(db_user, dict) and needs_rehash(password):
+            db_user.password = hash_password(password)
+            db.session.commit()
 
     # Serialize and return
     result = UserSchema().dump(db_user)
@@ -153,7 +162,7 @@ def create_google_user():
         "id": user_id,
         "name": name,
         "email_address": email_address,
-        "password": password,
+        "password": hash_password(password),
         "sis_user_id": sis_user_id,
         "role": role
     }
@@ -331,7 +340,7 @@ def update_account():
     if new_name:
         user.name = new_name
     if new_password:
-        user.password = new_password
+        user.password = hash_password(new_password)
 
     # Commit changes to the database
     try:

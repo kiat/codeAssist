@@ -62,7 +62,10 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
 
     ```bash
     DB_CONNECTION_STRING="postgresql://postgres:postgres@host.docker.internal:5432/codeassist"
+    PASSWORD_SALT="obtain this value from the main developer or project lead"
     ```
+
+    Note: PASSWORD_SALT is required for password hashing. Without it, the backend will fall back to storing plaintext passwords (unsafe). Make sure all developers use the same salt string in their .env file for consistency.
 
 10. Start the frontend service -- will automatically open the webpage
     In a NEW terminal  

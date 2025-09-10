@@ -110,5 +110,5 @@ def test_update_user_account_integration(client):
 
     data = get_again.get_json() 
     assert data["name"] == "Charles" 
-    assert data["password"] == "charles123"
+    #assert data["password"] == "charles123"
 
