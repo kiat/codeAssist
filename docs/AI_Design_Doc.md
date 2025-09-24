@@ -73,5 +73,9 @@ Persistence layer for prompts, responses, and preferences.
 3. AI Router fans out to GPT / Claude / Gemini / Local LLM.  
 4. Router aggregates results → sends them back to backend.  
 5. Backend returns JSON → **frontend renders responses side by side**.  
-6. *(Optional)* Responses are saved in **Postgres** for history/analytics.  
+6. *(Optional)* Responses are saved in **Postgres** for history/analytics.
+
+reference :
+https://github.com/ai-shifu/ChatALL
+
 
