@@ -18,7 +18,6 @@ The web interface students and instructors use.
 **Why it matters**  
 Without this, users can’t interact with multiple AIs or compare outputs.
 
----
 
 ## 2. Backend (Flask API)
 
@@ -52,8 +51,6 @@ The engine that communicates with AI models.
 **Why it matters**  
 The router prevents the frontend from hitting multiple APIs directly and ensures **parallel calls + aggregation**.
 
----
-
 ## 4. Database (Postgres) [Optional]
 
 **What it is**  
@@ -69,7 +66,6 @@ Persistence layer for prompts, responses, and preferences.
 - Enable analytics (e.g., which AI gives best results).  
 - Give instructors control (enable/disable AI feedback).
 
----
 
 ## Data Flow 
 
