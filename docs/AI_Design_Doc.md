@@ -4,7 +4,6 @@
 
 This document explains how the **Multi-AI Chat (ChatALL)** feature extends the existing CodeAssist system.
 
----
 
 ## 1. Frontend (React)
 
@@ -51,7 +50,7 @@ The engine that communicates with AI models.
 **Why it matters**  
 The router prevents the frontend from hitting multiple APIs directly and ensures **parallel calls + aggregation**.
 
-## 4. Database (Postgres) [Optional]
+## 4. Database (Postgres) 
 
 **What it is**  
 Persistence layer for prompts, responses, and preferences.
