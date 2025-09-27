@@ -2,6 +2,7 @@
   "name": "grading",
   "version": "0.1.0",
   "private": true,
+  "proxy": "http://localhost:5002",
   "dependencies": {
     "@ant-design/icons": "^4.7.0",
     "@react-oauth/google": "^0.12.2",
