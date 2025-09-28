@@ -4,6 +4,7 @@ This document explains how the **Multiple-LLM** feature extends the existing Cod
 
 ## 0. Summary
 With rapid development of varying LLMs, different models excel on different languagesand rubric styles. To deliver reliable, explainable, and low-latency. grading with provenance, CodeAssist sends the same structued grading task to an ensemble of LLMs, chosen by the user, in parellel. Each model's response is validated against a schema, cross-checked with deterministic tool results (unit tests), and cited back to rubric items.
+
 **Approach**: Fire the same structured grading task to multiple LLMs concurrently, based on user choice → Display each and all respons in the UI (per-model tabs for transparency), TBD.
 
 ## 1. Objectives
