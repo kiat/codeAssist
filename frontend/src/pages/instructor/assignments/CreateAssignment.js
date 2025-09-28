@@ -309,7 +309,20 @@ export default ({
                   />
                 </Form.Item>
 
-                <Form.Item
+
+              <Form.Item
+                label="AI MODEL USED"
+                name="ai_feedback_model"
+                rules={[{ required: enableAiFeedback, message: "Please select an AI model (e.g. gpt-5o)" }]}
+              >
+                <Input.TextArea
+                  placeholder="gpt-5o"
+                  autoSize={{ minRows: 1, maxRows: 1}}
+                  disabled={!enableAiFeedback}
+                />
+              </Form.Item>
+
+                {/* <Form.Item
                   label="AI MODEL USED"
                   name="ai_feedback_model"
                   initialValue="gpt-4o"
@@ -320,7 +333,7 @@ export default ({
                     <Select.Option value="gpt-4o">GPT-4o</Select.Option>
                     <Select.Option value="custom-model">Custom Model</Select.Option>
                   </Select>
-                </Form.Item>
+                </Form.Item> */}
 
                 <Form.Item
                   label="MODEL TEMPERATURE"
