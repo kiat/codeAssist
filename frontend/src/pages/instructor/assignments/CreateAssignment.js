@@ -29,6 +29,29 @@ import moment from "moment";
 
 
 const { Sider, Content } = Layout;
+const LLM_OPTIONS = [
+  { label: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+  { label: "GPT-4o", value: "gpt-4o" },
+  { label: "Custom Model", value: "custom-model" },
+];
+
+const AICheckbox = ({ value, onChange, options, disabled }) => {
+  const current = value ? [value] : [];
+
+  const handleChange = (vals) => {
+    const next = vals.length ? vals[vals.length - 1] : undefined;
+    onChange?.(next);
+  }
+
+  return (
+    <Checkbox.Group
+      options={options}
+      value={current}
+      disabled={disabled}
+      onChange={handleChange}
+    />
+  );
+};
 
 export default ({
   currentStep,
@@ -310,16 +333,15 @@ export default ({
                 </Form.Item>
 
                 <Form.Item
-                  label="AI MODEL USED"
+                  label="AI MODEL USED (select one)"
                   name="ai_feedback_model"
                   initialValue="gpt-4o"
                   rules={[{ required: aiFeedbackEnabled, message: "Please select an AI model" }]}
                 >
-                  <Select placeholder="Select AI model" disabled={!aiFeedbackEnabled}>
-                    <Select.Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Select.Option>
-                    <Select.Option value="gpt-4o">GPT-4o</Select.Option>
-                    <Select.Option value="custom-model">Custom Model</Select.Option>
-                  </Select>
+                  <AICheckbox
+                    options={LLM_OPTIONS}
+                    disabled={!aiFeedbackEnabled}  
+                  />
                 </Form.Item>
 
                 <Form.Item
