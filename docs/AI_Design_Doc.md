@@ -6,6 +6,60 @@ The **AI Feedback API** extends the existing CodeAssist system to provide LLM-po
 2. Perform static checks for style and complexity using linters.
 3. Invoke Large-Language Models (LLMs) to evaluate submissions against instructors' rubrics and for accuracy, and provide personalized feedback.
 
+
+## Frontend
+###  Menu design change (NEED TO BE DONE, refer ChatALL)
+
+## AI Settings (Instructor View)
+
+* API key input fields (OpenAI, Gemini, Claude, Local LLM).
+* Save settings to backend.
+* Option to toggle **“Enable AI Feedback”** on assignments.
+* Dropdown to select **1 model (model_id)** for the assignment.
+  * Example: Instructor sets `GPT-4o-mini` as default for Assignment 1.
+
+**Backend Alignment**:
+* `POST /assignments` includes `model_id`.
+
+---
+
+## AI Feedback Panel (Student View)
+
+Since the model is already chosen by the instructor, **students don’t pick multiple models**.
+
+### Students see:
+
+* **Summary card** with general feedback (from `general_feedback`).
+* **Inline code viewer** with line-level highlights (from `line_comments`).(Use a code editor component in frontend)
+* **Rubric breakdown** (table or progress bars) from `rubric_breakdown`. (e.g., table: Correctness, Style, Efficiency).--> store it as JSON in backend → render it as table in frontend.
+
+**Backend Alignment**:
+* `GET /results/{result_id}` returns structured JSON for **one model’s output**.
+
+#### Example rubric breakdown table: 
+
+| Line | Rubric Item   | Score | Feedback                                   |  
+|------|---------------|-------|--------------------------------------------|  
+| 12   | Correctness   | -1    | Missing return value                       |  
+| 12   | Efficiency    | -2    | Suggest using list comprehension           |  
+| 20   | Style         | -0.5  | Variable naming not following convention   |  
+
+#### Example JSON Response (Backend → Frontend): 
+
+{
+  "general_feedback": "Your solution works but can be optimized.",
+  "rubric_breakdown": {
+    "Correctness": 7,
+    "Style": 8,
+    "Efficiency": 6
+  },
+  "line_comments": [
+    {"line": 12, "comment": "Consider using a loop instead of repeating code."},
+    {"line": 20, "comment": "Variable name 'x' should be more descriptive."}
+  ]
+}
+
+
 ## Backend
 
 Aligning with the existing system, our Python/Flask backend provides a suite of REST API endpoints to the frontend, and is connected to our PostgreSQL database. 
