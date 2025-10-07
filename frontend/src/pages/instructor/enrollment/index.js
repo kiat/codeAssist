@@ -12,7 +12,7 @@ import {
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
-import { useCallback, useState, useContext } from "react";
+import { useCallback, useState, useEffect } from "react";
 import {
   createEnrollment,
   createEnrollmentCSV,
@@ -23,24 +23,33 @@ import {
   getUserByEmail,
 } from "../../../services/user";
 import { useParams } from "react-router-dom";
-import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
-import { GlobalContext } from "../../../App";
 import AddCSVModal from "./AddCSVModal";
 const columns = [
-  { title: "NAME", dataIndex: "name" },
-  { title: "EMAIL", dataIndex: "email_address" },
+  {
+    title: "NAME",
+    dataIndex: "name",
+    sorter: (a, b) => (a.name || "").localeCompare(b.name || ""),
+    sortDirections: ["ascend", "descend"],
+  },
+  {
+    title: "EMAIL",
+    dataIndex: "email_address",
+    sorter: (a, b) =>
+      (a.email_address || "").localeCompare(b.email_address || ""),
+    sortDirections: ["ascend", "descend"],
+  },
 ];
 
 export default () => {
-  const { userInfo } = useContext(GlobalContext);
+  const [form] = Form.useForm();
   
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCSVModalOpen, setAddCSVModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
   const [enrollment, setEnrollment] = useState([]);
+  const [filteredEnrollment, setFilteredEnrollment] = useState([]);
   const urlParams = useParams();
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const { courseId } = urlParams;
 
   const toggleAddModalOpen = useCallback(() => {
@@ -55,11 +64,38 @@ export default () => {
     setAddMoreUsersModalOpen((t) => !t);
   }, []);
 
+  const applyFilters = useCallback((data, filters = {}) => {
+    const { role, section, username } = filters;
+    const normalizedRole = role ? role.toLowerCase() : null;
+    const normalizedSection = section ? section.toLowerCase() : null;
+    const normalizedUsername = username ? username.toLowerCase() : null;
+
+    return data.filter((entry) => {
+      const entryRole = (entry.role || "").toLowerCase();
+      const entrySection = (entry.section || "").toLowerCase();
+      const entryName = (entry.name || "").toLowerCase();
+      const entryEmail = (entry.email_address || "").toLowerCase();
+
+      const matchesRole = !normalizedRole || entryRole === normalizedRole;
+      const matchesSection =
+        !normalizedSection || entrySection.includes(normalizedSection);
+      const matchesUsername =
+        !normalizedUsername ||
+        entryName.includes(normalizedUsername) ||
+        entryEmail.includes(normalizedUsername);
+
+      return matchesRole && matchesSection && matchesUsername;
+    });
+  }, []);
+
   const getEnrollment = useCallback(() => {
     getCourseEnrollment({ course_id: courseId }).then((res) => {
-      setEnrollment(res.data);
+      const data = res.data || [];
+      setEnrollment(data);
+      const currentFilters = form.getFieldsValue(true);
+      setFilteredEnrollment(applyFilters(data, currentFilters));
     });
-  }, [courseId]);
+  }, [courseId, applyFilters, form]);
 
   const handleUpdateRole = useCallback(
     async (newRole, studentId) => {
@@ -144,6 +180,51 @@ export default () => {
     getEnrollment();
   }, [getEnrollment]);
 
+  const handleFormValuesChange = useCallback(
+    (_, allValues) => {
+      setFilteredEnrollment(applyFilters(enrollment, allValues));
+    },
+    [applyFilters, enrollment]
+  );
+
+  const handleFormFinish = useCallback(
+    (values) => {
+      setFilteredEnrollment(applyFilters(enrollment, values));
+    },
+    [applyFilters, enrollment]
+  );
+
+  const tableColumns = [
+    ...columns,
+    {
+      title: "ROLE",
+      dataIndex: "role",
+      sorter: (a, b) => (a.role || "").localeCompare(b.role || ""),
+      sortDirections: ["ascend", "descend"],
+      filters: [
+        { text: "Instructors", value: "instructor" },
+        { text: "Students", value: "student" },
+        { text: "TAs", value: "ta" },
+        { text: "Readers", value: "reader" },
+      ],
+      onFilter: (value, record) =>
+        (record.role || "").toLowerCase() === value,
+      render: (_, record) => (
+        <Select
+          value={record.role}
+          style={{ width: 140 }}
+          onChange={(value) => handleUpdateRole(value, record.id)}
+          disabled={(record.role || "").toLowerCase() === "instructor"}
+        >
+          <Select.Option value="student">Student</Select.Option>
+          <Select.Option value="TA">TA</Select.Option>
+          <Select.Option value="instructor">Instructor</Select.Option>
+          <Select.Option value="reader">Reader</Select.Option>
+        </Select>
+      ),
+    },
+  ];
+
   return (
     <>
       <PageHeader
@@ -151,51 +232,41 @@ export default () => {
         style={{ borderBottom: "1px solid #f0f0f0" }}
       />
       <Card bordered={false}>
-        <Form layout="inline" style={{ marginBottom: "20px" }}>
+        <Form
+          form={form}
+          layout="inline"
+          style={{ marginBottom: "20px" }}
+          onValuesChange={handleFormValuesChange}
+          onFinish={handleFormFinish}
+        >
           <Form.Item name="role">
             <Select
               placeholder="view by role"
               style={{ width: "180px" }}
+              allowClear
               options={[
-                { label: "All", value: "0" },
-                { label: "Students", value: "1" },
-                { label: "Instructors", value: "2" },
-                { label: "TAs", value: "3" },
-                { label: "Readers", value: "4" },
+                { label: "Instructors", value: "instructor" },
+                { label: "Students", value: "student" },
+                { label: "TAs", value: "TA" },
+                { label: "Readers", value: "reader" },
               ]}
             />
           </Form.Item>
           <Form.Item name="section">
-            <Input placeholder="view by section" />
+            <Input placeholder="view by section" allowClear />
           </Form.Item>
           <Form.Item name="username">
-            <Input placeholder="view by name" />
+            <Input placeholder="view by name or email" allowClear />
           </Form.Item>
           <Form.Item>
-            <Button type="primary">search</Button>
+            <Button type="primary" htmlType="submit">
+              search
+            </Button>
           </Form.Item>
         </Form>
         <Table
-          columns={[
-            ...columns,
-            {
-              title: "ROLE",
-              dataIndex: "role",
-              render: (text, record) => (
-                <Select
-                  defaultValue={text}
-                  style={{ width: 120 }}
-                  onChange={(value) => handleUpdateRole(value, record.id)}
-                  disabled={text === "instructor"} // Disable dropdown if the role is instructor
-                >
-                  <Select.Option value="student">Student</Select.Option>
-                  <Select.Option value="TA">TA</Select.Option>
-                  <Select.Option value="instructor">Instructor</Select.Option>
-                </Select>
-              ),
-            },
-          ]}
-          dataSource={enrollment}
+          columns={tableColumns}
+          dataSource={filteredEnrollment}
           rowKey="id"
         />
       </Card>
