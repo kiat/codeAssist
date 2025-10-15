@@ -73,6 +73,43 @@ def upload_submission():
     if not assignment_id or not student_id or not file.filename:
         raise BadRequestError("Missing required fields")
 
+    from api.models import AssignmentExtension
+    from datetime import datetime, timezone
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    # Retreive any extension for this student
+    extension = db.session.query(AssignmentExtension).filter_by(
+        assignment_id=assignment_id,
+        student_id=student_id
+    ).first()
+
+    # Determine applicable dates & use extension if it exists
+    release_date = extension.release_date_extension if extension and extension.release_date_extension else assignment.published_date
+    due_date = extension.due_date_extension if extension and extension.due_date_extension else assignment.due_date
+    late_due_date = extension.late_due_date_extension if extension and extension.late_due_date_extension else assignment.late_due_date
+
+    now = datetime.now(timezone.utc)
+
+    # Assignment must be published
+    if not assignment.published:
+        raise BadRequestError("Assignment is not published yet.")
+
+    # Must not be before release date
+    if release_date and now < release_date:
+        raise BadRequestError("Cannot submit before the release date.")
+
+    # Must not be past due/late due window
+    if due_date and now > due_date:
+        if assignment.late_submission:
+            if late_due_date and now > late_due_date:
+                raise BadRequestError("Submission period has ended (past late due date).")
+        else:
+            raise BadRequestError("Submission period has ended (past due date).")
+
+
     filename = secure_filename(file.filename)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
