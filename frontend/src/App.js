@@ -11,6 +11,7 @@ import RootSider from "./components/layout/sider";
 import "./mock";
 import InstructorDashboard from "./pages/instructor/dashboard";
 import CourseSettings from "./pages/instructor/courseSettings";
+import AISettings from "./pages/instructor/aiSettings";
 import InstructorAssignments from "./pages/instructor/assignments";
 import Enrollment from "./pages/instructor/enrollment";
 import ReviewGrades from "./pages/reviewGrades";
@@ -171,6 +172,10 @@ function App() {
               <Route
                 path='/courseSettings/:courseId'
                 element={<CourseSettings />}
+              />
+              <Route
+                path='/aiSettings/:courseId'
+                element={<AISettings />}
               />
               <Route path='/enrollment/:courseId' element={<Enrollment />} />
               <Route
