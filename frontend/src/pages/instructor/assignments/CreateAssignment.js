@@ -237,7 +237,6 @@ export default ({
                   releaseDate: moment(), // current date
                   dueDate: moment().add(7, "day"), // 7 days from now
                   autograderPoints: "100",
-                  ai_feedback_enabled: false,
                   autograder: { operation: "zip", timeout: "300" },
                 }}
                 onFinish={handleFinish}
