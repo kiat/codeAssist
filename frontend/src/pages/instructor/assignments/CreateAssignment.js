@@ -22,11 +22,18 @@ import {
   Typography,
   Upload,
   Select,
-  Switch
+  Switch,
+  message,
 } from "antd";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import moment from "moment";
 
+import AutograderSection from "../../configureAutograder/AutograderSection";
+import TestAutograder from "../../configureAutograder/TestAutograder";
+import TestResultsDisplay from "../../result/TestResultsDisplay";
+import { uploadAssignmentAutograder } from "../../../services/submission";
+import { createAssignment, updateAssignment } from "../../../services/assignment";
 
 const { Sider, Content } = Layout;
 
@@ -38,8 +45,82 @@ export default ({
   form,
 }) => {
   const [assignmentType, setAssignmentType] = useState(0);
-  const [enableAiFeedback, setEnableAiFeedback] = useState(true);
+  const [enableAiFeedback, setEnableAiFeedback] = useState(false);
   const aiFeedbackEnabled = Form.useWatch("ai_feedback_enabled", form);
+  
+  const [configureAutograderNow, setConfigureAutograderNow] = useState(false);
+  const [autograderFile, setAutograderFile] = useState(null);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [resultsModalOpen, setResultsModalOpen] = useState(false);
+  const [testResultsData, setTestResultsData] = useState(null);
+
+  const { courseId } = useParams();
+  
+  const openTest = useCallback(() => setModalOpen(true), []);
+  const closeTest = useCallback(() => setModalOpen(false), []);
+  const handleAutograderSuccess = (data) => {
+    setTestResultsData(data);
+    setResultsModalOpen(true);
+  };
+  const handleCloseResultsModal = () => setResultsModalOpen(false);
+
+  const handleFinish = async (values) => {
+    try {
+      setSaveLoading(true);
+      let createdOk = false;
+      if (!courseId) {
+        throw new Error("Missing courseId in route. Unable to create assignment.");
+      }
+
+      const assignment = await createAssignment({
+        name: values.name,
+        course_id: courseId,
+      });
+
+      const assignmentId = assignment?.id ?? assignment?.data?.id ?? assignment?.assignment_id ?? assignment?.data?.assignment_id;
+      if (!assignmentId) {
+        throw new Error("Backend did not return an assignment id.");
+      }
+
+      if (String(assignmentType) === "2" && configureAutograderNow) {
+        await updateAssignment({
+          assignment_id: assignmentId,
+          name: values.name,
+          course_id: courseId,
+          autograder_points: Number(values.autograderPoints || 100)
+        })
+
+        const op = values?.autograder?.operation;
+        if (op === "zip") {
+          if (!autograderFile) throw new Error("Please choose an autograder .zip file.");
+          const fd = new FormData();
+          fd.append("assignment_id", assignmentId);
+          fd.append("file", autograderFile);
+          fd.append("autograder_timeout", String(values?.autograder?.timeout || "300"));
+          if (values?.autograder?.baseImageOS) {
+            fd.append("base_image_os", values.autograder.baseImageOS);
+            fd.append("base_image_version", values.autograder.baseImageVersion || "");
+            fd.append("base_image_variant", values.autograder.baseImageVariant || "");
+          }
+          await uploadAssignmentAutograder(fd);
+        }
+        // else if (op === "docker")
+      }
+
+      message.success("Assignment created");
+      createdOk = true;
+      form.resetFields();
+      if (createdOk && typeof toggleIsCreate === "function") {
+        toggleIsCreate();
+      }
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Failed to create assignment");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
 
 
   return (
@@ -133,7 +214,10 @@ export default ({
                   releaseDate: moment(), // current date
                   dueDate: moment().add(7, "day"), // 7 days from now
                   autograderPoints: "100",
+                  ai_feedback_enabled: false,
+                  autograder: { operation: "zip", timeout: "300" },
                 }}
+                onFinish={handleFinish}
                 >
                 <Form.Item
                   label="ASSIGNMENT NAME"
@@ -386,11 +470,51 @@ export default ({
                     </Checkbox>
                   </Form.Item>
                 ) : null} */}
+                { String(assignmentType) === "2" && (
+                  <AutograderSection
+                    form={form}
+                    configureNow={configureAutograderNow}
+                    setConfigureNow={setConfigureAutograderNow}
+                    autograderFile={autograderFile}
+                    setAutograderFile={setAutograderFile}
+                    onTestClick={openTest}
+                  />
+                )}
+                <Form.Item>
+                  <Space>
+                    <Button loading={saveLoading} type="primary" htmlType="submit">
+                      Create Assignment
+                    </Button>
+                    <Button onClick={toggleIsCreate}>Cancel</Button>
+                  </Space>
+                </Form.Item>
+
               </Form>
             </Card>
           </Content>
         </Layout>
       )}
+      <TestAutograder
+      open={modalOpen}
+      onCancel={closeTest}
+      autograderFile={autograderFile}
+      onSuccess={handleAutograderSuccess}
+    />
+
+    {resultsModalOpen && (
+      <TestResultsDisplay
+        viewMode="Results"
+        assignmentName={form?.getFieldValue("name") || "Untitled Assignment"}
+        studentName="John Doe"
+        score={testResultsData?.score}
+        totalPoints={Number(form?.getFieldValue("autograderPoints") || 100)}
+        data={testResultsData}
+        aiFeedbackEnabled={true}
+        isModal={true}
+        submissionId="dummy-id-12345"
+        onCancel={handleCloseResultsModal}
+      />
+    )}
     </>
   );
 };
