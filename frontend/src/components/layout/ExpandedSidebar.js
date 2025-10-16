@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, Typography, Space, Popover } from 'antd';
-import { MenuFoldOutlined, TableOutlined, FileTextOutlined, UsergroupAddOutlined, SettingOutlined, UserOutlined, LogoutOutlined, RedoOutlined } from '@ant-design/icons';
+import { MenuFoldOutlined, TableOutlined, FileTextOutlined, UsergroupAddOutlined, SettingOutlined, UserOutlined, LogoutOutlined, RedoOutlined, RobotOutlined } from '@ant-design/icons';
 import AccountPopoverContent from './accountPopoverContent';
 import GradeSider from './GradeSider';
 import styles from './styles.module.css';
@@ -70,6 +70,10 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed, hand
                     <Link to={`/courseSettings/${courseInfo.id}`} className={/courseSettings/i.test(pathname) ? "" : styles.linkText}>
                       <SettingOutlined />
                       <span> Course Settings</span>
+                    </Link>
+                    <Link to={`/aiSettings/${courseInfo.id}`} className={/aiSettings/i.test(pathname) ? "" : styles.linkText}>
+                      <RobotOutlined />
+                      <span> AI Settings</span>
                     </Link>
                   </>
                 }

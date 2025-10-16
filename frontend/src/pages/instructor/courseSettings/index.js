@@ -28,9 +28,6 @@ import axios from "axios";
 export default () => {
   const { courseId } = useParams();
   const [assignments, setAssignments] = useState([]);
-  const [openAiKey, setOpenAiKey] = useState(""); // State for OpenAI API Key
-  const [apiTestStatus, setApiTestStatus] = useState(null); // Tracks test connection status
-  const [isTesting, setIsTesting] = useState(false); // Loading state for testing API key
 
 
 
@@ -48,7 +45,6 @@ export default () => {
     try {
       const res = await getCourseInfo({course_id: courseId});
       form.setFieldsValue(res.data[0]);
-      setOpenAiKey(res.data[0].openai_api_key);
     }
     catch(error) {
       console.error("Error fetching course data: ", error)
@@ -118,29 +114,6 @@ export default () => {
   };
 
 
-  // Function to test OpenAI API Key
-  const testOpenAiKey = async () => {
-    setIsTesting(true); // Start loading animation
-    setApiTestStatus(null); // Reset status
-
-    try {
-      const response = await axios.get("https://api.openai.com/v1/models", {
-        headers: {
-          Authorization: `Bearer ${openAiKey}`,
-        },
-      });
-
-      if (response.status === 200) {
-        setApiTestStatus("success");
-        message.success("OpenAI API Key is valid!");
-      }
-    } catch (error) {
-      setApiTestStatus("error");
-      message.error("Failed to connect to OpenAI. Check your API key.");
-    } finally {
-      setIsTesting(false); // Stop loading animation
-    }
-  };
 
   return (
     <Form
@@ -199,32 +172,6 @@ export default () => {
           </Form.Item>
         </Card>
 
-        {/* OpenAI API Key Section */}
-        <Card title="AI Integration">
-          <Form.Item label="OpenAI API Key" name="openai_api_key">
-            <Input.Password
-              value={openAiKey}
-              onChange={(e) => setOpenAiKey(e.target.value)}
-              placeholder="Enter OpenAI API Key"
-            />
-          </Form.Item>
-          <Space>
-            <Button type="primary" onClick={testOpenAiKey} disabled={isTesting}>
-              Test Connection
-            </Button>
-            {isTesting && <Spin indicator={<LoadingOutlined style={{ fontSize: 16 }} spin />} />}
-            {apiTestStatus === "success" && (
-              <Typography.Text type="success">
-                <CheckCircleOutlined style={{ marginLeft: 10 }} /> Connected successfully!
-              </Typography.Text>
-            )}
-            {apiTestStatus === "error" && (
-              <Typography.Text type="danger">
-                <CloseCircleOutlined style={{ marginLeft: 10 }} /> Connection failed. Check your key.
-              </Typography.Text>
-            )}
-          </Space>
-        </Card>
 
         {/* <Card title="Grading Defaults">
           <p>
