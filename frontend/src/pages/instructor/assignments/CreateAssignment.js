@@ -29,6 +29,29 @@ import moment from "moment";
 
 
 const { Sider, Content } = Layout;
+const LLM_OPTIONS = [
+  { label: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+  { label: "GPT-4o", value: "gpt-4o" },
+  { label: "Custom Model", value: "custom-model" },
+];
+
+const AICheckbox = ({ value, onChange, options, disabled }) => {
+  const current = value ? [value] : [];
+
+  const handleChange = (vals) => {
+    const next = vals.length ? vals[vals.length - 1] : undefined;
+    onChange?.(next);
+  }
+
+  return (
+    <Checkbox.Group
+      options={options}
+      value={current}
+      disabled={disabled}
+      onChange={handleChange}
+    />
+  );
+};
 
 export default ({
   currentStep,
