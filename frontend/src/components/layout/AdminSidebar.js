@@ -57,7 +57,7 @@ function AdminSidebar() {
                       marginTop: '12px',
                     }}
                   >
-          <Link to='/admin/dashboard'>GRADING</Link>
+          <Link to='/admin/dashboard'>Feedback</Link>
           <MenuFoldOutlined onClick={toggleCollapsed} style={{ marginLeft: '30px' }} />
           </Typography.Title>
         </div>

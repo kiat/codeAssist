@@ -332,17 +332,31 @@ export default ({
                   />
                 </Form.Item>
 
-                <Form.Item
-                  label="AI MODEL USED (select one)"
+
+              <Form.Item
+                label="AI MODEL USED"
+                name="ai_feedback_model"
+                rules={[{ required: enableAiFeedback, message: "Please select an AI model (e.g. gpt-5o)" }]}
+              >
+                <Input.TextArea
+                  placeholder="gpt-5o"
+                  autoSize={{ minRows: 1, maxRows: 1}}
+                  disabled={!enableAiFeedback}
+                />
+              </Form.Item>
+
+                {/* <Form.Item
+                  label="AI MODEL USED"
                   name="ai_feedback_model"
                   initialValue="gpt-4o"
                   rules={[{ required: aiFeedbackEnabled, message: "Please select an AI model" }]}
                 >
-                  <AICheckbox
-                    options={LLM_OPTIONS}
-                    disabled={!aiFeedbackEnabled}  
-                  />
-                </Form.Item>
+                  <Select placeholder="Select AI model" disabled={!aiFeedbackEnabled}>
+                    <Select.Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Select.Option>
+                    <Select.Option value="gpt-4o">GPT-4o</Select.Option>
+                    <Select.Option value="custom-model">Custom Model</Select.Option>
+                  </Select>
+                </Form.Item> */}
 
                 <Form.Item
                   label="MODEL TEMPERATURE"

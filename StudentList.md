@@ -1,3 +1,11 @@
+
+# Fall 2025 
+* Yang Shao <yang.shao@utexas.edu>
+* Azaan Waseem <aw42679@utexas.edu>
+* KRISHA M PATEL <krisha.patel23@utexas.edu>
+* Wajeeh A Jafry <wajeehjafry@utexas.edu>
+* Makyra Kim <makyrakim@utexas.edu>
+
 # Summer 2025 
 * Yang Shao <yang.shao@utexas.edu>
 * Shreya Sharanya Varma <shreya.varma@utexas.edu>
@@ -9,9 +17,6 @@
 * Wajeeh A Jafry <wajeehjafry@utexas.edu>
 * Benjamin Anzaldua <benjamin.anzaldua@utexas.edu>
 * Makyra Kim <makyrakim@utexas.edu>
-
-
-
   
 # Spring 2025 
 * Aidan Liu <aidanliu2023@gmail.com>
@@ -28,7 +33,6 @@
 * Jayanth Vellanki <vellankijay@utexas.edu>
 * Tanish Gupta <tanish.gupta@utexas.edu>
 * Aidan Liu <aidanliu2023@gmail.com>
-
 
 
 # Summer 2024

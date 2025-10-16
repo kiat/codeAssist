@@ -312,6 +312,18 @@ const handleDeleteSubmissions = async (assignmentId) => {
         <Form.Item
           label="AI MODEL USED"
           name="ai_feedback_model"
+          rules={[{ required: enableAiFeedback, message: "Please select an AI model (e.g. gpt-5o)" }]}
+        >
+          <Input.TextArea
+            placeholder="gpt-5o"
+            autoSize={{ minRows: 1, maxRows: 1}}
+            disabled={!enableAiFeedback}
+          />
+        </Form.Item>
+
+        {/* <Form.Item
+          label="AI MODEL USED"
+          name="ai_feedback_model"
           rules={[{ required: enableAiFeedback, message: "Please select an AI model" }]}
         >
           <Radio.Group disabled={!enableAiFeedback}>
@@ -321,7 +333,7 @@ const handleDeleteSubmissions = async (assignmentId) => {
               <Radio value="custom-model">Custom Model</Radio>
             </Space>
           </Radio.Group>
-        </Form.Item>
+        </Form.Item> */}
 
         <Form.Item
           label="MODEL TEMPERATURE"

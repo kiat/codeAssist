@@ -25,7 +25,7 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed, hand
             marginTop: '12px',
           }}
         >
-          <Link to='/dashboard'> GRADING </Link>
+          <Link to='/dashboard'> Feedback </Link>
           <MenuFoldOutlined onClick={toggleCollapsed} style={{ marginLeft: '30px' }} />
         </Typography.Title>
 
