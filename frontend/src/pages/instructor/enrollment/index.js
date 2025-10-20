@@ -142,7 +142,7 @@ export default () => {
 
   useEffect(() => {
     getEnrollment();
-  }, [getEnrollment]);
+  }, [getEnrollment, courseId]);
 
   return (
     <>
@@ -151,28 +151,47 @@ export default () => {
         style={{ borderBottom: "1px solid #f0f0f0" }}
       />
       <Card bordered={false}>
-        <Form layout="inline" style={{ marginBottom: "20px" }}>
+        <Form
+          layout="inline"
+          style={{ marginBottom: "20px" }}
+          onFinish={(values) => {
+            const { role, username } = values;
+            let filtered = enrollment;
+
+            if (role && role !== "All") {
+              filtered = filtered.filter((e) => e.role.toLowerCase() === role.toLowerCase());
+            }
+            if (username) {
+              filtered = filtered.filter((e) =>
+                e.name.toLowerCase().includes(username.toLowerCase())
+              );
+            }
+
+            setEnrollment(filtered);
+          }}
+        >
           <Form.Item name="role">
             <Select
               placeholder="view by role"
               style={{ width: "180px" }}
               options={[
-                { label: "All", value: "0" },
-                { label: "Students", value: "1" },
-                { label: "Instructors", value: "2" },
-                { label: "TAs", value: "3" },
-                { label: "Readers", value: "4" },
+                { label: "All", value: "All" },
+                { label: "Student", value: "Student" },
+                { label: "Instructor", value: "Instructor" },
+                { label: "TA", value: "TA" },
               ]}
             />
-          </Form.Item>
-          <Form.Item name="section">
-            <Input placeholder="view by section" />
           </Form.Item>
           <Form.Item name="username">
             <Input placeholder="view by name" />
           </Form.Item>
           <Form.Item>
-            <Button type="primary">search</Button>
+            <Button type="primary" htmlType="submit">
+              search
+            </Button>
+          </Form.Item>
+          <Form.Item>
+            <Button onClick={getEnrollment}>Reset</Button>
           </Form.Item>
         </Form>
         <Table
@@ -183,10 +202,10 @@ export default () => {
               dataIndex: "role",
               render: (text, record) => (
                 <Select
-                  defaultValue={text}
+                  value={text}
                   style={{ width: 120 }}
                   onChange={(value) => handleUpdateRole(value, record.id)}
-                  disabled={text === "instructor"} // Disable dropdown if the role is instructor
+                  disabled={text.toLowerCase() === "instructor"}
                 >
                   <Select.Option value="student">Student</Select.Option>
                   <Select.Option value="TA">TA</Select.Option>
