@@ -68,7 +68,6 @@ export default ({
   form,
 }) => {
   const [assignmentType, setAssignmentType] = useState(0);
-  const [enableAiFeedback, setEnableAiFeedback] = useState(false);
   const aiFeedbackEnabled = Form.useWatch("ai_feedback_enabled", form);
   
   const [configureAutograderNow, setConfigureAutograderNow] = useState(false);
@@ -91,15 +90,33 @@ export default ({
   const handleFinish = async (values) => {
     try {
       setSaveLoading(true);
-      let createdOk = false;
       if (!courseId) {
         throw new Error("Missing courseId in route. Unable to create assignment.");
       }
 
-      const assignment = await createAssignment({
-        name: values.name,
-        course_id: courseId,
-      });
+      const toIso = (d) => (d ? new Date(d.valueOf()).toISOString() : null);
+      const now = new Date();
+      const releaseDate = values.releaseDate ? new Date(values.releaseDate.valueOf()) : null;
+
+      const payload = {
+      name: values.name,
+      course_id: courseId,
+      published_date: toIso(values.releaseDate),
+      published: releaseDate ? releaseDate <= now : false,
+      due_date: toIso(values.dueDate),
+      late_due_date: toIso(values.lateDueDate),
+      late_submission: !!values.allowLateSubmissions,
+      enable_group: !!values.groupSubmission, 
+      group_size: values.limitGroupSize ? Number(values.limitGroupSize) : null,
+      manual_grading: !!values.manualGrading,
+      autograder_points: values.autograderPoints ? Number(values.autograderPoints) : null,
+      ai_feedback_enabled: !!values.ai_feedback_enabled,
+      ai_feedback_prompt: values.ai_feedback_prompt ?? null,
+      ai_feedback_model: values.ai_feedback_model ?? null,
+      ai_feedback_temperature: values.ai_feedback_temperature ?? null,
+    };
+
+    const assignment = await createAssignment(payload);
 
       const assignmentId = assignment?.id ?? assignment?.data?.id ?? assignment?.assignment_id ?? assignment?.data?.assignment_id;
       if (!assignmentId) {
@@ -111,8 +128,8 @@ export default ({
           assignment_id: assignmentId,
           name: values.name,
           course_id: courseId,
-          autograder_points: Number(values.autograderPoints || 100)
-        })
+          autograder_points: Number(values.autograderPoints || 100),
+        });
 
         const op = values?.autograder?.operation;
         if (op === "zip") {
@@ -132,9 +149,8 @@ export default ({
       }
 
       message.success("Assignment created");
-      createdOk = true;
       form.resetFields();
-      if (createdOk && typeof toggleIsCreate === "function") {
+      if (typeof toggleIsCreate === "function") {
         toggleIsCreate();
       }
     } catch (e) {
@@ -191,10 +207,6 @@ export default ({
         <Layout>
           <Sider theme="light" width={230}>
             <Card bordered={false}>
-              {/* <Typography.Text level={5}>
-              <LeftCircleFilled />
-              <span> Go Back</span>
-            </Typography.Text> */}
               <Typography.Link
                 onClick={() => {
                   setAssignmentType("");
@@ -222,17 +234,12 @@ export default ({
                 </div>
               )}
             </Card>
-            {/* <Menu
-            items={[
-              { label: "Exam/Quiz" },
-              { label: "Homework/Problem Set" },
-              { label: "Programing Assignment" },
-            ]}
-          /> */}
           </Sider>
           <Content>
             <Card bordered={false}>
-              <Form layout="vertical" form={form}
+              <Form
+                layout="vertical"
+                form={form}
                 initialValues={{
                   releaseDate: moment(), // current date
                   dueDate: moment().add(7, "day"), // 7 days from now
@@ -240,7 +247,7 @@ export default ({
                   autograder: { operation: "zip", timeout: "300" },
                 }}
                 onFinish={handleFinish}
-                >
+              >
                 <Form.Item
                   label="ASSIGNMENT NAME"
                   name="name"
@@ -249,6 +256,7 @@ export default ({
                 >
                   <Input placeholder="Name your assignment" />
                 </Form.Item>
+
                 {assignmentType !== "2" ? (
                   <Form.Item
                     label="TEMPLATE"
@@ -260,13 +268,7 @@ export default ({
                     </Upload>
                   </Form.Item>
                 ) : null}
-                 {/* <Form.Item
-                  label="SUBMISSION ANONYMIZATION"
-                  name="submissionAnonymization"
-                  valuePropName="checked"
-                >
-                  <Checkbox>Enable Anonymous Grading</Checkbox>
-                </Form.Item> */}
+
                 {assignmentType === "2" ? (
                   <>
                     <Form.Item
@@ -310,7 +312,11 @@ export default ({
                           </Form.Item>
                         </Col>
                         <Col span={24} md={12}>
-                          <Form.Item label="DUE DATE (CDT)" name="dueDate" rules={[{ required: true, message: "Please select a due date" }]}>
+                          <Form.Item
+                            label="DUE DATE (CDT)"
+                            name="dueDate"
+                            rules={[{ required: true, message: "Please select a due date" }]}
+                          >
                             <DatePicker showTime style={{ width: "100%" }} />
                           </Form.Item>
                         </Col>
@@ -366,16 +372,19 @@ export default ({
                         ) : null}
                       </Row>
                     </Form.Item>
-                    {assignmentType === "2" ? null : (
-                      <Form.Item label="SUBMISSION TYPE" name="submissionType">
-                        <Radio.Group>
-                          <Space direction="vertical">
-                            <Radio value={0}>Variable Length</Radio>
-                            <Radio value={1}>Templated (Fixed Length)</Radio>
-                          </Space>
-                        </Radio.Group>
-                      </Form.Item>
-                    )}
+
+                    <Form.Item
+                      label="SUBMISSION TYPE"
+                      name="submissionType"
+                    >
+                      <Radio.Group>
+                        <Space direction="vertical">
+                          <Radio value={0}>Variable Length</Radio>
+                          <Radio value={1}>Templated (Fixed Length)</Radio>
+                        </Space>
+                      </Radio.Group>
+                    </Form.Item>
+
                     <Form.Item
                       label="GROUP SUBMISSION"
                       name="groupSubmission"
@@ -383,125 +392,84 @@ export default ({
                     >
                       <Checkbox>Enable Group Submission</Checkbox>
                     </Form.Item>
-                    <Form.Item label="LIMIT GROUP SIZE" 
-                    name="limitGroupSize" 
-                    rules={[
-                      { required: false},
-                      { pattern: /^\d+$/, message: "Only numeric values allowed" },
-                    ]}>
+                    <Form.Item
+                      label="LIMIT GROUP SIZE"
+                      name="limitGroupSize"
+                      rules={[
+                        { required: false },
+                        { pattern: /^\d+$/, message: "Only numeric values allowed" },
+                      ]}
+                    >
                       <Input />
                     </Form.Item>
 
-                {/* AI Feedback Toggle */}
-                <Form.Item
-                  label="ENABLE AI FEEDBACK"
-                  name="ai_feedback_enabled"
-                  valuePropName="checked"
-                >
-                  <Switch />
-                </Form.Item>
-
-                {/* AI Feedback Settings (Disabled when switch is off) */}
-                <Form.Item
-                  label="AI FEEDBACK PROMPT"
-                  name="ai_feedback_prompt"
-                  initialValue={"You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, style/formatting."}
-                  rules={[{ required: aiFeedbackEnabled, message: "Please enter a feedback prompt" }]}
-                >
-                  <Input.TextArea
-                    placeholder="Enter the feedback prompt for AI"
-                    autoSize={{ minRows: 4, maxRows: 8 }}
-                    disabled={!aiFeedbackEnabled}
-                  />
-                </Form.Item>
-
-
-              <Form.Item
-                label="AI MODEL USED"
-                name="ai_feedback_model"
-                rules={[{ required: enableAiFeedback, message: "Please select an AI model (e.g. gpt-5o)" }]}
-              >
-                <Input.TextArea
-                  placeholder="gpt-5o"
-                  autoSize={{ minRows: 1, maxRows: 1}}
-                  disabled={!enableAiFeedback}
-                />
-              </Form.Item>
-
-                {/* <Form.Item
-                  label="AI MODEL USED"
-                  name="ai_feedback_model"
-                  initialValue="gpt-4o"
-                  rules={[{ required: aiFeedbackEnabled, message: "Please select an AI model" }]}
-                >
-                  <Select placeholder="Select AI model" disabled={!aiFeedbackEnabled}>
-                    <Select.Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Select.Option>
-                    <Select.Option value="gpt-4o">GPT-4o</Select.Option>
-                    <Select.Option value="custom-model">Custom Model</Select.Option>
-                  </Select>
-                </Form.Item> */}
-
-                <Form.Item
-                  label="MODEL TEMPERATURE"
-                  name="ai_feedback_temperature"
-                  initialValue={0.5}
-                  rules={[
-                    { required: aiFeedbackEnabled, message: "Please enter a temperature" },
-                    { pattern: /^0(\.\d+)?|1$/, message: "Enter a value between 0 and 1" },
-                  ]}
-                >
-                  <Input placeholder="Enter temperature (0 to 1)" disabled={!aiFeedbackEnabled} />
-                </Form.Item>
-
-                  </>
-                )}
-                {/* {assignmentType === "2" ? (
-                  <>
                     <Form.Item
-                      label="LEADERBOARD"
-                      name="leaderBoard"
+                      label="ENABLE AI FEEDBACK"
+                      name="ai_feedback_enabled"
                       valuePropName="checked"
                     >
-                      <Checkbox>Enable Leaderboard</Checkbox>
+                      <Switch />
                     </Form.Item>
-                    <Form.Item label="DEFAULT # OF ENTRIES" name="leaderBoard" rules={[
-                      { required: false},
-                      { pattern: /^\d+$/, message: "Only numeric values allowed" },
-                    ]}>
-                      <Input />
+
+                    <Form.Item
+                      label="AI FEEDBACK PROMPT"
+                      name="ai_feedback_prompt"
+                      initialValue={"You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, style/formatting."}
+                      rules={[{ required: aiFeedbackEnabled, message: "Please enter a feedback prompt" }]}
+                    >
+                      <Input.TextArea
+                        placeholder="Enter the feedback prompt for AI"
+                        autoSize={{ minRows: 4, maxRows: 8 }}
+                        disabled={!aiFeedbackEnabled}
+                      />
                     </Form.Item>
-                  </>
-                ) : (
-                  <Form.Item label="CREATE YOUR RUBRIC" name="rubric">
-                    <Radio.Group
-                      options={[
-                        { label: "Before student submission", value: 0 },
-                        { label: "while grading submissions", value: 1 },
+
+                    <Form.Item
+                      label="AI MODEL USED"
+                      name="ai_feedback_model"
+                      rules={[{ required: aiFeedbackEnabled, message: "Please select an AI model (e.g. gpt-5o)" }]}
+                    >
+                      <Input.TextArea
+                        placeholder="gpt-5o"
+                        autoSize={{ minRows: 1, maxRows: 1}}
+                        disabled={!aiFeedbackEnabled}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="MODEL TEMPERATURE"
+                      name="ai_feedback_temperature"
+                      initialValue={0.5}
+                      rules={[
+                        { required: aiFeedbackEnabled, message: "Please enter a temperature" },
+                        { pattern: /^0(\.\d+)?|1$/, message: "Enter a value between 0 and 1" },
                       ]}
+                    >
+                      <Input placeholder="Enter temperature (0 to 1)" disabled={!aiFeedbackEnabled} />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="CONFIGURE AUTOGRADER"
+                      name="autograder_enabled"
+                      valuePropName="checked"
+                      initialValue={false}
+                    >
+                      <Switch onChange={(checked) => setConfigureAutograderNow(checked)} />
+                    </Form.Item>
+
+                    <AutograderSection
+                      form={form}
+                      configureNow={configureAutograderNow}
+                      setConfigureNow={setConfigureAutograderNow}
+                      autograderFile={autograderFile}
+                      setAutograderFile={setAutograderFile}
+                      onTestClick={openTest}
+                      disabled={!configureAutograderNow} 
                     />
-                  </Form.Item>
+                    <Form.Item style={{ marginBottom: 0 }} />
+                  </>
                 )}
-                {assignmentType === "1" ? (
-                  <Form.Item
-                    label="TEMPLATE VISIBILITY"
-                    name="templateVisibility"
-                    valuePropName="checked"
-                  >
-                    <Checkbox>
-                      Allow student to view and download the template
-                    </Checkbox>
-                  </Form.Item>
-                ) : null} */}
-                { String(assignmentType) === "2" && (
-                  <AutograderSection
-                    form={form}
-                    configureNow={configureAutograderNow}
-                    setConfigureNow={setConfigureAutograderNow}
-                    autograderFile={autograderFile}
-                    setAutograderFile={setAutograderFile}
-                    onTestClick={openTest}
-                  />
-                )}
+
                 <Form.Item>
                   <Space>
                     <Button loading={saveLoading} type="primary" htmlType="submit">
@@ -510,33 +478,32 @@ export default ({
                     <Button onClick={toggleIsCreate}>Cancel</Button>
                   </Space>
                 </Form.Item>
-
               </Form>
             </Card>
           </Content>
         </Layout>
       )}
       <TestAutograder
-      open={modalOpen}
-      onCancel={closeTest}
-      autograderFile={autograderFile}
-      onSuccess={handleAutograderSuccess}
-    />
-
-    {resultsModalOpen && (
-      <TestResultsDisplay
-        viewMode="Results"
-        assignmentName={form?.getFieldValue("name") || "Untitled Assignment"}
-        studentName="John Doe"
-        score={testResultsData?.score}
-        totalPoints={Number(form?.getFieldValue("autograderPoints") || 100)}
-        data={testResultsData}
-        aiFeedbackEnabled={true}
-        isModal={true}
-        submissionId="dummy-id-12345"
-        onCancel={handleCloseResultsModal}
+        open={modalOpen}
+        onCancel={closeTest}
+        autograderFile={autograderFile}
+        onSuccess={handleAutograderSuccess}
       />
-    )}
+
+      {resultsModalOpen && (
+        <TestResultsDisplay
+          viewMode="Results"
+          assignmentName={form?.getFieldValue("name") || "Untitled Assignment"}
+          studentName="John Doe"
+          score={testResultsData?.score}
+          totalPoints={Number(form?.getFieldValue("autograderPoints") || 100)}
+          data={testResultsData}
+          aiFeedbackEnabled={true}
+          isModal={true}
+          submissionId="dummy-id-12345"
+          onCancel={handleCloseResultsModal}
+        />
+      )}
     </>
   );
 };
