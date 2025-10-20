@@ -193,7 +193,7 @@ export default () => {
           <Form.Item>
             <Button onClick={getEnrollment}>Reset</Button>
           </Form.Item>
-        </Form>
+        </Form> 
         <Table
           columns={[
             ...columns,
