@@ -123,4 +123,112 @@
 [33mdf7bb63[m standardized backend error handling for assignment
 [33m8b76df8[m added onCancel handler for test results modal
 [33me273c04[m added test results modal for test autograder
-[33mc458a17[m passed autograder and submission files 
+[33mc458a17[m passed autograder and submission files to backend succesfully
+[33m72e4db7[m Merge pull request #223 from kiat/fix/handle_submit_without_autograder_#196
+[33m3276c8f[m[33m ([m[1;31morigin/fix/handle_submit_without_autograder_#196[m[33m)[m fixed bug with assignment submission
+[33m79176dc[m updated completion status for submitted assignment
+[33me3acc5e[m Merge pull request #225 from kiat/frontend-test
+[33m8091c03[m[33m ([m[1;31morigin/assignments[m[33m)[m commit new
+[33mc01f61c[m[33m ([m[1;31morigin/newfrontend[m[33m, [m[1;31morigin/frontend-test[m[33m)[m commit
+[33mfc2c884[m Merge pull request #224 from kiat/fix/upload-autograder
+[33mc9ae7a0[m Merge pull request #220 from kiat/fix/login-form-validation
+[33m21a3004[m finished 1 frontend test for fileupload
+[33m05a33f1[m[33m ([m[1;31morigin/fix/upload-autograder[m[33m)[m Fix: autograder upload uses old file due to incorrect Docker tar handling
+[33mf217d5e[m dynamic graded and ungraded checkmark
+[33mc1dbaef[m Doesn't result in error if autograde is missing
+[33m148b0fe[m Merge pull request #222 from kiat/kiat-patch-1
+[33m8f5b533[m[33m ([m[1;31morigin/kiat-patch-1[m[33m)[m Update StudentList.md
+[33m1a7a926[m[33m ([m[1;31morigin/fix/login-form-validation[m[33m)[m Add frontend validation for login form (fixes #181)
+[33ma98bf43[m Update StudentList.md
+[33m340479b[m Merge pull request #218 from kiat/new_regrade_branch
+[33m59fad7c[m Merge pull request #216 from kiat/snowbawler/clean-frontend
+[33m4d03216[m Merge pull request #215 from kiat/bugfix_timeout_submission
+[33md80783f[m Update Course_Assignment_Submission.md
+[33mb1ce538[m Create Course_Assignment_Submission.md
+[33m889ebfe[m Merge pull request #219 from kiat/encryption_docs
+[33m15e5994[m updated encryption docs
+[33m384b74c[m[33m ([m[1;31morigin/new_regrade_branch[m[33m)[m commiting testing documentation
+[33m8542e75[m Merge pull request #213 from kiat/password_encryption
+[33m706da3f[m[33m ([m[1;31morigin/snowbawler/clean-frontend[m[33m)[m revert remove Test Autograder
+[33m26b830d[m documentation for unimplemented pages
+[33me4fce11[m catch unhandled update autograder error
+[33m527096c[m clean unused instructor buttons
+[33m28f5bb0[m[33m ([m[1;31morigin/bugfix_timeout_submission[m[33m)[m Fixing timeout submission upload handling
+[33m7689d58[m[33m ([m[1;31morigin/password_encryption[m[33m)[m fixed test case
+[33m234f310[m fixed bug with test case
+[33m1c83b52[m fix
+[33m52d0c47[m encryption implemented
+[33mff30ce5[m Merge pull request #211 from kiat/kenlu66-patch-1
+[33me1c6fa3[m Merge pull request #201 from kiat/new_regrade_branch
+[33m2a6be9f[m[33m ([m[1;31morigin/kenlu66-patch-1[m[33m)[m Update README.md
+[33m13a31de[m Merge pull request #209 from kiat/default_allow_students_to_join_course
+[33m7f4e566[m Merge pull request #202 from kiat/frontend_form_clear
+[33mb218257[m Merge pull request #208 from kiat/docs_refactoring_and_submission_doc
+[33m2149616[m fixed up assignment
+[33m1df6d78[m Merge branch 'main' into new_regrade_branch
+[33ma4191db[m[33m ([m[1;31morigin/docs_refactoring_and_submission_doc[m[33m)[m updated ai_feedback.md with implementation details and next steps
+[33m886795d[m Update ai_feedback.md
+[33m2e1c097[m added AI Feedback Documentation
+[33med071fa[m[33m ([m[1;31morigin/default_allow_students_to_join_course[m[33m)[m allowed endpoint to set default value if missing
+[33mcd91669[m Allowed students to join course via entry code by default
+[33mbfac0e1[m Refactoring documentation dir + adding submission cycle documentation
+[33m886aa03[m[33m ([m[1;31morigin/admin_dashboard[m[33m)[m Merge pull request #206 from kiat/kenlu66-desDoc
+[33mb6359d5[m Merge pull request #207 from kiat/bjebo-patch-1
+[33m4e55eac[m[33m ([m[1;31morigin/bjebo-patch-1[m[33m)[m Update StudentList.md
+[33m8c7b23b[m[33m ([m[1;31morigin/kenlu66-desDoc[m[33m)[m Update CodeAssist_Design_Doc.md
+[33mf2fa4da[m Merge pull request #205 from kiat/snowbawler/clean-frontend
+[33m2c74381[m remove hardcoded assignment tabs
+[33m2404490[m Merge pull request #197 from kiat/ai_feedback_integration
+[33me46e211[m[33m ([m[1;31morigin/ai_feedback_integration[m[33m)[m removed reset_db.py
+[33m74def33[m Revert dashboard index.js to match main
+[33mebcfba1[m Merge branch 'main' of https://github.com/kiat/codeAssist into ai_feedback_integration
+[33m39ece9b[m Merge pull request #198 from kiat/better_defaults_for_assignment_creation
+[33m33c33ac[m[33m ([m[1;31morigin/frontend_form_clear[m[33m)[m Clearing add user forms and refactoring fetch endpoint call
+[33m1b9ad1d[m Merge pull request #199 from kiat/empty-dashboard-bug-fix
+[33m634acf8[m Merge pull request #195 from kiat/assignment_settings_endpoint_bug_fix
+[33m0f9003b[m Merge pull request #191 from kiat/null_dates_and_file_type_frontend_fixes
+[33m3ad240c[m[33m ([m[1;31morigin/empty-dashboard-bug-fix[m[33m)[m empty dashboard bug fix
+[33mf6c63f4[m[33m ([m[1;31morigin/better_defaults_for_assignment_creation[m[33m)[m implemented better default values for the assignment creation page
+[33m8640073[m fixed issue with ai_feedback_enabled not persisting
+[33m9f5f823[m Merge branch 'assignment_settings_endpoint_bug_fix' into ai_feedback_integration
+[33m2fd4ff5[m[33m ([m[1;31morigin/assignment_settings_endpoint_bug_fix[m[33m)[m updated tests
+[33m513e6f3[m AI feedback system implemented
+[33mdcf7315[m Merge branch 'assignment_settings_endpoint_bug_fix' into ai_feedback_integration
+[33m813ca3a[m fixed bad endpoint GET /get_assignment
+[33mc720584[m[33m ([m[1;31morigin/regrade_branch[m[33m)[m committing new changes
+[33m82f4d68[m[33m ([m[1;31morigin/dashboard_bug_fix[m[33m)[m mostly fixed dashboard issue
+[33m4164e96[m Tests for submission (#187)
+[33m1b9300b[m Merge pull request #190 from kiat/course-tests-#161
+[33me5da4fd[m[33m ([m[1;31morigin/null_dates_and_file_type_frontend_fixes[m[33m)[m Handling null dates on dashboard + checking autograder file type
+[33mc824912[m[33m ([m[1;31morigin/test_submission[m[33m)[m commit
+[33m5b736d1[m[33m ([m[1;31morigin/course-tests-#161[m[33m)[m Merge branch 'main' into course-tests-#161
+[33md2a122a[m Merge pull request #189 from kiat/snowbawler/course-tests
+[33m8063ccb[m removing file for merge with existing
+[33me2875a8[m[33m ([m[1;31morigin/snowbawler/course-tests[m[33m)[m test: add endpoint testing for course routes
+[33m95622f9[m committing fixes
+[33mb9a2a4b[m committing tests for submission
+[33m2092375[m started course integration tests
+[33mfac6895[m remove unused imports
+[33ma824b79[m more user integration tests
+[33m0bae45f[m basic unit tests for course
+[33m7d66130[m Merge pull request #182 from kiat/docker-sdk-refactor
+[33m79ceb96[m[33m ([m[1;31morigin/docker-sdk-refactor[m[33m)[m reverting the revert because unit tests broke
+[33m6291e56[m reverting get_assignment to fix turn in bug
+[33mf0912d0[m Merge pull request #183 from kiat/snowbawler/fix-create-assignment-route
+[33m421dba5[m[33m ([m[1;31morigin/snowbawler/fix-create-assignment-route[m[33m)[m fix: add assignment fields for create assignment route
+[33m92fe72e[m Refactoring of submission.py to use Docker SDK
+[33m9356aaa[m Merge pull request #179 from kiat/login-error-handling-#175
+[33mc04612f[m Merge pull request #178 from kiat/donne-clean-frontend
+[33maf19164[m more user resource tests
+[33m558d5ef[m error handling for login and signup pages, removed Reader role
+[33m3ef9aca[m login error handling
+[33maa0f518[m[33m ([m[1;31morigin/test_assignment_branch[m[33m)[m commit
+[33m7b1c882[m commiting
+[33mb7db666[m Merge pull request #176 from kiat/requestLoopFix
+[33me4e1692[m clean up course block frontend and flexbox by semester
+[33mbc7be02[m finished test_assignment
+[33mcb36e02[m useEffect loop fixed
+[33m9fd2e5c[m Merge pull request #174 from kiat/testing-consistency-#162
+[33m2f5b875[m making testing consistent between  and
+[33ma60feea[m Merge pull request #173 from kiat/docker-client-dependency-fix
+[33m34a06cc[m removed docker_clie
