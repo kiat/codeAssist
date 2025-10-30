@@ -38,7 +38,9 @@ export default () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCSVModalOpen, setAddCSVModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
+  const [originalEnrollment, setOriginalEnrollment] = useState([]); 
   const [enrollment, setEnrollment] = useState([]);
+
   const urlParams = useParams();
   const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const { courseId } = urlParams;
@@ -58,8 +60,10 @@ export default () => {
   const getEnrollment = useCallback(() => {
     getCourseEnrollment({ course_id: courseId }).then((res) => {
       setEnrollment(res.data);
+      setOriginalEnrollment(res.data); 
     });
   }, [courseId]);
+
 
   const handleUpdateRole = useCallback(
     async (newRole, studentId) => {
@@ -156,11 +160,15 @@ export default () => {
           style={{ marginBottom: "20px" }}
           onFinish={(values) => {
             const { role, username } = values;
-            let filtered = enrollment;
+            // Always start from the full list, not the already filtered one
+            let filtered = originalEnrollment;
 
             if (role && role !== "All") {
-              filtered = filtered.filter((e) => e.role.toLowerCase() === role.toLowerCase());
+              filtered = filtered.filter(
+                (e) => e.role.toLowerCase() === role.toLowerCase()
+              );
             }
+
             if (username) {
               filtered = filtered.filter((e) =>
                 e.name.toLowerCase().includes(username.toLowerCase())
@@ -169,6 +177,7 @@ export default () => {
 
             setEnrollment(filtered);
           }}
+
         >
           <Form.Item name="role">
             <Select
@@ -191,7 +200,7 @@ export default () => {
             </Button>
           </Form.Item>
           <Form.Item>
-            <Button onClick={getEnrollment}>Reset</Button>
+            <Button onClick={() => setEnrollment(originalEnrollment)}>Reset</Button>
           </Form.Item>
         </Form> 
         <Table
