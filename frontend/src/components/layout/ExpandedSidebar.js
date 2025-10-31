@@ -89,12 +89,13 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed, hand
               {userInfo?.isStudent && typeof handleLeaveCourse === "function" && courseInfo?.id &&
                 <Card title='COURSE ACTIONS' size='small' bordered={false}>
                   <div
-                    className={styles.iconText}
+                    className={`${styles.iconText} ${styles.leaveCourseContainer}`}
                     onClick={() => handleLeaveCourse(courseInfo.id)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <LogoutOutlined />
-                    <span className={styles.linkText}> Leave Course</span>
+                    {/* Added class here */}
+                    <LogoutOutlined className={styles.leaveCourseIcon} />
+                    <span className={`${styles.linkText} ${styles.leaveCourse}`}> Leave Course</span>
                   </div>
                 </Card>
               }          
