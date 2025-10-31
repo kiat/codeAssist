@@ -22,18 +22,16 @@ export default () => {
   const { courseId } = useParams();
   const [form] = Form.useForm();
 
-  // Sidebar models list
-  const models = [
-    { key: "openai-o-5", provider: "openai", label: "OpenAI o-5" },
-    { key: "openai-gpt-4o", provider: "openai", label: "OpenAI GPT-4o" },
-    { key: "google-gemini-1.5-pro", provider: "google", label: "Gemini 1.5 Pro" },
-    { key: "anthropic-claude-3.5-sonnet", provider: "anthropic", label: "Claude 3.5 Sonnet" },
+  // Sidebar providers list
+  const providers = [
+    { key: "openai", label: "ChatGPT" },
+    { key: "google", label: "Gemini" },
+    { key: "anthropic", label: "Claude" },
   ];
 
-  const [selectedModelKey, setSelectedModelKey] = useState(models[0].key);
   const [provider, setProvider] = useState("openai");
   const [apiKey, setApiKey] = useState("");
-  const [temperature, setTemperature] = useState(1.0);
+  const [modelName, setModelName] = useState("");
   const [isTesting, setIsTesting] = useState(false);
   const [apiTestStatus, setApiTestStatus] = useState(null);
 
@@ -43,21 +41,18 @@ export default () => {
         const res = await getCourseInfo({ course_id: courseId });
         const course = res?.data?.[0] || {};
         form.setFieldsValue(course);
-        // initialize selected model and provider
-        const savedSelected = localStorage.getItem(`ai_selected_model_${courseId}`);
-        const modelKey = savedSelected || models[0].key;
-        setSelectedModelKey(modelKey);
-        const modelMeta = models.find(m => m.key === modelKey) || models[0];
-        setProvider(modelMeta.provider);
+        // initialize selected provider
+        const savedProvider = localStorage.getItem(`ai_selected_provider_${courseId}`) || "openai";
+        setProvider(savedProvider);
 
         // preload OpenAI key from backend column if provider is openai
         const backendOpenAiKey = course.openai_api_key || "";
-        const storedProviderKey = localStorage.getItem(`ai_key_${modelMeta.provider}_${courseId}`) || "";
-        setApiKey(modelMeta.provider === "openai" ? (backendOpenAiKey || storedProviderKey) : storedProviderKey);
+        const storedProviderKey = localStorage.getItem(`ai_key_${savedProvider}_${courseId}`) || "";
+        setApiKey(savedProvider === "openai" ? (backendOpenAiKey || storedProviderKey) : storedProviderKey);
 
-        // per-model temperature
-        const savedTempForModel = localStorage.getItem(`ai_temperature_${modelKey}_${courseId}`);
-        if (savedTempForModel) setTemperature(parseFloat(savedTempForModel));
+        // per-provider model name
+        const savedModelName = localStorage.getItem(`ai_model_name_${savedProvider}_${courseId}`) || "";
+        setModelName(savedModelName);
       } catch (e) {
         console.error(e);
       }
@@ -67,9 +62,9 @@ export default () => {
 
   const handleSave = async () => {
     try {
-      // persist current selection and per-model temperature
-      localStorage.setItem(`ai_selected_model_${courseId}`, selectedModelKey);
-      localStorage.setItem(`ai_temperature_${selectedModelKey}_${courseId}`, String(temperature));
+      // persist current selection and per-provider settings
+      localStorage.setItem(`ai_selected_provider_${courseId}`, provider);
+      localStorage.setItem(`ai_model_name_${provider}_${courseId}`, modelName);
 
       if (provider === "openai") {
         await updateCourse({ course_id: courseId, openai_api_key: apiKey });
@@ -133,27 +128,25 @@ export default () => {
   };
 
   const handleSelectModel = async (e) => {
-    const newKey = e.key;
-    setSelectedModelKey(newKey);
-    const meta = models.find(m => m.key === newKey) || models[0];
-    setProvider(meta.provider);
+    const newProvider = e.key;
+    setProvider(newProvider);
     // load key for provider; prefer backend for openai if present
     try {
-      if (meta.provider === "openai") {
+      if (newProvider === "openai") {
         const res = await getCourseInfo({ course_id: courseId });
         const course = res?.data?.[0] || {};
         const backendOpenAiKey = course.openai_api_key || "";
-        const storedProviderKey = localStorage.getItem(`ai_key_${meta.provider}_${courseId}`) || "";
+        const storedProviderKey = localStorage.getItem(`ai_key_${newProvider}_${courseId}`) || "";
         setApiKey(backendOpenAiKey || storedProviderKey);
       } else {
-        const storedProviderKey = localStorage.getItem(`ai_key_${meta.provider}_${courseId}`) || "";
+        const storedProviderKey = localStorage.getItem(`ai_key_${newProvider}_${courseId}`) || "";
         setApiKey(storedProviderKey);
       }
     } catch (e) {
       console.error(e);
     }
-    const savedTempForModel = localStorage.getItem(`ai_temperature_${newKey}_${courseId}`);
-    setTemperature(savedTempForModel ? parseFloat(savedTempForModel) : 1.0);
+    const savedModelName = localStorage.getItem(`ai_model_name_${newProvider}_${courseId}`) || "";
+    setModelName(savedModelName);
   };
 
   const { Sider, Content } = Layout;
@@ -166,31 +159,23 @@ export default () => {
         </div>
         <Menu
           mode="inline"
-          selectedKeys={[selectedModelKey]}
+          selectedKeys={[provider]}
           onClick={handleSelectModel}
-          items={models.map(m => ({ key: m.key, label: m.label }))}
+          items={providers.map(p => ({ key: p.key, label: p.label }))}
         />
       </Sider>
       <Content style={{ padding: '0 24px' }}>
         <Form form={form} layout="vertical" style={{ marginLeft: "0px", paddingBottom: '24px' }}>
           <Space direction="vertical" style={{ width: "100%" }}>
-            <PageHeader title="AI Settings" subTitle={models.find(m => m.key === selectedModelKey)?.label} />
+            <PageHeader title="AI Settings" subTitle={providers.find(p => p.key === provider)?.label} />
             <Card title="Credentials">
               <Form.Item label="API Key">
                 <Input.Password value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Enter API key" />
               </Form.Item>
             </Card>
-            <Card title="Parameters">
-              <Form.Item label="Temperature">
-                <Input
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  value={temperature}
-                  onChange={(e) => setTemperature(parseFloat(e.target.value || 0))}
-                  style={{ width: 120 }}
-                />
+            <Card title="Model">
+              <Form.Item label="Model Name (e.g., gpt-5o, gemini-1.5-pro, claude-3-5-sonnet)">
+                <Input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="Enter model name" />
               </Form.Item>
             </Card>
             <Card title="Connection Test">
@@ -209,9 +194,9 @@ export default () => {
                 )}
               </Space>
             </Card>
-            <Space>
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
               <Button type="primary" onClick={handleSave}>Save Settings</Button>
-            </Space>
+            </div>
           </Space>
         </Form>
       </Content>
