@@ -370,17 +370,29 @@ def test_get_user_enrollments_missing_user_id(client):
     assert response.status_code == 400
     assert response.json["message"] == "Missing user_id argument"
 
+from types import SimpleNamespace
+
 def test_get_course_enrollment_success(client, mocker):
+    # Mock the query chain used in the new route (query -> join -> filter)
     mock_query = mocker.patch("routes.course.db.session.query")
-    mock_query.return_value.filter_by.return_value = [mocker.Mock(student_id="student-123")]
-    mock_query.return_value.filter.return_value = [mocker.Mock(name="John Doe", email_address="john@example.com", id="student-123", role="student")]
-    mock_schema = mocker.patch("routes.course.UserSchema")
-    mock_schema.return_value.dump.return_value = [{"name": "John Doe", "email_address": "john@example.com", "id": "student-123", "role": "student"}]
-
+    mock_query_instance = mock_query.return_value
+    mock_join = mock_query_instance.join.return_value
+    mock_filter = mock_join.filter.return_value
+    mock_filter.all.return_value = [
+        SimpleNamespace(
+            id="student-123",
+            name="John Doe",
+            email_address="john@example.com",
+            role="student"
+        )
+    ]
     response = client.get("/get_course_enrollment", query_string={"course_id": "course-123"})
-
     assert response.status_code == 200
-    assert response.json == [{"name": "John Doe", "email_address": "john@example.com", "id": "student-123", "role": "student"}]
+    data = response.get_json()
+    assert len(data) == 1
+    assert data[0]["id"] == "student-123"
+    assert data[0]["name"] == "John Doe"
+    assert data[0]["role"] == "student"
 
 def test_get_course_enrollment_missing_course_id(client):
     response = client.get("/get_course_enrollment")

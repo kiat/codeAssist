@@ -420,25 +420,35 @@ def get_user_enrollments():
 @cross_origin()
 def get_course_enrollment():
     """
-    /get_course_enrollment gets all students enrolled in a course
-    Requires from the frontend a JSON containing:
-    @param course_id        the id of a course
+    Returns all users enrolled in a course,
+    showing their course-specific role from the Enrollment table.
     """
     course_id = request.args.get("course_id")
-    if not course_id or course_id == "":
+    if not course_id:
         raise BadRequestError("Missing course_id argument")
 
-    students = db.session.query(Enrollment.student_id).filter_by(course_id=course_id)
-    students = EnrollmentSchema().dump(students, many=True)
+    results = (
+        db.session.query(
+            User.id,
+            User.name,
+            User.email_address,
+            Enrollment.role.label("role")
+        )
+        .join(Enrollment, Enrollment.student_id == User.id)
+        .filter(Enrollment.course_id == course_id)
+        .all()
+    )
 
-    list_of_students = [x["student_id"] for x in students]
-
-    students = db.session.query(
-        User.name, User.email_address, User.id, User.role
-    ).filter(User.id.in_(list_of_students))
-    students = UserSchema().dump(students, many=True)
-
-    return jsonify(students)
+    data = [
+        {
+            "id": r.id,
+            "name": r.name,
+            "email_address": r.email_address,
+            "role": r.role
+        }
+        for r in results
+    ]
+    return jsonify(data), 200
 
 
 @course.route("/get_course_assignments", methods=["GET"])

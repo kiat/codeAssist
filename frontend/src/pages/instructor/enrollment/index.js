@@ -38,7 +38,9 @@ export default () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCSVModalOpen, setAddCSVModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
+  const [originalEnrollment, setOriginalEnrollment] = useState([]); 
   const [enrollment, setEnrollment] = useState([]);
+
   const urlParams = useParams();
   const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const { courseId } = urlParams;
@@ -58,8 +60,10 @@ export default () => {
   const getEnrollment = useCallback(() => {
     getCourseEnrollment({ course_id: courseId }).then((res) => {
       setEnrollment(res.data);
+      setOriginalEnrollment(res.data); 
     });
   }, [courseId]);
+
 
   const handleUpdateRole = useCallback(
     async (newRole, studentId) => {
@@ -142,7 +146,7 @@ export default () => {
 
   useEffect(() => {
     getEnrollment();
-  }, [getEnrollment]);
+  }, [getEnrollment, courseId]);
 
   return (
     <>
@@ -151,30 +155,54 @@ export default () => {
         style={{ borderBottom: "1px solid #f0f0f0" }}
       />
       <Card bordered={false}>
-        <Form layout="inline" style={{ marginBottom: "20px" }}>
+        <Form
+          layout="inline"
+          style={{ marginBottom: "20px" }}
+          onFinish={(values) => {
+            const { role, username } = values;
+            // Always start from the full list, not the already filtered one
+            let filtered = originalEnrollment;
+
+            if (role && role !== "All") {
+              filtered = filtered.filter(
+                (e) => e.role.toLowerCase() === role.toLowerCase()
+              );
+            }
+
+            if (username) {
+              filtered = filtered.filter((e) =>
+                e.name.toLowerCase().includes(username.toLowerCase())
+              );
+            }
+
+            setEnrollment(filtered);
+          }}
+
+        >
           <Form.Item name="role">
             <Select
               placeholder="view by role"
               style={{ width: "180px" }}
               options={[
-                { label: "All", value: "0" },
-                { label: "Students", value: "1" },
-                { label: "Instructors", value: "2" },
-                { label: "TAs", value: "3" },
-                { label: "Readers", value: "4" },
+                { label: "All", value: "All" },
+                { label: "Student", value: "Student" },
+                { label: "Instructor", value: "Instructor" },
+                { label: "TA", value: "TA" },
               ]}
             />
-          </Form.Item>
-          <Form.Item name="section">
-            <Input placeholder="view by section" />
           </Form.Item>
           <Form.Item name="username">
             <Input placeholder="view by name" />
           </Form.Item>
           <Form.Item>
-            <Button type="primary">search</Button>
+            <Button type="primary" htmlType="submit">
+              search
+            </Button>
           </Form.Item>
-        </Form>
+          <Form.Item>
+            <Button onClick={() => setEnrollment(originalEnrollment)}>Reset</Button>
+          </Form.Item>
+        </Form> 
         <Table
           columns={[
             ...columns,
@@ -183,10 +211,10 @@ export default () => {
               dataIndex: "role",
               render: (text, record) => (
                 <Select
-                  defaultValue={text}
+                  value={text}
                   style={{ width: 120 }}
                   onChange={(value) => handleUpdateRole(value, record.id)}
-                  disabled={text === "instructor"} // Disable dropdown if the role is instructor
+                  disabled={text.toLowerCase() === "instructor"}
                 >
                   <Select.Option value="student">Student</Select.Option>
                   <Select.Option value="TA">TA</Select.Option>
