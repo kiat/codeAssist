@@ -1,0 +1,126 @@
+[33mfc7dc97[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfix/issue-275-course-description[m[33m, [m[1;31morigin/fix/issue-275-course-description[m[33m)[m solve all description is same
+[33mc3225ec[m solve all description is same
+[33m60bf02a[m fix #275
+[33m2609f71[m fix #275
+[33mdcfaa02[m Fix: stable course info fetch and description update in InstructorDashboard
+[33mbf4cc1f[m fix #275
+[33md428990[m fix #275
+[33mdcf9db6[m fix #275
+[33mcc83825[m fix(issue-275)
+[33m324ffff[m fix(issue-275): update frontend courseSettings to use res.data instead of res.data[0]
+[33m11c1ef9[m fix #275 course description
+[33m66cf35e[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m Merge pull request #283 from kiat/ai-settings
+[33md6ab9e0[m Merge pull request #271 from kiat/ai
+[33mbbcf0ec[m[33m ([m[1;31morigin/ai[m[33m)[m Merge branch 'main' into ai
+[33mcb3ad0e[m Add AI Settings
+[33m59f8fe0[m[33m ([m[1;32mai[m[33m)[m docs: add frontend part design (AI Settings + Student Feedback Panel)
+[33m49c171b[m design for endpoitns added
+[33m51f6d17[m AI feature frontend updated to checkboxes
+[33m3f235cb[m readme updated based on last week's clarifications
+[33m57a4ead[m Update StudentList.md
+[33m19dc6cf[m .
+[33m57fb6a9[m changed grading to feedback
+[33mb817767[m added assignment text
+[33m67b576a[m design doc updated
+[33mcfb8320[m Delete docs/ai_feature.md
+[33m8821c55[m Update AI_Design_Doc.md
+[33mded2ccb[m Update AI_Design_Doc.md
+[33m618436e[m Update AI_Design_Doc.md
+[33mcc1a116[m Update AI_Design_Doc.md
+[33md84c120[m Update AI_Design_Doc.md
+[33m3267d9f[m Create AI_Design_Doc.md
+[33mbafd2d3[m README file added
+[33m20ed3e0[m Merge pull request #270 from Nominose/main
+[33mdbfc995[m Merge branch 'main' into main
+[33me5c5f82[m Merge pull request #263 from kiat/password/salting
+[33m8ecd09e[m Update README.md
+[33mf1b162b[m[33m ([m[1;31morigin/254-java-testing-for-multiple-files[m[33m)[m Merge pull request #268 from kiat/linux_doc
+[33m3fbb66a[m[33m ([m[1;31morigin/password/salting[m[33m)[m readme edit
+[33m445540f[m[33m ([m[1;31morigin/linux_doc[m[33m)[m Fix: update only path/to/your/file
+[33m36cd726[m Merge pull request #267 from kiat/users-fix
+[33m8f39b8f[m Updates accounts that had their passwords stored in plaintext
+[33mf9796c8[m For CI purposes
+[33md63800c[m Passing all user tests
+[33mdbcf5a1[m[33m ([m[1;31morigin/users-fix[m[33m)[m fixed users
+[33mce4bc85[m Merge pull request #261 from kiat/admin-dashboard
+[33m2f0f60e[m Encryption
+[33mc1af2be[m Merge pull request #260 from kiat/aidan-liu-patch-3
+[33m9f41238[m Update frontend/src/pages/admin/courses/manage.js
+[33ma99b12b[m course manage features for admin
+[33mec608ae[m Merge pull request #259 from kiat/admin-dashboard
+[33mca4ac72[m[33m ([m[1;31morigin/aidan-liu-patch-3[m[33m)[m Create Gemma3_local_model.md
+[33maf6ac2f[m Update documentation
+[33m1c49c79[m Merge pull request #253 from kiat/race-condition
+[33m60295dc[m switched add Course form to use Instructor EID instead of ID
+[33m5175506[m Merge pull request #250 from kiat/edit-grades-bug
+[33m562ac9e[m Merge pull request #241 from kiat/admin-dashboard
+[33maaf114b[m Added manage/remove/add course feature- still need to change the add course page a little (instructor_id part)
+[33mc93b8db[m[33m ([m[1;31morigin/race-condition[m[33m)[m cleanup
+[33mb97354d[m[33m ([m[1;31morigin/stress-tests[m[33m)[m fixed race condition in upload_submission route
+[33m9a53d9e[m Merge pull request #246 from kiat/stress-tests
+[33m973d3ca[m Merge branch 'admin-dashboard' of https://github.com/kiat/codeAssist into admin-dashboard
+[33m07639ca[m Instructor Add/Manage feature
+[33m8a87321[m frontend for admin course 'manage' function
+[33m0bceb06[m[33m ([m[1;31morigin/edit-grades-bug[m[33m)[m package.json and package-lock.json reverted back to match main
+[33m7f590af[m Update admin_emails.py to accept email as command-line argument
+[33m5563a51[m Fix failing test after resolving merge conflict
+[33m52c68e9[m Merge branch 'main' into admin-dashboard
+[33m20f933a[m added cleanup param for assignment
+[33m609807c[m Merge pull request #248 from kiat/admin-dashboard-docs
+[33mad5ce03[m Merge pull request #244 from kiat/user_error_handling
+[33m7728342[m multiple submissions stress test
+[33m8c90345[m score edit fixed, score reflexs edit on all screens
+[33m0d5026e[m[33m ([m[1;31morigin/admin-dashboard-docs[m[33m)[m Documentation
+[33m9abcd05[m Add features to Students page
+[33mafda413[m Merge pull request #240 from kiat/reviewGrades
+[33m9adbb96[m delete extra file
+[33mf637b1a[m cleanup
+[33mc0b19e0[m added manual assignment deletion to test and changed file structure
+[33md5538f3[m sort courses by most recent bug fix
+[33m9bc5da6[m added stress test for assignment creation and testing utils file
+[33mbe71540[m[33m ([m[1;31morigin/reviewGrades[m[33m)[m exportSubmission frontend connected, search functionality completed
+[33m918fac0[m search function added
+[33m19561bc[m Add view all courses button
+[33m1fdbe01[m Add search functionality to courses, students, instructors page.
+[33m070d260[m Merge pull request #245 from kiat/aidan-liu-patch-2
+[33m066cf40[m[33m ([m[1;31morigin/aidan-liu-patch-2[m[33m)[m Update testing.md (documentation for testing)
+[33md79292f[m[33m ([m[1;31morigin/user_error_handling[m[33m)[m finished adding unit tests
+[33m40c32a1[m added more unit tests
+[33mb872645[m adding more tests
+[33m1acdae1[m Fix: Handle undefined role in Capitalize() causing Edit Account crash after Google login
+[33maa0cbf3[m Google login + admin role through email function complete
+[33mc8ca3ea[m step 1 for OAuth2 login--in progress
+[33m1a666c6[m admin email database + login w/ google button
+[33mc7e91b2[m updated test
+[33m825c217[m dashboard layout
+[33m8e79938[m added documentation
+[33m96706fd[m Merge pull request #238 from kiat/reviewGrades_tests
+[33mb29c507[m Merge pull request #236 from kiat/gradeSubmission/home
+[33ma57613e[m sign up as admin
+[33m5ea3c6d[m Step 1 of reviewGrades, students and their active submission grades populated
+[33m81c304a[m aded error jandling
+[33m1a24bbe[m Merge pull request #237 from kiat/fix/date-change-bug
+[33m26d7771[m Merge pull request #234 from kiat/leave-course-feature
+[33m8abd324[m Merge pull request #235 from kiat/dashboard
+[33m8a0deb7[m[33m ([m[1;31morigin/reviewGrades_tests[m[33m)[m committing all tests for files in reviewGrades
+[33m7a4a895[m Merge pull request #229 from kiat/backend-error-handling-for-assignment
+[33ma6ec6dd[m Merge pull request #231 from kiat/fix/test_autograder_217
+[33m8764daf[m[33m ([m[1;31morigin/fix/date-change-bug[m[33m)[m updated createAssignment to pass moment.js objects rather than day.js to fix frontend bug
+[33m5a03d6b[m[33m ([m[1;31morigin/gradeSubmission/home[m[33m)[m test: added gradeSubmission/home component unit tests
+[33mec85371[m Merge pull request #228 from kiat/assignments
+[33m55653a9[m Update StudentList.md
+[33m90e536d[m Update StudentList.md
+[33m73719f4[m Update StudentList.md
+[33m68f708d[m[33m ([m[1;31morigin/dashboard[m[33m)[m committing main component tests for the dashboard screen: addCourse, addForm, index, relationForm, relationModal
+[33m8a9db4c[m[33m ([m[1;31morigin/leave-course-feature[m[33m)[m leave course feature
+[33m24a8839[m leave course feature
+[33m949cdd0[m leave course + confirmation
+[33m2c6a1e1[m[33m ([m[1;31morigin/fix/test_autograder_217[m[33m)[m cleanup
+[33mda3bda6[m updated backend to correctly pass props
+[33m65d9801[m added loading graphic
+[33mf922359[m[33m ([m[1;31morigin/backend-error-handling-for-assignment[m[33m)[m updated delete_assignment and tests
+[33m7677301[m updated backend tests
+[33mdf7bb63[m standardized backend error handling for assignment
+[33m8b76df8[m added onCancel handler for test results modal
+[33me273c04[m added test results modal for test autograder
+[33mc458a17[m passed autograder and submission files 
