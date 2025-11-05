@@ -91,13 +91,13 @@ export default () => {
     navigate(`/instructorDashboard/${courseId}`);
   };
 
-  const onFinish = async (values) => {
-    const dataToSend = {
-      course_id: courseId,
-      ...Object.fromEntries(
-        Object.entries(values).filter(([_, value]) => value !== undefined)
-      ),
-    };
+const onFinish = async (values) => {
+  const dataToSend = {
+    course_id: courseId,
+    ...Object.fromEntries(
+      Object.entries(values).filter(([_, value]) => value !== undefined)
+    ),
+  };
 
     try {
       await updateCourse(dataToSend);
@@ -116,6 +116,7 @@ export default () => {
       navigate(`/instructorDashboard/${courseId}`);
     } catch (error) {
       console.error("Error updating course:", error);
+      message.error("Failed to update course");
     }
   };
 
