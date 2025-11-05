@@ -418,7 +418,19 @@ def get_latest_submission():
         # Return an empty object instead of an error
         return jsonify({"message": "No submissions found", "data": submission_schema.dump(None)}), 200
 
+    #submission_data = submission_schema.dump(latest_submission)
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    student = db.session.query(User).filter_by(id=student_id).first()
+
     submission_data = submission_schema.dump(latest_submission)
+
+    # check if user is student + hide results
+    if student.role == "student":
+        if assignment.hold_results_until_publish and not assignment.published:
+            submission_data["results"] = None
+            submission_data["score"] = None
+
     return jsonify(submission_data), 200
 
 @submission.route('/get_all_assignment_submissions', methods=["GET"])

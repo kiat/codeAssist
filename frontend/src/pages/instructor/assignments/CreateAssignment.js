@@ -114,6 +114,7 @@ export default ({
       ai_feedback_prompt: values.ai_feedback_prompt ?? null,
       ai_feedback_model: values.ai_feedback_model ?? null,
       ai_feedback_temperature: values.ai_feedback_temperature ?? null,
+      hold_results_until_publish: !!values.hold_results_until_publish,
     };
 
     const assignment = await createAssignment(payload);
@@ -288,6 +289,15 @@ export default ({
                     >
                       <Checkbox>Enable Manual Grading</Checkbox>
                     </Form.Item>
+                    <Form.Item
+                      label="HOLD AUTOGRADER RESULTS UNTIL PUBLISH"
+                      name="hold_results_until_publish"
+                      valuePropName="checked"
+                      initialValue={false}
+                    >
+                      <Switch />
+                    </Form.Item>
+
                   </>
                 ) : (
                   <Form.Item
