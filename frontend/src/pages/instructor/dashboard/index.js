@@ -16,6 +16,18 @@ import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
+import { getCourseAssignments, getCourseInfo } from "../../../services/course";
+
+// Normalize course info to ensure consistent structure
+const normalizeCourseInfo = (detail, courseId) => ({
+  id: courseId,
+  name: detail.name ?? detail.course_name ?? "",
+  code: detail.code ?? detail.entryCode ?? "",
+  semester: detail.semester ?? "",
+  year: detail.year ?? "",
+  description: detail.description ?? detail.course_description ?? "",
+});
+
 //for now change this to a course_id you have in the database
 const columns = [
   {

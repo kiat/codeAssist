@@ -56,29 +56,57 @@ export const GlobalContext = createContext({
 });
 
 function App() {
-  const [userInfo, setUserInfo] = useState(() => 
+  // Load user info from localStorage
+  const [userInfo, setUserInfo] = useState(() =>
     JSON.parse(localStorage.getItem("userInfo")) || initialUserInfo
   );
-  const [courseInfo, setCourseInfo] = useState(() => 
-    JSON.parse(localStorage.getItem("courseInfo")) || initialCourseInfo
-  );
+
+  // Load the most recent course ID from localStorage
+  const [courseInfo, setCourseInfo] = useState(() => {
+    const lastCourseId = localStorage.getItem("lastCourseId");
+    if (lastCourseId) {
+      const storedCourse = localStorage.getItem(`courseInfo_${lastCourseId}`);
+      if (storedCourse) return JSON.parse(storedCourse);
+    }
+    return initialCourseInfo;
+  });
   const [assignmentInfo, setAssignmentInfo] = useState(initialAssignmentInfo);
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
-  // Effect for initializing courseInfo from localStorage
-  useEffect(() => {
-    const storedCourseInfo = localStorage.getItem("courseInfo");
-    if (storedCourseInfo) {
-      setCourseInfo(JSON.parse(storedCourseInfo));
-    }
-  }, []);
 
-  // Effect for saving courseInfo to localStorage when it changes
+
+  // Always refresh from backend if course ID changes
   useEffect(() => {
-    localStorage.setItem("courseInfo", JSON.stringify(courseInfo));
+    const refreshCourse = async () => {
+      if (!courseInfo.id) return;
+      try {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/get_course_info`, {
+          params: { course_id: courseInfo.id },
+        });
+        const latest = res.data?.[0] || JSON.parse(localStorage.getItem(`courseInfo_${courseInfo.id}`));
+        setCourseInfo(latest);
+        localStorage.setItem(`courseInfo_${courseInfo.id}`, JSON.stringify(latest));
+      } catch (error) {
+        console.warn("Using cached course info (backend unreachable)");
+        const stored = localStorage.getItem(`courseInfo_${courseInfo.id}`);
+        if (stored) setCourseInfo(JSON.parse(stored));
+      }
+    };
+    refreshCourse();
+  }, [courseInfo.id]);
+
+
+  // Save courseInfo per-course and remember the last course visited
+  useEffect(() => {
+    if (courseInfo.id) {
+      localStorage.setItem(`courseInfo_${courseInfo.id}`, JSON.stringify(courseInfo));
+      localStorage.setItem("lastCourseId", courseInfo.id);
+    }
   }, [courseInfo]);
+
+
   // Callbacks for updating state, using empty dependencies to ensure they don't change
   const updateCourseInfo = useCallback(info => setCourseInfo(info), []);
   const updateUserInfo = useCallback(info => setUserInfo(info), []);
