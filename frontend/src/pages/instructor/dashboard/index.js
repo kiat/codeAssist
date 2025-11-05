@@ -95,19 +95,30 @@ export default function InstructorDashboard() {
   
   useEffect(() => {
     const initFetch = async () => {
-      const assignmentsData = await fetchData("/get_course_assignments", { course_id: courseId });
-      setData(assignmentsData);
-      
-      if (!courseInfo.id || !courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode || !courseInfo.description) {
-        const courseDetails = await fetchData("/get_course_info", { course_id: courseId });
-        if (courseDetails && courseDetails.length > 0) {
-          const [detail] = courseDetails;
-          updateCourseInfo({ ...detail, id: courseId });
+      try {
+        // getCourseAssignments from service (instead of raw fetch)
+        const a = await getCourseAssignments({ course_id: courseId });
+        setData(Array.isArray(a?.data) ? a.data : a);
+
+
+        // Fetch course info consistently
+        const info = await getCourseInfo({ course_id: courseId });
+        const rows = Array.isArray(info?.data) ? info.data : info;
+
+        if (rows?.length) {
+          const normalized = normalizeCourseInfo(rows[0], courseId);
+          updateCourseInfo(normalized);
+          localStorage.setItem(`courseInfo_${courseId}`, JSON.stringify(normalized));
+          console.log("Updated course info:", normalized);
         }
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
       }
     };
+
     initFetch();
-  }, [courseId, courseInfo.id, courseInfo.name, courseInfo.year, courseInfo.semester, courseInfo.entryCode, courseInfo.description, updateCourseInfo]);
+  }, [courseId, updateCourseInfo]);
+
 
   if (!courseInfo.id) return null;
 
