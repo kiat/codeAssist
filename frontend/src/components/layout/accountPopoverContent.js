@@ -20,13 +20,8 @@ export default function AccountPopoverContent() {
         width: "160px",
       }}
     >
-      <div>
-        <QuestionCircleFilled />
-        <span> Help</span>
-      </div>
       {!isAdmin && (
         <>
-          <hr />
           <div>
             <Link to={`/editAccount/${userId}`}>
               <UserOutlined />
