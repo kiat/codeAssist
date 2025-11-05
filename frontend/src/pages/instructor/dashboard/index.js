@@ -85,17 +85,19 @@ export default function InstructorDashboard() {
     const initFetch = async () => {
       const assignmentsData = await fetchData("/get_course_assignments", { course_id: courseId });
       setData(assignmentsData);
-      
-      if (!courseInfo.id || !courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode || !courseInfo.description) {
-        const courseDetails = await fetchData("/get_course_info", { course_id: courseId });
-        if (courseDetails && courseDetails.length > 0) {
-          const [detail] = courseDetails;
-          updateCourseInfo({ ...detail, id: courseId });
-        }
+
+      // Always refresh course info
+      const courseDetails = await fetchData("/get_course_info", { course_id: courseId });
+      if (courseDetails && courseDetails.length > 0) {
+        const [detail] = courseDetails;
+        updateCourseInfo({ ...detail, id: courseId });
       }
+
+      // Move console.log here (inside the function)
+      console.log("Fetched course details:", courseDetails);
     };
     initFetch();
-  }, [courseId, courseInfo.id, courseInfo.name, courseInfo.year, courseInfo.semester, courseInfo.entryCode, courseInfo.description, updateCourseInfo]);
+  }, [courseId, updateCourseInfo]);
 
   if (!courseInfo.id) return null;
 

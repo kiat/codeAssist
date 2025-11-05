@@ -56,29 +56,46 @@ export const GlobalContext = createContext({
 });
 
 function App() {
-  const [userInfo, setUserInfo] = useState(() => 
+  // Add this back in
+  const [userInfo, setUserInfo] = useState(() =>
     JSON.parse(localStorage.getItem("userInfo")) || initialUserInfo
   );
-  const [courseInfo, setCourseInfo] = useState(() => 
-    JSON.parse(localStorage.getItem("courseInfo")) || initialCourseInfo
-  );
+
+  // Load the most recent course ID from localStorage
+  const [courseInfo, setCourseInfo] = useState(() => {
+    const lastCourseId = localStorage.getItem("lastCourseId");
+    if (lastCourseId) {
+      const storedCourse = localStorage.getItem(`courseInfo_${lastCourseId}`);
+      if (storedCourse) return JSON.parse(storedCourse);
+    }
+    return initialCourseInfo;
+  });
   const [assignmentInfo, setAssignmentInfo] = useState(initialAssignmentInfo);
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
-  // Effect for initializing courseInfo from localStorage
+  // Load per-course info from localStorage (if available)
   useEffect(() => {
-    const storedCourseInfo = localStorage.getItem("courseInfo");
-    if (storedCourseInfo) {
-      setCourseInfo(JSON.parse(storedCourseInfo));
+    if (courseInfo.id) {
+      const stored = localStorage.getItem(`courseInfo_${courseInfo.id}`);
+      if (stored) {
+        setCourseInfo(JSON.parse(stored));
+        console.log(`Loaded cached info for course ${courseInfo.id}`);
+      }
     }
-  }, []);
+  }, [courseInfo.id]);
 
-  // Effect for saving courseInfo to localStorage when it changes
+
+  // Save courseInfo per-course and remember the last course visited
   useEffect(() => {
-    localStorage.setItem("courseInfo", JSON.stringify(courseInfo));
+    if (courseInfo.id) {
+      localStorage.setItem(`courseInfo_${courseInfo.id}`, JSON.stringify(courseInfo));
+      localStorage.setItem("lastCourseId", courseInfo.id);
+    }
   }, [courseInfo]);
+
+
   // Callbacks for updating state, using empty dependencies to ensure they don't change
   const updateCourseInfo = useCallback(info => setCourseInfo(info), []);
   const updateUserInfo = useCallback(info => setUserInfo(info), []);
