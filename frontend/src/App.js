@@ -56,12 +56,12 @@ export const GlobalContext = createContext({
 });
 
 function App() {
-  // Add this back in
+  // ✅ Load user info from localStorage
   const [userInfo, setUserInfo] = useState(() =>
     JSON.parse(localStorage.getItem("userInfo")) || initialUserInfo
   );
 
-  // Load the most recent course ID from localStorage
+  // ✅ Load the most recent course ID from localStorage
   const [courseInfo, setCourseInfo] = useState(() => {
     const lastCourseId = localStorage.getItem("lastCourseId");
     if (lastCourseId) {
@@ -75,16 +75,29 @@ function App() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
-  // Load per-course info from localStorage (if available)
+
+
+  // 🔄 Always refresh from backend if course ID changes
   useEffect(() => {
-    if (courseInfo.id) {
-      const stored = localStorage.getItem(`courseInfo_${courseInfo.id}`);
-      if (stored) {
-        setCourseInfo(JSON.parse(stored));
-        console.log(`Loaded cached info for course ${courseInfo.id}`);
+    const refreshCourse = async () => {
+      if (!courseInfo.id) return;
+      try {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/get_course_info`, {
+          params: { course_id: courseInfo.id },
+        });
+        const latest = res.data?.[0] || JSON.parse(localStorage.getItem(`courseInfo_${courseInfo.id}`));
+        setCourseInfo(latest);
+        localStorage.setItem(`courseInfo_${courseInfo.id}`, JSON.stringify(latest));
+      } catch (error) {
+        console.warn("Using cached course info (backend unreachable)");
+        const stored = localStorage.getItem(`courseInfo_${courseInfo.id}`);
+        if (stored) setCourseInfo(JSON.parse(stored));
       }
-    }
+    };
+    refreshCourse();
   }, [courseInfo.id]);
+
+
 
 
   // Save courseInfo per-course and remember the last course visited

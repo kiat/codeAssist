@@ -16,6 +16,19 @@ import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
+import { getCourseAssignments, getCourseInfo } from "../../../services/course";
+
+const normalizeCourseInfo = (detail, courseId) => ({
+  id: courseId,
+  name: detail.name ?? detail.course_name ?? "",
+  code: detail.code ?? detail.entryCode ?? "",
+  semester: detail.semester ?? "",
+  year: detail.year ?? "",
+  description: detail.description ?? detail.course_description ?? "",
+});
+
+
+
 //for now change this to a course_id you have in the database
 const columns = [
   {
@@ -83,21 +96,29 @@ export default function InstructorDashboard() {
   
   useEffect(() => {
     const initFetch = async () => {
-      const assignmentsData = await fetchData("/get_course_assignments", { course_id: courseId });
-      setData(assignmentsData);
+      try {
+        // getCourseAssignments from service (instead of raw fetch)
+        const a = await getCourseAssignments({ course_id: courseId });
+        setData(Array.isArray(a?.data) ? a.data : a);
 
-      // Always refresh course info
-      const courseDetails = await fetchData("/get_course_info", { course_id: courseId });
-      if (courseDetails && courseDetails.length > 0) {
-        const [detail] = courseDetails;
-        updateCourseInfo({ ...detail, id: courseId });
+        // Fetch course info consistently
+        const info = await getCourseInfo({ course_id: courseId });
+        const rows = Array.isArray(info?.data) ? info.data : info;
+
+        if (rows?.length) {
+          const normalized = normalizeCourseInfo(rows[0], courseId);
+          updateCourseInfo(normalized);
+          localStorage.setItem(`courseInfo_${courseId}`, JSON.stringify(normalized));
+          console.log("Updated course info:", normalized);
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
       }
-
-      // Move console.log here (inside the function)
-      console.log("Fetched course details:", courseDetails);
     };
+
     initFetch();
   }, [courseId, updateCourseInfo]);
+
 
   if (!courseInfo.id) return null;
 
