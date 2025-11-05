@@ -18,6 +18,7 @@ import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
 import { getCourseAssignments, getCourseInfo } from "../../../services/course";
 
+// Normalize course info to ensure consistent structure
 const normalizeCourseInfo = (detail, courseId) => ({
   id: courseId,
   name: detail.name ?? detail.course_name ?? "",
@@ -26,8 +27,6 @@ const normalizeCourseInfo = (detail, courseId) => ({
   year: detail.year ?? "",
   description: detail.description ?? detail.course_description ?? "",
 });
-
-
 
 //for now change this to a course_id you have in the database
 const columns = [

@@ -30,7 +30,6 @@ export default () => {
   const [assignments, setAssignments] = useState([]);
 
 
-
   // Used to manage form state
   const [form] = Form.useForm();
 
@@ -104,25 +103,22 @@ const onFinish = async (values) => {
       await updateCourse(dataToSend);
       message.success("Course updated successfully");
 
-      // ✅ Re-fetch the latest info from backend
+      // Re-fetch the latest info from backend
       const res = await getCourseInfo({ course_id: courseId });
       const updated = res.data?.[0] || {};
 
-      // ✅ Sync with global context + cache
+      // Sync with global context + cache
       updateCourseInfo(updated);
       localStorage.setItem(`courseInfo_${courseId}`, JSON.stringify(updated));
       localStorage.setItem("lastCourseId", courseId);
 
-      // ✅ Go back to dashboard
+      // Go back to dashboard
       navigate(`/instructorDashboard/${courseId}`);
     } catch (error) {
       console.error("Error updating course:", error);
       message.error("Failed to update course");
     }
   };
-
-
-
 
   return (
     <Form

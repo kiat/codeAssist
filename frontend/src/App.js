@@ -56,12 +56,12 @@ export const GlobalContext = createContext({
 });
 
 function App() {
-  // ✅ Load user info from localStorage
+  // Load user info from localStorage
   const [userInfo, setUserInfo] = useState(() =>
     JSON.parse(localStorage.getItem("userInfo")) || initialUserInfo
   );
 
-  // ✅ Load the most recent course ID from localStorage
+  // Load the most recent course ID from localStorage
   const [courseInfo, setCourseInfo] = useState(() => {
     const lastCourseId = localStorage.getItem("lastCourseId");
     if (lastCourseId) {
@@ -77,7 +77,7 @@ function App() {
 
 
 
-  // 🔄 Always refresh from backend if course ID changes
+  // Always refresh from backend if course ID changes
   useEffect(() => {
     const refreshCourse = async () => {
       if (!courseInfo.id) return;
@@ -96,8 +96,6 @@ function App() {
     };
     refreshCourse();
   }, [courseInfo.id]);
-
-
 
 
   // Save courseInfo per-course and remember the last course visited
