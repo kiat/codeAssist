@@ -1,0 +1,519 @@
+import {
+  BookOutlined,
+  CodeOutlined,
+  FileTextOutlined,
+  LeftCircleFilled,
+  UploadOutlined,
+} from "@ant-design/icons";
+import {
+  Button,
+  Card,
+  Checkbox,
+  Col,
+  DatePicker,
+  Form,
+  Input,
+  Layout,
+  Menu,
+  Radio,
+  Row,
+  Space,
+  Steps,
+  Typography,
+  Upload,
+  Select,
+  Switch,
+  message,
+} from "antd";
+import { useState, useCallback } from "react";
+import { useParams } from "react-router-dom";
+import moment from "moment";
+
+import AutograderSection from "../../configureAutograder/AutograderSection";
+import TestAutograder from "../../configureAutograder/TestAutograder";
+import TestResultsDisplay from "../../result/TestResultsDisplay";
+import { uploadAssignmentAutograder } from "../../../services/submission";
+import { createAssignment, updateAssignment } from "../../../services/assignment";
+
+const { Sider, Content } = Layout;
+const LLM_OPTIONS = [
+  { label: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+  { label: "GPT-4o", value: "gpt-4o" },
+  { label: "Custom Model", value: "custom-model" },
+];
+
+const AICheckbox = ({ value, onChange, options, disabled }) => {
+  const current = value ? [value] : [];
+
+  const handleChange = (vals) => {
+    const next = vals.length ? vals[vals.length - 1] : undefined;
+    onChange?.(next);
+  }
+
+  return (
+    <Checkbox.Group
+      options={options}
+      value={current}
+      disabled={disabled}
+      onChange={handleChange}
+    />
+  );
+};
+
+export default ({
+  currentStep,
+  updateCurrentStep,
+  toggleIsCreate,
+  nameValidationStatus,
+  form,
+}) => {
+  const [assignmentType, setAssignmentType] = useState(0);
+  const aiFeedbackEnabled = Form.useWatch("ai_feedback_enabled", form);
+  
+  const [configureAutograderNow, setConfigureAutograderNow] = useState(false);
+  const [autograderFile, setAutograderFile] = useState(null);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [resultsModalOpen, setResultsModalOpen] = useState(false);
+  const [testResultsData, setTestResultsData] = useState(null);
+
+  const { courseId } = useParams();
+  
+  const openTest = useCallback(() => setModalOpen(true), []);
+  const closeTest = useCallback(() => setModalOpen(false), []);
+  const handleAutograderSuccess = (data) => {
+    setTestResultsData(data);
+    setResultsModalOpen(true);
+  };
+  const handleCloseResultsModal = () => setResultsModalOpen(false);
+
+  const handleFinish = async (values) => {
+    try {
+      setSaveLoading(true);
+      if (!courseId) {
+        throw new Error("Missing courseId in route. Unable to create assignment.");
+      }
+
+      const toIso = (d) => (d ? new Date(d.valueOf()).toISOString() : null);
+      const now = new Date();
+      const releaseDate = values.releaseDate ? new Date(values.releaseDate.valueOf()) : null;
+
+      const payload = {
+      name: values.name,
+      course_id: courseId,
+      published_date: toIso(values.releaseDate),
+      published: releaseDate ? releaseDate <= now : false,
+      due_date: toIso(values.dueDate),
+      late_due_date: toIso(values.lateDueDate),
+      late_submission: !!values.allowLateSubmissions,
+      enable_group: !!values.groupSubmission, 
+      group_size: values.limitGroupSize ? Number(values.limitGroupSize) : null,
+      manual_grading: !!values.manualGrading,
+      autograder_points: values.autograderPoints ? Number(values.autograderPoints) : null,
+      ai_feedback_enabled: !!values.ai_feedback_enabled,
+      ai_feedback_prompt: values.ai_feedback_prompt ?? null,
+      ai_feedback_model: values.ai_feedback_model ?? null,
+      ai_feedback_temperature: values.ai_feedback_temperature ?? null,
+      hold_results_until_publish: !!values.hold_results_until_publish,
+    };
+
+    const assignment = await createAssignment(payload);
+
+      const assignmentId = assignment?.id ?? assignment?.data?.id ?? assignment?.assignment_id ?? assignment?.data?.assignment_id;
+      if (!assignmentId) {
+        throw new Error("Backend did not return an assignment id.");
+      }
+
+      if (String(assignmentType) === "2" && configureAutograderNow) {
+        await updateAssignment({
+          assignment_id: assignmentId,
+          name: values.name,
+          course_id: courseId,
+          autograder_points: Number(values.autograderPoints || 100),
+        });
+
+        const op = values?.autograder?.operation;
+        if (op === "zip") {
+          if (!autograderFile) throw new Error("Please choose an autograder .zip file.");
+          const fd = new FormData();
+          fd.append("assignment_id", assignmentId);
+          fd.append("file", autograderFile);
+          fd.append("autograder_timeout", String(values?.autograder?.timeout || "300"));
+          if (values?.autograder?.baseImageOS) {
+            fd.append("base_image_os", values.autograder.baseImageOS);
+            fd.append("base_image_version", values.autograder.baseImageVersion || "");
+            fd.append("base_image_variant", values.autograder.baseImageVariant || "");
+          }
+          await uploadAssignmentAutograder(fd);
+        }
+        // else if (op === "docker")
+      }
+
+      message.success("Assignment created");
+      form.resetFields();
+      if (typeof toggleIsCreate === "function") {
+        toggleIsCreate();
+      }
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Failed to create assignment");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+
+  return (
+    <>
+      <Steps
+        current={currentStep}
+        type="navigation"
+        items={[
+          { title: "Assignment Type", status: "process" },
+          { title: "Assignment Settings", status: "process" },
+        ]}
+      />
+      {currentStep === 0 ? (
+        <Card bordered={false}>
+          <Typography.Link onClick={toggleIsCreate}>
+            <LeftCircleFilled />
+            <span> Exit</span>
+          </Typography.Link>
+          <Typography.Title level={5}>ASSIGNMENT TYPES</Typography.Title>
+          <Menu
+            onClick={({ key }) => {
+              setAssignmentType(key);
+              updateCurrentStep(1);
+            }}
+            items={[
+              // {
+              //   label: "Exam / Quiz",
+              //   key: 0,
+              //   icon: <FileTextOutlined />,
+              // },
+              // {
+              //   label: "Homework / Problem Set",
+              //   key: 1,
+              //   icon: <BookOutlined />,
+              // },
+              {
+                label: "Programming Assignment",
+                key: 2,
+                icon: <CodeOutlined />,
+              },
+            ]}
+          />
+        </Card>
+      ) : (
+        <Layout>
+          <Sider theme="light" width={230}>
+            <Card bordered={false}>
+              <Typography.Link
+                onClick={() => {
+                  setAssignmentType("");
+                  updateCurrentStep(0);
+                }}
+              >
+                <LeftCircleFilled />
+                <span> Go Back</span>
+              </Typography.Link>
+              <Typography.Title level={5}>ASSIGNMENT TYPE</Typography.Title>
+              {assignmentType === "0" ? (
+                <div>
+                  <FileTextOutlined />
+                  <span> Exam / Quiz</span>
+                </div>
+              ) : assignmentType === "1" ? (
+                <div>
+                  <BookOutlined />
+                  <span> Homework / Problem Set</span>
+                </div>
+              ) : (
+                <div>
+                  <CodeOutlined />
+                  <span> Programming Assignment</span>
+                </div>
+              )}
+            </Card>
+          </Sider>
+          <Content>
+            <Card bordered={false}>
+              <Form
+                layout="vertical"
+                form={form}
+                initialValues={{
+                  releaseDate: moment(), // current date
+                  dueDate: moment().add(7, "day"), // 7 days from now
+                  autograderPoints: "100",
+                  autograder: { operation: "zip", timeout: "300" },
+                }}
+                onFinish={handleFinish}
+              >
+                <Form.Item
+                  label="ASSIGNMENT NAME"
+                  name="name"
+                  validateStatus={nameValidationStatus}
+                  rules={[{ required: true, message: "Please enter a name" }]}
+                >
+                  <Input placeholder="Name your assignment" />
+                </Form.Item>
+
+                {assignmentType !== "2" ? (
+                  <Form.Item
+                    label="TEMPLATE"
+                    name="template"
+                    valuePropName="fileList"
+                  >
+                    <Upload>
+                      <Button icon={<UploadOutlined />}>select PDF</Button>
+                    </Upload>
+                  </Form.Item>
+                ) : null}
+
+                {assignmentType === "2" ? (
+                  <>
+                    <Form.Item
+                      label="AUTOGRADER POINTS"
+                      name="autograderPoints"
+                      rules={[
+                        { required: true, message: "Please enter a point value" },
+                        { pattern: /^\d+$/, message: "Only numeric values allowed" },
+                      ]}
+                    >
+                      <Input />
+                    </Form.Item>
+                    <Form.Item
+                      label="MANUAL GRADING"
+                      name="manualGrading"
+                      valuePropName="checked"
+                    >
+                      <Checkbox>Enable Manual Grading</Checkbox>
+                    </Form.Item>
+                    <Form.Item
+                      label="HOLD AUTOGRADER RESULTS UNTIL PUBLISH"
+                      name="hold_results_until_publish"
+                      valuePropName="checked"
+                      initialValue={false}
+                    >
+                      <Switch />
+                    </Form.Item>
+
+                  </>
+                ) : (
+                  <Form.Item
+                    label="WHO WILL UPLOAD SUBMISSIONS?"
+                    name="identify"
+                  >
+                    <Radio.Group options={["Instructor", "Student"]} />
+                  </Form.Item>
+                )}
+
+                {assignmentType === "0" ? null : (
+                  <>
+                    <Form.Item wrapperCol={{ xl: 12 }}>
+                      <Row gutter={20}>
+                        <Col span={24} md={12}>
+                          <Form.Item
+                            label="RELEASE DATE (CDT)"
+                            name="releaseDate"
+                            rules={[{ required: true, message: "Please select a release date" }]}
+                          >
+                            <DatePicker showTime style={{ width: "100%" }} />
+                          </Form.Item>
+                        </Col>
+                        <Col span={24} md={12}>
+                          <Form.Item
+                            label="DUE DATE (CDT)"
+                            name="dueDate"
+                            rules={[{ required: true, message: "Please select a due date" }]}
+                          >
+                            <DatePicker showTime style={{ width: "100%" }} />
+                          </Form.Item>
+                        </Col>
+                        <Col span={24} md={12}>
+                          <Form.Item
+                            name="allowLateSubmissions"
+                            valuePropName="checked"
+                          >
+                            <Checkbox>Allow Late Submissions</Checkbox>
+                          </Form.Item>
+                        </Col>
+                        <Col span={24} md={12}>
+                          <Form.Item
+                            label="LATE DUE DATE (CDT)"
+                            dependencies={["dueDate"]}
+                            name="lateDueDate"
+                            rules={[
+                              ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                  if (!value || getFieldValue("dueDate") < value) {
+                                    return Promise.resolve();
+                                  }
+                                  return Promise.reject(new Error("Late due date must be after due date"));
+                                },
+                              }),
+                            ]}
+                          >
+                            <DatePicker showTime style={{ width: "100%" }} />
+                          </Form.Item>
+                        </Col>
+                        {assignmentType === "1" ? (
+                          <>
+                            <Col span={24} md={12}>
+                              <Form.Item
+                                name="enforceTimeLimit"
+                                valuePropName="checked"
+                              >
+                                <Checkbox>Enforce time limit</Checkbox>
+                              </Form.Item>
+                            </Col>
+                            <Col span={24} md={12}>
+                              <Form.Item
+                                label="MAXIMUM TIME PERMITTED (MINUTES)"
+                                name="maximumTimePermitted"
+                              >
+                                <DatePicker
+                                  showTime
+                                  style={{ width: "100%" }}
+                                />
+                              </Form.Item>
+                            </Col>
+                          </>
+                        ) : null}
+                      </Row>
+                    </Form.Item>
+
+                    <Form.Item
+                      label="SUBMISSION TYPE"
+                      name="submissionType"
+                    >
+                      <Radio.Group>
+                        <Space direction="vertical">
+                          <Radio value={0}>Variable Length</Radio>
+                          <Radio value={1}>Templated (Fixed Length)</Radio>
+                        </Space>
+                      </Radio.Group>
+                    </Form.Item>
+
+                    <Form.Item
+                      label="GROUP SUBMISSION"
+                      name="groupSubmission"
+                      valuePropName="checked"
+                    >
+                      <Checkbox>Enable Group Submission</Checkbox>
+                    </Form.Item>
+                    <Form.Item
+                      label="LIMIT GROUP SIZE"
+                      name="limitGroupSize"
+                      rules={[
+                        { required: false },
+                        { pattern: /^\d+$/, message: "Only numeric values allowed" },
+                      ]}
+                    >
+                      <Input />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="ENABLE AI FEEDBACK"
+                      name="ai_feedback_enabled"
+                      valuePropName="checked"
+                    >
+                      <Switch />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="AI FEEDBACK PROMPT"
+                      name="ai_feedback_prompt"
+                      initialValue={"You are an AI used to provide constructive feedback to students on their coding assignments. Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation, error handling, style/formatting."}
+                      rules={[{ required: aiFeedbackEnabled, message: "Please enter a feedback prompt" }]}
+                    >
+                      <Input.TextArea
+                        placeholder="Enter the feedback prompt for AI"
+                        autoSize={{ minRows: 4, maxRows: 8 }}
+                        disabled={!aiFeedbackEnabled}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="AI MODEL USED"
+                      name="ai_feedback_model"
+                      rules={[{ required: aiFeedbackEnabled, message: "Please select an AI model (e.g. gpt-5o)" }]}
+                    >
+                      <Input.TextArea
+                        placeholder="gpt-5o"
+                        autoSize={{ minRows: 1, maxRows: 1}}
+                        disabled={!aiFeedbackEnabled}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="MODEL TEMPERATURE"
+                      name="ai_feedback_temperature"
+                      initialValue={0.5}
+                      rules={[
+                        { required: aiFeedbackEnabled, message: "Please enter a temperature" },
+                        { pattern: /^0(\.\d+)?|1$/, message: "Enter a value between 0 and 1" },
+                      ]}
+                    >
+                      <Input placeholder="Enter temperature (0 to 1)" disabled={!aiFeedbackEnabled} />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="CONFIGURE AUTOGRADER"
+                      name="autograder_enabled"
+                      valuePropName="checked"
+                      initialValue={false}
+                    >
+                      <Switch onChange={(checked) => setConfigureAutograderNow(checked)} />
+                    </Form.Item>
+
+                    <AutograderSection
+                      form={form}
+                      configureNow={configureAutograderNow}
+                      setConfigureNow={setConfigureAutograderNow}
+                      autograderFile={autograderFile}
+                      setAutograderFile={setAutograderFile}
+                      onTestClick={openTest}
+                      disabled={!configureAutograderNow} 
+                    />
+                    <Form.Item style={{ marginBottom: 0 }} />
+                  </>
+                )}
+
+                <Form.Item>
+                  <Space>
+                    <Button loading={saveLoading} type="primary" htmlType="submit">
+                      Create Assignment
+                    </Button>
+                    <Button onClick={toggleIsCreate}>Cancel</Button>
+                  </Space>
+                </Form.Item>
+              </Form>
+            </Card>
+          </Content>
+        </Layout>
+      )}
+      <TestAutograder
+        open={modalOpen}
+        onCancel={closeTest}
+        autograderFile={autograderFile}
+        onSuccess={handleAutograderSuccess}
+      />
+
+      {resultsModalOpen && (
+        <TestResultsDisplay
+          viewMode="Results"
+          assignmentName={form?.getFieldValue("name") || "Untitled Assignment"}
+          studentName="John Doe"
+          score={testResultsData?.score}
+          totalPoints={Number(form?.getFieldValue("autograderPoints") || 100)}
+          data={testResultsData}
+          aiFeedbackEnabled={true}
+          isModal={true}
+          submissionId="dummy-id-12345"
+          onCancel={handleCloseResultsModal}
+        />
+      )}
+    </>
+  );
+};
