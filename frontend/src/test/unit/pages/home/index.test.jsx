@@ -35,6 +35,12 @@ jest.mock(
   }})
 );
 
+jest.mock('@react-oauth/google', () => ({
+  GoogleOAuthProvider: ({ children }) => <>{children}</>,
+  GoogleLogin: () => <button data-testid="google-login">Mock GoogleLogin</button>,
+  useGoogleLogin: () => jest.fn(),
+}));
+
 import Home from '../../../../pages/home';
 import { GlobalContext } from '../../../../App';
 
