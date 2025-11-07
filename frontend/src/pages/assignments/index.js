@@ -2,7 +2,7 @@ import { Card, Descriptions, PageHeader, Table, Button, message} from "antd";
 import { useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../App";
-import moment from "moment";
+import moment from "moment-timezone";
 import AssignmentModal from "./assignment_modal";
 
 export default function Assignments() {
@@ -44,21 +44,29 @@ export default function Assignments() {
       title: "RELEASED",
       dataIndex: "published_date",
       key: "published_date",
-      render: text => text ? moment(text).format("MMM DD [AT] h:mmA").toUpperCase() : "None",
+      render: text => text
+  ? moment.tz(text, "UTC").tz("America/Chicago").format("MMM DD [AT] h:mmA").toUpperCase()
+  : "None",
+
       sorter: (a, b) => moment(a.published_date).unix() - moment(b.published_date).unix(),
     },
     {
       title: "DUE (CDT)",
       dataIndex: "due_date",
       key: "due_date",
-      render: text => text ? moment(text).format("MMM DD [AT] h:mmA").toUpperCase() : "None",
+      render: text => text
+  ? moment.tz(text, "UTC").tz("America/Chicago").format("MMM DD [AT] h:mmA").toUpperCase()
+  : "None",
+
       sorter: (a, b) => moment(a.due_date).unix() - moment(b.due_date).unix(),
     },
     {
       title: "LATE DUE (CDT)",
       dataIndex: "late_due_date",
       key: "late_due_date",
-      render: text => text ? moment(text).format("MMM DD [AT] h:mmA").toUpperCase() : "None",
+      render: text => text
+  ? moment.tz(text, "UTC").tz("America/Chicago").format("MMM DD [AT] h:mmA").toUpperCase()
+  : "None",
       sorter: (a, b) => moment(a.due_date).unix() - moment(b.due_date).unix(),
     },
   ];
