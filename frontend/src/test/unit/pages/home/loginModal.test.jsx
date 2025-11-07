@@ -138,12 +138,14 @@ describe('<LogInModal />', () => {
         id: 5,
         isStudent: true,
         role: 'student',
+        isAdmin: false,
       });
       expect(JSON.parse(localStorage.getItem('userInfo'))).toEqual({
         name: 'Bob',
         id: 5,
         isStudent: true,
         role: 'student',
+        isAdmin: false,
       });
     });
   });
