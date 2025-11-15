@@ -53,6 +53,19 @@ Added gunicorn
 
 4. get .env files for root folder and postgres security folder and then go to postgres security and execute create_user.sh
 
+.env in the main root folder of codeAssist 
+
+```
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+PG_DB=codeassist
+```
+
+then run 
+```
+sh ./create_user.sh 
+```
+
 5. run `docker compose up` 
 
 
