@@ -63,7 +63,7 @@ PG_DB=codeassist
 
 then run 
 ```
-sh ./create_user.sh 
+python3 init_db.py
 ```
 
 5. run `docker compose up` 
