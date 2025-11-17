@@ -33,11 +33,11 @@ jest.mock('antd', () => {
   const Table = ({ columns, dataSource }) => (
       <table>
         <tbody>
-          {dataSource.map(r => (
+          {dataSource.map((r, rowIdx) => (
             <tr key={r.id} role="row">
-              {columns.map(c => (
-                <td key={c.dataIndex}>
-                  {c.render ? c.render(r[c.dataIndex], r) : r[c.dataIndex]}
+              {columns.map((c, colIdx) => (
+                <td key={c.dataIndex ?? colIdx}>
+                  {c.render ? c.render(r[c.dataIndex], r, rowIdx) : r[c.dataIndex]}
                 </td>
               ))}
             </tr>
@@ -54,7 +54,7 @@ jest.mock('antd', () => {
   );
   const Card   = ({ children }) => <div>{children}</div>;
   const Button = ({ children }) => <button>{children}</button>;
-  const Input  = { Search: props => <input {...props} /> };
+  const Input  = { Search: ({ enterButton, ...props}) => <input {...props} /> };
 
   return {
     __esModule: true,
