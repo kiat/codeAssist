@@ -30,13 +30,13 @@ const columns = [
     title: "RELEASED",
     dataIndex: "published_date",
     sorter: (a, b) => a.released - b.released,
-    render: (text) => moment(text + "Z").format("MMM DD [AT] h:mmA").toUpperCase(),
+    render: (text) => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
   },
   {
     title: "DUE(CDT)",
     dataIndex: "due_date",
     sorter: (a, b) => a.due - b.due,
-    render: (text) => moment(text + "Z").format("MMM DD [AT] h:mmA").toUpperCase(),
+    render: (text) => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
   },
   {
     title: "SUBMISSIONS",
