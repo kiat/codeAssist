@@ -55,21 +55,37 @@ describe("<ReviewGrades />", () => {
   it("renders header and fetches + displays a submission row", async () => {
     const fakeSubmission = [
       {
-        id: 1,
-        student_name: "Alice Example",
-        email_address: "alice@example.com",
+        id: 10,
+        student_id: 1,
         score: 88,
-        graded: 1,
-        viewed: 0,
+        active: true,
         submitted_at: 1658362327000,
-        time: 1658362327000,
       },
     ];
-    global.fetch = jest.fn().mockResolvedValue({
+
+    const fakeStudents = [
+      {
+        id: 1,
+        name: "Alice Example",
+        email_address: "alice@example.com",
+      },
+      {
+        id: 42,
+        name: "Instructor",
+        email_address: "instructor@example.com",
+      },
+    ];
+
+    global.fetch = jest.fn()
+    .mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve(fakeSubmission),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(fakeStudents),
     });
-
+    
     renderWithCtx();
 
     expect(

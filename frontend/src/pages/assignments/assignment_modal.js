@@ -83,7 +83,7 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
           </Upload.Dragger>
         </Form.Item>
         <Form.Item>
-          <Button style={{ width: "100%" }} type="primary" onClick={handleSubmit}>
+          <Button style={{ width: "100%" }} type="submit" onClick={handleSubmit}>
             Submit
           </Button>
         </Form.Item>

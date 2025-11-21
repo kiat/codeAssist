@@ -21,7 +21,7 @@ jest.mock('antd', () => {
     </button>
   );
 
-  const Form = ({ onFinish, children, ...p }) => {
+  const Form = ({ onFinish, children, initialValues, ...p }) => {
     const handle = e => {
       e.preventDefault();
       onFinish(Object.fromEntries(new FormData(e.currentTarget).entries()));

@@ -161,13 +161,13 @@ export default function UploadModal({
     <LoadingOverlay loading={loading} /> 
     <Modal title="Submit Assignment" open={open} onCancel={onCancel} footer={null}>
       <Form layout="vertical">
-        <Form.Item name="upload">
+        <Form.Item name="upload" valuePropName="fileList">
           <Upload.Dragger
             name="file"
             multiple={false}
             onChange={handleFileChange}
             beforeUpload={file => {
-                setFile(file); // Set file on beforeUpload instead of upload itself
+              setFile(file); // Set file on beforeUpload instead of upload itself
               return false; // Prevent default upload
             }}
             onDrop={e => console.log('Dropped files', e.dataTransfer.files)}

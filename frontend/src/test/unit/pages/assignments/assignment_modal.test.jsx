@@ -10,6 +10,23 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AssignmentModal from '../../../../pages/assignments/assignment_modal';
 import { GlobalContext } from '../../../../App';
+import axios from 'axios';
+
+/* ───────────────────────── axios stub ────────────────────────── */
+
+jest.mock('axios', () => {
+  const mockAxios = jest.fn();
+
+  mockAxios.create = jest.fn(() => mockAxios);
+
+  mockAxios.interceptors = {
+    response: {
+      use: jest.fn(),
+    },
+  };
+
+  return mockAxios;
+});
 
 /* ───────────────────────── antd stub ────────────────────────── */
 
@@ -60,16 +77,16 @@ beforeAll(() => {
 afterEach(() => {
   jest.clearAllMocks();
   mockNavigate.mockReset();
-  global.fetch?.mockClear();
 });
 
 /* ───────────────────────────── test ─────────────────────────── */
 
 describe('AssignmentModal', () => {
   test('uploads file, posts to API, and navigates to results', async () => {
+    
     /* fake server response */
-    global.fetch = jest.fn().mockResolvedValueOnce({
-      json: () => Promise.resolve({ submissionID: 123 }),
+    axios.mockResolvedValueOnce({
+      data: { submissionID: 123 },
     });
 
     /* render component with user context */
@@ -92,14 +109,14 @@ describe('AssignmentModal', () => {
     await userEvent.click(screen.getByRole('button', { name: /submit/i }));
 
     /* fetch called once with correct FormData */
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
-    const [url, opts] = global.fetch.mock.calls[0];
+    await waitFor(() => expect(axios).toHaveBeenCalledTimes(1));
+    const [config] = axios.mock.calls[0];
 
-    expect(url).toBe('http://fake.api/upload_submission');
-    expect(opts.method).toBe('POST');
-    expect(opts.body).toBeInstanceOf(FormData);
+    expect(config.url).toBe('upload_submission');
+    expect(config.data).toBeInstanceOf(FormData);
+    expect(config.method).toBe("post");
 
-    const fd = opts.body;
+    const fd = config.data;
     expect(fd.get('file')).toBe(file);
     expect(fd.get('assignment')).toBe('Assignment 1');
     expect(fd.get('student_id')).toBe('42');
