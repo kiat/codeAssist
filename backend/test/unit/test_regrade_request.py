@@ -75,8 +75,7 @@ def test_get_regrade_request_success(client, mocker):
     fake_req = mocker.Mock(justification="Because…", reviewed=False)
 
     # Submission exists
-    sub_query = mocker.patch("routes.regrade_request.Submission.query")
-    # sub_query.filter_by.return_value = fake_sub     
+    sub_query = mocker.patch("routes.regrade_request.Submission.query")  
     sub_query.filter_by.return_value.first.return_value = fake_sub
     
     # RegradeRequest exists

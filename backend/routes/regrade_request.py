@@ -47,13 +47,10 @@ def get_regrade_request():
     '''
     submission_id = request.args.get("submission_id")
     if not submission_id:
-        # return jsonify({"message": "no submission id passed"})
         raise BadRequestError("No submission id passed")
 
-    # submission = Submission.query.filter_by(id=submission_id)
     submission = Submission.query.filter_by(id=submission_id).first()
     if not submission:
-        # return jsonify({"message": "no such submission"})
         raise NotFoundError("No such submission")
     regrade = RegradeRequest.query.filter_by(submission_id=submission_id).first()
     if not regrade :
@@ -79,18 +76,15 @@ def update_grade():
     new_grade = data.get('new_grade')
 
     if not submission_id or new_grade is None:
-        # return jsonify({"message": "Missing submission_id or new_grade"}), 400
         raise BadRequestError("Missing submission_id or new_grade")
     submission = Submission.query.filter_by(id=submission_id).first()
 
     if not submission:
-        # return jsonify({"message": "No such submission found"}), 404
         raise NotFoundError("No such submission found")
 
     try:
         new_grade = float(new_grade)  # Ensure the grade is a float
     except ValueError:
-        # return jsonify({"message": "Invalid grade value"}), 400
         raise BadRequestError("Invalid grade value")
 
     submission.score = new_grade
@@ -164,7 +158,6 @@ def set_reviewed():
     entry = db.session.query(RegradeRequest).filter_by(submission_id=submissionid).first()
     
     if entry is None:
-        # return jsonify({"error": f"No regrade request found for submission_id: {submissionid}"}), 404
         raise NotFoundError(f"No regrade request found for submission_id: {submissionid}")
     entry.reviewed = True
     db.session.commit()
