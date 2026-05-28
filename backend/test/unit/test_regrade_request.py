@@ -45,24 +45,28 @@ def test_send_regrade_request_success(client, mocker):
 
 def test_get_regrade_request_missing_id(client):
     res = client.get("/get_regrade_request")
-    assert res.status_code == 200
-    assert res.get_json()["message"] == "no submission id passed"
+    assert res.status_code == 400
+    assert res.get_json()["message"] == "No submission id passed"
 
 
 def test_get_regrade_request_no_submission(client, mocker):
     sub_query = mocker.patch("routes.regrade_request.Submission.query")
-    sub_query.filter_by.return_value = None
+    sub_query.filter_by.return_value.first.return_value = None
 
     res = client.get("/get_regrade_request?submission_id=sub404")
-    assert res.status_code == 200
-    assert res.get_json()["message"] == "no such submission"
+    assert res.status_code == 404
+    assert res.get_json()["message"] == "No such submission"
 
 
 def test_get_regrade_request_no_request(client, mocker):
-    mocker.patch("routes.regrade_request.Submission.query.filter_by")
-    mocker.patch("routes.regrade_request.RegradeRequest.query.filter_by", return_value=mocker.Mock(first=lambda: None))
+    sub_query = mocker.patch("routes.regrade_request.Submission.query")
+    sub_query.filter_by.return_value.first.return_value = object()
+
+    req_query = mocker.patch("routes.regrade_request.RegradeRequest.query")
+    req_query.filter_by.return_value.first.return_value = None
+
     res = client.get("/get_regrade_request?submission_id=sub1")
-    assert res.status_code == 200
+    assert res.status_code == 404
     assert res.get_json()["message"] == "No regrade request found"
 
 
@@ -72,7 +76,8 @@ def test_get_regrade_request_success(client, mocker):
 
     # Submission exists
     sub_query = mocker.patch("routes.regrade_request.Submission.query")
-    sub_query.filter_by.return_value = fake_sub     
+    # sub_query.filter_by.return_value = fake_sub     
+    sub_query.filter_by.return_value.first.return_value = fake_sub
     
     # RegradeRequest exists
     req_query = mocker.patch("routes.regrade_request.RegradeRequest.query")
@@ -219,7 +224,7 @@ def test_get_student_regrade_requests_success(client, mocker):
 # Test cases for get_instructor_regrade_requests
 
 
-def test_set_reviewed(client, mocker):
+def test_set_reviewed_success_with_simple_namespace(client, mocker):
     entry = SimpleNamespace(reviewed=False)
     mocker.patch("routes.regrade_request.db.session.query") \
           .return_value.filter_by.return_value.first.return_value = entry
@@ -231,3 +236,37 @@ def test_set_reviewed(client, mocker):
     assert res.get_json()["message"] == "Review updated successfully"
     commit.assert_called_once()
 
+def test_update_grade_no_submission(client, mocker):
+    sub_query = mocker.patch("routes.regrade_request.Submission.query")
+    sub_query.filter_by.return_value.first.return_value = None
+
+    res = client.post("/update_grade", json={
+        "submission_id": "missing-sub",
+        "new_grade": 95
+    })
+
+    assert res.status_code == 404
+    assert res.get_json()["message"] == "No such submission found"
+
+def test_update_grade_invalid_grade(client, mocker):
+    fake_sub = SimpleNamespace(score=80)
+
+    sub_query = mocker.patch("routes.regrade_request.Submission.query")
+    sub_query.filter_by.return_value.first.return_value = fake_sub
+
+    res = client.post("/update_grade", json={
+        "submission_id": "sub1",
+        "new_grade": "bad-grade"
+    })
+
+    assert res.status_code == 400
+    assert res.get_json()["message"] == "Invalid grade value"
+
+def test_set_reviewed_not_found(client, mocker):
+    mocker.patch("routes.regrade_request.db.session.query") \
+        .return_value.filter_by.return_value.first.return_value = None
+
+    res = client.post("/set_reviewed", json={"submission_id": "sub404"})
+
+    assert res.status_code == 404
+    assert res.get_json()["message"] == "No regrade request found for submission_id: sub404"
