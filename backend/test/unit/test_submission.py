@@ -628,3 +628,108 @@ def test_get_all_assignment_submissions_success(client, mocker):
 
     assert response.status_code == 200
     assert response.get_json() == fake_submissions
+
+def test_activate_submission_internal_error(client, mocker):
+    payload = {
+        "submission_id": "sub1",
+        "student_id": "stu1",
+        "assignment_id": "assgn1"
+    }
+
+    mock_session = mocker.patch("routes.submission.db.session")
+    mock_session.query.side_effect = Exception("database error")
+
+    response = client.post("/activate_submission", json=payload)
+
+    assert response.status_code == 500
+    assert response.get_json()["message"] == "Failed to activate submission"
+    mock_session.rollback.assert_called_once()
+
+def test_get_submission_details_not_found(client, mocker):
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.get(
+        "/get_submission_details?submission_id=sub1"
+    )
+
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "No submission found"
+
+def test_get_results_user_not_found(client, mocker):
+    mock_query = mocker.patch("routes.submission.db.session.query")
+
+    fake_user_query = mocker.Mock()
+    fake_user_query.filter_by.return_value.first.return_value = None
+    mock_query.return_value = fake_user_query
+
+    response = client.get("/get_results?email=test@test.com&assignment_id=a1")
+
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "User not found"
+
+
+from io import BytesIO
+
+def test_upload_submission_missing_fields(client):
+    response = client.post(
+        "/upload_submission",
+        data={
+            "file": (BytesIO(b"hello"), "test.py")
+        },
+        content_type="multipart/form-data"
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing required fields"
+
+def test_upload_submission_assignment_not_found(client, mocker):
+    mock_query = mocker.patch(
+        "routes.submission.db.session.query"
+    )
+
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.post(
+        "/upload_submission",
+        data={
+            "assignment_id": "a1",
+            "student_id": "s1",
+            "file": (BytesIO(b"hello"), "test.py")
+        },
+        content_type="multipart/form-data"
+    )
+
+    assert response.status_code == 404
+
+def test_delete_submission_commit_error(client, mocker):
+    fake_submission = object()
+
+    mocker.patch(
+        "routes.submission.db.session.get",
+        return_value=fake_submission
+    )
+
+    mocker.patch(
+        "routes.submission.db.session.delete"
+    )
+
+    mocker.patch(
+        "routes.submission.db.session.commit",
+        side_effect=Exception("db error")
+    )
+
+    rollback = mocker.patch(
+        "routes.submission.db.session.rollback"
+    )
+
+    response = client.delete(
+        "/delete_submission?submission_id=123"
+    )
+
+    assert response.status_code == 500
+
+    data = response.get_json()
+    assert data["message"] == "Failed to delete submission"
+
+    rollback.assert_called_once()

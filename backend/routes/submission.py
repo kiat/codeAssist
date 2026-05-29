@@ -383,8 +383,10 @@ def get_results():
     assignment_id = request.args.get("assignment_id")
 
     student = db.session.query(User).filter_by(email_address=email).first()
-    if student:
-        student_id = student.id
+    if not student:
+        raise NotFoundError("User not found")
+
+    student_id = student.id
 
     submission = (db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
                     .order_by(desc(Submission.submitted_at)).limit(1))
@@ -400,7 +402,6 @@ def get_latest_submission():
     assignment_id = request.args.get("assignment_id")
 
     if not student_id or not assignment_id:
-        # return jsonify({"error": "Missing student_id or assignment_id"}), 400
         raise BadRequestError("Missing student_id or assignment_id")
     # Query for the latest submission based on the submitted time
     latest_submission = Submission.query.filter_by(
@@ -441,7 +442,6 @@ def get_all_assignment_submissions():
 
     return jsonify(submissions_data), 200
 
-
 @submission.route('/delete_submission', methods=["DELETE"])
 @cross_origin()
 def delete_submission():
@@ -450,18 +450,18 @@ def delete_submission():
     if not submission_id:
         raise BadRequestError("Missing submission_id")
 
-    # Query for the submission to be deleted by submission_id
     submission_to_delete = db.session.get(Submission, submission_id)
 
     if not submission_to_delete:
-        # If no submission is found, return an error message
         raise NotFoundError("No submission found to delete")
 
-    # If a submission is found, delete it from the database
-    db.session.delete(submission_to_delete)
-    db.session.commit()
+    try:
+        db.session.delete(submission_to_delete)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to delete submission")
 
-    # Return a success message
     return jsonify({"message": "Submission successfully deleted"}), 200
 
 @submission.route('/get_submission_details', methods=["GET"])
