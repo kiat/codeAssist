@@ -12,8 +12,11 @@ class User(db.Model):
     sis_user_id = db.Column(db.String, nullable=False, unique=True)
     role = db.Column(db.String, nullable = False)
 
-    # -- AI Integration -- 
+    # -- AI Integration --
     coding_insights = db.Column(db.String, default="No history.")
+
+    reset_token = db.Column(db.String, nullable=True)
+    reset_token_expiry = db.Column(TIMESTAMP(timezone=True), nullable=True)
 
 class Course(db.Model):
     __tablename__ = "courses"

@@ -36,7 +36,8 @@ import AdminAllCourses from "./pages/admin/courses/all";
 import AdminStudentManage from "./pages/admin/students/manage";
 import AdminStudentAdd from "./pages/admin/students/add";
 import AdminCourseManage from "./pages/admin/courses/manage";
-import AdminCourseAdd from "./pages/admin/courses/add"; // <-- Add this line
+import AdminCourseAdd from "./pages/admin/courses/add";
+import ResetPassword from "./pages/resetPassword";
 
 
 const { Content } = Layout;
@@ -84,9 +85,11 @@ function App() {
   const updateUserInfo = useCallback(info => setUserInfo(info), []);
   const updateAssignmentInfo = useCallback(info => setAssignmentInfo(info), []);
 
-  // Redirect to home if not logged in and not on home page
+  const publicPaths = ["/", "/reset-password"];
+
+  // Redirect to home if not logged in and not on a public page
   useEffect(() => {
-    if (location.pathname !== "/" && !userInfo.name) {
+    if (!publicPaths.includes(location.pathname) && !userInfo.name) {
       navigate("/");
     }
   }, [userInfo, location, navigate]);
@@ -143,6 +146,7 @@ function App() {
           >
             <Routes>
               <Route path='/' element={<Home />} />
+              <Route path='/reset-password' element={<ResetPassword />} />
               <Route path='/dashboard' element={<Dashboard />} />
               <Route path='/admin/dashboard' element={<AdminDashboard/>} />
               <Route path='/admin/courses' element={<AdminCourses />} />
