@@ -23,14 +23,52 @@ from util.encryption_utils import decrypt_api_key
 
 
 DEFAULT_MODEL="gpt-4-turbo"
-DEFAULT_FEEDBACK_PROMPT="You are an AI used to provide constructive feedback to students on their coding assignments.\
-    Provide feedback on the following assignment regarding correctness, efficiency, code quality, documentation,\
-    error handling, style/formatting.\n"
+DEFAULT_FEEDBACK_PROMPT = """
+You are giving short, student-facing feedback on a coding assignment.
+
+Your goal is to help students write better code without giving away the full solution.
+
+Rules:
+- Do not provide corrected code.
+- Do not give copy-paste fixes.
+- Give short hints, not full answers.
+- Focus on code quality, debugging, edge cases, readability, and error handling.
+- Keep each comment under 2 sentences.
+- Use encouraging, clear language.
+- Prefer guiding questions when possible.
+
+Return strictly valid JSON in this format:
+{
+  "insights": [
+    "One short overall takeaway about how the student can improve."
+  ],
+  "annotations": [
+    {
+      "pattern": "exact code snippet or recognizable code pattern",
+      "category": "Correctness | Edge Case | Error Handling | Readability | Efficiency | Style",
+      "hint": "A short hint that helps the student improve without giving the answer.",
+      "why_it_matters": "One short reason this matters."
+    }
+  ]
+}
+"""
+
 DEFAULT_TEMPERATURE=0.5
-RETURN_SPEC="Response should be JSON in the form:\
-            { 'insights': <updated insights for this student's coding behavior, focused on areas of improvement. Should be a series of consise bullets>,\
-            'annotations': [{'pattern': <> , 'comment': <>}, ...]\
-            }"
+RETURN_SPEC = """
+Response should be strictly JSON:
+{
+  "insights": ["short overall learning takeaway"],
+  "annotations": [
+    {
+      "pattern": "exact code snippet",
+      "comment": "short student-facing hint, not a direct answer"
+    }
+  ]
+}
+
+Do not provide corrected code. Do not give copy-paste fixes.
+Each comment should help the student think about how to improve their code.
+"""
 
 # Load environment variables
 load_dotenv()
@@ -155,36 +193,62 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
     ctx.push()
 
     try:
+        print(f"AI_FEEDBACK: Starting for submission {submission_id}", flush=True)
+
         with open(file_path, 'r') as code_file:
             code_text = code_file.read()
 
+        print("AI_FEEDBACK: Code file loaded", flush=True)
+
         submission, assignment, course, student = fetch_submission_data(submission_id)
 
-        if not assignment.ai_feedback_enabled:
-            print(f"AI_FEEDBACK: Disabled for submission {submission_id}")
-            return
-
-        prompt = build_feedback_prompt(
-            assignment.ai_feedback_prompt,
-            student.coding_insights,
-            code_text,
-            results_json_content
+        print(
+            f"AI_FEEDBACK: Loaded DB records. enabled={assignment.ai_feedback_enabled}",
+            flush=True
         )
 
-        model = assignment.ai_feedback_model
-        temperature = assignment.ai_feedback_temperature
+        if not assignment.ai_feedback_enabled:
+            print(f"AI_FEEDBACK: Disabled for submission {submission_id}", flush=True)
+            return
+
+        past_insights = student.coding_insights or "No prior insights."
+        base_prompt = assignment.ai_feedback_prompt or DEFAULT_FEEDBACK_PROMPT
+        model = assignment.ai_feedback_model or DEFAULT_MODEL
+
+        try:
+            temperature = float(assignment.ai_feedback_temperature or DEFAULT_TEMPERATURE)
+        except (TypeError, ValueError):
+            temperature = DEFAULT_TEMPERATURE
+
+        if not course.openai_api_key:
+            raise ValueError("Missing OpenAI API key for this course")
+
+        print(f"AI_FEEDBACK: Using model={model}, temperature={temperature}", flush=True)
 
         decrypted_api_key = decrypt_api_key(course.openai_api_key)
         client = OpenAI(api_key=decrypted_api_key)
 
-        ai_feedback_json, new_insights = get_structured_feedback_from_openai(
-            client, prompt, model, temperature, student.coding_insights
+        prompt = build_feedback_prompt(
+            base_prompt,
+            past_insights,
+            code_text,
+            results_json_content
         )
+
+        print("AI_FEEDBACK: Calling OpenAI", flush=True)
+
+        ai_feedback_json, new_insights = get_structured_feedback_from_openai(
+            client, prompt, model, temperature, past_insights
+        )
+
+        print("AI_FEEDBACK: Updating submission feedback", flush=True)
 
         update_submission_feedback(submission_id, ai_feedback_json, new_insights)
 
+        print(f"AI_FEEDBACK: Saved feedback for submission {submission_id}", flush=True)
+
     except Exception as e:
-        print(f"AI_FEEDBACK: Unexpected error - {e}")
+        print(f"AI_FEEDBACK: Unexpected error - {type(e).__name__}: {e}", flush=True)
 
     finally:
         ctx.pop()
