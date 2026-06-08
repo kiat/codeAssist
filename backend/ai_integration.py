@@ -55,19 +55,27 @@ Return strictly valid JSON in this format:
 
 DEFAULT_TEMPERATURE=0.5
 RETURN_SPEC = """
-Response should be strictly JSON:
+Return only valid JSON. Do not use markdown, code fences, or extra explanation.
+
+Use this exact JSON structure:
 {
-  "insights": ["short overall learning takeaway"],
+  "insights": [
+    "One short overall takeaway about how the student can improve."
+  ],
   "annotations": [
     {
-      "pattern": "exact code snippet",
-      "comment": "short student-facing hint, not a direct answer"
+      "pattern": "exact code snippet or recognizable code pattern",
+      "comment": "A short student-facing hint that helps the student improve without giving the answer."
     }
   ]
 }
 
-Do not provide corrected code. Do not give copy-paste fixes.
-Each comment should help the student think about how to improve their code.
+Rules:
+- Do not provide corrected code.
+- Do not give copy-paste fixes.
+- Keep each comment under 2 sentences.
+- Make feedback helpful for improving code quality, debugging, edge cases, readability, and error handling.
+- Use hints and guiding questions instead of direct answers.
 """
 
 # Load environment variables
@@ -104,15 +112,13 @@ def fetch_submission_data(submission_id):
 def build_feedback_prompt(base_prompt, past_insights, code, autograder_results):
     """Constructs the full prompt sent to the AI model."""
     return (
-        f"{base_prompt}"
-        "Pay special attention to the past insights of this student:\n"
-        f"{past_insights}"
-
-        "Response should be strictly JSON, with no extra formatting, in the form:\n"
-        "{ 'insights': [...], 'annotations': [{pattern: ..., comment: ...}, ...] }\n\n"
-        "Code:\n\n"
+        f"{base_prompt or DEFAULT_FEEDBACK_PROMPT}\n\n"
+        f"{RETURN_SPEC}\n\n"
+        "Past student insights:\n"
+        f"{past_insights}\n\n"
+        "Student code:\n"
         f"{code}\n\n"
-        "Autograder results:\n\n"
+        "Autograder results:\n"
         f"{autograder_results}\n\n"
     )
 
@@ -129,17 +135,18 @@ def get_structured_feedback_from_openai(client, prompt, model, temperature, past
         messages=[
             {
                 "role": "system",
-                "content": format_message("You are an AI that provides constructive criticism on submitted code.", model)
+                "content": "You are an AI that gives short, student-facing coding hints. Return only valid JSON."
             },
             {
                 "role": "user",
-                "content": format_message(prompt, model)
+                "content": prompt
             }
         ],
         model=model,
         max_tokens=700,
         temperature=temperature,
-        timeout=30  # timeout in seconds
+        timeout=30,
+        response_format={"type": "json_object"}
     )
 
     raw_response = response.choices[0].message.content.strip()
@@ -151,16 +158,17 @@ def get_structured_feedback_from_openai(client, prompt, model, temperature, past
             parsed_json = json.loads(parsed_json)
 
         print("AI_FEEDBACK:")
-        print(json.dumps(parsed_json, indent=4))
+        print(json.dumps(parsed_json, indent=4), flush=True)
 
         return parsed_json, parsed_json.get("insights", [])
-    except Exception:
-        print("AI_FEEDBACK: Failed to parse JSON from response.")
+    except Exception as e:
+        print(f"AI_FEEDBACK: Failed to parse JSON from response: {e}", flush=True)
+        print(f"AI_FEEDBACK RAW RESPONSE: {cleaned}", flush=True)
+
         return {
             "error": "Failed to parse OpenAI response as JSON",
             "response_text": cleaned
         }, past_insights
-
 
 def clean_ai_response(text):
     """Strips markdown formatting and unescapes newlines."""
