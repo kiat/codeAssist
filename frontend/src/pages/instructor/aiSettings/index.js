@@ -11,7 +11,8 @@ import {
   Space,
   Typography,
   message,
-  Spin
+  Spin,
+  Select
 } from "antd";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -34,6 +35,58 @@ export default () => {
   const [modelName, setModelName] = useState("");
   const [isTesting, setIsTesting] = useState(false);
   const [apiTestStatus, setApiTestStatus] = useState(null);
+  const [modelsList, setModelsList] = useState([]);
+  const [searchValue, setSearchValue] = useState("");
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      if (!apiKey) {
+        setModelsList([]);
+        return;
+      }
+      try {
+        let fetchedModels = [];
+        if (provider === "openai") {
+          const response = await axios.get("https://api.openai.com/v1/models", {
+            headers: { Authorization: `Bearer ${apiKey}` },
+          });
+          if (response.status === 200 && response.data?.data) {
+            fetchedModels = response.data.data.map(m => m.id);
+          }
+        } else if (provider === "google") {
+          const response = await axios.get(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            { params: { key: apiKey } }
+          );
+          if (response.status === 200 && response.data?.models) {
+            fetchedModels = response.data.models.map(m => m.name.replace(/^models\//, ""));
+          }
+        } else if (provider === "anthropic") {
+          const response = await axios.get("https://api.anthropic.com/v1/models", {
+            headers: {
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+              "anthropic-dangerous-direct-browser-access": "true"
+            },
+          });
+          if (response.status === 200 && response.data?.data) {
+            fetchedModels = response.data.data.map(m => m.id);
+          }
+        }
+        setModelsList(fetchedModels);
+      } catch (e) {
+        console.error("Failed to fetch models dynamically:", e);
+        setModelsList([]);
+      }
+    };
+    fetchModels();
+  }, [provider, apiKey]);
+
+  const displayModelsList = Array.from(new Set([
+    ...(modelName ? [modelName] : []),
+    ...(searchValue ? [searchValue] : []),
+    ...modelsList
+  ]));
 
   useEffect(() => {
     const load = async () => {
@@ -104,13 +157,14 @@ export default () => {
         );
         ok = response.status === 200;
       } else if (provider === "anthropic") {
-        // Claude models listing (simple ping via models is not public; do a harmless messages call with empty content)
-        const response = await axios.post(
-          "https://api.anthropic.com/v1/messages",
-          { model: "claude-3-5-sonnet", max_tokens: 1, messages: [{ role: "user", content: "ping" }] },
-          { headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" } }
-        );
-        ok = response.status >= 200 && response.status < 300;
+        const response = await axios.get("https://api.anthropic.com/v1/models", {
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true"
+          },
+        });
+        ok = response.status === 200;
       }
       if (ok) {
         setApiTestStatus("success");
@@ -175,7 +229,21 @@ export default () => {
             </Card>
             <Card title="Model">
               <Form.Item label="Model Name (e.g., gpt-5o, gemini-1.5-pro, claude-3-5-sonnet)">
-                <Input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="Enter model name" />
+                <Select
+                  showSearch
+                  value={modelName}
+                  onChange={(val) => setModelName(val)}
+                  onSearch={(val) => setSearchValue(val)}
+                  placeholder="Select or search model name"
+                  filterOption={(input, option) =>
+                    (option?.value ?? "").toLowerCase().includes(input.toLowerCase())
+                  }
+                  style={{ width: "100%" }}
+                >
+                  {displayModelsList.map(m => (
+                    <Select.Option key={m} value={m}>{m}</Select.Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Card>
             <Card title="Connection Test">
