@@ -15,7 +15,7 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getCourseInfo, updateCourse } from "../../../services/course";
+import {  getCourseInfo, storeApiKey } from "../../../services/course";
 import axios from "axios";
 
 export default () => {
@@ -67,17 +67,22 @@ export default () => {
       localStorage.setItem(`ai_model_name_${provider}_${courseId}`, modelName);
 
       if (provider === "openai") {
-        await updateCourse({ course_id: courseId, openai_api_key: apiKey });
+        await storeApiKey({
+          course_id: courseId,
+          api_key: apiKey,
+        });
+
         // also mirror into local storage for consistency
         localStorage.setItem(`ai_key_${provider}_${courseId}`, apiKey);
       } else {
         // temporarily cache non-openai keys in localStorage
         localStorage.setItem(`ai_key_${provider}_${courseId}`, apiKey);
       }
+
       message.success("AI settings saved");
     } catch (e) {
-      console.error(e);
-      message.error("Failed to save AI settings");
+      console.error("Failed to save AI settings:", e.response?.data || e);
+      message.error(e.response?.data?.error || "Failed to save AI settings");
     }
   };
 

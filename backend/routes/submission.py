@@ -20,7 +20,6 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_integration import async_get_ai_feedback
 import threading
-import json
 
 
 submission = Blueprint('submission', __name__)
@@ -45,16 +44,14 @@ def get_submissions():
     assignment_id = request.args.get("assignment_id")
 
     if not student_id or not assignment_id:
-        return jsonify({"error": "Missing student_id or assignment_id"}), 400
-
+        raise BadRequestError("Missing student_id or assignment_id")
     submissions = db.session.query(Submission).filter_by(
         student_id=student_id, 
         assignment_id=assignment_id
     ).all()  
 
     if not submissions:
-        return jsonify({"message": "No submissions found for the provided student and assignment"}), 404
-
+        raise NotFoundError("No submissions found for the provided student and assignment")
     submission_schema = SubmissionSchema(many=True)
     result = submission_schema.dump(submissions)
 
@@ -336,7 +333,7 @@ def upload_assignment_autograder():
     # Check assignment exists
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
-        return jsonify({"error": "Assignment not found"}), 404
+        raise NotFoundError("Assignment not found")
 
     # Write Dockerfile
     dockerfile_content = """
@@ -386,8 +383,10 @@ def get_results():
     assignment_id = request.args.get("assignment_id")
 
     student = db.session.query(User).filter_by(email_address=email).first()
-    if student:
-        student_id = student.id
+    if not student:
+        raise NotFoundError("User not found")
+
+    student_id = student.id
 
     submission = (db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
                     .order_by(desc(Submission.submitted_at)).limit(1))
@@ -403,8 +402,7 @@ def get_latest_submission():
     assignment_id = request.args.get("assignment_id")
 
     if not student_id or not assignment_id:
-        return jsonify({"error": "Missing student_id or assignment_id"}), 400
-
+        raise BadRequestError("Missing student_id or assignment_id")
     # Query for the latest submission based on the submitted time
     latest_submission = Submission.query.filter_by(
         student_id=student_id,
@@ -427,7 +425,8 @@ def get_all_assignment_submissions():
     assignment_id = request.args.get("assignment_id")
 
     if not assignment_id:
-        return jsonify({"error": "Missing assignment_id"}), 400
+
+        raise BadRequestError("Missing assignment_id")
 
     # Query for all submissions related to the assignment
     all_submissions = Submission.query.filter_by(
@@ -435,7 +434,7 @@ def get_all_assignment_submissions():
     ).order_by(Submission.submitted_at.desc()).all()
 
     if not all_submissions:
-        return jsonify({"error": "No submissions found for this assignment"}), 404
+        raise NotFoundError("No submissions found for this assignment")
 
     # Serialize the submission data
     submissions_schema = SubmissionSchema(many=True)  # Set 'many=True' to handle multiple objects
@@ -443,27 +442,26 @@ def get_all_assignment_submissions():
 
     return jsonify(submissions_data), 200
 
-
 @submission.route('/delete_submission', methods=["DELETE"])
 @cross_origin()
 def delete_submission():
     submission_id = request.args.get("submission_id")
 
     if not submission_id:
-        return jsonify({"error": "Missing submission_id"}), 400
+        raise BadRequestError("Missing submission_id")
 
-    # Query for the submission to be deleted by submission_id
     submission_to_delete = db.session.get(Submission, submission_id)
 
     if not submission_to_delete:
-        # If no submission is found, return an error message
-        return jsonify({"message": "No submission found to delete"}), 404
+        raise NotFoundError("No submission found to delete")
 
-    # If a submission is found, delete it from the database
-    db.session.delete(submission_to_delete)
-    db.session.commit()
+    try:
+        db.session.delete(submission_to_delete)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to delete submission")
 
-    # Return a success message
     return jsonify({"message": "Submission successfully deleted"}), 200
 
 @submission.route('/get_submission_details', methods=["GET"])
@@ -477,16 +475,14 @@ def get_submission_details():
     id = request.args.get("submission_id")
 
     if not id:
-        return jsonify({"error": "Missing submission id"}), 400
+        raise BadRequestError("Missing submission id")
     
-    submission_to_get = db.session.query(Submission).filter_by(id=id)
+    submission_to_get = db.session.query(Submission).filter_by(id=id).first()
 
     if not submission_to_get:
-        # If no submission is found, return an error message
-        return jsonify({"message": "No submission found"}), 404
+        raise NotFoundError("No submission found")
     
-    submission = SubmissionSchema().dump(submission_to_get, many=True)[0]
-
+    submission = SubmissionSchema().dump(submission_to_get)
     return jsonify(submission), 200
 
 @submission.route('/get_active_submission', methods=["GET"])
@@ -504,7 +500,7 @@ def get_active_submission():
     submission = db.session.query(Submission).filter_by(assignment_id=assignment, student_id=student, active=True).first()
 
     if not submission:
-        return jsonify({"message": "no such submission found"})
+        raise NotFoundError("No such submission found")
     
     details = SubmissionSchema().dump(submission)
 
@@ -527,7 +523,7 @@ def activate_submission():
     assignment_id = data.get('assignment_id')
 
     if not submission_id or not student_id or not assignment_id:
-        return jsonify({"error": "Missing submission_id, student_id or assignment_id"}), 400
+        raise BadRequestError("Missing submission_id, student_id, or assignment_id")
 
     try:
         # Deactivate the current active submission for the same assignment and student
@@ -542,7 +538,7 @@ def activate_submission():
         return jsonify({"message": "Submission activated successfully"}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        raise InternalProcessingError("Failed to activate submission")
 
 
 @submission.route('/test_autograder_submission', methods=["POST"])

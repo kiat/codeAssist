@@ -509,10 +509,76 @@ def test_get_user_by_id_non_uuid(client, mocker):
     assert data['message'] == "Invalid user id"
 
 
+def test_google_login_invalid_token(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {
+        "error": "invalid_token"
+    }
+
+    mocker.patch(
+        "routes.user.requests.get",
+        return_value=mock_response
+    )
+
+    response = client.post(
+        "/google_login",
+        json={"credential": "bad_token"}
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Invalid google token"   
+
+
+def test_create_google_user_invalid_token(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {
+        "error": "invalid_token"
+    }
+
+    mocker.patch(
+        "routes.user.requests.get",
+        return_value=mock_response
+    )
+
+    response = client.post(
+        "/create_google_user",
+        json={"credential": "bad_token"}
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Invalid google token"
+
     
+def test_get_instructor_by_eid_missing_eid(client):
+    response = client.get("/get_instructor_by_eid")
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing EID"
 
 
+def test_get_instructor_by_eid_not_found(client, mocker):
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.get("/get_instructor_by_eid?eid=EID404")
+
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "Instructor with this EID not found"
 
 
-    
+def test_get_user_by_eid_missing_eid(client):
+    response = client.get("/get_user_by_eid")
 
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing EID"
+
+
+def test_get_user_by_eid_not_found(client, mocker):
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.all.return_value = []
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.get("/get_user_by_eid?eid=EID404")
+
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "User with this EID not found"
