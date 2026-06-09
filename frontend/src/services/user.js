@@ -24,4 +24,12 @@ export async function googleLogin(params) {
   return service("google_login", params, "post");
 }
 
+export async function forgotPassword(params) {
+  return service("forgot_password", params, "post");
+}
+
+export async function resetPassword(params) {
+  return service("reset_password", params, "post");
+}
+
 
