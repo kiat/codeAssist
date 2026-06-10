@@ -15,7 +15,7 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import {  getCourseInfo, storeApiKey } from "../../../services/course";
+import { getCourseInfo, storeApiKey } from "../../../services/course";
 import axios from "axios";
 
 export default () => {
@@ -31,7 +31,6 @@ export default () => {
 
   const [provider, setProvider] = useState("openai");
   const [apiKey, setApiKey] = useState("");
-  const [modelName, setModelName] = useState("");
   const [isTesting, setIsTesting] = useState(false);
   const [apiTestStatus, setApiTestStatus] = useState(null);
 
@@ -50,9 +49,6 @@ export default () => {
         const storedProviderKey = localStorage.getItem(`ai_key_${savedProvider}_${courseId}`) || "";
         setApiKey(savedProvider === "openai" ? (backendOpenAiKey || storedProviderKey) : storedProviderKey);
 
-        // per-provider model name
-        const savedModelName = localStorage.getItem(`ai_model_name_${savedProvider}_${courseId}`) || "";
-        setModelName(savedModelName);
       } catch (e) {
         console.error(e);
       }
@@ -64,7 +60,6 @@ export default () => {
     try {
       // persist current selection and per-provider settings
       localStorage.setItem(`ai_selected_provider_${courseId}`, provider);
-      localStorage.setItem(`ai_model_name_${provider}_${courseId}`, modelName);
 
       if (provider === "openai") {
         await storeApiKey({
@@ -132,7 +127,7 @@ export default () => {
     }
   };
 
-  const handleSelectModel = async (e) => {
+  const handleSelectProvider = async (e) => {
     const newProvider = e.key;
     setProvider(newProvider);
     // load key for provider; prefer backend for openai if present
@@ -150,8 +145,6 @@ export default () => {
     } catch (e) {
       console.error(e);
     }
-    const savedModelName = localStorage.getItem(`ai_model_name_${newProvider}_${courseId}`) || "";
-    setModelName(savedModelName);
   };
 
   const { Sider, Content } = Layout;
@@ -160,12 +153,12 @@ export default () => {
     <Layout style={{ background: '#fff', height: '100%', minHeight: '100%' }}>
       <Sider width={260} style={{ background: '#fff', borderRight: '1px solid #f0f2f5' }}>
         <div style={{ padding: '16px' }}>
-          <Typography.Title level={4} style={{ margin: 0 }}>AI Models</Typography.Title>
+          <Typography.Title level={4} style={{ margin: 0 }}>AI Providers</Typography.Title>
         </div>
         <Menu
           mode="inline"
           selectedKeys={[provider]}
-          onClick={handleSelectModel}
+          onClick={handleSelectProvider}
           items={providers.map(p => ({ key: p.key, label: p.label }))}
         />
       </Sider>
@@ -176,11 +169,6 @@ export default () => {
             <Card title="Credentials">
               <Form.Item label="API Key">
                 <Input.Password value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Enter API key" />
-              </Form.Item>
-            </Card>
-            <Card title="Model">
-              <Form.Item label="Model Name (e.g., gpt-5o, gemini-1.5-pro, claude-3-5-sonnet)">
-                <Input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="Enter model name" />
               </Form.Item>
             </Card>
             <Card title="Connection Test">
