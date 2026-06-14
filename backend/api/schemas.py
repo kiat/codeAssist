@@ -1,4 +1,4 @@
-from api.models import Course, Enrollment, Assignment, Submission, User, TestCaseResult, TestCase, RegradeRequest, AssignmentExtension
+from api.models import Course, Enrollment, Assignment, Submission, User, TestCaseResult, TestCase, RegradeRequest, AssignmentExtension, CodeDraft
 from api import ma
 
 
@@ -49,4 +49,9 @@ class AssignmentExtensionSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = AssignmentExtension
         include_fk = True
-        include_relationships = True  # Add this if you want to include relationships in the serialized data
+        include_relationships = True
+
+class CodeDraftSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = CodeDraft
+        include_fk = True  # Add this if you want to include relationships in the serialized data

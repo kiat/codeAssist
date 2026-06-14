@@ -130,6 +130,17 @@ class AssignmentExtension(db.Model):
     assignment = db.relationship("Assignment", backref=db.backref("extensions", lazy="dynamic"))
     student = db.relationship("User", backref=db.backref("extensions", lazy="dynamic"))
 
+class CodeDraft(db.Model):
+    __tablename__ = "code_drafts"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False, index=True)
+    content = db.Column(db.Text, nullable=False)
+    file_name = db.Column(db.String, nullable=True, default="solution.py")
+    version_number = db.Column(db.Integer, nullable=False, default=1)
+    saved_at = db.Column(TIMESTAMP(timezone=True), nullable=False)
+    auto_saved = db.Column(db.Boolean, nullable=False, default=False)
+
 class AdminEmail(db.Model):
     __tablename__ = 'admin_emails'
     id = db.Column(db.Integer, primary_key=True)

@@ -25,6 +25,8 @@ services:
         build: 
             context: "./backend/"
             dockerfile: Dockerfile
+        env_file:
+            - ./.env
         environment:
             FLASK_APP: app.py
             FLASK_DEBUG: 1

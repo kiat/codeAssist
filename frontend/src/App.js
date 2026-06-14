@@ -24,6 +24,7 @@ import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
 import RegradeRequests from './components/RegradeRequests';
+import CodeEditorPage from "./pages/codeEditor";
 import AdminDashboard from "./pages/admin/dashboard";
 import AdminSidebar from "./components/layout/AdminSidebar";
 import { leaveCourse } from "./services/course";
@@ -215,9 +216,8 @@ function App() {
               <Route
                 path='/assignment/assignmentSettings/:assignmentId'
                 element={<AssignmentSettings />}
-              />
-              <Route
-                path = '/editAccount/:userId'
+              />              <Route path='/codeEditor/:assignmentId' element={<CodeEditorPage />} />
+              <Route path='/editAccount/:userId'
                 element={<EditAccount />} 
               />
               <Route path="/regradeRequests" element={<RegradeRequests />} />
