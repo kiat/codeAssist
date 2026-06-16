@@ -464,9 +464,44 @@ def get_course_assignments():
         raise BadRequestError("Missing course_id argument")
     
     assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
-    assignments = AssignmentSchema().dump(assignments, many=True)
+    assignments_data = AssignmentSchema().dump(assignments, many=True)
+    enrolled_student_count = (
+        db.session.query(Enrollment.student_id)
+        .filter_by(course_id=course_id, role="student")
+        .distinct()
+        .count()
+    )
 
-    return jsonify(assignments), 200
+    for assignment_data in assignments_data:
+        assignment_id = assignment_data.get("id")
+
+        submission_count = (
+            db.session.query(Submission.student_id)
+            .filter_by(assignment_id=assignment_id)
+            .distinct()
+            .count()
+        )
+        graded_count = (
+            db.session.query(Submission.student_id)
+            .filter_by(assignment_id=assignment_id)
+            .filter(Submission.score.isnot(None))
+            .distinct()
+            .count()
+        )
+        regrade_count = (
+            db.session.query(RegradeRequest.id)
+            .join(Submission, RegradeRequest.submission_id == Submission.id)
+            .filter(Submission.assignment_id == assignment_id)
+            .count()
+        )
+
+        assignment_data["submissions"] = submission_count
+        assignment_data["graded_count"] = graded_count
+        assignment_data["total_students"] = enrolled_student_count
+        assignment_data["graded"] = 0 if enrolled_student_count == 0 else round((graded_count / enrolled_student_count) * 100)
+        assignment_data["regrades"] = regrade_count
+
+    return jsonify(assignments_data), 200
 
 @course.route("/get_course_info", methods=["GET"])
 @cross_origin()
