@@ -496,8 +496,14 @@ def get_active_submission():
 
     if not assignment or not student:
       raise BadRequestError("not sufficient details")
+
+    try:
+        student_uuid = uuid.UUID(str(student))
+        assignment_uuid = uuid.UUID(str(assignment))
+    except (ValueError, TypeError):
+        raise BadRequestError("Invalid student_id or assignment_id")
     
-    submission = db.session.query(Submission).filter_by(assignment_id=assignment, student_id=student, active=True).first()
+    submission = db.session.query(Submission).filter_by(assignment_id=assignment_uuid, student_id=student_uuid, active=True).first()
 
     if not submission:
         raise NotFoundError("No such submission found")

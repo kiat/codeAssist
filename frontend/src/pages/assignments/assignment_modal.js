@@ -8,16 +8,22 @@ import LoadingOverlay from "../../components/LoadingOverlay";
 
 export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle }) {
   const [file, setFile] = useState(null);
+  const [fileList, setFileList] = useState([]);
   const { userInfo } = useContext(GlobalContext);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleFileChange = (info) => {
+    const nextFileList = Array.isArray(info.fileList) ? info.fileList.slice(-1) : [];
+    setFileList(nextFileList);
+
     if (info.file.status === 'done') {
-      setFile(info.file.originFileObj);
+      setFile(info.file.originFileObj || info.file);
       message.success(`${info.file.name} file uploaded successfully.`);
     } else if (info.file.status === 'error') {
       message.error(`${info.file.name} file upload failed.`);
+    } else if (info.file.status === 'removed') {
+      setFile(null);
     }
   };
 
@@ -69,9 +75,11 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
           <Upload.Dragger
             name="file"
             multiple={false}
+            fileList={fileList}
             onChange={handleFileChange}
             beforeUpload={file => {
-              setFile(file); // Set file on beforeUpload instead of upload itself
+              setFile(file);
+              setFileList([{ uid: file.uid || `${Date.now()}`, name: file.name, status: 'done', originFileObj: file }]);
               return false; // Prevent default upload
             }}
             onDrop={e => console.log('Dropped files', e.dataTransfer.files)}
