@@ -18,19 +18,16 @@ from util.encryption_utils import hash_password, verify_password, needs_rehash, 
 
 
 def _send_reset_email(to_email, reset_link):
-    smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-    smtp_port = int(os.getenv('SMTP_PORT', 587))
-    smtp_user = os.getenv('SMTP_USERNAME', '')
-    smtp_pass = os.getenv('SMTP_PASSWORD', '')
-    from_email = os.getenv('SMTP_FROM_EMAIL', smtp_user)
+    email_address = os.getenv('EMAIL_ADDRESS', '')
+    email_password = os.getenv('EMAIL_PASSWORD', '')
 
-    if not smtp_user or not smtp_pass:
+    if not email_address or not email_password:
         print(f"[DEV] Password reset link for {to_email}: {reset_link}", flush=True)
         return
 
     msg = MIMEMultipart('alternative')
     msg['Subject'] = 'Password Reset Request'
-    msg['From'] = from_email
+    msg['From'] = email_address
     msg['To'] = to_email
 
     text = f"Click the link below to reset your password (expires in 1 hour):\n\n{reset_link}"
@@ -42,10 +39,10 @@ def _send_reset_email(to_email, reset_link):
     msg.attach(MIMEText(text, 'plain'))
     msg.attach(MIMEText(html, 'html'))
 
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
+    with smtplib.SMTP('smtp.gmail.com', 587) as server:
         server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.sendmail(from_email, to_email, msg.as_string())
+        server.login(email_address, email_password)
+        server.sendmail(email_address, to_email, msg.as_string())
 
 
 user = Blueprint('user', __name__)
