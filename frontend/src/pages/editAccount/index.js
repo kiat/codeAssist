@@ -19,13 +19,13 @@ import { useEffect, useState, useCallback } from "react";
 import { useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../App";
+import { getPasswordRules } from "../../utils/assignmentData";
 
 export default () => {
     const userId = JSON.parse(localStorage.getItem("userInfo"))?.id;
     const isStudent = JSON.parse(localStorage.getItem("userInfo"))?.isStudent;
     const [formData, setFormData] = useState({});
     const [placeholders, setPlaceholders] = useState({});
-    const [passwordVisible, setPasswordVisible] = useState(false); // State for password visibility
 
     useEffect(() => {
         if (userId) {
@@ -69,8 +69,11 @@ export default () => {
         navigate("/dashboard");
     };
 
+    const [form] = Form.useForm();
+
     return (
         <Form
+            form={form}
             layout='vertical'
             wrapperCol={{
                 lg: 12,
@@ -81,6 +84,10 @@ export default () => {
             initialValues={formData}
             onValuesChange={(changedValues, allValues) => {
                 setFormData(allValues);
+            }}
+            onFinish={() => {
+                onFinish();
+                navigateHome();
             }}
         >
             <Space direction='vertical' style={{ width: "100%" }}>
@@ -102,18 +109,8 @@ export default () => {
                         <Input placeholder={placeholders.email_address || "Enter Email Address"} disabled />
                     </Form.Item>
                     {/* make sure password is only visible when click eye icon */}
-                    <Form.Item label='PASSWORD' name="password">
-                        <Input
-                            type={passwordVisible ? 'text' : 'password'}
-                            placeholder={passwordVisible ? placeholders.password : '********'}
-                            addonAfter={
-                                <Button
-                                    type="link"
-                                    icon={passwordVisible ? <EyeInvisibleOutlined /> : <EyeTwoTone />}
-                                    onClick={() => setPasswordVisible(!passwordVisible)}
-                                />
-                            }
-                        />
+                    <Form.Item label='PASSWORD' name="password" rules={getPasswordRules()}>
+                        <Input.Password placeholder="********" />
                     </Form.Item>
                 </Card>
 
@@ -121,10 +118,7 @@ export default () => {
                     <Space>
                         <Button
                             type='primary'
-                            onClick={() => {
-                                onFinish();
-                                navigateHome();
-                            }}
+                            htmlType= 'submit'
                         >
                             Update Account
                         </Button>

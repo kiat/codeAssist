@@ -2,6 +2,7 @@ import { Button, Form, Input, Modal } from "antd";
 import { useContext } from "react";
 import { GlobalContext } from "../../App";
 import { userLogin } from "../../services/user";
+import { getPasswordRules } from "../../utils/assignmentData";
 
 /**
  * login window modal
@@ -68,16 +69,7 @@ export default function LogInModal({ open, onCancel }) {
         <Form.Item
           label="Password"
           name="password"
-          rules={[
-            {
-              required: true,
-              message: "Please enter your password",
-            },
-            {
-              min: 6,
-              message: "Password must be at least 6 characters",
-            },
-          ]}
+          rules={getPasswordRules()}
         >
           <Input.Password placeholder="Your Password" />
         </Form.Item>
