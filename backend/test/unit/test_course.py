@@ -1063,7 +1063,7 @@ def test_fetch_ai_models_unsupported_provider_returns_400(client):
     assert response.json["message"] == "Unsupported AI provider"
 
 
-def test_fetch_ai_models_openai_filters_chat_models_only(client, mocker):
+def test_fetch_ai_models_openai_filters_unsupported_models(client, mocker):
     mock_gpt_model = mocker.Mock()
     mock_gpt_model.id = "gpt-4o-mini"
 
@@ -1099,7 +1099,7 @@ def test_fetch_ai_models_openai_filters_chat_models_only(client, mocker):
 
     assert response.status_code == 200
     assert "gpt-4o-mini" in response.json["models"]
-    assert "o3-mini" in response.json["models"]
+    assert "o3-mini" not in response.json["models"]
     assert "text-embedding-3-small" not in response.json["models"]
     assert "whisper-1" not in response.json["models"]
 

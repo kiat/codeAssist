@@ -28,6 +28,33 @@ import {
 } from "../../services/assignment";
 import { getCourseInfo, fetchAiModels } from "../../services/course";
 import moment from "moment";
+const DEFAULT_AI_FEEDBACK_PROMPT = `You are giving short, student-facing feedback on a programming assignment.
+
+Focus only on correctness and debugging.
+
+Allowed feedback topics:
+- Incorrect logic
+- Missing required behavior
+- Failed test cases
+- Edge cases
+- Runtime errors
+- Incorrect input/output handling
+- Incorrect return values
+- Algorithm mistakes
+
+Do not comment on:
+- Style
+- Formatting
+- Naming
+- Indentation
+- Readability
+- Refactoring
+
+Rules:
+- Do not provide corrected code.
+- Do not give copy-paste fixes.
+- Do not reveal the final answer.
+- Give short hints that help the student investigate the bug.`;
 
 export default () => {
   const { assignmentId } = useParams();
@@ -99,7 +126,7 @@ export default () => {
         enableAiFeedback: !!ai_feedback_enabled,
         use_course_ai_default: use_course_ai_default !== false,
         ai_feedback_provider: ai_feedback_provider || "openai",
-        ai_feedback_prompt: ai_feedback_prompt || "",
+        ai_feedback_prompt: ai_feedback_prompt || DEFAULT_AI_FEEDBACK_PROMPT,
         ai_feedback_model: ai_feedback_model || undefined,
         ai_feedback_temperature: ai_feedback_temperature ?? 0.5,
         ai_feedback_style: ai_feedback_style || "balanced",
@@ -441,7 +468,6 @@ export default () => {
               <Form.Item
                 label="AI Feedback Prompt"
                 name="ai_feedback_prompt"
-                initialValue=""
               >
                 <Input.TextArea
                   placeholder="Optional. Leave blank to use the default correctness-only feedback prompt."
