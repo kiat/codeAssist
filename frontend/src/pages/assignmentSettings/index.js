@@ -28,33 +28,7 @@ import {
 } from "../../services/assignment";
 import { getCourseInfo, fetchAiModels } from "../../services/course";
 import moment from "moment";
-const DEFAULT_AI_FEEDBACK_PROMPT = `You are giving short, student-facing feedback on a programming assignment.
-
-Focus only on correctness and debugging.
-
-Allowed feedback topics:
-- Incorrect logic
-- Missing required behavior
-- Failed test cases
-- Edge cases
-- Runtime errors
-- Incorrect input/output handling
-- Incorrect return values
-- Algorithm mistakes
-
-Do not comment on:
-- Style
-- Formatting
-- Naming
-- Indentation
-- Readability
-- Refactoring
-
-Rules:
-- Do not provide corrected code.
-- Do not give copy-paste fixes.
-- Do not reveal the final answer.
-- Give short hints that help the student investigate the bug.`;
+import { DEFAULT_AI_FEEDBACK_PROMPT } from "../../constants/aiFeedback";
 
 export default () => {
   const { assignmentId } = useParams();
@@ -470,7 +444,7 @@ export default () => {
                 name="ai_feedback_prompt"
               >
                 <Input.TextArea
-                  placeholder="Optional. Leave blank to use the default correctness-only feedback prompt."
+                  placeholder="Default feedback prompt"
                   autoSize={{ minRows: 4, maxRows: 8 }}
                 />
               </Form.Item>

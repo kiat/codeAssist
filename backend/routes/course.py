@@ -28,18 +28,35 @@ def is_supported_openai_model(model_id):
     """
     Filter OpenAI models shown in the dropdown.
 
-    Remove o-series models that fail with the current test request because
-    they do not support max_tokens in the chat completions call.
+    Keep standard text chat models that work with this app's chat completion
+    request shape. Remove o-series and special-purpose models that may appear
+    in the models API but fail with max_tokens, response_format, or text-only
+    chat completions.
     """
-    blocked_models = {
-        "o3-mini",
-        "o4-mini",
-    }
+    normalized_model_id = (model_id or "").lower()
+    blocked_prefixes = ("o1", "o3", "o4")
+    blocked_keywords = [
+        "audio",
+        "dall-e",
+        "embedding",
+        "image",
+        "instruct",
+        "moderation",
+        "preview",
+        "realtime",
+        "search",
+        "transcribe",
+        "tts",
+        "whisper",
+    ]
 
-    if model_id in blocked_models:
+    if normalized_model_id.startswith(blocked_prefixes):
         return False
 
-    return model_id.startswith("gpt-")
+    if any(keyword in normalized_model_id for keyword in blocked_keywords):
+        return False
+
+    return normalized_model_id.startswith("gpt-")
 
 
 def is_supported_gemini_model(model_id):
@@ -60,6 +77,9 @@ def is_supported_gemini_model(model_id):
         "learnlm",
         "deep-research",
         "antigravity",
+        "preview",
+        "exp",
+        "experimental",
     ]
 
     blocked_models = {

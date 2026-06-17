@@ -36,33 +36,7 @@ import TestResultsDisplay from "../../result/TestResultsDisplay";
 import { uploadAssignmentAutograder } from "../../../services/submission";
 import { createAssignment, updateAssignment } from "../../../services/assignment";
 import { getCourseInfo, fetchAiModels } from "../../../services/course";
-const DEFAULT_AI_FEEDBACK_PROMPT = `You are giving short, student-facing feedback on a programming assignment.
-
-Focus only on correctness and debugging.
-
-Allowed feedback topics:
-- Incorrect logic
-- Missing required behavior
-- Failed test cases
-- Edge cases
-- Runtime errors
-- Incorrect input/output handling
-- Incorrect return values
-- Algorithm mistakes
-
-Do not comment on:
-- Style
-- Formatting
-- Naming
-- Indentation
-- Readability
-- Refactoring
-
-Rules:
-- Do not provide corrected code.
-- Do not give copy-paste fixes.
-- Do not reveal the final answer.
-- Give short hints that help the student investigate the bug.`;
+import { DEFAULT_AI_FEEDBACK_PROMPT } from "../../../constants/aiFeedback";
 const { Sider, Content } = Layout;
 
 export default ({
@@ -102,7 +76,7 @@ export default ({
           ai_feedback_provider: course.default_ai_provider || "openai",
           ai_feedback_model: course.default_ai_model || undefined,
           ai_feedback_style: course.default_feedback_style || "balanced",
-          ai_feedback_prompt: "",
+          ai_feedback_prompt: DEFAULT_AI_FEEDBACK_PROMPT,
           ai_feedback_temperature: course.default_ai_temperature ?? 0.5,
         });
       } catch (e) {
@@ -342,7 +316,7 @@ export default ({
                   autograder: { operation: "zip", timeout: "300" },
                   use_course_ai_default: true,
                   ai_feedback_style: "balanced",
-                  ai_feedback_prompt: "",
+                  ai_feedback_prompt: DEFAULT_AI_FEEDBACK_PROMPT,
                   ai_feedback_temperature: 0.5,
                 }}
                 onFinish={handleFinish}
@@ -520,7 +494,6 @@ export default ({
                           <Form.Item
                             label="Model Source"
                             name="use_course_ai_default"
-                            initialValue={true}
                           >
                             <Radio.Group>
                               <Space direction="vertical">
@@ -605,7 +578,6 @@ export default ({
                           <Form.Item
                             label="Feedback Style"
                             name="ai_feedback_style"
-                            initialValue="balanced"
                           >
                             <Select
                               options={[
@@ -619,10 +591,9 @@ export default ({
                           <Form.Item
                             label="AI Feedback Prompt"
                             name="ai_feedback_prompt"
-                            initialValue=""
                           >
                             <Input.TextArea
-                              placeholder="Optional. Leave blank to use the default correctness-only feedback prompt."
+                              placeholder="Default feedback prompt"
                               autoSize={{ minRows: 4, maxRows: 8 }}
                             />
                           </Form.Item>
@@ -630,7 +601,6 @@ export default ({
                           <Form.Item
                             label="Model Temperature"
                             name="ai_feedback_temperature"
-                            initialValue={0.5}
                             rules={[
                               {
                                 pattern: /^0(\.\d+)?|1$/,

@@ -1067,6 +1067,18 @@ def test_fetch_ai_models_openai_filters_unsupported_models(client, mocker):
     mock_gpt_model = mocker.Mock()
     mock_gpt_model.id = "gpt-4o-mini"
 
+    mock_audio_model = mocker.Mock()
+    mock_audio_model.id = "gpt-4o-audio-preview"
+
+    mock_realtime_model = mocker.Mock()
+    mock_realtime_model.id = "gpt-4o-realtime-preview"
+
+    mock_search_model = mocker.Mock()
+    mock_search_model.id = "gpt-4o-mini-search-preview"
+
+    mock_o_model_full = mocker.Mock()
+    mock_o_model_full.id = "o3"
+
     mock_o_model = mocker.Mock()
     mock_o_model.id = "o3-mini"
 
@@ -1080,7 +1092,11 @@ def test_fetch_ai_models_openai_filters_unsupported_models(client, mocker):
     mock_models_response.data = [
         mock_embedding_model,
         mock_gpt_model,
+        mock_audio_model,
+        mock_realtime_model,
+        mock_search_model,
         mock_other_model,
+        mock_o_model_full,
         mock_o_model,
     ]
 
@@ -1099,9 +1115,51 @@ def test_fetch_ai_models_openai_filters_unsupported_models(client, mocker):
 
     assert response.status_code == 200
     assert "gpt-4o-mini" in response.json["models"]
+    assert "gpt-4o-audio-preview" not in response.json["models"]
+    assert "gpt-4o-realtime-preview" not in response.json["models"]
+    assert "gpt-4o-mini-search-preview" not in response.json["models"]
+    assert "o3" not in response.json["models"]
     assert "o3-mini" not in response.json["models"]
     assert "text-embedding-3-small" not in response.json["models"]
     assert "whisper-1" not in response.json["models"]
+
+
+def test_fetch_ai_models_gemini_filters_preview_and_experimental_models(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "models": [
+            {
+                "name": "models/gemini-2.5-flash",
+                "supportedGenerationMethods": ["generateContent"],
+            },
+            {
+                "name": "models/gemini-2.5-pro-preview-06-05",
+                "supportedGenerationMethods": ["generateContent"],
+            },
+            {
+                "name": "models/gemini-2.0-flash-exp",
+                "supportedGenerationMethods": ["generateContent"],
+            },
+            {
+                "name": "models/gemini-2.5-flash-preview-tts",
+                "supportedGenerationMethods": ["generateContent"],
+            },
+        ]
+    }
+
+    mocker.patch("routes.course.requests.get", return_value=mock_response)
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={
+            "provider": "gemini",
+            "api_key": "test-gemini-key",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["models"] == ["gemini-2.5-flash"]
 
 
 def test_fetch_ai_models_gemini_api_error_returns_provider_error(client, mocker):
