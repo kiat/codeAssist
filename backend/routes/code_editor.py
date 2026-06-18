@@ -18,7 +18,13 @@ from ai_integration import async_get_ai_feedback
 import docker
 
 code_editor = Blueprint('code_editor', __name__)
-docker_client = docker.from_env()
+_docker_client = None
+
+def get_docker_client():
+    global _docker_client
+    if _docker_client is None:
+        _docker_client = docker.from_env()
+    return _docker_client
 
 
 @code_editor.route('/save_code_draft', methods=["POST"])
@@ -71,11 +77,14 @@ def save_code_draft():
 @cross_origin()
 def get_code_drafts():
     """
-    Get all code drafts for a student/assignment (version history).
-    Query params: student_id, assignment_id
+    Get code drafts for a student/assignment.
+    Query params: student_id, assignment_id, condensed (optional, default false)
+    When condensed=true, returns only manual saves + the latest auto-save
+    (skips intermediate auto-saves to keep history compact).
     """
     student_id = request.args.get("student_id")
     assignment_id = request.args.get("assignment_id")
+    condensed = request.args.get("condensed", "false").lower() == "true"
 
     if not student_id or not assignment_id:
         raise BadRequestError("Missing student_id or assignment_id")
@@ -86,6 +95,19 @@ def get_code_drafts():
         .order_by(CodeDraft.version_number.desc())
         .all()
     )
+
+    if condensed:
+        # Keep all manual saves + only the latest auto-save
+        filtered = []
+        latest_auto = None
+        for d in drafts:
+            if not d.auto_saved:
+                filtered.append(d)
+            elif latest_auto is None:
+                latest_auto = d
+        if latest_auto:
+            filtered.append(latest_auto)
+        drafts = sorted(filtered, key=lambda d: d.version_number, reverse=True)
 
     return jsonify(CodeDraftSchema().dump(drafts, many=True)), 200
 
@@ -219,7 +241,7 @@ def submit_code():
 
     # Run autograder in Docker
     temp_container_name = f"submission_{uuid.uuid4().hex[:8]}"
-    container = docker_client.containers.run(
+    container = get_docker_client().containers.run(
         image=assignment.autograder_image_name,
         name=temp_container_name,
         detach=True,
@@ -383,6 +405,141 @@ def _save_final_draft(student_id, assignment_id, content, file_name):
     )
     db.session.add(draft)
     db.session.commit()
+
+
+@code_editor.route('/run_code', methods=["POST"])
+@cross_origin()
+def run_code():
+    """
+    Run code against test cases without creating a submission.
+    Expects JSON: { student_id, assignment_id, content, file_name? }
+    Returns test results but does NOT create a submission record.
+    Requires an autograder Docker image to execute code safely.
+    """
+    data = request.json
+    student_id = data.get("student_id")
+    assignment_id = data.get("assignment_id")
+    content = data.get("content")
+    file_name = data.get("file_name", "solution.py")
+
+    if not student_id or not assignment_id or content is None:
+        raise BadRequestError("Missing required fields: student_id, assignment_id, content")
+
+    if len(content) > 100000:
+        raise BadRequestError("Code content exceeds maximum length of 100KB")
+
+    # Check assignment exists and is published
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    if not assignment.published:
+        raise BadRequestError("Assignment is not published yet.")
+
+    # Check due dates (same logic as submit_code)
+    extension = db.session.query(AssignmentExtension).filter_by(
+        assignment_id=assignment_id, student_id=student_id
+    ).first()
+
+    release_date = extension.release_date_extension if extension and extension.release_date_extension else assignment.published_date
+    due_date = extension.due_date_extension if extension and extension.due_date_extension else assignment.due_date
+    late_due_date = extension.late_due_date_extension if extension and extension.late_due_date_extension else assignment.late_due_date
+
+    now = datetime.now(timezone.utc)
+
+    if release_date and now < release_date:
+        raise BadRequestError("Cannot run code before the release date.")
+
+    if due_date and now > due_date:
+        if assignment.late_submission:
+            if late_due_date and now > late_due_date:
+                raise BadRequestError("Submission period has ended (past late due date).")
+        else:
+            raise BadRequestError("Submission period has ended (past due date).")
+
+    # Require autograder image — never run arbitrary code on the host
+    if not assignment.autograder_image_name or not assignment.autograder_image_name.strip():
+        raise BadRequestError("No autograder configured for this assignment. Cannot run code without a sandboxed environment.")
+
+    # Save content to a temp file
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
+    run_uuid = uuid.uuid4().hex[:8]
+    submissions_dir = os.path.join(assignment_dir, "run", run_uuid)
+    os.makedirs(submissions_dir, exist_ok=True)
+
+    file_path = os.path.join(submissions_dir, file_name)
+    with open(file_path, 'w') as f:
+        f.write(content)
+
+    container = None
+    temp_container_name = f"run_{uuid.uuid4().hex[:8]}"
+
+    try:
+        # Run in autograder container (sandboxed)
+        container = get_docker_client().containers.run(
+            image=assignment.autograder_image_name,
+            name=temp_container_name,
+            detach=True,
+            tty=True,
+            command="tail -f /dev/null",
+        )
+
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            tar.add(file_path, arcname=file_name)
+        tar_stream.seek(0)
+        container.put_archive("/autograder/submission/", tar_stream)
+
+        exec_proc = subprocess.run(
+            f"docker exec {temp_container_name} /bin/bash /autograder/source/run_autograder".split(),
+            capture_output=True,
+            timeout=assignment.autograder_timeout,
+        )
+
+        if exec_proc.returncode != 0:
+            return jsonify({
+                "output": exec_proc.stderr.decode() if exec_proc.stderr else "Execution failed",
+                "passed": False,
+                "tests": [],
+            }), 200
+
+        cat_result = container.exec_run("cat /autograder/results/results.json")
+        if cat_result.exit_code == 0:
+            result_data = json.loads(cat_result.output.decode())
+            return jsonify({
+                "output": result_data.get("output", ""),
+                "passed": result_data.get("score", 0) > 0,
+                "score": result_data.get("score", 0),
+                "tests": result_data.get("tests", []),
+            }), 200
+        else:
+            return jsonify({
+                "output": "Could not read results",
+                "passed": False,
+                "tests": [],
+            }), 200
+
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            "output": "Execution timed out",
+            "passed": False,
+            "tests": [],
+        }), 200
+    except Exception as e:
+        print(f"RUN_CODE error: {e}", flush=True)
+        return jsonify({
+            "output": f"Error: {type(e).__name__}: {str(e)}",
+            "passed": False,
+            "tests": [],
+        }), 200
+    finally:
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass
 
 
 @code_editor.route('/ai_chat', methods=["POST"])

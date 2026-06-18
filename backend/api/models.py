@@ -58,6 +58,9 @@ class Assignment(db.Model):
     autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
 
+    # -- Code Editor Settings --
+    enable_code_editor = db.Column(db.Boolean, default=False)
+
     # -- AI Integration Settings -- 
     ai_feedback_enabled = db.Column(db.Boolean, default=False)
     ai_feedback_prompt = db.Column(db.Text, nullable=True)

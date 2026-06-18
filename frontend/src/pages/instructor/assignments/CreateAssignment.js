@@ -110,6 +110,7 @@ export default ({
       group_size: values.limitGroupSize ? Number(values.limitGroupSize) : null,
       manual_grading: !!values.manualGrading,
       autograder_points: values.autograderPoints ? Number(values.autograderPoints) : null,
+      enable_code_editor: !!values.enable_code_editor,
       ai_feedback_enabled: !!values.ai_feedback_enabled,
       ai_feedback_prompt: values.ai_feedback_prompt ?? null,
       ai_feedback_model: values.ai_feedback_model ?? null,
@@ -401,6 +402,15 @@ export default ({
                       ]}
                     >
                       <Input />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="ENABLE CODE EDITOR"
+                      name="enable_code_editor"
+                      valuePropName="checked"
+                      tooltip="Allow students to write and submit code directly in the browser instead of uploading a file"
+                    >
+                      <Switch />
                     </Form.Item>
 
                     <Form.Item

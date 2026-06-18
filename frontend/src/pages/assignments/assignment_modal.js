@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { uploadSubmission } from "../../services/submission";
 import LoadingOverlay from "../../components/LoadingOverlay";
 
-export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle }) {
+export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle, enableCodeEditor }) {
   const [file, setFile] = useState(null);
   const { userInfo } = useContext(GlobalContext);
   const [loading, setLoading] = useState(false);
@@ -74,19 +74,23 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
           Choose how you want to submit your work:
         </Typography.Text>
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
-          <Button
-            block
-            size="large"
-            icon={<CodeOutlined />}
-            onClick={handleOpenEditor}
-            style={{ height: 56, textAlign: 'left', display: 'flex', alignItems: 'center' }}
-          >
-            <div style={{ marginLeft: 8 }}>
-              <div style={{ fontWeight: 600 }}>Open Code Editor</div>
-              <div style={{ fontSize: 12, color: '#999' }}>Type your code directly with auto-save</div>
-            </div>
-          </Button>
-          <div style={{ textAlign: 'center', color: '#999', fontSize: 12 }}>— or —</div>
+          {enableCodeEditor && (
+            <>
+              <Button
+                block
+                size="large"
+                icon={<CodeOutlined />}
+                onClick={handleOpenEditor}
+                style={{ height: 56, textAlign: 'left', display: 'flex', alignItems: 'center' }}
+              >
+                <div style={{ marginLeft: 8 }}>
+                  <div style={{ fontWeight: 600 }}>Open Code Editor</div>
+                  <div style={{ fontSize: 12, color: '#999' }}>Type your code directly with auto-save</div>
+                </div>
+              </Button>
+              <div style={{ textAlign: 'center', color: '#999', fontSize: 12 }}>— or —</div>
+            </>
+          )}
           <Form layout="vertical" style={{ marginBottom: 0 }}>
             <Form.Item name="upload" style={{ marginBottom: 8 }}>
               <Upload.Dragger
@@ -107,7 +111,7 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
             </Form.Item>
             <Form.Item style={{ marginBottom: 0 }}>
               <Button style={{ width: "100%" }} type="primary" onClick={handleSubmit} disabled={!file}>
-                Submit File
+                Submit
               </Button>
             </Form.Item>
           </Form>

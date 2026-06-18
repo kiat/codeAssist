@@ -8,6 +8,7 @@ import {
   CodeOutlined,
   CheckCircleFilled,
   ClockCircleOutlined,
+  CaretRightOutlined,
 } from "@ant-design/icons";
 
 // CodeMirror 6 imports
@@ -99,6 +100,7 @@ const oneDarkTheme = EditorView.theme({
  *   onChange        – (newValue) => void
  *   onSave          – () => void   (manual save)
  *   onSubmit        – () => void   (submit for grading)
+ *   onRun           – () => void   (run code without submitting)
  *   onRequestFeedback – () => void
  *   onOpenHistory   – () => void
  *   autoSaveStatus  – 'idle' | 'saving' | 'saved' | 'error'
@@ -111,6 +113,7 @@ export default function CodeEditor({
   onChange,
   onSave,
   onSubmit,
+  onRun = () => {},
   onRequestFeedback,
   onOpenHistory,
   autoSaveStatus = "idle",
@@ -293,6 +296,16 @@ export default function CodeEditor({
                 History
               </Button>
             </Tooltip>
+            <Tooltip title="Run your code">
+              <Button
+                size="small"
+                icon={<CaretRightOutlined />}
+                onClick={onRun}
+                disabled={readOnly}
+              >
+                Run
+              </Button>
+            </Tooltip>
             <Tooltip title="Ask AI for feedback on your code">
               <Button
                 size="small"
@@ -311,7 +324,7 @@ export default function CodeEditor({
               onClick={onSubmit}
               disabled={readOnly}
             >
-              Submit
+              Submit for Grading
             </Button>
           </Space>
         </div>

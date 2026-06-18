@@ -6,7 +6,7 @@ import CodeEditor from "../../components/CodeEditor";
 import AIChatPanel from "../../components/AIChatPanel";
 import VersionHistoryModal from "../../components/VersionHistoryModal";
 import { getAssignment, getExtension } from "../../services/assignment";
-import { aiChat, saveCodeDraft, getLatestDraft, submitCode } from "../../services/submission";
+import { aiChat, saveCodeDraft, getLatestDraft, submitCode, runCode } from "../../services/submission";
 import moment from "moment";
 
 /**
@@ -41,6 +41,9 @@ export default function CodeEditorPage() {
   const [dueDate, setDueDate] = useState(null);
   const [lateDueDate, setLateDueDate] = useState(null);
   const [lateAllowed, setLateAllowed] = useState(false);
+
+  // Run code output state
+  const [runOutput, setRunOutput] = useState(null);
 
   // AI chat callback — uses the service helper which hits URL_PREFIX (localhost:5001)
   const handleAiChat = useCallback(
@@ -175,6 +178,32 @@ export default function CodeEditorPage() {
     return true; // Before due
   }, [dueDate, lateDueDate, lateAllowed]);
 
+  const handleRun = useCallback(async () => {
+    if (!code.trim()) {
+      message.error("Cannot run empty code");
+      return;
+    }
+    setRunOutput(null);
+    try {
+      const res = await runCode({
+        student_id: userInfo.id,
+        assignment_id: assignmentId,
+        content: code,
+        file_name: fileName,
+      });
+      setRunOutput(res.data);
+      if (res.data.passed) {
+        message.success("Code ran successfully!");
+      } else {
+        message.warning("Code finished with issues. Check output below.");
+      }
+    } catch (err) {
+      console.error("Run error:", err);
+      message.error(err.message || "Failed to run code");
+      setRunOutput({ output: err.message || "Run failed", passed: false, tests: [] });
+    }
+  }, [code, userInfo?.id, assignmentId, fileName]);
+
   // Submit code for grading
   const handleSubmit = useCallback(async () => {
     if (!code.trim()) {
@@ -212,7 +241,7 @@ export default function CodeEditorPage() {
         }
       },
     });
-  }, [code, userInfo?.id, assignmentId, fileName, checkDueDate, navigate, saveDraft]);
+  }, [code, userInfo?.id, assignmentId, fileName, checkDueDate, navigate]);
 
   // Request feedback — sends the code to the AI chat panel for review
   const chatPanelRef = useRef(null);
@@ -280,6 +309,7 @@ export default function CodeEditorPage() {
             onChange={setCode}
             onSave={() => saveDraft(false)}
             onSubmit={handleSubmit}
+            onRun={handleRun}
             onRequestFeedback={handleRequestFeedback}
             onOpenHistory={() => setHistoryOpen(true)}
             autoSaveStatus={autoSaveStatus}
@@ -287,6 +317,15 @@ export default function CodeEditorPage() {
             language="python"
             readOnly={submitting}
           />
+          {runOutput && (
+            <div style={styles.outputPanel}>
+              <div style={styles.outputHeader}>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>Output</span>
+                <Button size="small" type="text" onClick={() => setRunOutput(null)}>Close</Button>
+              </div>
+              <pre style={styles.outputContent}>{runOutput.output || "No output"}</pre>
+            </div>
+          )}
         </div>
 
         {/* Right: AI Chat */}
@@ -353,5 +392,33 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
+  },
+  outputPanel: {
+    marginTop: 8,
+    border: "1px solid #3e4451",
+    borderRadius: 6,
+    backgroundColor: "#1e2127",
+    overflow: "hidden",
+  },
+  outputHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "6px 12px",
+    borderBottom: "1px solid #3e4451",
+    backgroundColor: "#21252b",
+    color: "#abb2bf",
+  },
+  outputContent: {
+    margin: 0,
+    padding: "10px 12px",
+    fontSize: 12,
+    fontFamily: "'SFMono-Regular', Consolas, monospace",
+    color: "#abb2bf",
+    backgroundColor: "#282c34",
+    maxHeight: 200,
+    overflowY: "auto",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-all",
   },
 };

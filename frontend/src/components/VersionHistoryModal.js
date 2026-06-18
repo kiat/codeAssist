@@ -28,7 +28,7 @@ export default function VersionHistoryModal({
     setLoading(true);
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_code_drafts?student_id=${studentId}&assignment_id=${assignmentId}`
+        `${process.env.REACT_APP_API_URL}/get_code_drafts?student_id=${studentId}&assignment_id=${assignmentId}&condensed=true`
       );
       const data = await response.json();
       setDrafts(Array.isArray(data) ? data : []);

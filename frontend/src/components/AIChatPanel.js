@@ -1,10 +1,47 @@
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
-import { Button, Input, Spin, Empty } from "antd";
-import { SendOutlined, RobotOutlined, UserOutlined } from "@ant-design/icons";
+import { Button, Spin, Empty } from "antd";
+import { RobotOutlined, BulbOutlined, BugOutlined, CodeOutlined, LineChartOutlined, TrophyOutlined } from "@ant-design/icons";
 
 /**
- * AIChatPanel — a chat interface for students to converse with an AI agent
- * about their current code.
+ * DEFAULT_PROMPTS — predefined prompts students can select.
+ * Students can ONLY use these prompts; free-text input is disabled.
+ */
+const DEFAULT_PROMPTS = [
+  {
+    key: "explain",
+    label: "Explain my code",
+    icon: <BulbOutlined />,
+    message: "Please explain what my code does step by step.",
+  },
+  {
+    key: "debug",
+    label: "Help me debug",
+    icon: <BugOutlined />,
+    message: "I'm having a bug. Can you help me find the issue without giving away the full solution?",
+  },
+  {
+    key: "improve",
+    label: "Suggest improvements",
+    icon: <CodeOutlined />,
+    message: "Can you suggest improvements to my code for efficiency, readability, and style?",
+  },
+  {
+    key: "test",
+    label: "Walk me through test cases",
+    icon: <LineChartOutlined />,
+    message: "Can you walk me through how I might approach testing my code?",
+  },
+  {
+    key: "hint",
+    label: "Give me a hint",
+    icon: <TrophyOutlined />,
+    message: "I'm stuck. Can you give me a hint on how to approach this problem without revealing the solution?",
+  },
+];
+
+/**
+ * AIChatPanel — a preset-prompt chat interface for students to get AI help.
+ * Students can ONLY select from default prompts; no free-text input.
  *
  * Props:
  *   onSendMessage  – async (message, code) => string  (returns AI reply)
@@ -16,44 +53,35 @@ const AIChatPanel = forwardRef(function AIChatPanel({ onSendMessage, code = "", 
     {
       role: "assistant",
       content:
-        "Hi! I'm your AI coding assistant. Ask me anything about your code — I can help with debugging, understanding concepts, or suggesting improvements without giving away the full solution.",
+        "Hi! I'm your AI coding assistant. Select a prompt below to get help with your code — I can help with debugging, understanding concepts, or suggesting improvements without giving away the full solution.",
     },
   ]);
-  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async () => {
-    const trimmed = input.trim();
-    if (!trimmed || loading || disabled) return;
+  const handlePromptClick = async (prompt) => {
+    if (loading || disabled) return;
 
-    // Add user message
-    const userMsg = { role: "user", content: trimmed };
+    const userMsg = { role: "user", content: prompt.label };
     setMessages((prev) => [...prev, userMsg]);
-    setInput("");
     setLoading(true);
 
     try {
-      const reply = await onSendMessage(trimmed, code);
+      const reply = await onSendMessage(prompt.message, code);
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch (err) {
       const errorMsg = err?.response?.data?.message || err?.message || "Sorry, I encountered an error. Please try again.";
       setMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          content: errorMsg,
-        },
+        { role: "assistant", content: errorMsg },
       ]);
     } finally {
       setLoading(false);
-      inputRef.current?.focus();
     }
   };
 
@@ -68,11 +96,18 @@ const AIChatPanel = forwardRef(function AIChatPanel({ onSendMessage, code = "", 
   // Expose sendMessage via ref so parent can trigger feedback requests
   useImperativeHandle(ref, () => ({
     sendMessage: (text) => {
-      const trimmed = text.trim();
-      if (!trimmed || disabledRef.current) return;
-      setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+      if (disabledRef.current) return;
+      // Map the text to the closest default prompt or use "hint" as fallback
+      const matchedPrompt = DEFAULT_PROMPTS.find(
+        (p) => p.message === text
+      ) || {
+        key: "custom",
+        label: text,
+        message: text,
+      };
+      setMessages((prev) => [...prev, { role: "user", content: matchedPrompt.label }]);
       setLoading(true);
-      onSendMessageRef.current(trimmed, codeRef.current)
+      onSendMessageRef.current(matchedPrompt.message, codeRef.current)
         .then((reply) => {
           setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
         })
@@ -89,13 +124,6 @@ const AIChatPanel = forwardRef(function AIChatPanel({ onSendMessage, code = "", 
     },
   }), []);
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   return (
     <div style={styles.container}>
       {/* Header */}
@@ -110,7 +138,7 @@ const AIChatPanel = forwardRef(function AIChatPanel({ onSendMessage, code = "", 
           <div style={styles.emptyState}>
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="Ask me about your code!"
+              description="Select a prompt to get started!"
               style={{ marginTop: 40 }}
             />
           </div>
@@ -141,11 +169,6 @@ const AIChatPanel = forwardRef(function AIChatPanel({ onSendMessage, code = "", 
             >
               <div style={styles.messageContent}>{msg.content}</div>
             </div>
-            {msg.role === "user" && (
-              <div style={styles.avatar}>
-                <UserOutlined style={{ fontSize: 14, color: "#666" }} />
-              </div>
-            )}
           </div>
         ))}
         {loading && (
@@ -164,25 +187,23 @@ const AIChatPanel = forwardRef(function AIChatPanel({ onSendMessage, code = "", 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div style={styles.inputArea}>
-        <Input.TextArea
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask about your code..."
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          disabled={disabled || loading}
-          style={styles.input}
-        />
-        <Button
-          type="primary"
-          icon={<SendOutlined />}
-          onClick={handleSend}
-          disabled={!input.trim() || loading || disabled}
-          style={{ marginLeft: 8, flexShrink: 0 }}
-        />
+      {/* Preset Prompt Buttons */}
+      <div style={styles.promptArea}>
+        <div style={styles.promptLabel}>Select a prompt:</div>
+        <div style={styles.promptGrid}>
+          {DEFAULT_PROMPTS.map((prompt) => (
+            <Button
+              key={prompt.key}
+              size="small"
+              icon={prompt.icon}
+              onClick={() => handlePromptClick(prompt)}
+              disabled={loading || disabled}
+              style={styles.promptButton}
+            >
+              {prompt.label}
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -253,16 +274,25 @@ const styles = {
   messageContent: {
     whiteSpace: "pre-wrap",
   },
-  inputArea: {
-    display: "flex",
-    alignItems: "flex-end",
+  promptArea: {
     padding: "8px 10px",
     borderTop: "1px solid #f0f0f0",
     backgroundColor: "#fafafa",
     flexShrink: 0,
   },
-  input: {
-    flex: 1,
-    borderRadius: 6,
+  promptLabel: {
+    fontSize: 11,
+    color: "#999",
+    marginBottom: 6,
+  },
+  promptGrid: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  promptButton: {
+    fontSize: 11,
+    height: 28,
+    borderRadius: 14,
   },
 };
