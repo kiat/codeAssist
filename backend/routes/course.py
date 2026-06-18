@@ -17,12 +17,18 @@ from api.models import (
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
+from ai_integration import (
+    CORRECTNESS_SYSTEM_PROMPT,
+    get_gemini_generation_config,
+    parse_feedback_json,
+)
 from openai import OpenAI
 
 course = Blueprint("course", __name__)
 
 ALLOWED_EXTENSIONS = {'csv'}
 UPLOAD_FOLDER = 'uploads'
+SUPPORTED_AI_PROVIDERS = {"openai", "gemini", "claude"}
 
 def is_supported_openai_model(model_id):
     """
@@ -111,21 +117,6 @@ def is_supported_claude_model(model_id):
 
     return model_id.startswith("claude-")
 
-def get_plain_api_key(encrypted_key):
-    """
-    Returns decrypted API key for the frontend password input.
-
-    This allows the UI to keep the saved key hidden by default,
-    while still allowing the user to reveal it with the visibility icon.
-    """
-    if not encrypted_key:
-        return ""
-
-    try:
-        return decrypt_api_key(encrypted_key)
-    except Exception:
-        return ""
-    
 @course.route("/create_course", methods=["POST", "GET"])
 @cross_origin()
 def create_course():
@@ -597,10 +588,6 @@ def get_course_info():
         "has_openai_api_key": bool(course_obj.openai_api_key),
         "has_gemini_api_key": bool(course_obj.gemini_api_key),
         "has_claude_api_key": bool(course_obj.claude_api_key),
-
-        "openai_api_key_value": get_plain_api_key(course_obj.openai_api_key),
-        "gemini_api_key_value": get_plain_api_key(course_obj.gemini_api_key),
-        "claude_api_key_value": get_plain_api_key(course_obj.claude_api_key),
     })
 
     return jsonify([course_data]), 200
@@ -657,6 +644,9 @@ def update_ai_settings():
     if not course_obj:
         raise NotFoundError("Course not found")
 
+    if provider and provider not in SUPPORTED_AI_PROVIDERS:
+        raise BadRequestError("Unsupported AI provider")
+
     if provider:
         course_obj.default_ai_provider = provider
 
@@ -668,9 +658,14 @@ def update_ai_settings():
 
     if temperature is not None:
         try:
-            course_obj.default_ai_temperature = float(temperature)
+            temperature_value = float(temperature)
         except (TypeError, ValueError):
             raise BadRequestError("Invalid temperature")
+
+        if temperature_value < 0 or temperature_value > 1:
+            raise BadRequestError("Temperature must be between 0 and 1")
+
+        course_obj.default_ai_temperature = temperature_value
 
     if api_key:
         if not provider:
@@ -684,8 +679,6 @@ def update_ai_settings():
             course_obj.gemini_api_key = encrypted_api_key
         elif provider == "claude":
             course_obj.claude_api_key = encrypted_api_key
-        else:
-            raise BadRequestError("Unsupported AI provider")
 
     try:
         db.session.commit()
@@ -970,6 +963,14 @@ def test_ai_model():
             "{\"insights\":[\"Model test passed.\"],\"annotations\":[]}"
         )
 
+        def validate_feedback_response(raw_response, provider_name):
+            parsed_feedback, _ = parse_feedback_json(raw_response, provider_name, [])
+
+            if isinstance(parsed_feedback, dict) and parsed_feedback.get("error"):
+                return None
+
+            return parsed_feedback
+
         if provider == "openai":
             client = OpenAI(api_key=api_key)
             response = client.chat.completions.create(
@@ -990,11 +991,19 @@ def test_ai_model():
                 timeout=30,
             )
 
+            raw_response = (response.choices[0].message.content or "").strip()
+            parsed_feedback = validate_feedback_response(raw_response, "OpenAI")
+
+            if parsed_feedback is None:
+                return jsonify({
+                    "error": "Selected OpenAI model did not return valid JSON feedback"
+                }), 400
+
             return jsonify({
                 "message": "OpenAI model is usable",
                 "provider": provider,
                 "model": model,
-                "response": response.choices[0].message.content,
+                "response": parsed_feedback,
             }), 200
 
         if provider == "gemini":
@@ -1007,16 +1016,12 @@ def test_ai_model():
                             "role": "user",
                             "parts": [
                                 {
-                                    "text": test_prompt,
+                                    "text": f"{CORRECTNESS_SYSTEM_PROMPT}\n\n{test_prompt}",
                                 }
                             ],
                         }
                     ],
-                    "generationConfig": {
-                        "temperature": 0,
-                        "maxOutputTokens": 80,
-                        "responseMimeType": "application/json",
-                    },
+                    "generationConfig": get_gemini_generation_config(model, 0),
                 },
                 timeout=30,
             )
@@ -1026,11 +1031,25 @@ def test_ai_model():
                     "error": f"Selected Gemini model cannot be used: {response.text}"
                 }), response.status_code
 
+            data = response.json()
+            candidate = data.get("candidates", [{}])[0]
+            raw_response = "".join(
+                part.get("text", "")
+                for part in candidate.get("content", {}).get("parts", [])
+                if not part.get("thought")
+            )
+            parsed_feedback = validate_feedback_response(raw_response, "Gemini")
+
+            if parsed_feedback is None:
+                return jsonify({
+                    "error": "Selected Gemini model did not return valid JSON feedback"
+                }), 400
+
             return jsonify({
                 "message": "Gemini model is usable",
                 "provider": provider,
                 "model": model,
-                "response": response.json(),
+                "response": parsed_feedback,
             }), 200
 
         if provider == "claude":
@@ -1060,11 +1079,24 @@ def test_ai_model():
                     "error": f"Selected Claude model cannot be used: {response.text}"
                 }), response.status_code
 
+            data = response.json()
+            content = data.get("content", [])
+            raw_response = ""
+            if content and content[0].get("type") == "text":
+                raw_response = content[0].get("text", "")
+
+            parsed_feedback = validate_feedback_response(raw_response, "Claude")
+
+            if parsed_feedback is None:
+                return jsonify({
+                    "error": "Selected Claude model did not return valid JSON feedback"
+                }), 400
+
             return jsonify({
                 "message": "Claude model is usable",
                 "provider": provider,
                 "model": model,
-                "response": response.json(),
+                "response": parsed_feedback,
             }), 200
 
         raise BadRequestError("Unsupported AI provider")

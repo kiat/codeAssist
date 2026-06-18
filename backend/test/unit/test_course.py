@@ -438,9 +438,6 @@ def test_get_course_info_success(client, mocker):
         "name": "CS101",
     }
 
-    mock_get_plain_api_key = mocker.patch("routes.course.get_plain_api_key")
-    mock_get_plain_api_key.side_effect = lambda key: "test-openai-key" if key else ""
-
     response = client.get("/get_course_info", query_string={"course_id": "course-123"})
 
     assert response.status_code == 200
@@ -455,11 +452,12 @@ def test_get_course_info_success(client, mocker):
             "has_openai_api_key": True,
             "has_gemini_api_key": False,
             "has_claude_api_key": False,
-            "openai_api_key_value": "test-openai-key",
-            "gemini_api_key_value": "",
-            "claude_api_key_value": "",
         }
     ]
+
+    assert "openai_api_key_value" not in response.json[0]
+    assert "gemini_api_key_value" not in response.json[0]
+    assert "claude_api_key_value" not in response.json[0]
 
 def test_get_course_info_missing_course_id(client):
     response = client.get("/get_course_info")
@@ -729,6 +727,74 @@ def test_test_ai_model_gemini_success(client, mocker):
     mock_post.assert_called_once()
     assert "gemini-1.5-flash:generateContent" in mock_post.call_args.args[0]
     assert mock_post.call_args.kwargs["params"] == {"key": "test-gemini-key"}
+
+
+def test_test_ai_model_gemini_uses_feedback_generation_config(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": '{"insights":["Model test passed."],"annotations":[]}'
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+    mock_post = mocker.patch("routes.course.requests.post", return_value=mock_response)
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "provider": "gemini",
+            "model": "gemini-2.5-flash",
+            "api_key": "test-gemini-key",
+        },
+    )
+
+    assert response.status_code == 200
+
+    generation_config = mock_post.call_args.kwargs["json"]["generationConfig"]
+    assert generation_config["maxOutputTokens"] == 1600
+    assert generation_config["responseMimeType"] == "application/json"
+    assert generation_config["thinkingConfig"] == {"thinkingBudget": 0}
+
+
+def test_test_ai_model_gemini_invalid_json_returns_error(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": "This model can chat, but did not return JSON."
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+    mocker.patch("routes.course.requests.post", return_value=mock_response)
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "provider": "gemini",
+            "model": "gemini-1.5-flash",
+            "api_key": "test-gemini-key",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "valid JSON feedback" in response.json["error"]
 
 
 def test_test_ai_model_gemini_unavailable_returns_error(client, mocker):
@@ -1253,6 +1319,46 @@ def test_update_ai_settings_invalid_temperature_returns_400(client, mocker):
 
     assert response.status_code == 400
     assert response.json["message"] == "Invalid temperature"
+
+
+def test_update_ai_settings_temperature_out_of_range_returns_400(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "openai",
+            "temperature": 1.5,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json["message"] == "Temperature must be between 0 and 1"
+
+
+def test_update_ai_settings_unsupported_provider_without_api_key_returns_400(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "llama",
+            "model_name": "llama-test-model",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json["message"] == "Unsupported AI provider"
+    mock_commit.assert_not_called()
 
 
 def test_update_ai_settings_unsupported_provider_for_api_key_returns_400(client, mocker):

@@ -23,7 +23,7 @@ import {
   Typography,
   message,
 } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   getCourseInfo,
@@ -51,6 +51,19 @@ const PROVIDER_DEFAULT_MODELS = {
   claude: "claude-3-5-sonnet-20241022",
 };
 
+const getKeyStatus = (course, selectedProviderKey) => {
+  if (selectedProviderKey === "openai") {
+    return !!course.has_openai_api_key;
+  }
+  if (selectedProviderKey === "gemini") {
+    return !!course.has_gemini_api_key;
+  }
+  if (selectedProviderKey === "claude") {
+    return !!course.has_claude_api_key;
+  }
+  return false;
+};
+
 export default function AISettings() {
   const { courseId } = useParams();
   const [form] = Form.useForm();
@@ -66,35 +79,57 @@ export default function AISettings() {
 
   const selectedProvider = PROVIDERS.find((item) => item.key === provider);
 
-  const getKeyStatus = (course, selectedProviderKey) => {
-    if (selectedProviderKey === "openai") {
-      return !!course.has_openai_api_key;
-    }
-    if (selectedProviderKey === "gemini") {
-      return !!course.has_gemini_api_key;
-    }
-    if (selectedProviderKey === "claude") {
-      return !!course.has_claude_api_key;
-    }
-    return false;
-  };
+  const fetchModelsForProvider = useCallback(async ({
+    targetProvider,
+    keyOverride = "",
+    currentModel = "",
+    silent = false,
+  } = {}) => {
+    try {
+      setModelsLoading(true);
 
-  const getProviderKeyValue = (course, selectedProviderKey) => {
-    if (selectedProviderKey === "openai") {
-      return course.openai_api_key_value || "";
-    }
+      const response = await fetchAiModels({
+        course_id: courseId,
+        provider: targetProvider,
+        api_key: keyOverride || undefined,
+      });
 
-    if (selectedProviderKey === "gemini") {
-      return course.gemini_api_key_value || "";
-    }
+      const fetchedModels = response?.data?.models || [];
+      setModels(fetchedModels);
 
-    if (selectedProviderKey === "claude") {
-      return course.claude_api_key_value || "";
-    }
+      if (fetchedModels.length === 0) {
+        if (!silent) {
+          message.warning("No models found for this provider");
+        }
+        return;
+      }
 
-    return "";
-  };
-  const loadCourseAiInfo = async () => {
+      const providerPreferredModel = PROVIDER_DEFAULT_MODELS[targetProvider];
+
+      const preferredModel =
+        providerPreferredModel && fetchedModels.includes(providerPreferredModel)
+          ? providerPreferredModel
+          : fetchedModels[0];
+
+      if (!currentModel || !fetchedModels.includes(currentModel)) {
+        setModelName(preferredModel);
+        form.setFieldsValue({ model_name: preferredModel });
+      }
+
+      if (!silent) {
+        message.success("Models refreshed successfully");
+      }
+    } catch (e) {
+      console.error("Failed to fetch models:", e.response?.data || e);
+      if (!silent) {
+        message.error(e.response?.data?.error || "Failed to refresh models");
+      }
+    } finally {
+      setModelsLoading(false);
+    }
+  }, [courseId, form]);
+
+  const loadCourseAiInfo = useCallback(async () => {
     try {
       const res = await getCourseInfo({ course_id: courseId });
       const course = res?.data?.[0] || {};
@@ -109,7 +144,7 @@ export default function AISettings() {
 
       setProvider(defaultProvider);
       setModelName(defaultModel);
-      setApiKey(getProviderKeyValue(course, defaultProvider));
+      setApiKey("");
 
       form.setFieldsValue({
         provider: defaultProvider,
@@ -117,79 +152,64 @@ export default function AISettings() {
         feedback_style: course.default_feedback_style || "balanced",
         temperature: course.default_ai_temperature ?? 0.5,
       });
+
+      if (getKeyStatus(course, defaultProvider)) {
+        await fetchModelsForProvider({
+          targetProvider: defaultProvider,
+          keyOverride: "",
+          currentModel: defaultModel,
+          silent: true,
+        });
+      }
     } catch (e) {
       console.error("Failed to load course AI settings:", e);
       message.error("Failed to load AI settings");
     }
-  };
+  }, [courseId, fetchModelsForProvider, form]);
+
   useEffect(() => {
     loadCourseAiInfo();
-  }, [courseId]);
+  }, [loadCourseAiInfo]);
 
-  const handleProviderChange = (newProvider) => {
+  const handleProviderChange = async (newProvider) => {
     setProvider(newProvider);
     setModels([]);
     setApiTestStatus(null);
 
-    const savedKey = getProviderKeyValue(courseAiInfo, newProvider);
     const fallbackModel = PROVIDER_DEFAULT_MODELS[newProvider] || "";
 
-    setApiKey(savedKey);
+    setApiKey("");
+
+    let nextModel = fallbackModel;
 
     if (newProvider === courseAiInfo.default_ai_provider) {
       const savedModel = courseAiInfo.default_ai_model || fallbackModel;
 
-      setModelName(savedModel);
-      form.setFieldsValue({
-        provider: newProvider,
-        model_name: savedModel,
-      });
-    } else {
-      setModelName(fallbackModel);
-      form.setFieldsValue({
-        provider: newProvider,
-        model_name: fallbackModel,
+      nextModel = savedModel;
+    }
+
+    setModelName(nextModel);
+    form.setFieldsValue({
+      provider: newProvider,
+      model_name: nextModel,
+    });
+
+    if (getKeyStatus(courseAiInfo, newProvider)) {
+      await fetchModelsForProvider({
+        targetProvider: newProvider,
+        keyOverride: "",
+        currentModel: nextModel,
+        silent: true,
       });
     }
   };
 
   const handleFetchModels = async () => {
-    try {
-      setModelsLoading(true);
-
-      const response = await fetchAiModels({
-        course_id: courseId,
-        provider,
-        api_key: apiKey || undefined,
-      });
-
-      const fetchedModels = response?.data?.models || [];
-      setModels(fetchedModels);
-
-      if (fetchedModels.length === 0) {
-        message.warning("No models found for this provider");
-        return;
-      }
-
-      const providerPreferredModel = PROVIDER_DEFAULT_MODELS[provider];
-
-      const preferredModel =
-        providerPreferredModel && fetchedModels.includes(providerPreferredModel)
-          ? providerPreferredModel
-          : fetchedModels[0];
-
-      if (!modelName || !fetchedModels.includes(modelName)) {
-        setModelName(preferredModel);
-        form.setFieldsValue({ model_name: preferredModel });
-      }
-
-      message.success("Models fetched successfully");
-    } catch (e) {
-      console.error("Failed to fetch models:", e.response?.data || e);
-      message.error(e.response?.data?.error || "Failed to fetch models");
-    } finally {
-      setModelsLoading(false);
-    }
+    await fetchModelsForProvider({
+      targetProvider: provider,
+      keyOverride: apiKey,
+      currentModel: modelName,
+    });
   };
 
   const testConnection = async () => {
@@ -201,7 +221,7 @@ export default function AISettings() {
       const selectedModel = values.model_name || modelName;
 
       if (!selectedModel) {
-        message.error("Please fetch models and select a model before testing");
+        message.error("Please refresh models and select a model before testing");
         setApiTestStatus("error");
         return;
       }
@@ -220,7 +240,7 @@ export default function AISettings() {
       setApiTestStatus("error");
       message.error(
         e.response?.data?.error ||
-          "Selected model cannot be used. Please fetch models and choose another model."
+          "Selected model cannot be used. Please refresh models and choose another model."
       );
     } finally {
       setIsTesting(false);
@@ -249,7 +269,6 @@ export default function AISettings() {
   };
 
   const hasSavedKey = getKeyStatus(courseAiInfo, provider);
-  const setupReady = hasSavedKey && !!modelName;
 
   return (
     <Layout style={{ background: "#fff", minHeight: "100%" }}>
@@ -285,38 +304,38 @@ export default function AISettings() {
               subTitle="Configure course default AI settings and provider keys"
             />
 
-            <Card title="AI Setup Status">
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Space>
-                  {setupReady ? (
-                    <Tag color="success" icon={<CheckCircleOutlined />}>
-                      Ready
-                    </Tag>
-                  ) : (
-                    <Tag color="warning" icon={<CloseCircleOutlined />}>
-                      Setup incomplete
-                    </Tag>
-                  )}
+            <Space wrap>
+              <Tag
+                color={hasSavedKey ? "success" : "warning"}
+                icon={hasSavedKey ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+              >
+                API key: {hasSavedKey ? "Connected" : "Not saved"}
+              </Tag>
 
-                  <Typography.Text>
-                    Default:{" "}
-                    <strong>
-                      {courseAiInfo.default_ai_provider || "Not selected"} /{" "}
-                      {courseAiInfo.default_ai_model || "No model selected"}
-                    </strong>
-                  </Typography.Text>
-                </Space>
-
-                {!hasSavedKey && (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message={`${selectedProvider?.label} API key is not saved`}
-                    description="Add and save an API key before using this provider for AI feedback."
-                  />
-                )}
-              </Space>
-            </Card>
+              <Tag
+                color={
+                  apiTestStatus === "success"
+                    ? "success"
+                    : apiTestStatus === "error"
+                    ? "error"
+                    : "default"
+                }
+                icon={
+                  apiTestStatus === "success" ? (
+                    <CheckCircleOutlined />
+                  ) : apiTestStatus === "error" ? (
+                    <CloseCircleOutlined />
+                  ) : null
+                }
+              >
+                Selected model:{" "}
+                {apiTestStatus === "success"
+                  ? "Tested successfully"
+                  : apiTestStatus === "error"
+                  ? "Test failed"
+                  : "Not tested"}
+              </Tag>
+            </Space>
 
             <Card
               title={
@@ -335,8 +354,8 @@ export default function AISettings() {
                 type="info"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message="Fetch models before choosing"
-                description="Click Fetch Models first to load all available models for this provider. Before fetching, the dropdown may only show the currently saved/default model."
+                message="Refresh models before choosing"
+                description="Use Refresh Models to load the current usable models for this provider. A saved model may appear before the model list is refreshed."
               />
 
               <Form.Item label="Provider" name="provider">
@@ -356,7 +375,7 @@ export default function AISettings() {
                 rules={[
                   {
                     required: true,
-                    message: "Please fetch models and select a usable model",
+                    message: "Please refresh models and select a usable model",
                   },
                 ]}
               >
@@ -366,7 +385,7 @@ export default function AISettings() {
                     loading={modelsLoading}
                     style={{ width: 180 }}
                   >
-                    Fetch Models
+                    Refresh Models
                   </Button>
 
                   <Select
@@ -413,7 +432,7 @@ export default function AISettings() {
                   }
                   description={
                     hasSavedKey
-                      ? "Saved key is loaded into the password field and hidden by default. Use the visibility icon to view it."
+                      ? "A saved key exists. Paste a new key only if you want to replace it."
                       : "Paste an API key below and save it for this provider."
                   }
                 />
@@ -429,7 +448,7 @@ export default function AISettings() {
 
                 <Space>
                   <Button onClick={testConnection} disabled={isTesting}>
-                    Test Connection
+                    Test Selected Model
                   </Button>
 
                   {isTesting && (
@@ -442,13 +461,13 @@ export default function AISettings() {
 
                   {apiTestStatus === "success" && (
                     <Typography.Text type="success">
-                      <CheckCircleOutlined /> Connected successfully
+                      <CheckCircleOutlined /> Selected model tested successfully
                     </Typography.Text>
                   )}
 
                   {apiTestStatus === "error" && (
                     <Typography.Text type="danger">
-                      <CloseCircleOutlined /> Connection failed
+                      <CloseCircleOutlined /> Selected model test failed
                     </Typography.Text>
                   )}
                 </Space>

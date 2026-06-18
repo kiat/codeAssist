@@ -64,6 +64,14 @@ export default ({
   const { courseId } = useParams();
 
   useEffect(() => {
+    if (aiFeedbackEnabled && !form.getFieldValue("ai_feedback_prompt")) {
+      form.setFieldsValue({
+        ai_feedback_prompt: DEFAULT_AI_FEEDBACK_PROMPT,
+      });
+    }
+  }, [aiFeedbackEnabled, form]);
+
+  useEffect(() => {
     const loadCourseAiInfo = async () => {
       try {
         const res = await getCourseInfo({ course_id: courseId });
@@ -123,10 +131,10 @@ export default ({
         });
       }
 
-      message.success("Models fetched successfully");
+      message.success("Models refreshed successfully");
     } catch (e) {
       console.error("Failed to fetch models:", e.response?.data || e);
-      message.error(e.response?.data?.error || "Failed to fetch models");
+      message.error(e.response?.data?.error || "Failed to refresh models");
     } finally {
       setAssignmentModelsLoading(false);
     }
@@ -548,7 +556,7 @@ export default ({
                                 rules={[
                                   {
                                     required: true,
-                                    message: "Please fetch and select an AI model",
+                                    message: "Please refresh and select an AI model",
                                   },
                                 ]}
                               >
@@ -558,7 +566,7 @@ export default ({
                                     loading={assignmentModelsLoading}
                                     style={{ width: 180 }}
                                   >
-                                    Fetch Models
+                                    Refresh Models
                                   </Button>
 
                                   <Select
