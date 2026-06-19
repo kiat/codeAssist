@@ -407,14 +407,135 @@ def _save_final_draft(student_id, assignment_id, content, file_name):
     db.session.commit()
 
 
+# Default Python image used when no autograder is configured
+_DEFAULT_PYTHON_IMAGE = "python:3.11-slim"
+
+
+def _run_code_in_container(image, content, file_name, timeout):
+    """
+    Run student code inside a Docker container and return
+    (stdout_text, stderr_text, return_code).
+    """
+    run_uuid = uuid.uuid4().hex[:8]
+    container_name = f"run_{run_uuid}"
+    container = None
+
+    try:
+        container = get_docker_client().containers.run(
+            image=image,
+            name=container_name,
+            detach=True,
+            tty=True,
+            command="tail -f /dev/null",
+        )
+
+        # Write code to a temp file on disk, then put it in the container
+        tmp_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            'upload_autograder', 'runs', f'_run_{run_uuid}',
+        )
+        os.makedirs(tmp_dir, exist_ok=True)
+        tmp_path = os.path.join(tmp_dir, file_name)
+        with open(tmp_path, 'w') as f:
+            f.write(content)
+
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            tar.add(tmp_path, arcname=file_name)
+        tar_stream.seek(0)
+        container.put_archive("/tmp/run/", tar_stream)
+
+        # Execute the Python file and capture stdout + stderr
+        exec_proc = subprocess.run(
+            [
+                "docker", "exec", container_name,
+                "python", f"/tmp/run/{file_name}",
+            ],
+            capture_output=True,
+            timeout=timeout,
+        )
+
+        stdout_text = exec_proc.stdout.decode(errors="replace")
+        stderr_text = exec_proc.stderr.decode(errors="replace")
+        return stdout_text, stderr_text, exec_proc.returncode
+
+    except subprocess.TimeoutExpired:
+        return "", "Execution timed out", 1
+    finally:
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass
+
+
+def _run_autograder_in_container(image, content, file_name, assignment_id, timeout):
+    """
+    Run the autograder Docker image and return the parsed results dict,
+    or None on failure.
+    """
+    run_uuid = uuid.uuid4().hex[:8]
+    container_name = f"run_{run_uuid}"
+    container = None
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
+    submissions_dir = os.path.join(assignment_dir, "run", run_uuid)
+    os.makedirs(submissions_dir, exist_ok=True)
+    file_path = os.path.join(submissions_dir, file_name)
+    with open(file_path, 'w') as f:
+        f.write(content)
+
+    try:
+        container = get_docker_client().containers.run(
+            image=image,
+            name=container_name,
+            detach=True,
+            tty=True,
+            command="tail -f /dev/null",
+        )
+
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            tar.add(file_path, arcname=file_name)
+        tar_stream.seek(0)
+        container.put_archive("/autograder/submission/", tar_stream)
+
+        exec_proc = subprocess.run(
+            f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(),
+            capture_output=True,
+            timeout=timeout,
+        )
+
+        if exec_proc.returncode != 0:
+            return None
+
+        cat_result = container.exec_run("cat /autograder/results/results.json")
+        if cat_result.exit_code == 0:
+            return json.loads(cat_result.output.decode())
+        return None
+    except subprocess.TimeoutExpired:
+        return None
+    finally:
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass
+
+
 @code_editor.route('/run_code', methods=["POST"])
 @cross_origin()
 def run_code():
     """
-    Run code against test cases without creating a submission.
+    Run code without creating a submission.
     Expects JSON: { student_id, assignment_id, content, file_name? }
-    Returns test results but does NOT create a submission record.
-    Requires an autograder Docker image to execute code safely.
+
+    Always returns the program's stdout/stderr output.
+    If an autograder Docker image is configured the code is also
+    executed through the autograder and individual test results are
+    included in the response.
     """
     data = request.json
     student_id = data.get("student_id")
@@ -457,89 +578,79 @@ def run_code():
         else:
             raise BadRequestError("Submission period has ended (past due date).")
 
-    # Require autograder image — never run arbitrary code on the host
-    if not assignment.autograder_image_name or not assignment.autograder_image_name.strip():
-        raise BadRequestError("No autograder configured for this assignment. Cannot run code without a sandboxed environment.")
+    has_autograder = (
+        assignment.autograder_image_name
+        and assignment.autograder_image_name.strip()
+    )
+    timeout = assignment.autograder_timeout or 30
 
-    # Save content to a temp file
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
-    run_uuid = uuid.uuid4().hex[:8]
-    submissions_dir = os.path.join(assignment_dir, "run", run_uuid)
-    os.makedirs(submissions_dir, exist_ok=True)
-
-    file_path = os.path.join(submissions_dir, file_name)
-    with open(file_path, 'w') as f:
-        f.write(content)
-
-    container = None
-    temp_container_name = f"run_{uuid.uuid4().hex[:8]}"
-
+    # ------------------------------------------------------------------
+    # 1. Always run the student's code and capture stdout / stderr
+    # ------------------------------------------------------------------
+    run_image = (
+        assignment.autograder_image_name if has_autograder
+        else _DEFAULT_PYTHON_IMAGE
+    )
     try:
-        # Run in autograder container (sandboxed)
-        container = get_docker_client().containers.run(
-            image=assignment.autograder_image_name,
-            name=temp_container_name,
-            detach=True,
-            tty=True,
-            command="tail -f /dev/null",
+        stdout_text, stderr_text, return_code = _run_code_in_container(
+            run_image, content, file_name, timeout,
         )
-
-        tar_stream = io.BytesIO()
-        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
-            tar.add(file_path, arcname=file_name)
-        tar_stream.seek(0)
-        container.put_archive("/autograder/submission/", tar_stream)
-
-        exec_proc = subprocess.run(
-            f"docker exec {temp_container_name} /bin/bash /autograder/source/run_autograder".split(),
-            capture_output=True,
-            timeout=assignment.autograder_timeout,
-        )
-
-        if exec_proc.returncode != 0:
-            return jsonify({
-                "output": exec_proc.stderr.decode() if exec_proc.stderr else "Execution failed",
-                "passed": False,
-                "tests": [],
-            }), 200
-
-        cat_result = container.exec_run("cat /autograder/results/results.json")
-        if cat_result.exit_code == 0:
-            result_data = json.loads(cat_result.output.decode())
-            return jsonify({
-                "output": result_data.get("output", ""),
-                "passed": result_data.get("score", 0) > 0,
-                "score": result_data.get("score", 0),
-                "tests": result_data.get("tests", []),
-            }), 200
-        else:
-            return jsonify({
-                "output": "Could not read results",
-                "passed": False,
-                "tests": [],
-            }), 200
-
-    except subprocess.TimeoutExpired:
-        return jsonify({
-            "output": "Execution timed out",
-            "passed": False,
-            "tests": [],
-        }), 200
     except Exception as e:
-        print(f"RUN_CODE error: {e}", flush=True)
+        print(f"RUN_CODE _run_code_in_container error: {e}", flush=True)
         return jsonify({
             "output": f"Error: {type(e).__name__}: {str(e)}",
+            "programOutput": "",
             "passed": False,
+            "score": 0,
             "tests": [],
         }), 200
-    finally:
-        if container:
-            try:
-                container.stop()
-                container.remove()
-            except Exception:
-                pass
+
+    # Build the human-readable output string from stdout / stderr
+    output_parts = []
+    if stdout_text.strip():
+        output_parts.append(stdout_text)
+    if stderr_text.strip():
+        output_parts.append("--- stderr ---\n" + stderr_text)
+    program_output = "\n".join(output_parts).strip()
+    if not program_output:
+        program_output = "(no output)"
+
+    # ------------------------------------------------------------------
+    # 2. If an autograder is configured, also run it for test results
+    # ------------------------------------------------------------------
+    tests = []
+    score = 0
+    passed = return_code == 0
+
+    if has_autograder:
+        try:
+            result_data = _run_autograder_in_container(
+                assignment.autograder_image_name, content,
+                file_name, assignment_id, timeout,
+            )
+        except Exception as e:
+            print(f"RUN_CODE autograder error: {e}", flush=True)
+            result_data = None
+
+        if result_data is not None:
+            tests = result_data.get("tests", [])
+            score = result_data.get("score", 0)
+            # Use autograder score to determine pass/fail when available
+            passed = score > 0 or return_code == 0
+            # If autograder produced its own output, append it
+            ag_output = result_data.get("output", "")
+            if ag_output and ag_output.strip():
+                program_output += "\n\n--- autograder ---\n" + ag_output
+
+    return jsonify({
+        "output": program_output,
+        "programOutput": program_output,
+        "stdout": stdout_text,
+        "stderr": stderr_text,
+        "passed": passed,
+        "score": score,
+        "tests": tests,
+    }), 200
 
 
 @code_editor.route('/ai_chat', methods=["POST"])
