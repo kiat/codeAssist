@@ -26,6 +26,7 @@ export default () => {
     const isStudent = JSON.parse(localStorage.getItem("userInfo"))?.isStudent;
     const [formData, setFormData] = useState({});
     const [placeholders, setPlaceholders] = useState({});
+    const [passwordVisible, setPasswordVisible] = useState(false);
 
     useEffect(() => {
         if (userId) {
@@ -109,8 +110,18 @@ export default () => {
                         <Input placeholder={placeholders.email_address || "Enter Email Address"} disabled />
                     </Form.Item>
                     {/* make sure password is only visible when click eye icon */}
-                    <Form.Item label='PASSWORD' name="password" rules={getPasswordRules()}>
-                        <Input.Password placeholder="********" />
+                    <Form.Item label='PASSWORD' name="password" rules={getPasswordRules({ required: false })}>
+                        <Input
+                            type={passwordVisible ? 'text' : 'password'}
+                            placeholder='********'
+                            addonAfter={
+                                <Button
+                                    type="link"
+                                    icon={passwordVisible ? <EyeTwoTone /> : <EyeInvisibleOutlined />}
+                                    onClick={() => setPasswordVisible(!passwordVisible)}
+                                />
+                            }
+                        />
                     </Form.Item>
                 </Card>
 
