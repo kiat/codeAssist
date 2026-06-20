@@ -51,3 +51,7 @@ export async function updateCourse(params) {
 export async function updateRole(params) {
   return service("update_role", params, "post");
 }
+
+export async function setCourseActive(params) {
+  return service("set_course_active", params, "put");
+}

@@ -22,12 +22,13 @@ import { useEffect, useState, useCallback } from "react";
 import { useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../../App";
-import { getCourseAssignments, updateCourse , deleteCourse, deleteAllAssignments, getCourseInfo} from "../../../services/course";
+import { getCourseAssignments, updateCourse, deleteCourse, deleteAllAssignments, getCourseInfo, setCourseActive as setCourseActiveAPI } from "../../../services/course";
 import axios from "axios";
 
 export default () => {
   const { courseId } = useParams();
   const [assignments, setAssignments] = useState([]);
+  const [courseActive, setCourseActive] = useState(true);
 
 
 
@@ -45,6 +46,7 @@ export default () => {
     try {
       const res = await getCourseInfo({course_id: courseId});
       form.setFieldsValue(res.data[0]);
+      setCourseActive(res.data[0]?.active ?? true);
     }
     catch(error) {
       console.error("Error fetching course data: ", error)
@@ -70,6 +72,16 @@ export default () => {
     }
     catch(error) {
       console.error("Error deleting all assignments: ", error);
+    }
+  };
+
+  const handleSetCourseActive = async (active) => {
+    try {
+      await setCourseActiveAPI({ course_id: courseId, active });
+      setCourseActive(active);
+      message.success(active ? "Course reactivated successfully" : "Course deactivated successfully");
+    } catch (error) {
+      console.error("Error updating course status:", error);
     }
   };
 
@@ -212,6 +224,21 @@ export default () => {
             >
               Update Course
             </Button>
+            <Popconfirm
+              title={courseActive ? "Deactivate this course?" : "Reactivate this course?"}
+              description={
+                courseActive
+                  ? "Students will no longer see this course in their dashboard."
+                  : "Students will see this course again in their dashboard."
+              }
+              onConfirm={() => handleSetCourseActive(!courseActive)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <Button type="primary">
+                {courseActive ? "Deactivate Course" : "Reactivate Course"}
+              </Button>
+            </Popconfirm>
           </Space>
           <Typography.Title level={5} style={{ marginTop: "10px" }}>
             DANGER ZONE
