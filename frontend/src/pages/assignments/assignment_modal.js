@@ -1,0 +1,102 @@
+import { Button, message, Form, Modal, Upload } from "antd";
+import { InboxOutlined } from '@ant-design/icons';
+import { useState, useContext } from "react";
+import { GlobalContext } from "../../App";
+import { useNavigate } from "react-router-dom";
+import { uploadSubmission } from "../../services/submission";
+import LoadingOverlay from "../../components/LoadingOverlay";
+
+export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle }) {
+  const [file, setFile] = useState(null);
+  const [fileList, setFileList] = useState([]);
+  const { userInfo } = useContext(GlobalContext);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleFileChange = (info) => {
+    const nextFileList = Array.isArray(info.fileList) ? info.fileList.slice(-1) : [];
+    setFileList(nextFileList);
+
+    if (info.file.status === 'done') {
+      setFile(info.file.originFileObj || info.file);
+      message.success(`${info.file.name} file uploaded successfully.`);
+    } else if (info.file.status === 'error') {
+      message.error(`${info.file.name} file upload failed.`);
+    } else if (info.file.status === 'removed') {
+      setFile(null);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!file) {
+      message.error("No file uploaded");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('assignment', assignmentTitle);
+    formData.append('student_id', userInfo.id);
+    formData.append('assignment_id', assignmentID);
+
+    try {
+      setLoading(true);
+      const response = await uploadSubmission(formData)
+      const responseData = response.data;
+      navigateToResults(responseData.submissionID);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+
+      // check if we had a submission timeout error
+      if (error.response && error.response.data.submission_id) {
+        // Navigate to results if submission_id is in the response data
+        navigateToResults(error.response.data.submission_id);
+      }
+    }
+    finally {
+      setLoading(false);
+    }
+  };
+
+  const navigateToResults = (submissionID) => {
+    //use the returned submission id to navigate to its reults
+    navigate(`/assignmentResult/${submissionID}`);
+
+    // using updated route def
+    //navigate(`/assignmentResult/${assignmentID}/${userInfo.id}`);
+  };
+
+  return (
+    <>
+    <LoadingOverlay loading={loading}/> 
+    <Modal title="Submit Assignment" open={open} onCancel={onCancel} footer={null}>
+      <Form layout="vertical">
+        <Form.Item name="upload">
+          <Upload.Dragger
+            name="file"
+            multiple={false}
+            fileList={fileList}
+            onChange={handleFileChange}
+            beforeUpload={file => {
+              setFile(file);
+              setFileList([{ uid: file.uid || `${Date.now()}`, name: file.name, status: 'done', originFileObj: file }]);
+              return false; // Prevent default upload
+            }}
+            onDrop={e => console.log('Dropped files', e.dataTransfer.files)}
+          >
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined />
+            </p>
+            <p className="ant-upload-text">Click or drag file to this area to upload</p>
+          </Upload.Dragger>
+        </Form.Item>
+        <Form.Item>
+          <Button style={{ width: "100%" }} type="submit" onClick={handleSubmit}>
+            Submit
+          </Button>
+        </Form.Item>
+      </Form>
+    </Modal>
+    </>
+  );
+}

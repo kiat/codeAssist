@@ -1,0 +1,58 @@
+export const texts = [
+  "Assignment-0",
+  "Training-Test-1 - Triangle",
+  "Training-Test-2 - FindingProduct",
+];
+
+export const tableData = [
+  {
+    assignmentName: "Training-Test-2-Question-1 - Gift Card",
+    released: 1658362327000,
+    due: 1658363338000,
+    submissions: 8,
+    graded: 100,
+    published: 0,
+    regrades: "",
+    id: 1,
+  },
+  {
+    assignmentName: "Training-Test-2-Question-2-Magic Marbles",
+    released: 1653362328000,
+    due: 1655362328000,
+    submissions: 18,
+    graded: 90,
+    published: 1,
+    regrades: 2,
+    id: 2,
+  },
+  {
+    assignmentName: "Training-Test-2-Question-3 Following the Rules",
+    released: 1658362326000,
+    due: 1658362328000,
+    submissions: 13,
+    graded: 80,
+    published: 0,
+    regrades: 3,
+    id: 3,
+  },
+  {
+    assignmentName: "Training-Test-2-Question-4 PD Balancing",
+    released: 1658362329000,
+    due: 1658362329000,
+    submissions: 8,
+    graded: 70,
+    published: 1,
+    regrades: "",
+    id: 4,
+  },
+  {
+    assignmentName: "Training-Test-2-Question-5 Secret",
+    released: 1658362338000,
+    due: 1658362348000,
+    submissions: 8,
+    graded: 60,
+    published: 0,
+    regrades: "",
+    id: 5,
+  },
+];
