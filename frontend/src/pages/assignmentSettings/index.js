@@ -28,12 +28,13 @@ export default () => {
   const [publishedBefore, setPubBefore] = useState(undefined);
   const [originalPublish, setOGPub] = useState(undefined);
   const [enableAiFeedback, setEnableAiFeedback] = useState(false);
+  const [allowLateSubmissions, setAllowLateSubmissions] = useState(false);
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
 
 
   const getAssignmentInfo = useCallback(() => {
     getAssignment({ assignment_id: assignmentId }).then(res => {
-      const { name, published, due_date, autograder_points, course_id, published_date, 
+      const { name, published, due_date, autograder_points, course_id, published_date, late_submission, late_due_date, 
         ai_feedback_enabled, ai_feedback_prompt, ai_feedback_model, ai_feedback_temperature } = res.data || {};      
         setPubBefore(published);
 
@@ -45,12 +46,14 @@ export default () => {
         autograderPoints: autograder_points,
         dueDate: moment.utc(due_date).local(),
         releaseDate: moment.utc(published_date).local(),
+        allowLateSubmissions: late_submission,
+        lateDueDate: late_due_date ? moment.utc(late_due_date).local() : null,
         enableAiFeedback: ai_feedback_enabled,
         ai_feedback_prompt,
         ai_feedback_model,
         ai_feedback_temperature
       });
-
+      setAllowLateSubmissions(late_submission);
       setEnableAiFeedback(ai_feedback_enabled);
     });
   }, [assignmentId, form]);
@@ -116,7 +119,7 @@ const handleDeleteSubmissions = async (assignmentId) => {
       anonymous_grading: values.submissionAnonymization,
       manual_grading: values.manualGrading,
       late_submission: values.allowLateSubmissions,
-      late_due_date: values.lateDueDate,
+      late_due_date: values.allowLateSubmissions ? values.lateDueDate : null,
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
@@ -210,8 +213,10 @@ const handleDeleteSubmissions = async (assignmentId) => {
                 >
                   <DatePicker showTime style={{ width: "100%" }} />
                 </Form.Item>
-                <Form.Item>
-                  <Checkbox>Allow Late Submissions</Checkbox>
+                <Form.Item name="allowLateSubmissions" valuePropName="checked">
+                  <Checkbox onChange={(e) => setAllowLateSubmissions(e.target.checked)}>
+                    Allow Late Submissions
+                  </Checkbox>
                 </Form.Item>
               </Col>
               <Col>
@@ -223,7 +228,7 @@ const handleDeleteSubmissions = async (assignmentId) => {
                   <DatePicker showTime style={{ width: "100%" }} />
                 </Form.Item>
                 <Form.Item label='LATE DUE DATE (CST)' name='lateDueDate'>
-                  <DatePicker showTime style={{ width: "100%" }} />
+                  <DatePicker showTime style={{ width: "100%" }} disabled={!allowLateSubmissions} />
                 </Form.Item>
               </Col>
             </Row>
