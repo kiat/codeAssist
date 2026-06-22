@@ -439,6 +439,9 @@ def _run_code_in_container(image, content, file_name, timeout):
         with open(tmp_path, 'w') as f:
             f.write(content)
 
+        # Create the /tmp/run/ directory inside the container first
+        container.exec_run("mkdir -p /tmp/run/")
+
         tar_stream = io.BytesIO()
         with tarfile.open(fileobj=tar_stream, mode="w") as tar:
             tar.add(tmp_path, arcname=file_name)
