@@ -147,7 +147,16 @@ export default () => {
   useEffect(() => {
     getEnrollment();
   }, [getEnrollment, courseId]);
-
+  // count the number of students, instructors, and TAs for the course
+  const studentCount = originalEnrollment.filter(
+    (e) => e.role?.toLowerCase() === "student"
+  ).length;
+  const instructorCount = originalEnrollment.filter(
+    (e) => e.role?.toLowerCase() === "instructor"
+  ).length;
+  const taCount = originalEnrollment.filter(
+    (e) => e.role?.toLowerCase() === "ta"
+  ).length;
   return (
     <>
       <PageHeader
@@ -240,9 +249,9 @@ export default () => {
         }}
       >
         <Space size="large">
-          <Typography.Title level={5}>50 students</Typography.Title>
-          <Typography.Title level={5}>2 instructors</Typography.Title>
-          <Typography.Title level={5}>2 TAs</Typography.Title>
+          <Typography.Title level={5}> {studentCount} students</Typography.Title>
+          <Typography.Title level={5}> {instructorCount} instructors</Typography.Title>
+          <Typography.Title level={5}> {taCount} TAs</Typography.Title>
         </Space>
         <div
           style={{
