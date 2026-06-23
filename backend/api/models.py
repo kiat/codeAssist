@@ -66,7 +66,11 @@ class Assignment(db.Model):
     autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
 
-    # -- AI Integration Settings --
+    # -- Code Editor Settings --
+    enable_code_editor = db.Column(db.Boolean, default=False)
+
+    # -- AI Integration Settings -- 
+
     ai_feedback_enabled = db.Column(db.Boolean, default=False)
     use_course_ai_default = db.Column(db.Boolean, default=True)
     ai_feedback_provider = db.Column(db.String, nullable=True)
@@ -140,6 +144,17 @@ class AssignmentExtension(db.Model):
 
     assignment = db.relationship("Assignment", backref=db.backref("extensions", lazy="dynamic"))
     student = db.relationship("User", backref=db.backref("extensions", lazy="dynamic"))
+
+class CodeDraft(db.Model):
+    __tablename__ = "code_drafts"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False, index=True)
+    content = db.Column(db.Text, nullable=False)
+    file_name = db.Column(db.String, nullable=True, default="solution.py")
+    version_number = db.Column(db.Integer, nullable=False, default=1)
+    saved_at = db.Column(TIMESTAMP(timezone=True), nullable=False)
+    auto_saved = db.Column(db.Boolean, nullable=False, default=False)
 
 class AdminEmail(db.Model):
     __tablename__ = 'admin_emails'

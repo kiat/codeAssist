@@ -153,7 +153,7 @@ export default ({
       const releaseDate = values.releaseDate
         ? new Date(values.releaseDate.valueOf())
         : null;
-
+      
       const payload = {
         name: values.name,
         course_id: courseId,
@@ -168,7 +168,7 @@ export default ({
         autograder_points: values.autograderPoints
           ? Number(values.autograderPoints)
           : null,
-
+        enable_code_editor: !!values.enable_code_editor,
         ai_feedback_enabled: !!values.ai_feedback_enabled,
         use_course_ai_default: values.use_course_ai_default !== false,
         ai_feedback_provider:
@@ -469,14 +469,22 @@ export default ({
                       <Input />
                     </Form.Item>
 
-                    <Card title="AI Feedback Settings" style={{ marginBottom: 24 }}>
-                      <Form.Item
-                        label="Enable AI Feedback"
-                        name="ai_feedback_enabled"
-                        valuePropName="checked"
-                      >
-                        <Switch />
-                      </Form.Item>
+                    <Form.Item
+                      label="ENABLE CODE EDITOR"
+                      name="enable_code_editor"
+                      valuePropName="checked"
+                      tooltip="Allow students to write and submit code directly in the browser instead of uploading a file"
+                    >
+                      <Switch />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="ENABLE AI FEEDBACK"
+                      name="ai_feedback_enabled"
+                      valuePropName="checked"
+                    >
+                      <Switch />
+                    </Form.Item>
 
                       {aiFeedbackEnabled && (
                         <>
