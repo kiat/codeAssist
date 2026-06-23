@@ -29,8 +29,9 @@ class Course(db.Model):
     entryCode = db.Column(db.String, nullable=False, unique=True)
     allowEntryCode = db.Column(db.Boolean, default=False)
     description = db.Column(db.String, default="")
+    active = db.Column(db.Boolean, default=True, nullable=False)
 
-    # -- AI Integration Settings -- 
+    # -- AI Integration Settings --
     openai_api_key = db.Column(db.String, default="")
 
 @dataclass
