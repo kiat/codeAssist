@@ -29,7 +29,7 @@ course = Blueprint("course", __name__)
 
 ALLOWED_EXTENSIONS = {'csv'}
 UPLOAD_FOLDER = 'uploads'
-SUPPORTED_AI_PROVIDERS = {"openai", "gemini", "claude"}
+SUPPORTED_AI_PROVIDERS = {"openai", "gemini", "claude", "ollama"}
 
 def is_supported_openai_model(model_id):
     """
@@ -635,6 +635,8 @@ def get_course_info():
         "has_openai_api_key": bool(course_obj.openai_api_key),
         "has_gemini_api_key": bool(course_obj.gemini_api_key),
         "has_claude_api_key": bool(course_obj.claude_api_key),
+        "has_ollama_api_key": bool(course_obj.ollama_base_url),
+        "ollama_base_url": course_obj.ollama_base_url,
     })
 
     return jsonify([course_data]), 200
@@ -718,14 +720,17 @@ def update_ai_settings():
         if not provider:
             raise BadRequestError("Missing provider for API key")
 
-        encrypted_api_key = encrypt_api_key(api_key)
+        if provider == "ollama":
+            course_obj.ollama_base_url = api_key.strip() if api_key else ""
+        else:
+            encrypted_api_key = encrypt_api_key(api_key)
 
-        if provider == "openai":
-            course_obj.openai_api_key = encrypted_api_key
-        elif provider == "gemini":
-            course_obj.gemini_api_key = encrypted_api_key
-        elif provider == "claude":
-            course_obj.claude_api_key = encrypted_api_key
+            if provider == "openai":
+                course_obj.openai_api_key = encrypted_api_key
+            elif provider == "gemini":
+                course_obj.gemini_api_key = encrypted_api_key
+            elif provider == "claude":
+                course_obj.claude_api_key = encrypted_api_key
 
     try:
         db.session.commit()
@@ -763,8 +768,23 @@ def fetch_ai_models():
                 api_key = decrypt_api_key(course_obj.gemini_api_key)
             elif provider == "claude" and course_obj.claude_api_key:
                 api_key = decrypt_api_key(course_obj.claude_api_key)
+            elif provider == "ollama" and course_obj.ollama_base_url:
+                api_key = course_obj.ollama_base_url
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
+
+        if provider == "ollama":
+            base_url = (api_key or "http://host.docker.internal:11434").strip()
+            try:
+                response = requests.get(f"{base_url}/api/tags", timeout=10)
+                if response.status_code >= 400:
+                    return jsonify({"error": f"Ollama returned error: {response.text}"}), response.status_code
+                
+                models_data = response.json().get("models", [])
+                model_ids = [m.get("name") for m in models_data if m.get("name")]
+                return jsonify({"models": sorted(list(set(model_ids)))}), 200
+            except Exception as e:
+                return jsonify({"error": f"Failed to connect to Ollama at {base_url}: {str(e)}"}), 500
 
         if provider == "openai":
             client = OpenAI(api_key=api_key)
@@ -913,6 +933,8 @@ def test_ai_api_key():
                 api_key = decrypt_api_key(course_obj.gemini_api_key)
             elif provider == "claude" and course_obj.claude_api_key:
                 api_key = decrypt_api_key(course_obj.claude_api_key)
+            elif provider == "ollama" and course_obj.ollama_base_url:
+                api_key = course_obj.ollama_base_url
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
 
@@ -962,6 +984,22 @@ def test_ai_api_key():
                 "provider": provider,
             }), 200
 
+        if provider == "ollama":
+            base_url = (api_key or "http://host.docker.internal:11434").strip()
+            try:
+                response = requests.get(f"{base_url}/api/tags", timeout=10)
+                if response.status_code >= 400:
+                    return jsonify({
+                        "error": f"Ollama connection test failed: {response.text}"
+                    }), response.status_code
+
+                return jsonify({
+                    "message": "Ollama connection is valid",
+                    "provider": provider,
+                }), 200
+            except Exception as e:
+                return jsonify({"error": f"Ollama connection error: {str(e)}"}), 500
+
         raise BadRequestError("Unsupported AI provider")
 
     except (BadRequestError, NotFoundError):
@@ -1002,6 +1040,8 @@ def test_ai_model():
                 api_key = decrypt_api_key(course_obj.gemini_api_key)
             elif provider == "claude" and course_obj.claude_api_key:
                 api_key = decrypt_api_key(course_obj.claude_api_key)
+            elif provider == "ollama" and course_obj.ollama_base_url:
+                api_key = course_obj.ollama_base_url
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
 
@@ -1145,6 +1185,46 @@ def test_ai_model():
                 "model": model,
                 "response": parsed_feedback,
             }), 200
+
+        if provider == "ollama":
+            base_url = (api_key or "http://host.docker.internal:11434").strip()
+            try:
+                response = requests.post(
+                    f"{base_url}/api/chat",
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "user", "content": test_prompt}
+                        ],
+                        "options": {
+                            "temperature": 0
+                        },
+                        "stream": False,
+                        "format": "json"
+                    },
+                    timeout=15
+                )
+                if response.status_code >= 400:
+                    return jsonify({
+                        "error": f"Selected Ollama model cannot be used: {response.text}"
+                    }), response.status_code
+
+                raw_response = response.json().get("message", {}).get("content", "").strip()
+                parsed_feedback = validate_feedback_response(raw_response, "Ollama")
+
+                if parsed_feedback is None:
+                    return jsonify({
+                        "error": "Selected Ollama model did not return valid JSON feedback"
+                    }), 400
+
+                return jsonify({
+                    "message": "Ollama model is usable",
+                    "provider": provider,
+                    "model": model,
+                    "response": parsed_feedback,
+                }), 200
+            except Exception as e:
+                return jsonify({"error": f"Ollama connection error: {str(e)}"}), 500
 
         raise BadRequestError("Unsupported AI provider")
 
