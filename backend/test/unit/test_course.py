@@ -323,11 +323,17 @@ def test_update_role_not_found(client, mocker):
 import io
 
 def test_create_enrollment_csv_success(client, mocker):
-    # create a file like object to simulate the uploaded file
-    file_content = "student-1\nstudent-2"
+    file_content = "Email\nstudent1@test.com\nstudent2@test.com"
     mock_file = (io.BytesIO(file_content.encode()), "students.csv")
 
-    # Mock dependencies
+    mock_user_1 = mocker.Mock()
+    mock_user_1.id = "uuid-1"
+    mock_user_2 = mocker.Mock()
+    mock_user_2.id = "uuid-2"
+
+    mock_query = mocker.patch("routes.course.User.query")
+    mock_query.filter_by.return_value.first.side_effect = [mock_user_1, mock_user_2]
+
     mocker.patch("routes.course.allowed_file", return_value=True)
     mocker.patch("routes.course.os.path.exists", return_value=False)
     mocker.patch("routes.course.os.makedirs")
@@ -344,8 +350,12 @@ def test_create_enrollment_csv_success(client, mocker):
 
     assert response.status_code == 200
     assert response.json["failed_enrollments"] == []
-    mock_open.assert_any_call(mocker.ANY, newline="")  
-    mock_create_bulk.assert_called_once_with({"course_id": "course-123", "student_ids": ["student-1", "student-2"]})
+    mock_open.assert_any_call(mocker.ANY, newline="")
+    mock_create_bulk.assert_called_once_with({
+        "course_id": "course-123",
+        "student_ids": ["uuid-1", "uuid-2"],
+        "role": "student"
+    })
 
 
 def test_create_enrollment_csv_missing_file(client, mocker):
@@ -460,6 +470,7 @@ def test_create_enrollment_bulk_with_failures(mocker):
 
     mocker.patch("routes.course.db.session.add", side_effect=raise_error)
     mocker.patch("routes.course.db.session.commit", side_effect=raise_error)
+    mocker.patch("routes.course.db.session.rollback")
 
     data = {
         "course_id": "course-1",
@@ -467,7 +478,8 @@ def test_create_enrollment_bulk_with_failures(mocker):
     }
 
     result = create_enrollment_bulk(data)
-    assert set(result["failed_enrollments"]) == {"a", "b"}  # Compare as sets to ignore order
+    failed_ids = {f["id"] for f in result["failed_enrollments"]}
+    assert failed_ids == {"a", "b"}
 
 def test_create_course_get_not_allowed(client):
     response = client.get("/create_course")
