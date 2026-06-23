@@ -33,8 +33,9 @@ export default () => {
 
   const getAssignmentInfo = useCallback(() => {
     getAssignment({ assignment_id: assignmentId }).then(res => {
-      const { name, published, due_date, autograder_points, course_id, published_date, 
-        ai_feedback_enabled, ai_feedback_prompt, ai_feedback_model, ai_feedback_temperature } = res.data || {};      
+      const { name, published, due_date, autograder_points, course_id, published_date,
+        hold_results,
+        ai_feedback_enabled, ai_feedback_prompt, ai_feedback_model, ai_feedback_temperature } = res.data || {};
         setPubBefore(published);
 
       setOGPub(published_date);
@@ -42,6 +43,7 @@ export default () => {
       form.setFieldsValue({
         name,
         published,
+        hold_results: hold_results ?? false,
         autograderPoints: autograder_points,
         dueDate: moment.utc(due_date).local(),
         releaseDate: moment.utc(published_date).local(),
@@ -123,6 +125,8 @@ const handleDeleteSubmissions = async (assignmentId) => {
       published: values.published,
       published_date: publishedDate,
 
+      hold_results: values.hold_results ?? false,
+
       // AI Feedback Config
       ai_feedback_enabled: values.enableAiFeedback,
       ai_feedback_prompt: values.ai_feedback_prompt,
@@ -182,6 +186,14 @@ const handleDeleteSubmissions = async (assignmentId) => {
                 { label: "NO", value: false },
               ]}
             />
+          </Form.Item>
+          <Form.Item
+            label='HOLD RESULTS'
+            name='hold_results'
+            valuePropName='checked'
+            extra='When enabled, students see their submission was received but cannot view scores or test results until you release them.'
+          >
+            <Checkbox>Hold results from students</Checkbox>
           </Form.Item>
           {/* NEED TO CONNECT TO BACKEND  */}
           {/* <Form.Item label='SUBMISSION ANONYMIZATION'>

@@ -114,6 +114,7 @@ export default ({
       ai_feedback_prompt: values.ai_feedback_prompt ?? null,
       ai_feedback_model: values.ai_feedback_model ?? null,
       ai_feedback_temperature: values.ai_feedback_temperature ?? null,
+      hold_results: !!values.hold_results,
     };
 
     const assignment = await createAssignment(payload);
@@ -446,6 +447,15 @@ export default ({
                       ]}
                     >
                       <Input placeholder="Enter temperature (0 to 1)" disabled={!aiFeedbackEnabled} />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="HOLD RESULTS"
+                      name="hold_results"
+                      valuePropName="checked"
+                      extra="When enabled, students see their submission was received but cannot view scores or test results until you release them."
+                    >
+                      <Checkbox>Hold results from students</Checkbox>
                     </Form.Item>
 
                     <Form.Item
