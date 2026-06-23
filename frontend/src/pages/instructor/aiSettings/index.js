@@ -1,212 +1,508 @@
-import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from "@ant-design/icons";
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  LoadingOutlined,
+  KeyOutlined,
+  RobotOutlined,
+} from "@ant-design/icons";
 
 import {
+  Alert,
   Button,
   Card,
-  Layout,
-  Menu,
+  Divider,
   Form,
   Input,
+  Layout,
+  Menu,
   PageHeader,
+  Select,
   Space,
+  Spin,
+  Tag,
   Typography,
   message,
-  Spin
 } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import {  getCourseInfo, storeApiKey } from "../../../services/course";
-import axios from "axios";
+import {
+  getCourseInfo,
+  updateAiSettings,
+  fetchAiModels,
+  testAiModel,
+} from "../../../services/course";
 
-export default () => {
+const { Sider, Content } = Layout;
+
+const PROVIDERS = [
+  { key: "openai", label: "ChatGPT", displayName: "OpenAI / ChatGPT" },
+  { key: "gemini", label: "Gemini", displayName: "Google Gemini" },
+  { key: "claude", label: "Claude", displayName: "Anthropic Claude" },
+];
+
+const FEEDBACK_STYLES = [
+  { label: "Hint-based", value: "hint-based" },
+  { label: "Balanced", value: "balanced" },
+  { label: "Detailed debugging", value: "detailed-debugging" },
+];
+const PROVIDER_DEFAULT_MODELS = {
+  openai: "gpt-4o-mini",
+  gemini: "gemini-1.5-flash",
+  claude: "claude-3-5-sonnet-20241022",
+};
+
+const getKeyStatus = (course, selectedProviderKey) => {
+  if (selectedProviderKey === "openai") {
+    return !!course.has_openai_api_key;
+  }
+  if (selectedProviderKey === "gemini") {
+    return !!course.has_gemini_api_key;
+  }
+  if (selectedProviderKey === "claude") {
+    return !!course.has_claude_api_key;
+  }
+  return false;
+};
+
+export default function AISettings() {
   const { courseId } = useParams();
   const [form] = Form.useForm();
-
-  // Sidebar providers list
-  const providers = [
-    { key: "openai", label: "ChatGPT" },
-    { key: "google", label: "Gemini" },
-    { key: "anthropic", label: "Claude" },
-  ];
 
   const [provider, setProvider] = useState("openai");
   const [apiKey, setApiKey] = useState("");
   const [modelName, setModelName] = useState("");
+  const [models, setModels] = useState([]);
+  const [courseAiInfo, setCourseAiInfo] = useState({});
   const [isTesting, setIsTesting] = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [apiTestStatus, setApiTestStatus] = useState(null);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await getCourseInfo({ course_id: courseId });
-        const course = res?.data?.[0] || {};
-        form.setFieldsValue(course);
-        // initialize selected provider
-        const savedProvider = localStorage.getItem(`ai_selected_provider_${courseId}`) || "openai";
-        setProvider(savedProvider);
+  const selectedProvider = PROVIDERS.find((item) => item.key === provider);
 
-        // preload OpenAI key from backend column if provider is openai
-        const backendOpenAiKey = course.openai_api_key || "";
-        const storedProviderKey = localStorage.getItem(`ai_key_${savedProvider}_${courseId}`) || "";
-        setApiKey(savedProvider === "openai" ? (backendOpenAiKey || storedProviderKey) : storedProviderKey);
+  const fetchModelsForProvider = useCallback(async ({
+    targetProvider,
+    keyOverride = "",
+    currentModel = "",
+    silent = false,
+  } = {}) => {
+    try {
+      setModelsLoading(true);
 
-        // per-provider model name
-        const savedModelName = localStorage.getItem(`ai_model_name_${savedProvider}_${courseId}`) || "";
-        setModelName(savedModelName);
-      } catch (e) {
-        console.error(e);
+      const response = await fetchAiModels({
+        course_id: courseId,
+        provider: targetProvider,
+        api_key: keyOverride || undefined,
+      });
+
+      const fetchedModels = response?.data?.models || [];
+      setModels(fetchedModels);
+
+      if (fetchedModels.length === 0) {
+        if (!silent) {
+          message.warning("No models found for this provider");
+        }
+        return;
       }
-    };
-    load();
+
+      const providerPreferredModel = PROVIDER_DEFAULT_MODELS[targetProvider];
+
+      const preferredModel =
+        providerPreferredModel && fetchedModels.includes(providerPreferredModel)
+          ? providerPreferredModel
+          : fetchedModels[0];
+
+      if (!currentModel || !fetchedModels.includes(currentModel)) {
+        setModelName(preferredModel);
+        form.setFieldsValue({ model_name: preferredModel });
+      }
+
+      if (!silent) {
+        message.success("Models refreshed successfully");
+      }
+    } catch (e) {
+      console.error("Failed to fetch models:", e.response?.data || e);
+      if (!silent) {
+        message.error(e.response?.data?.error || "Failed to refresh models");
+      }
+    } finally {
+      setModelsLoading(false);
+    }
   }, [courseId, form]);
+
+  const loadCourseAiInfo = useCallback(async () => {
+    try {
+      const res = await getCourseInfo({ course_id: courseId });
+      const course = res?.data?.[0] || {};
+
+      setCourseAiInfo(course);
+
+      const defaultProvider = course.default_ai_provider || "openai";
+      const defaultModel =
+        course.default_ai_model ||
+        PROVIDER_DEFAULT_MODELS[defaultProvider] ||
+        "";
+
+      setProvider(defaultProvider);
+      setModelName(defaultModel);
+      setApiKey("");
+
+      form.setFieldsValue({
+        provider: defaultProvider,
+        model_name: defaultModel,
+        feedback_style: course.default_feedback_style || "balanced",
+        temperature: course.default_ai_temperature ?? 0.5,
+      });
+
+      if (getKeyStatus(course, defaultProvider)) {
+        await fetchModelsForProvider({
+          targetProvider: defaultProvider,
+          keyOverride: "",
+          currentModel: defaultModel,
+          silent: true,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to load course AI settings:", e);
+      message.error("Failed to load AI settings");
+    }
+  }, [courseId, fetchModelsForProvider, form]);
+
+  useEffect(() => {
+    loadCourseAiInfo();
+  }, [loadCourseAiInfo]);
+
+  const handleProviderChange = async (newProvider) => {
+    setProvider(newProvider);
+    setModels([]);
+    setApiTestStatus(null);
+
+    const fallbackModel = PROVIDER_DEFAULT_MODELS[newProvider] || "";
+
+    setApiKey("");
+
+    let nextModel = fallbackModel;
+
+    if (newProvider === courseAiInfo.default_ai_provider) {
+      const savedModel = courseAiInfo.default_ai_model || fallbackModel;
+
+      nextModel = savedModel;
+    }
+
+    setModelName(nextModel);
+    form.setFieldsValue({
+      provider: newProvider,
+      model_name: nextModel,
+    });
+
+    if (getKeyStatus(courseAiInfo, newProvider)) {
+      await fetchModelsForProvider({
+        targetProvider: newProvider,
+        keyOverride: "",
+        currentModel: nextModel,
+        silent: true,
+      });
+    }
+  };
+
+  const handleFetchModels = async () => {
+    await fetchModelsForProvider({
+      targetProvider: provider,
+      keyOverride: apiKey,
+      currentModel: modelName,
+    });
+  };
+
+  const testConnection = async () => {
+    try {
+      setIsTesting(true);
+      setApiTestStatus(null);
+
+      const values = form.getFieldsValue();
+      const selectedModel = values.model_name || modelName;
+
+      if (!selectedModel) {
+        message.error("Please refresh models and select a model before testing");
+        setApiTestStatus("error");
+        return;
+      }
+
+      await testAiModel({
+        course_id: courseId,
+        provider,
+        model: selectedModel,
+        api_key: apiKey || undefined,
+      });
+
+      setApiTestStatus("success");
+      message.success("Selected model can be used successfully");
+    } catch (e) {
+      console.error("Selected model test failed:", e.response?.data || e);
+      setApiTestStatus("error");
+      message.error(
+        e.response?.data?.error ||
+          "Selected model cannot be used. Please refresh models and choose another model."
+      );
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const handleSave = async () => {
     try {
-      // persist current selection and per-provider settings
-      localStorage.setItem(`ai_selected_provider_${courseId}`, provider);
-      localStorage.setItem(`ai_model_name_${provider}_${courseId}`, modelName);
+      const values = await form.validateFields();
 
-      if (provider === "openai") {
-        await storeApiKey({
-          course_id: courseId,
-          api_key: apiKey,
-        });
+      await updateAiSettings({
+        course_id: courseId,
+        provider,
+        model_name: values.model_name,
+        api_key: apiKey || undefined,
+        feedback_style: values.feedback_style,
+        temperature: values.temperature,
+      });
 
-        // also mirror into local storage for consistency
-        localStorage.setItem(`ai_key_${provider}_${courseId}`, apiKey);
-      } else {
-        // temporarily cache non-openai keys in localStorage
-        localStorage.setItem(`ai_key_${provider}_${courseId}`, apiKey);
-      }
-
-      message.success("AI settings saved");
+      message.success("Course AI settings saved");
+      await loadCourseAiInfo();
     } catch (e) {
       console.error("Failed to save AI settings:", e.response?.data || e);
       message.error(e.response?.data?.error || "Failed to save AI settings");
     }
   };
 
-  const testConnection = async () => {
-    setIsTesting(true);
-    setApiTestStatus(null);
-    try {
-      if (!apiKey) {
-        message.error("Enter API key first");
-        setApiTestStatus("error");
-        return;
-      }
-      let ok = false;
-      if (provider === "openai") {
-        const response = await axios.get("https://api.openai.com/v1/models", {
-          headers: { Authorization: `Bearer ${apiKey}` },
-        });
-        ok = response.status === 200;
-      } else if (provider === "google") {
-        // Gemini models listing
-        const response = await axios.get(
-          "https://generativelanguage.googleapis.com/v1beta/models",
-          { params: { key: apiKey } }
-        );
-        ok = response.status === 200;
-      } else if (provider === "anthropic") {
-        // Claude models listing (simple ping via models is not public; do a harmless messages call with empty content)
-        const response = await axios.post(
-          "https://api.anthropic.com/v1/messages",
-          { model: "claude-3-5-sonnet", max_tokens: 1, messages: [{ role: "user", content: "ping" }] },
-          { headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" } }
-        );
-        ok = response.status >= 200 && response.status < 300;
-      }
-      if (ok) {
-        setApiTestStatus("success");
-        message.success("Connected successfully!");
-      } else {
-        setApiTestStatus("error");
-        message.error("Connection failed. Check your key.");
-      }
-    } catch (e) {
-      setApiTestStatus("error");
-      message.error("Connection failed. Check your key.");
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
-  const handleSelectModel = async (e) => {
-    const newProvider = e.key;
-    setProvider(newProvider);
-    // load key for provider; prefer backend for openai if present
-    try {
-      if (newProvider === "openai") {
-        const res = await getCourseInfo({ course_id: courseId });
-        const course = res?.data?.[0] || {};
-        const backendOpenAiKey = course.openai_api_key || "";
-        const storedProviderKey = localStorage.getItem(`ai_key_${newProvider}_${courseId}`) || "";
-        setApiKey(backendOpenAiKey || storedProviderKey);
-      } else {
-        const storedProviderKey = localStorage.getItem(`ai_key_${newProvider}_${courseId}`) || "";
-        setApiKey(storedProviderKey);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    const savedModelName = localStorage.getItem(`ai_model_name_${newProvider}_${courseId}`) || "";
-    setModelName(savedModelName);
-  };
-
-  const { Sider, Content } = Layout;
+  const hasSavedKey = getKeyStatus(courseAiInfo, provider);
 
   return (
-    <Layout style={{ background: '#fff', height: '100%', minHeight: '100%' }}>
-      <Sider width={260} style={{ background: '#fff', borderRight: '1px solid #f0f2f5' }}>
-        <div style={{ padding: '16px' }}>
-          <Typography.Title level={4} style={{ margin: 0 }}>AI Models</Typography.Title>
+    <Layout style={{ background: "#fff", minHeight: "100%" }}>
+      <Sider
+        width={260}
+        style={{ background: "#fff", borderRight: "1px solid #f0f2f5" }}
+      >
+        <div style={{ padding: "16px" }}>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            AI Providers
+          </Typography.Title>
+          <Typography.Text type="secondary">
+            Select a provider to configure.
+          </Typography.Text>
         </div>
+
         <Menu
           mode="inline"
           selectedKeys={[provider]}
-          onClick={handleSelectModel}
-          items={providers.map(p => ({ key: p.key, label: p.label }))}
+          onClick={(item) => handleProviderChange(item.key)}
+          items={PROVIDERS.map((item) => ({
+            key: item.key,
+            label: item.label,
+          }))}
         />
       </Sider>
-      <Content style={{ padding: '0 24px' }}>
-        <Form form={form} layout="vertical" style={{ marginLeft: "0px", paddingBottom: '24px' }}>
-          <Space direction="vertical" style={{ width: "100%" }}>
-            <PageHeader title="AI Settings" subTitle={providers.find(p => p.key === provider)?.label} />
-            <Card title="Credentials">
-              <Form.Item label="API Key">
-                <Input.Password value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Enter API key" />
+
+      <Content style={{ padding: "0 24px 24px" }}>
+        <Form form={form} layout="vertical">
+          <Space direction="vertical" style={{ width: "100%" }} size="large">
+            <PageHeader
+              title="AI Settings"
+              subTitle="Configure course default AI settings and provider keys"
+            />
+
+            <Space wrap>
+              <Tag
+                color={hasSavedKey ? "success" : "warning"}
+                icon={hasSavedKey ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+              >
+                API key: {hasSavedKey ? "Connected" : "Not saved"}
+              </Tag>
+
+              <Tag
+                color={
+                  apiTestStatus === "success"
+                    ? "success"
+                    : apiTestStatus === "error"
+                    ? "error"
+                    : "default"
+                }
+                icon={
+                  apiTestStatus === "success" ? (
+                    <CheckCircleOutlined />
+                  ) : apiTestStatus === "error" ? (
+                    <CloseCircleOutlined />
+                  ) : null
+                }
+              >
+                Selected model:{" "}
+                {apiTestStatus === "success"
+                  ? "Tested successfully"
+                  : apiTestStatus === "error"
+                  ? "Test failed"
+                  : "Not tested"}
+              </Tag>
+            </Space>
+
+            <Card
+              title={
+                <Space>
+                  <RobotOutlined />
+                  <span>Course Default Model</span>
+                </Space>
+              }
+            >
+              <Typography.Paragraph type="secondary">
+                This provider and model will be used by assignments unless an
+                assignment chooses custom AI settings.
+              </Typography.Paragraph>
+
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="Refresh models before choosing"
+                description="Use Refresh Models to load the current usable models for this provider. A saved model may appear before the model list is refreshed."
+              />
+
+              <Form.Item label="Provider" name="provider">
+                <Select
+                  value={provider}
+                  onChange={handleProviderChange}
+                  options={PROVIDERS.map((item) => ({
+                    label: item.displayName,
+                    value: item.key,
+                  }))}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Default Model"
+                name="model_name"
+                rules={[
+                  {
+                    required: true,
+                    message: "Please refresh models and select a usable model",
+                  },
+                ]}
+              >
+                <Space.Compact style={{ width: "100%" }}>
+                  <Button
+                    onClick={handleFetchModels}
+                    loading={modelsLoading}
+                    style={{ width: 180 }}
+                  >
+                    Refresh Models
+                  </Button>
+
+                  <Select
+                    value={modelName || undefined}
+                    onChange={(value) => {
+                      setModelName(value);
+                      form.setFieldsValue({ model_name: value });
+                    }}
+                    placeholder="Select a model"
+                    style={{ width: "100%" }}
+                    disabled={models.length === 0 && !modelName}
+                    options={[
+                      ...(modelName
+                        ? [{ label: modelName, value: modelName }]
+                        : []),
+                      ...models
+                        .filter((item) => item !== modelName)
+                        .map((item) => ({
+                          label: item,
+                          value: item,
+                        })),
+                    ]}
+                  />
+                </Space.Compact>
               </Form.Item>
             </Card>
-            <Card title="Model">
-              <Form.Item label="Model Name (e.g., gpt-5o, gemini-1.5-pro, claude-3-5-sonnet)">
-                <Input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="Enter model name" />
-              </Form.Item>
-            </Card>
-            <Card title="Connection Test">
-              <Space>
-                <Button type="primary" onClick={testConnection} disabled={isTesting}>Test Connection</Button>
-                {isTesting && <Spin indicator={<LoadingOutlined style={{ fontSize: 16 }} spin />} />}
-                {apiTestStatus === "success" && (
-                  <Typography.Text type="success">
-                    <CheckCircleOutlined style={{ marginLeft: 10 }} /> Connected successfully!
-                  </Typography.Text>
-                )}
-                {apiTestStatus === "error" && (
-                  <Typography.Text type="danger">
-                    <CloseCircleOutlined style={{ marginLeft: 10 }} /> Connection failed. Check your key.
-                  </Typography.Text>
-                )}
+
+            <Card
+              title={
+                <Space>
+                  <KeyOutlined />
+                  <span>Provider API Key</span>
+                </Space>
+              }
+            >
+              <Space direction="vertical" style={{ width: "100%" }}>
+                <Alert
+                  type={hasSavedKey ? "success" : "info"}
+                  showIcon
+                  message={
+                    hasSavedKey
+                      ? `${selectedProvider?.label} API key is saved`
+                      : `${selectedProvider?.label} API key is not configured`
+                  }
+                  description={
+                    hasSavedKey
+                      ? "A saved key exists. Paste a new key only if you want to replace it."
+                      : "Paste an API key below and save it for this provider."
+                  }
+                />
+
+                <Form.Item label="Add or Replace API Key">
+                  <Input.Password
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="Paste a new API key to add or replace"
+                    visibilityToggle
+                  />
+                </Form.Item>
+
+                <Space>
+                  <Button onClick={testConnection} disabled={isTesting}>
+                    Test Selected Model
+                  </Button>
+
+                  {isTesting && (
+                    <Spin
+                      indicator={
+                        <LoadingOutlined style={{ fontSize: 16 }} spin />
+                      }
+                    />
+                  )}
+
+                  {apiTestStatus === "success" && (
+                    <Typography.Text type="success">
+                      <CheckCircleOutlined /> Selected model tested successfully
+                    </Typography.Text>
+                  )}
+
+                  {apiTestStatus === "error" && (
+                    <Typography.Text type="danger">
+                      <CloseCircleOutlined /> Selected model test failed
+                    </Typography.Text>
+                  )}
+                </Space>
               </Space>
             </Card>
-            <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
-              <Button type="primary" onClick={handleSave}>Save Settings</Button>
+
+            <Card title="Feedback Defaults">
+              <Form.Item label="Feedback Style" name="feedback_style">
+                <Select options={FEEDBACK_STYLES} />
+              </Form.Item>
+
+              <Form.Item
+                label="Temperature"
+                name="temperature"
+                rules={[
+                  {
+                    pattern: /^0(\.\d+)?|1$/,
+                    message: "Enter a value between 0 and 1",
+                  },
+                ]}
+              >
+                <Input placeholder="0.5" />
+              </Form.Item>
+            </Card>
+
+            <Divider />
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <Button type="primary" onClick={handleSave}>
+                Save Course Default
+              </Button>
             </div>
           </Space>
         </Form>
       </Content>
     </Layout>
   );
-};
-
-
+}

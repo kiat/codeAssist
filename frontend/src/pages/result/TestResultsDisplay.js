@@ -1,8 +1,7 @@
 import React, { useContext, useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { GlobalContext } from "../../App";
-import { Collapse, Button, Space } from "antd";
-import { Tooltip, Spin, Tag, Modal } from "antd";
+import { Alert, Collapse, Button, Tooltip, Spin, Tag, Modal } from "antd";
 import { useRef } from "react";
 
 import "antd/dist/antd.css";
@@ -12,7 +11,7 @@ const { Panel } = Collapse;
 
 //can also be displayed as a modal
 const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, score, totalPoints, assignmentId, data, aiFeedbackEnabled, isModal = false, submissionId: submissionIdFromProps, onCancel }) => {
-  const { userInfo, courseInfo } = useContext(GlobalContext);
+  const { userInfo } = useContext(GlobalContext);
   const params = useParams();
   const submissionId = submissionIdFromProps || params.submissionId; //const { assignmentId } = useParams();
   const navigate = useNavigate();
@@ -20,13 +19,12 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
   const [studentCode, setStudentCode] = useState("");
   const [studentFileName, setStudentFileName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [StudScore, setStudScore] = useState(score);
 
   const [highlightedLines, setHighlightedLines] = useState([]);
   const [annotations, setAnnotations] = useState([]);
+  const [aiFeedback, setAiFeedback] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState("null"); // 'loading', 'success', 'error', or null
-  const [submissionDetails, setSubmissionDetails] = useState("null");
 
   // used to store the line references for scrolling to
   const lineRefs = useRef({});
@@ -51,9 +49,9 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
       console.error("not available");
     }
     setIsLoading(false);
-  }, [submissionId, navigate, userInfo, courseInfo]);
+  }, [submissionId, navigate, userInfo, data]);
 
-  const getAiAnnotations = () => {
+  const getAiAnnotations = useCallback(() => {
     if (!aiFeedbackEnabled) {
       // setAiFeedbackEnabled(false);
       setLoadingStatus(null);
@@ -70,11 +68,15 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
           setLoadingStatus("error");
           return null;
         }
-      } else {
-        console.error("AI Feedback is not a string", data.ai_feedback);
-        setLoadingStatus("error");
-        return null;
       }
+
+      if (typeof data.ai_feedback === "object") {
+        return data.ai_feedback;
+      }
+
+      console.error("AI Feedback has an unsupported format", data.ai_feedback);
+      setLoadingStatus("error");
+      return null;
     } else {
       // ai_feedback is still being generated or fetched
       console.log("ai_feedback is still being generated or fetched");
@@ -82,33 +84,58 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
       setLoadingStatus("loading");
       return null;
     }
-  };
+  }, [aiFeedbackEnabled, data]);
 
-  const findAnnotations = (code) => {
+  const findAnnotations = useCallback((code) => {
+    if (!aiFeedbackEnabled) {
+      setAiFeedback(null);
+      setHighlightedLines([]);
+      setAnnotations([]);
+      setLoadingStatus(null);
+      return;
+    }
+
     setLoadingStatus("loading");
 
     const aiAnnotations = getAiAnnotations();
     if (!aiAnnotations) {
+      setAiFeedback(null);
       setLoadingStatus("loading");
       return;
     }
 
     if (aiAnnotations.error) {
       console.error("AI feedback error:", aiAnnotations.error);
+      setAiFeedback({
+        error: aiAnnotations.error,
+        insights: Array.isArray(aiAnnotations.insights) ? aiAnnotations.insights : [],
+        annotations: [],
+      });
       setLoadingStatus("error");
       return;
     }
 
-    console.log("AI feedback: ", aiAnnotations);
+    const feedbackInsights = Array.isArray(aiAnnotations.insights)
+      ? aiAnnotations.insights
+      : [];
+    const feedbackAnnotations = Array.isArray(aiAnnotations.annotations)
+      ? aiAnnotations.annotations
+      : [];
 
-    const { annotations } = aiAnnotations;
-    if (!Array.isArray(annotations)) {
-      console.error("Missing or invalid 'annotations' array in AI feedback.");
+    if (
+      !Array.isArray(aiAnnotations.insights) &&
+      !Array.isArray(aiAnnotations.annotations)
+    ) {
+      console.error("Missing or invalid AI feedback arrays.");
       setLoadingStatus("error");
       return;
     }
 
-    console.log("Ai annotations: ", annotations);
+    setAiFeedback({
+      ...aiAnnotations,
+      insights: feedbackInsights,
+      annotations: feedbackAnnotations,
+    });
 
     const lines = code.split("\n");
     const highlighted = [];
@@ -116,7 +143,11 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
 
     const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole match
 
-    annotations.forEach(({ pattern, comment }) => {
+    feedbackAnnotations.forEach(({ pattern, comment }) => {
+      if (!pattern || !comment) {
+        return;
+      }
+
       let regex;
       try {
         const safePattern = escapeRegExp(pattern.trim()); // Escape special characters
@@ -137,7 +168,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     setHighlightedLines(highlighted);
     setAnnotations(newAnnotations);
     setLoadingStatus("success");
-  };
+  }, [aiFeedbackEnabled, getAiAnnotations]);
 
   useEffect(() => {
     if (data) {
@@ -145,9 +176,9 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
       // setAiFeedbackEnabled(true);
       findAnnotations(data.student_code_file || "");
     }
-  }, [data]);
+  }, [data, findAnnotations]);
 
-  const fetchSubmissionDetails = async () => {
+  const fetchSubmissionDetails = useCallback(async () => {
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`);
       const data = await response.json();
@@ -155,11 +186,11 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     } catch (error) {
       console.error("Failed to fetch updated submission details:", error);
     }
-  };
+  }, [submissionId]);
 
   useEffect(() => {
     fetchSubmissionDetails();
-  }, [submissionId]);
+  }, [fetchSubmissionDetails]);
 
   const displayCodeWithAnnotations = () => {
     const lines = studentCode.split("\n");
@@ -172,8 +203,8 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
             <Tooltip title="Fetching AI feedback...">{loadingStatus === "loading" && <Spin size="small" />}</Tooltip>
 
             {loadingStatus === "success" && (
-              <Tooltip title="AI feedback was successfully loaded and applied to matching code lines.">
-                <Tag color="green">AI Feedback Loaded</Tag>
+              <Tooltip title="AI feedback was successfully loaded. Summary feedback may appear even when no line annotations are returned.">
+                <Tag color="green">AI Feedback Ready</Tag>
               </Tooltip>
             )}
 
@@ -218,6 +249,119 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     );
   };
 
+  const renderAiFeedbackSummary = () => {
+    if (!aiFeedbackEnabled) {
+      return null;
+    }
+
+    if (loadingStatus === "loading") {
+      return (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginTop: 20 }}
+          message="AI feedback is generating"
+          description="Refresh this submission shortly to see feedback after the model finishes."
+        />
+      );
+    }
+
+    if (loadingStatus === "error") {
+      return (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginTop: 20 }}
+          message="AI feedback unavailable"
+          description={
+            aiFeedback?.error ||
+            "The AI feedback response could not be loaded or parsed."
+          }
+        />
+      );
+    }
+
+    if (loadingStatus !== "success" || !aiFeedback) {
+      return null;
+    }
+
+    const insights = Array.isArray(aiFeedback.insights) ? aiFeedback.insights : [];
+    const hasLineAnnotations = annotations.length > 0;
+
+    return (
+      <div style={{ marginTop: 20 }}>
+        {insights.length > 0 && (
+          <Alert
+            type="success"
+            showIcon
+            message="AI Feedback Summary"
+            description={
+              <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                {insights.map((insight, index) => (
+                  <li key={`${insight}-${index}`}>{insight}</li>
+                ))}
+              </ul>
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {!hasLineAnnotations && (
+          <Alert
+            type="info"
+            showIcon
+            message="No line-by-line annotations"
+            description="AI feedback was generated successfully, but it did not identify a specific code line that needed a comment."
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {hasLineAnnotations && (
+          <div>
+            <h3>Line Feedback</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {annotations.map((annotation, index) => (
+                <div
+                  key={index}
+                  onClick={() => {
+                    const lineEl = lineRefs.current[annotation.line];
+                    if (lineEl) {
+                      lineEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                      lineEl.style.transition = "background-color 0.5s";
+                      lineEl.style.backgroundColor = "#fff7d6";
+                      setTimeout(() => {
+                        lineEl.style.backgroundColor = "#ffe6e6";
+                      }, 1500);
+                    }
+                  }}
+                  style={{
+                    cursor: "pointer",
+                    backgroundColor: "#fafafa",
+                    border: "1px solid #ddd",
+                    borderLeft: "5px solid #1890ff",
+                    padding: "10px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      color: "#333",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Line {annotation.line}
+                  </div>
+                  <div style={{ color: "#555" }}>{annotation.comment}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const downloadFile = useCallback(() => {
     const element = document.createElement("a");
     const file = new Blob([studentCode], { type: "text/plain" });
@@ -229,10 +373,6 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
 
   if (isLoading) {
     return <p>Loading...</p>;
-  }
-
-  if (error) {
-    return <p>Error loading data: {error.message}</p>;
   }
 
   if (!testResults || !Array.isArray(testResults.tests)) {
@@ -267,40 +407,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
       <Collapse accordion>
         <Panel header={studentFileName} key="1">
           {displayCodeWithAnnotations()}
-          {aiFeedbackEnabled && annotations.length > 0 && (
-            <div style={{ marginTop: "20px" }}>
-              <h3>🔍 Feedback Summary</h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {annotations.map((annotation, index) => (
-                  <div
-                    key={index}
-                    onClick={() => {
-                      const lineEl = lineRefs.current[annotation.line];
-                      if (lineEl) {
-                        lineEl.scrollIntoView({ behavior: "smooth", block: "center" });
-                        lineEl.style.transition = "background-color 0.5s";
-                        lineEl.style.backgroundColor = "#fff7d6"; // highlight color
-                        setTimeout(() => {
-                          lineEl.style.backgroundColor = "#ffe6e6"; // revert
-                        }, 1500);
-                      }
-                    }}
-                    style={{
-                      cursor: "pointer",
-                      backgroundColor: "#fafafa",
-                      border: "1px solid #ddd",
-                      borderLeft: "5px solid #1890ff",
-                      padding: "10px",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    <div style={{ fontWeight: "bold", color: "#333", marginBottom: "6px" }}>📍 Line {annotation.line}</div>
-                    <div style={{ color: "#555" }}>{annotation.comment}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {renderAiFeedbackSummary()}
           {/* <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{studentCode}</pre> */}
           <Button onClick={downloadFile} type="primary" style={{ marginTop: "10px" }}>
             Download
@@ -324,10 +431,6 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
 
   if (isLoading) {
     return <p>Loading...</p>;
-  }
-
-  if (error) {
-    return <p>Error loading data: {error.message}</p>;
   }
 
   if (!testResults || !Array.isArray(testResults.tests)) {

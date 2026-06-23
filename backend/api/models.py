@@ -28,7 +28,15 @@ class Course(db.Model):
     description = db.Column(db.String, default="")
 
     # -- AI Integration Settings -- 
+    default_ai_provider = db.Column(db.String, default="openai")
+    default_ai_model = db.Column(db.String, default="gpt-4o-mini")
+
     openai_api_key = db.Column(db.String, default="")
+    gemini_api_key = db.Column(db.String, default="")
+    claude_api_key = db.Column(db.String, default="")
+
+    default_feedback_style = db.Column(db.String, default="hint-based")
+    default_ai_temperature = db.Column(db.Float, default=0.5)
 
 @dataclass
 class Enrollment(db.Model):
@@ -58,11 +66,14 @@ class Assignment(db.Model):
     autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
 
-    # -- AI Integration Settings -- 
+    # -- AI Integration Settings --
     ai_feedback_enabled = db.Column(db.Boolean, default=False)
+    use_course_ai_default = db.Column(db.Boolean, default=True)
+    ai_feedback_provider = db.Column(db.String, nullable=True)
+    ai_feedback_model = db.Column(db.String, nullable=True)
     ai_feedback_prompt = db.Column(db.Text, nullable=True)
-    ai_feedback_model = db.Column(db.Text, nullable=True)
     ai_feedback_temperature = db.Column(db.Float, nullable=True)
+    ai_feedback_style = db.Column(db.String, nullable=True)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
