@@ -21,8 +21,10 @@ export default function AccountPopoverContent() {
       }}
     >
       <div>
-        <QuestionCircleFilled />
-        <span> Help</span>
+        <Link to="/help">
+          <QuestionCircleFilled />
+          <span> Help</span>
+        </Link>
       </div>
       {!isAdmin && (
         <>

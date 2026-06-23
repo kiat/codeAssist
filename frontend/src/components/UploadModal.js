@@ -30,20 +30,38 @@ export default function UploadModal({
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [activeSubmission, setActiveSubmission] = useState();
   const [hasRequest, setHasRequest] = useState(false);
+  const [fileList, setFileList] = useState([]);
 
   useEffect(() => {
-    if (open) {
+    if (!open) {
+      setFileList([]);
+      setFile(null);
+      return;
+    }
+
+    if (open && userInfo?.id && assignmentID) {
       getActive();
     }
-  }, [open, userInfo.id, assignmentID]);
+  }, [open, userInfo?.id, assignmentID]);
 
   const getActive = async () => {
     try {
       const submissionResponse = await fetch(`${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${userInfo.id}&assignment_id=${assignmentID}`);
+      if (!submissionResponse.ok) {
+        setActiveSubmission(null);
+        setHasRequest(false);
+        return;
+      }
+
       const submissionData = await submissionResponse.json();
-      console.log(submissionData)
-      console.log(submissionData.id)
-      setActiveSubmission(submissionData.id)
+      const submissionId = submissionData?.id ?? null;
+      setActiveSubmission(submissionId);
+
+      if (!submissionId) {
+        setHasRequest(false);
+        return;
+      }
+
       const req = await fetch(
         `${process.env.REACT_APP_API_URL}/check_regrade_request`,
         {
@@ -52,25 +70,31 @@ export default function UploadModal({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            submission_id: submissionData.id,
+            submission_id: submissionId,
           }),
         }
       );
       const reqData = await req.json();
-      console.log("this is the response data:", reqData.has_request)
-      setHasRequest(reqData.has_request)
+      setHasRequest(Boolean(reqData?.has_request));
     } catch(error){
+      setActiveSubmission(null);
+      setHasRequest(false);
       message.error("Failed")
     }
   }
 
 
   const handleFileChange = (info) => {
+    const nextFileList = Array.isArray(info.fileList) ? info.fileList.slice(-1) : [];
+    setFileList(nextFileList);
+
     if (info.file.status === 'done') {
-      setFile(info.file.originFileObj);
+      setFile(info.file.originFileObj || info.file);
       message.success(`${info.file.name} file uploaded successfully.`);
     } else if (info.file.status === 'error') {
       message.error(`${info.file.name} file upload failed.`);
+    } else if (info.file.status === 'removed') {
+      setFile(null);
     }
   };
 
@@ -93,10 +117,9 @@ export default function UploadModal({
 
 
   const navigateToResults = (submissionID) => {
-    onCancel()
-    //use the returned submission id to navigate to its reults
+    onCancel?.();
     navigate(`/assignmentResult/${submissionID}`);
-    extra()
+    extra?.();
   };
 
   const handleConfirm = async () => {
@@ -137,6 +160,8 @@ export default function UploadModal({
       setLoading(true); // Show loading overlay
       const response = await uploadSubmission(formData)
       const responseData = response.data;
+      setFileList([]);
+      setFile(null);
 
       // Proceed to results page after successful upload
       navigateToResults(responseData.submissionID);
@@ -161,13 +186,19 @@ export default function UploadModal({
     <LoadingOverlay loading={loading} /> 
     <Modal title="Submit Assignment" open={open} onCancel={onCancel} footer={null}>
       <Form layout="vertical">
-        <Form.Item name="upload" valuePropName="fileList">
+        <Form.Item
+          name="upload"
+          valuePropName="fileList"
+          getValueFromEvent={(info) => Array.isArray(info.fileList) ? info.fileList : []}
+        >
           <Upload.Dragger
             name="file"
             multiple={false}
+            fileList={fileList}
             onChange={handleFileChange}
             beforeUpload={file => {
-              setFile(file); // Set file on beforeUpload instead of upload itself
+              setFile(file);
+              setFileList([{ uid: file.uid || `${Date.now()}`, name: file.name, status: 'done', originFileObj: file }]);
               return false; // Prevent default upload
             }}
             onDrop={e => console.log('Dropped files', e.dataTransfer.files)}

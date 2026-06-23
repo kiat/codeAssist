@@ -8,16 +8,22 @@ import LoadingOverlay from "../../components/LoadingOverlay";
 
 export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle, enableCodeEditor }) {
   const [file, setFile] = useState(null);
+  const [fileList, setFileList] = useState([]);
   const { userInfo } = useContext(GlobalContext);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleFileChange = (info) => {
+    const nextFileList = Array.isArray(info.fileList) ? info.fileList.slice(-1) : [];
+    setFileList(nextFileList);
+
     if (info.file.status === 'done') {
-      setFile(info.file.originFileObj);
+      setFile(info.file.originFileObj || info.file);
       message.success(`${info.file.name} file uploaded successfully.`);
     } else if (info.file.status === 'error') {
       message.error(`${info.file.name} file upload failed.`);
+    } else if (info.file.status === 'removed') {
+      setFile(null);
     }
   };
 
@@ -68,6 +74,7 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
   return (
     <>
     <LoadingOverlay loading={loading}/> 
+
     <Modal title="Submit Assignment" open={open} onCancel={onCancel} footer={null} width={520}>
       <div style={{ marginBottom: 20 }}>
         <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
@@ -117,6 +124,7 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
           </Form>
         </Space>
       </div>
+
     </Modal>
     </>
   );
