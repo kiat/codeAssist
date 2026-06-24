@@ -13,6 +13,7 @@ export default function Assignments() {
   const [isModalOpen, setModalOpen] = useState(false);
   const [assignmentID, setAssignmentID] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
 
   const columns = [
     {
@@ -154,7 +155,6 @@ export default function Assignments() {
     const now = moment();
     const dueDateTime = moment(assignment.due_date).valueOf();
 
-    //const lateDueDateTime = moment(assignment.late_due_date).valueOf();
     const lateDueDateTime = assignment.late_due_date ? moment(assignment.late_due_date) : null;
     // const extension = await fetchAssignmentExtensions(assignment.id);
     // if (extension != null) {
@@ -213,6 +213,7 @@ export default function Assignments() {
         onCancel={closeModal}
         assignmentID={assignmentID}
         assignmentTitle={assignmentTitle}
+        enableCodeEditor={selectedAssignment?.enable_code_editor}
       />
     </>
   );

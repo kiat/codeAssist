@@ -32,6 +32,7 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
 
 describe('<UploadModal />', () => {
   const fakeNavigate = jest.fn();
+  const fetchMock = jest.fn();
   useNavigate.mockReturnValue(fakeNavigate);
 
   const defaultProps = {
@@ -57,6 +58,7 @@ describe('<UploadModal />', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    global.fetch = fetchMock;
   });
 
   it('shows error message when submitting without a file', async () => {
@@ -68,5 +70,18 @@ describe('<UploadModal />', () => {
     });
   });
 
-  // Additional tests (file upload, successful submission) can be added here.
+  it('handles a missing active submission without crashing', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({ message: 'No such submission found' }),
+    });
+
+    renderWithContext(<UploadModal {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByRole('button', { name: /submit/i })).toBeInTheDocument();
+  });
 });
