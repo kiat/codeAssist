@@ -32,6 +32,9 @@ def test_save_code_draft_success(client, mocker):
     # No existing drafts — version should be 1
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = None
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
         "assignment_id": "asgn-1",
@@ -81,6 +84,9 @@ def test_save_code_draft_increments_version(client, mocker):
     existing_draft.version_number = 3
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = existing_draft
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
         "assignment_id": "asgn-1",
@@ -97,6 +103,9 @@ def test_save_code_draft_auto_saved_flag(client, mocker):
     mock_commit = mocker.patch("routes.code_editor.db.session.commit")
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = None
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
 
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
@@ -122,6 +131,9 @@ def test_get_code_drafts_success(client, mocker):
     mock_query.return_value.filter_by.return_value.order_by.return_value.all.return_value = fake_drafts
     mock_schema.return_value.dump.return_value = fake_drafts
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
     resp = client.get("/get_code_drafts?student_id=stu-1&assignment_id=asgn-1")
     assert resp.status_code == 200
     assert resp.get_json() == fake_drafts
@@ -138,6 +150,9 @@ def test_get_code_drafts_empty(client, mocker):
     mock_schema = mocker.patch("routes.code_editor.CodeDraftSchema")
     mock_query.return_value.filter_by.return_value.order_by.return_value.all.return_value = []
     mock_schema.return_value.dump.return_value = []
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
 
     resp = client.get("/get_code_drafts?student_id=stu-1&assignment_id=asgn-1")
     assert resp.status_code == 200
@@ -156,6 +171,9 @@ def test_get_latest_draft_success(client, mocker):
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = fake_draft
     mock_schema.return_value.dump.return_value = fake_draft
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
     resp = client.get("/get_latest_draft?student_id=stu-1&assignment_id=asgn-1")
     assert resp.status_code == 200
     assert resp.get_json()["content"] == "print('latest')"
@@ -164,6 +182,9 @@ def test_get_latest_draft_success(client, mocker):
 def test_get_latest_draft_not_found(client, mocker):
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = None
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
 
     resp = client.get("/get_latest_draft?student_id=stu-1&assignment_id=asgn-1")
     assert resp.status_code == 200
@@ -217,6 +238,7 @@ def test_submit_code_assignment_not_found(client, mocker):
 
 
 def test_submit_code_assignment_not_published(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     mock_assignment = mocker.Mock()
     mock_assignment.published = False
 
@@ -392,6 +414,7 @@ def test_ai_chat_assignment_not_found(client, mocker):
 
 
 def test_ai_chat_not_enabled(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = False
 
