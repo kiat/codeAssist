@@ -22,7 +22,7 @@ def create_app(config_class='config.Config'):
     app.config.from_object(config_class)
     
     # Initialize the extensions with the app
-    CORS(app)
+    CORS(app, supports_credentials=True)
     ma.init_app(app)
     db.init_app(app)
     migrate.init_app(app, db)

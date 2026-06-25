@@ -8,12 +8,12 @@ import threading
 import time
 import logging
 from datetime import datetime, timezone
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, session
 from flask_cors import cross_origin
 from api import db
 from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course, Enrollment
 from api.schemas import CodeDraftSchema, SubmissionSchema
-from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
+from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError, ForbiddenError
 from openai import OpenAI
 from util.encryption_utils import decrypt_api_key
 from ai_feedback.integration import async_get_ai_feedback
@@ -24,32 +24,42 @@ logger = logging.getLogger(__name__)
 code_editor = Blueprint('code_editor', __name__)
 _docker_client = None
 
-# --- Rate limiting for run_code ---
-_run_code_timestamps = []
+# --- Rate limiting for run_code (per-user) ---
+_run_code_timestamps = {}  # {student_id: [timestamps]}
 _run_code_rate_lock = threading.Lock()
-_RUN_CODE_RATE_LIMIT = 10  # max requests
+_RUN_CODE_RATE_LIMIT = 10  # max requests per user
 _RUN_CODE_RATE_WINDOW = 60  # per 60 seconds
 
 
-def _check_run_code_rate_limit():
-    """Simple sliding-window rate limiter for run_code (thread-safe)."""
+def _check_run_code_rate_limit(student_id):
+    """Per-user sliding-window rate limiter for run_code (thread-safe)."""
     now = time.time()
     with _run_code_rate_lock:
+        timestamps = _run_code_timestamps.setdefault(student_id, [])
         # Prune timestamps outside the window
-        while _run_code_timestamps and _run_code_timestamps[0] < now - _RUN_CODE_RATE_WINDOW:
-            _run_code_timestamps.pop(0)
-        if len(_run_code_timestamps) >= _RUN_CODE_RATE_LIMIT:
+        while timestamps and timestamps[0] < now - _RUN_CODE_RATE_WINDOW:
+            timestamps.pop(0)
+        if len(timestamps) >= _RUN_CODE_RATE_LIMIT:
             raise BadRequestError("Too many run requests. Please wait a moment and try again.")
-        _run_code_timestamps.append(now)
+        timestamps.append(now)
 
 
 def _verify_student(student_id):
-    """Verify that student_id refers to a valid user. Raises 400 if invalid."""
+    """Verify that the authenticated session user matches the requested student_id.
+    Checks Flask session first, then falls back to DB lookup.
+    Raises 403 if session doesn't match, 400 if student_id is invalid."""
     if not student_id:
         raise BadRequestError("Missing student_id")
+    # Check that the user exists in the database
     user = db.session.query(User).filter_by(id=student_id).first()
     if not user:
         raise BadRequestError("Invalid student_id: user not found")
+    # Check that the authenticated session matches the requested student_id
+    session_user_id = session.get("user_id")
+    if not session_user_id:
+        raise ForbiddenError("Not authenticated. Please log in.")
+    if session_user_id != student_id:
+        raise ForbiddenError("You can only access your own data")
     return user
 
 
@@ -608,7 +618,7 @@ def run_code():
     file_name = data.get("file_name", "solution.py")
 
     _verify_student(student_id)
-    _check_run_code_rate_limit()
+    _check_run_code_rate_limit(student_id)
 
     if not assignment_id or content is None:
         raise BadRequestError("Missing required fields: assignment_id, content")
