@@ -49,7 +49,8 @@ def test_save_code_draft_success(client, mocker):
     mock_commit.assert_called_once()
 
 
-def test_save_code_draft_missing_fields(client):
+def test_save_code_draft_missing_fields(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
         # missing assignment_id and content
@@ -58,7 +59,8 @@ def test_save_code_draft_missing_fields(client):
     assert "Missing required fields" in resp.get_json()["message"]
 
 
-def test_save_code_draft_content_too_long(client):
+def test_save_code_draft_content_too_long(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
         "assignment_id": "asgn-1",
@@ -178,7 +180,8 @@ def test_get_latest_draft_missing_params(client):
 # submit_code
 # ---------------------------------------------------------------------------
 
-def test_submit_code_missing_fields(client):
+def test_submit_code_missing_fields(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/submit_code", json={
         "student_id": "stu-1",
         # missing assignment_id and content
@@ -187,7 +190,8 @@ def test_submit_code_missing_fields(client):
     assert "Missing required fields" in resp.get_json()["message"]
 
 
-def test_submit_code_content_too_long(client):
+def test_submit_code_content_too_long(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/submit_code", json={
         "student_id": "stu-1",
         "assignment_id": "asgn-1",
@@ -198,6 +202,7 @@ def test_submit_code_content_too_long(client):
 
 
 def test_submit_code_assignment_not_found(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None
 
@@ -230,8 +235,11 @@ def test_submit_code_assignment_not_published(client, mocker):
 def test_submit_code_past_due_date(client, mocker):
     from datetime import datetime, timezone, timedelta
 
+    mocker.patch("routes.code_editor._verify_student")
+
     mock_assignment = mocker.Mock()
     mock_assignment.published = True
+    mock_assignment.enable_code_editor = True
     mock_assignment.late_submission = False
     mock_assignment.published_date = None
     mock_assignment.due_date = datetime.now(timezone.utc) - timedelta(days=1)
@@ -263,7 +271,8 @@ def test_submit_code_past_due_date(client, mocker):
 # ai_chat
 # ---------------------------------------------------------------------------
 
-def test_ai_chat_missing_fields(client):
+def test_ai_chat_missing_fields(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/ai_chat", json={
         "student_id": "stu-1",
         # missing message
@@ -272,7 +281,8 @@ def test_ai_chat_missing_fields(client):
     assert "Missing" in resp.get_json()["message"]
 
 
-def test_ai_chat_missing_assignment(client):
+def test_ai_chat_missing_assignment(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/ai_chat", json={
         "student_id": "stu-1",
         "message": "help me",
@@ -283,6 +293,7 @@ def test_ai_chat_missing_assignment(client):
 
 
 def test_ai_chat_assignment_not_found(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None
 
@@ -314,6 +325,9 @@ def test_ai_chat_not_enabled(client, mocker):
 
 
 def test_ai_chat_no_api_key(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
+
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
 
