@@ -74,7 +74,13 @@ def main():
 
     print(f" Creating shared assignment in course {args.course_id}...")
     try:
-        assignment_id = create_assignment("Multithreaded Test Assignment", args.course_id)
+        assignment_id = create_assignment(
+            "Multithreaded Test Assignment",
+            args.course_id,
+            published=True,
+            published_date=None,
+            due_date=None,
+        )
         print(f" Assignment created with ID: {assignment_id}")
 
         upload_autograder(assignment_id, AUTOGRADER_ZIP_PATH)

@@ -21,7 +21,11 @@ Make sure to:
 
 """
 
-ASSIGNMENT_IDS_FILE = "generated_assignments.json"
+ASSIGNMENT_IDS_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "results",
+    "generated_assignments.json",
+)
 AUTOGRADER_ZIP_PATH = os.path.abspath(os.path.join("..", "..", "assignment-examples", "A1", "A1.zip"))
 
 created_assignments = []
@@ -70,6 +74,7 @@ def main():
         t.join()
 
     #save created assignment IDs
+    os.makedirs(os.path.dirname(ASSIGNMENT_IDS_FILE), exist_ok=True)
     with open(ASSIGNMENT_IDS_FILE, "w") as f:
         json.dump(created_assignments, f)
     print(f"\n Assignments saved to {ASSIGNMENT_IDS_FILE}: {created_assignments}")

@@ -3,14 +3,15 @@ import os
 import uuid
 
 
-BASE_URL = "http://localhost:5001"
+BASE_URL = os.environ.get("STRESS_BASE_URL", "http://localhost:5001")
 
-def create_assignment(name, course_id):
+def create_assignment(name, course_id, **extra_fields):
     url = f"{BASE_URL}/create_assignment"
     payload = {
         "name": name,
         "course_id": course_id
     }
+    payload.update(extra_fields)
     response = requests.post(url, json=payload)
     response.raise_for_status()
     return response.json()["id"]
