@@ -79,15 +79,21 @@ export default function CodeEditorPage() {
 
         if (assignRes?.data) {
           setAssignmentName(assignRes.data.name);
-          setFileName(assignRes.data.name?.toLowerCase().replace(/\s+/g, "_") + ".py" || "solution.py");
-          setDueDate(moment(assignRes.data.due_date).valueOf());
+          const nameLower = assignRes.data.name?.toLowerCase().replace(/\s+/g, "_");
+          setFileName(nameLower ? `${nameLower}.py` : "solution.py");
+
+          if (assignRes.data.due_date) {
+            setDueDate(moment(assignRes.data.due_date).valueOf());
+          }
           setLateAllowed(assignRes.data.late_submission);
-          setLateDueDate(moment(assignRes.data.late_due_date).valueOf());
+          if (assignRes.data.late_due_date) {
+            setLateDueDate(moment(assignRes.data.late_due_date).valueOf());
+          }
           if (extRes?.data?.due_date_extension) {
             setDueDate(moment(extRes.data.due_date_extension).valueOf());
           }
           if (extRes?.data?.late_due_date_extension) {
-            setDueDate(moment(extRes.data.late_due_date_extension).valueOf());
+            setLateDueDate(moment(extRes.data.late_due_date_extension).valueOf());
             setLateAllowed(true);
           }
         }
