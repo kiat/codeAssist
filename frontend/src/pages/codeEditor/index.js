@@ -184,12 +184,15 @@ export default function CodeEditorPage() {
     return true; // Before due
   }, [dueDate, lateDueDate, lateAllowed]);
 
+  const [running, setRunning] = useState(false);
+
   const handleRun = useCallback(async () => {
     if (!code.trim()) {
       message.error("Cannot run empty code");
       return;
     }
     setRunOutput(null);
+    setRunning(true);
     try {
       const res = await runCode({
         student_id: userInfo.id,
@@ -207,6 +210,8 @@ export default function CodeEditorPage() {
       console.error("Run error:", err);
       message.error(err.message || "Failed to run code");
       setRunOutput({ output: err.message || "Run failed", passed: false, tests: [] });
+    } finally {
+      setRunning(false);
     }
   }, [code, userInfo?.id, assignmentId, fileName]);
 
@@ -326,10 +331,47 @@ export default function CodeEditorPage() {
           {runOutput && (
             <div style={styles.outputPanel}>
               <div style={styles.outputHeader}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>Output</span>
-                <Button size="small" type="text" onClick={() => setRunOutput(null)}>Close</Button>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>
+                  {runOutput.passed ? (
+                    <span style={{ color: '#52c41a' }}>✓ Passed</span>
+                  ) : (
+                    <span style={{ color: '#ff4d4f' }}>✗ Failed</span>
+                  )}
+                  {' '}— Output
+                </span>
+                <Button size="small" type="text" onClick={() => setRunOutput(null)} style={{ color: '#abb2bf' }}>Close</Button>
               </div>
-              <pre style={styles.outputContent}>{runOutput.output || "No output"}</pre>
+              <pre style={styles.outputContent}>{runOutput.output || "(no output)"}</pre>
+              {runOutput.tests && runOutput.tests.length > 0 && (
+                <div style={{ borderTop: '1px solid #3e4451', padding: '8px 12px' }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, color: '#abb2bf', marginBottom: 6 }}>
+                    Test Results ({runOutput.tests.filter(t => t.status === 'passed').length}/{runOutput.tests.length} passed)
+                  </div>
+                  {runOutput.tests.map((t, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, fontSize: 12 }}>
+                      <span style={{ color: t.status === 'passed' ? '#52c41a' : '#ff4d4f' }}>
+                        {t.status === 'passed' ? '✓' : '✗'}
+                      </span>
+                      <span style={{ color: '#abb2bf' }}>{t.name || `Test ${i + 1}`}</span>
+                      {t.score !== undefined && (
+                        <span style={{ color: '#636d83', marginLeft: 'auto' }}>
+                          {t.score}/{t.max_score}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {runOutput.score !== undefined && runOutput.tests && runOutput.tests.length > 0 && (
+                <div style={{ borderTop: '1px solid #3e4451', padding: '6px 12px', fontSize: 12, color: '#abb2bf' }}>
+                  Score: {runOutput.score}
+                </div>
+              )}
+            </div>
+          )}
+          {running && (
+            <div style={{ ...styles.outputPanel, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <Spin size="small" /> <span style={{ color: '#abb2bf', marginLeft: 8, fontSize: 12 }}>Running code…</span>
             </div>
           )}
         </div>
