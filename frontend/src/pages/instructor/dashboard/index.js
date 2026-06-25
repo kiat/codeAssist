@@ -17,6 +17,15 @@ import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
 //for now change this to a course_id you have in the database
+const getPublishStatus = (record) => {
+  if (!record.published) {
+    return "unpublished";
+  }
+  if (record.published_date && moment().isBefore(moment(record.published_date))) {
+    return "scheduled";
+  }
+  return "published";
+};
 const columns = [
   {
     title: "ACTIVE ASSIGNMENTS",
@@ -53,11 +62,19 @@ const columns = [
     title: "PUBLISHED",
     dataIndex: "published",
     sorter: (a, b) => a.published - b.published,
-    render: (text) => (
-      <Button type={text ? "primary" : "default"} shape="circle" size="small">
-        {" "}
-      </Button>
-    ),
+    render: (_, record) => {
+      const status = getPublishStatus(record);
+      return (
+        <Button
+          type={status === "published" ? "primary" : "default"}
+          shape="circle"
+          size="small"
+          title={status}
+        >
+          {" "}
+        </Button>
+      );
+    },
   },
   {
     title: "REGRADES",
