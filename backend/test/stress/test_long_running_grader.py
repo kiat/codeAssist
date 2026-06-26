@@ -1,302 +1,291 @@
-import argparse
-import os
-import time
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import tempfile
-from utils import create_assignment, upload_autograder, upload_submission, add_user, delete_assignment
-
 """
 Stress test for long-running grading operations.
 
-This test evaluates if the grader can handle code that takes a long time to execute
-without timing out or failing. It creates submissions with various execution times
-and monitors the grading process.
-
-Usage:
-    python test_long_running_grader.py <course_id> [--max_execution_time SECONDS] [--num_submissions N]
-
-Example:
-    python test_long_running_grader.py 123e4567-e89b-12d3-a456-426614174000 --max_execution_time 30 --num_submissions 5
+The backend grades submissions synchronously inside /upload_submission, so this
+script measures the HTTP request duration directly instead of sleeping after
+submission. It uses the A1 calculator fixture with a controlled sleep prepended
+so the submitted file still matches the autograder's expected shape.
 """
 
-# Test configurations for different execution times
-TEST_CODES = [
-    {
-        "name": "quick_execution",
-        "execution_time": 1,
-        "code": """
+import argparse
+import os
+import shutil
+import tempfile
+import threading
 import time
-time.sleep(1)
-print("Quick execution complete")
-"""
-    },
-    {
-        "name": "medium_execution", 
-        "execution_time": 5,
-        "code": """
-import time
-time.sleep(5)
-print("Medium execution complete")
-"""
-    },
-    {
-        "name": "long_execution",
-        "execution_time": 10,
-        "code": """
-import time
-time.sleep(10)
-print("Long execution complete")
-"""
-    },
-    {
-        "name": "very_long_execution",
-        "execution_time": 20,
-        "code": """
-import time
-time.sleep(20)
-print("Very long execution complete")
-"""
-    },
-    {
-        "name": "cpu_intensive",
-        "execution_time": 15,
-        "code": """
-import time
-# CPU intensive task
-def fibonacci(n):
-    if n <= 1:
-        return n
-    return fibonacci(n-1) + fibonacci(n-2)
+import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-start_time = time.time()
-result = fibonacci(35)  # This takes significant CPU time
-end_time = time.time()
-print(f"Fibonacci result: {result}, Time taken: {end_time - start_time:.2f}s")
-"""
-    }
+from utils import (
+    add_user,
+    create_assignment,
+    delete_assignment,
+    delete_user,
+    upload_autograder,
+    upload_submission,
+)
+
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+AUTOGRADER_ZIP_PATH = os.path.abspath(
+    os.path.join(SCRIPT_DIR, "..", "..", "assignment-examples", "A1", "A1.zip")
+)
+SUBMISSION_TEMPLATE_PATH = os.path.abspath(
+    os.path.join(SCRIPT_DIR, "..", "..", "assignment-examples", "A1", "calculator.py")
+)
+
+TEST_CASES = [
+    {"name": "quick_execution", "execution_time": 1},
+    {"name": "medium_execution", "execution_time": 5},
+    {"name": "long_execution", "execution_time": 10},
+    {"name": "very_long_execution", "execution_time": 20},
 ]
 
-AUTOGRADER_ZIP_PATH = os.path.abspath(os.path.join("..", "..", "assignment-examples", "A1", "A1.zip"))
-
-# Shared state
 created_students = []
 created_students_lock = threading.Lock()
-assignment_id = None
 test_results = []
 results_lock = threading.Lock()
+assignment_id = None
 
 
-def create_test_submission_file(code_content, filename_prefix):
-    """Create a temporary submission file with the given code content."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', prefix=f'{filename_prefix}_', delete=False) as f:
-        f.write(code_content)
-        return f.name
+def create_delayed_submission_file(execution_time: int, filename_prefix: str) -> tuple[str, str]:
+    temp_dir = tempfile.mkdtemp(prefix=f"{filename_prefix}_")
+    submission_path = os.path.join(temp_dir, "calculator.py")
+
+    with open(SUBMISSION_TEMPLATE_PATH, "r", encoding="utf-8") as source:
+        template = source.read()
+
+    with open(submission_path, "w", encoding="utf-8") as target:
+        target.write("import time\n")
+        target.write(f"time.sleep({execution_time})\n\n")
+        target.write(template)
+
+    return temp_dir, submission_path
 
 
-def submit_and_monitor_grading(test_config, thread_index, assignment_id):
-    """Submit code and monitor the grading process."""
+def submit_and_measure(test_config: dict, thread_index: int, current_assignment_id: str) -> dict:
+    student_id = None
+    temp_dir = None
+    start_time = time.time()
+
     try:
-        # Create student
-        student_name = f"long_runner_{test_config['name']}_{thread_index}"
+        student_name = (
+            f"long_runner_{test_config['name']}_{thread_index}_{uuid.uuid4().hex[:8]}"
+        )
         student_id = add_user(name=student_name)
-        
+
         with created_students_lock:
             created_students.append(student_id)
-        
-        print(f"[Thread-{thread_index}] Created student: {student_name} for {test_config['name']}")
-        
-        # Create submission file
-        submission_file = create_test_submission_file(test_config['code'], test_config['name'])
-        
-        # Record start time
-        start_time = time.time()
-        
-        # Submit for grading
-        print(f"[Thread-{thread_index}] Submitting {test_config['name']} (expected ~{test_config['execution_time']}s)")
-        submission_result = upload_submission(
-            assignment_id=assignment_id,
-            student_id=student_id,
-            submission_file_path=submission_file
+
+        temp_dir, submission_file = create_delayed_submission_file(
+            test_config["execution_time"],
+            test_config["name"],
         )
-        
-        # Record submission time
-        submission_time = time.time() - start_time
-        
-        # Monitor grading (you may need to implement a way to check grading status)
-        # For now, we'll wait a reasonable amount of time
-        max_wait_time = test_config['execution_time'] + 30  # Add 30s buffer
-        time.sleep(max_wait_time)
-        
-        total_time = time.time() - start_time
-        
-        # Record results
+
+        print(
+            f"[worker {thread_index}] submitting {test_config['name']} "
+            f"(delay {test_config['execution_time']}s)"
+        )
+
+        upload_submission(
+            assignment_id=current_assignment_id,
+            student_id=student_id,
+            submission_file_path=submission_file,
+        )
+
+        duration = time.time() - start_time
         result = {
-            'test_name': test_config['name'],
-            'thread_index': thread_index,
-            'student_id': student_id,
-            'expected_execution_time': test_config['execution_time'],
-            'submission_time': submission_time,
-            'total_time': total_time,
-            'success': True,
-            'error': None
+            "test_name": test_config["name"],
+            "thread_index": thread_index,
+            "student_id": student_id,
+            "expected_execution_time": test_config["execution_time"],
+            "duration": duration,
+            "success": True,
+            "error": None,
         }
-        
-        with results_lock:
-            test_results.append(result)
-        
-        print(f"[Thread-{thread_index}] ✅ {test_config['name']} completed in {total_time:.2f}s")
-        
-        # Clean up temp file
-        os.unlink(submission_file)
-        
-    except Exception as e:
-        error_result = {
-            'test_name': test_config['name'],
-            'thread_index': thread_index,
-            'student_id': student_id if 'student_id' in locals() else None,
-            'expected_execution_time': test_config['execution_time'],
-            'submission_time': None,
-            'total_time': None,
-            'success': False,
-            'error': str(e)
+        print(f"[worker {thread_index}] PASS {test_config['name']} in {duration:.2f}s")
+        return result
+
+    except Exception as error:
+        duration = time.time() - start_time
+        result = {
+            "test_name": test_config["name"],
+            "thread_index": thread_index,
+            "student_id": student_id,
+            "expected_execution_time": test_config["execution_time"],
+            "duration": duration,
+            "success": False,
+            "error": str(error),
         }
-        
-        with results_lock:
-            test_results.append(error_result)
-        
-        print(f"[Thread-{thread_index}] ❌ {test_config['name']} failed: {e}")
-        
-        # Clean up temp file if it exists
-        if 'submission_file' in locals():
-            try:
-                os.unlink(submission_file)
-            except:
-                pass
+        print(f"[worker {thread_index}] FAIL {test_config['name']}: {error}")
+        return result
+
+    finally:
+        if temp_dir:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def print_results_summary():
-    """Print a summary of all test results."""
-    print("\n" + "="*80)
-    print("LONG-RUNNING GRADER STRESS TEST RESULTS")
-    print("="*80)
-    
-    successful_tests = [r for r in test_results if r['success']]
-    failed_tests = [r for r in test_results if not r['success']]
-    
-    print(f"Total tests: {len(test_results)}")
-    print(f"Successful: {len(successful_tests)} ({len(successful_tests)/len(test_results)*100:.1f}%)")
-    print(f"Failed: {len(failed_tests)} ({len(failed_tests)/len(test_results)*100:.1f}%)")
+def print_results_summary() -> None:
     print()
-    
-    if successful_tests:
-        print("SUCCESSFUL TESTS:")
-        print("-" * 60)
-        for result in successful_tests:
-            print(f"  {result['test_name']:<20} | Expected: {result['expected_execution_time']:>3}s | "
-                  f"Actual: {result['total_time']:>6.2f}s | Thread: {result['thread_index']}")
-    
-    if failed_tests:
-        print("\nFAILED TESTS:")
-        print("-" * 60)
-        for result in failed_tests:
-            print(f"  {result['test_name']:<20} | Thread: {result['thread_index']} | Error: {result['error']}")
-    
-    print("\n" + "="*80)
+    print("=" * 80)
+    print("LONG-RUNNING GRADER STRESS TEST RESULTS")
+    print("=" * 80)
+
+    total = len(test_results)
+    successful = [result for result in test_results if result["success"]]
+    failed = [result for result in test_results if not result["success"]]
+    success_rate = (len(successful) / total * 100) if total else 0
+
+    print(f"Total submissions: {total}")
+    print(f"Successful submissions: {len(successful)} ({success_rate:.1f}%)")
+    print(f"Failed submissions: {len(failed)}")
+    print()
+    print(f"{'Status':<8} {'Case':<24} {'Expected':>10} {'Actual':>10}")
+    print("-" * 58)
+
+    for result in test_results:
+        status = "PASS" if result["success"] else "FAIL"
+        expected = f"{result['expected_execution_time']}s"
+        actual = f"{result['duration']:.2f}s"
+        print(f"{status:<8} {result['test_name']:<24} {expected:>10} {actual:>10}")
+
+    if failed:
+        print()
+        print("Failure details:")
+        for result in failed:
+            print(f"- {result['test_name']}: {result['error']}")
+
+    print("=" * 80)
 
 
-def cleanup():
-    """Clean up created resources."""
-    print("\n🧹 Starting cleanup...")
-    
-    # Delete assignment (students are left for manual cleanup if needed)
-    if assignment_id:
+def cleanup(current_assignment_id: str | None) -> None:
+    print()
+    print("Cleanup:")
+
+    if current_assignment_id:
         try:
-            delete_assignment(assignment_id)
-            print(f"✅ Deleted assignment: {assignment_id}")
-        except Exception as e:
-            print(f"❌ Failed to delete assignment: {e}")
-    
-    print("🧹 Cleanup complete.")
+            delete_assignment(current_assignment_id)
+            print(f"- Deleted assignment: {current_assignment_id}")
+        except Exception as error:
+            print(f"- Failed to delete assignment {current_assignment_id}: {error}")
+
+    deleted_students = 0
+    for student_id in created_students:
+        try:
+            delete_user(student_id)
+            deleted_students += 1
+        except Exception as error:
+            print(f"- Failed to delete student {student_id}: {error}")
+
+    print(f"- Deleted students: {deleted_students}/{len(created_students)}")
 
 
-def main():
+def main() -> int:
     global assignment_id
-    
+
     parser = argparse.ArgumentParser(description="Long-running grader stress test.")
     parser.add_argument("course_id", type=str, help="Valid course ID")
-    parser.add_argument("--max_execution_time", type=int, default=20, 
-                       help="Maximum execution time to test (seconds)")
-    parser.add_argument("--num_submissions", type=int, default=1,
-                       help="Number of submissions per test type")
-    parser.add_argument("--max_workers", type=int, default=5,
-                       help="Maximum number of concurrent workers")
-    parser.add_argument("--cleanup", action="store_true", 
-                       help="Delete created assignment after test")
-    
+    parser.add_argument(
+        "--max_execution_time",
+        type=int,
+        default=20,
+        help="Maximum controlled delay to test, in seconds",
+    )
+    parser.add_argument(
+        "--num_submissions",
+        type=int,
+        default=1,
+        help="Number of submissions per selected delay",
+    )
+    parser.add_argument(
+        "--max_workers",
+        type=int,
+        default=2,
+        help="Maximum number of concurrent submission workers",
+    )
+    parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="Delete created assignment and users after the test",
+    )
+
     args = parser.parse_args()
-    
-    # Filter test codes based on max execution time
-    filtered_tests = [t for t in TEST_CODES if t['execution_time'] <= args.max_execution_time]
-    
-    if not filtered_tests:
-        print(f"No tests found with execution time <= {args.max_execution_time}s")
-        return
-    
-    print(f"🚀 Starting long-running grader stress test...")
-    print(f"   Course ID: {args.course_id}")
-    print(f"   Max execution time: {args.max_execution_time}s")
-    print(f"   Submissions per test: {args.num_submissions}")
-    print(f"   Test types: {[t['name'] for t in filtered_tests]}")
-    print(f"   Max concurrent workers: {args.max_workers}")
-    
+
+    if args.num_submissions < 1:
+        print("Failed to run stress test: --num_submissions must be at least 1")
+        return 1
+
+    if args.max_workers < 1:
+        print("Failed to run stress test: --max_workers must be at least 1")
+        return 1
+
+    if not os.path.isfile(AUTOGRADER_ZIP_PATH):
+        print(f"Failed to run stress test: autograder zip not found at {AUTOGRADER_ZIP_PATH}")
+        return 1
+
+    if not os.path.isfile(SUBMISSION_TEMPLATE_PATH):
+        print(f"Failed to run stress test: submission template not found at {SUBMISSION_TEMPLATE_PATH}")
+        return 1
+
+    selected_tests = [
+        test for test in TEST_CASES if test["execution_time"] <= args.max_execution_time
+    ]
+    if not selected_tests:
+        print(f"Failed to run stress test: no cases <= {args.max_execution_time}s")
+        return 1
+
+    print("Starting long-running grader stress test")
+    print(f"Course ID: {args.course_id}")
+    print(f"Selected delays: {[test['execution_time'] for test in selected_tests]}")
+    print(f"Submissions per delay: {args.num_submissions}")
+    print(f"Max workers: {args.max_workers}")
+
     try:
-        # Create assignment
-        print(f"\n📝 Creating test assignment...")
-        assignment_id = create_assignment("Long-Running Grader Test", args.course_id)
-        print(f"✅ Assignment created: {assignment_id}")
-        
-        # Upload autograder
-        if os.path.exists(AUTOGRADER_ZIP_PATH):
-            upload_autograder(assignment_id, AUTOGRADER_ZIP_PATH)
-            print("✅ Autograder uploaded")
-        else:
-            print(f"⚠️  Autograder not found at {AUTOGRADER_ZIP_PATH}")
-        
-        # Create all submission tasks
+        assignment_name = f"Long Running Grader {uuid.uuid4().hex[:8]}"
+        assignment_id = create_assignment(
+            assignment_name,
+            args.course_id,
+            published=True,
+            published_date=None,
+            due_date=None,
+        )
+        print(f"Created published assignment: {assignment_id}")
+
+        upload_autograder(assignment_id, AUTOGRADER_ZIP_PATH)
+        print("Uploaded autograder")
+
         tasks = []
-        for test_config in filtered_tests:
-            for i in range(args.num_submissions):
-                tasks.append((test_config, i))
-        
-        print(f"\n🧪 Running {len(tasks)} submission tests...")
-        
-        # Execute tasks with thread pool
+        for test_config in selected_tests:
+            for copy_index in range(args.num_submissions):
+                tasks.append((test_config, copy_index))
+
         with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
-            futures = []
-            for test_config, i in tasks:
-                future = executor.submit(submit_and_monitor_grading, test_config, i, assignment_id)
-                futures.append(future)
-            
-            # Wait for all tasks to complete
+            futures = [
+                executor.submit(submit_and_measure, test_config, index, assignment_id)
+                for index, (test_config, _) in enumerate(tasks)
+            ]
             for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    print(f"Task failed with exception: {e}")
-        
-        # Print results
+                with results_lock:
+                    test_results.append(future.result())
+
         print_results_summary()
-        
-        # Cleanup if requested
+
         if args.cleanup:
-            cleanup()
-            
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
+            cleanup(assignment_id)
+
+        failures = [result for result in test_results if not result["success"]]
+        if failures:
+            print("Failed to run stress test: one or more long-running submissions failed")
+            return 1
+
+        return 0
+
+    except Exception as error:
+        print(f"Failed to run stress test: {error}")
         if args.cleanup:
-            cleanup()
+            cleanup(assignment_id)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

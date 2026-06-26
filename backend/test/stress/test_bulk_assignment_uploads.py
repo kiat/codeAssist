@@ -86,7 +86,7 @@ class SystemMonitor:
                 time.sleep(1)
                 
             except Exception as e:
-                print(f"⚠️  Monitoring error: {e}")
+                print(f"WARNING Monitoring error: {e}")
                 time.sleep(1)
     
     def get_peak_metrics(self):
@@ -186,7 +186,7 @@ def upload_assignment_with_metrics(thread_id: int, course_id: str, upload_index:
         # Calculate upload speed
         upload_speed_mbps = (file_size / 1024 / 1024) / upload_duration if upload_duration > 0 else 0
         
-        print(f"[Thread-{thread_id}] ✅ Upload {upload_index}: {assignment_name} "
+        print(f"[Thread-{thread_id}] PASS Upload {upload_index}: {assignment_name} "
               f"({file_size/1024/1024:.1f}MB in {duration:.2f}s, {upload_speed_mbps:.1f} MB/s)")
         
         return UploadMetrics(
@@ -204,7 +204,7 @@ def upload_assignment_with_metrics(thread_id: int, course_id: str, upload_index:
         end_time = time.time()
         duration = end_time - start_time
         
-        print(f"[Thread-{thread_id}] ❌ Upload {upload_index} failed after {duration:.2f}s: {e}")
+        print(f"[Thread-{thread_id}] FAIL Upload {upload_index} failed after {duration:.2f}s: {e}")
         
         return UploadMetrics(
             assignment_id="",
@@ -320,11 +320,11 @@ def print_detailed_results(metrics: List[UploadMetrics], system_metrics: Dict[st
     print(f"PERFORMANCE INSIGHTS:")
     if successful_uploads:
         if success_rate < 95:
-            print("  ⚠️  Success rate below 95% - consider investigating server capacity")
+            print("  WARNING Success rate below 95% - consider investigating server capacity")
         if statistics.mean([m.duration for m in successful_uploads]) > 10:
-            print("  ⚠️  High average upload time - check network/server performance")
+            print("  WARNING High average upload time - check network/server performance")
         if len(set(m.thread_id for m in failed_uploads)) > len(thread_performance) * 0.3:
-            print("  ⚠️  Failures distributed across many threads - possible server overload")
+            print("  WARNING Failures distributed across many threads - possible server overload")
     
     print("\n" + "="*80)
 
@@ -334,7 +334,7 @@ def cleanup_assignments(assignment_ids: List[str]):
     if not assignment_ids:
         return
     
-    print(f"\n🧹 Cleaning up {len(assignment_ids)} assignments...")
+    print(f"\nCleaning up {len(assignment_ids)} assignments...")
     deleted_count = 0
     
     for assignment_id in assignment_ids:
@@ -344,7 +344,7 @@ def cleanup_assignments(assignment_ids: List[str]):
         except Exception as e:
             print(f"   Failed to delete assignment {assignment_id}: {e}")
     
-    print(f"🧹 Cleanup complete. Deleted {deleted_count}/{len(assignment_ids)} assignments.")
+    print(f"Cleanup complete. Deleted {deleted_count}/{len(assignment_ids)} assignments.")
 
 
 def main():
@@ -365,7 +365,7 @@ def main():
     
     args = parser.parse_args()
     
-    print(f"🚀 Starting bulk assignment upload stress test...")
+    print("Starting bulk assignment upload stress test")
     print(f"   Course ID: {args.course_id}")
     print(f"   Number of uploads: {args.num_uploads}")
     print(f"   Max concurrent workers: {args.max_workers}")
@@ -384,26 +384,26 @@ def main():
     try:
         if args.use_custom_zip and os.path.exists(args.use_custom_zip):
             zip_file_path = args.use_custom_zip
-            print(f"📁 Using custom zip file: {zip_file_path}")
+            print(f"Using custom zip file: {zip_file_path}")
         elif os.path.exists(AUTOGRADER_ZIP_PATH):
             zip_file_path = AUTOGRADER_ZIP_PATH
-            print(f"📁 Using default autograder zip: {zip_file_path}")
+            print(f"Using default autograder zip: {zip_file_path}")
         else:
-            print(f"📁 Creating test zip file ({args.zip_size_mb} MB)...")
+            print(f"Creating test zip file ({args.zip_size_mb} MB)...")
             zip_file_path = create_test_zip_file(args.zip_size_mb)
             cleanup_zip = True
-            print(f"📁 Created test zip: {zip_file_path}")
+            print(f"Created test zip: {zip_file_path}")
         
         file_size_mb = os.path.getsize(zip_file_path) / 1024 / 1024
-        print(f"📊 File size: {file_size_mb:.1f} MB")
+        print(f"File size: {file_size_mb:.1f} MB")
         
         # Start system monitoring
         if system_monitor:
-            print("📈 Starting system monitoring...")
+            print("Starting system monitoring...")
             system_monitor.start_monitoring()
         
         # Start the test
-        print(f"\n🧪 Starting {args.num_uploads} concurrent uploads...")
+        print(f"\nStarting {args.num_uploads} concurrent uploads...")
         test_start_time = time.time()
         
         # Create upload tasks
@@ -450,7 +450,7 @@ def main():
         if system_monitor:
             system_monitor.stop_monitoring()
             system_metrics = system_monitor.get_peak_metrics()
-            print("📈 System monitoring complete.")
+            print("System monitoring complete.")
         
         # Print results
         print_detailed_results(upload_metrics, system_metrics, test_duration)
@@ -465,12 +465,22 @@ def main():
         if cleanup_zip and zip_file_path:
             try:
                 os.unlink(zip_file_path)
-                print(f"🗑️  Cleaned up temporary zip file")
+                print("Cleaned up temporary zip file")
             except Exception as e:
-                print(f"⚠️  Failed to cleanup temp zip file: {e}")
+                print(f"WARNING Failed to cleanup temp zip file: {e}")
+
+        failed_uploads = [metric for metric in upload_metrics if not metric.success]
+        if failed_uploads:
+            print(
+                "Failed to run stress test: "
+                f"{len(failed_uploads)}/{len(upload_metrics)} uploads failed"
+            )
+            return 1
+
+        return 0
                 
     except Exception as e:
-        print(f"❌ Test failed: {e}")
+        print(f"Failed to run stress test: {e}")
         
         # Cleanup on failure
         if args.cleanup and 'upload_metrics' in locals():
@@ -487,6 +497,8 @@ def main():
         if system_monitor:
             system_monitor.stop_monitoring()
 
+        return 1
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

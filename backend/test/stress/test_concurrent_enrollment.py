@@ -1,344 +1,323 @@
+"""
+Stress test for concurrent enrollment and leave-course operations.
+
+This version matches the current backend routes:
+- POST /create_enrollment with student_id and course_id
+- POST /leave_course with user_id and course_id
+- GET /get_user_enrollments with user_id
+"""
+
 import argparse
+import random
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import random
-from utils import add_user, delete_user
-import requests
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-"""
-Stress test for concurrent user enrollment and unenrollment operations.
+from utils import (
+    add_user,
+    create_enrollment,
+    delete_user,
+    get_user_enrollments,
+    is_http_status,
+    leave_course,
+)
 
-Tests rapid enrollment/unenrollment of the same user from a course in parallel threads
-to check for race conditions, database locking issues, and data consistency.
 
-Usage:
-    python test_concurrent_enrollment.py <course_id> [--num_threads N] [--operations_per_thread M]
-
-Example:
-    python test_concurrent_enrollment.py 123e4567-e89b-12d3-a456-426614174000 --num_threads 10 --operations_per_thread 5
-"""
-
-BASE_URL = "http://localhost:5001"
-
-# Shared state
 test_results = []
 results_lock = threading.Lock()
 created_users = []
 users_lock = threading.Lock()
 
 
-def enroll_user_in_course(user_id, course_id):
-    """Enroll a user in a course."""
-    url = f"{BASE_URL}/enroll_user"
-    payload = {
-        "user_id": user_id,
-        "course_id": course_id
-    }
-    response = requests.post(url, json=payload)
-    response.raise_for_status()
-    return response.json()
+def is_user_enrolled(user_id: str, course_id: str) -> bool:
+    courses = get_user_enrollments(user_id)
+    return any(course.get("id") == course_id for course in courses)
 
 
-def unenroll_user_from_course(user_id, course_id):
-    """Unenroll a user from a course."""
-    url = f"{BASE_URL}/unenroll_user"
-    payload = {
-        "user_id": user_id,
-        "course_id": course_id
-    }
-    response = requests.post(url, json=payload)
-    response.raise_for_status()
-    return response.json()
-
-
-def get_user_courses(user_id):
-    """Get courses for a user."""
-    url = f"{BASE_URL}/get_user_courses"
-    response = requests.get(url, params={"user_id": user_id})
-    response.raise_for_status()
-    return response.json()
-
-
-def is_user_enrolled(user_id, course_id):
-    """Check if user is enrolled in a specific course."""
-    try:
-        courses = get_user_courses(user_id)
-        return any(course.get('id') == course_id for course in courses.get('courses', []))
-    except:
-        return False
-
-
-def rapid_enrollment_operations(user_id, course_id, thread_id, operations_count):
-    """Perform rapid enrollment and unenrollment operations."""
+def run_enrollment_operations(
+    user_id: str,
+    course_id: str,
+    thread_id: int,
+    operations_count: int,
+    randomize: bool,
+) -> dict:
     thread_results = {
-        'thread_id': thread_id,
-        'user_id': user_id,
-        'operations': [],
-        'total_operations': operations_count,
-        'successful_operations': 0,
-        'failed_operations': 0,
-        'errors': []
+        "thread_id": thread_id,
+        "user_id": user_id,
+        "total_operations": operations_count,
+        "successful_operations": 0,
+        "handled_conflicts": 0,
+        "failed_operations": 0,
+        "operations": [],
+        "errors": [],
     }
-    
-    print(f"[Thread-{thread_id}] Starting {operations_count} enrollment operations for user {user_id}")
-    
+
+    print(f"[thread {thread_id}] starting {operations_count} enrollment operations")
+
     for operation_num in range(operations_count):
+        if randomize:
+            operation = "enroll" if operation_num == 0 or random.choice([True, False]) else "leave"
+        else:
+            operation = "enroll" if operation_num % 2 == 0 else "leave"
+
+        start_time = time.time()
         try:
-            start_time = time.time()
-            
-            # Randomly choose to enroll or unenroll
-            # Start with enrollment to ensure we have something to unenroll
-            if operation_num == 0 or random.choice([True, False]):
-                operation = "enroll"
-                result = enroll_user_in_course(user_id, course_id)
+            if operation == "enroll":
+                create_enrollment(user_id, course_id)
                 expected_enrolled = True
             else:
-                operation = "unenroll"
-                result = unenroll_user_from_course(user_id, course_id)
+                leave_course(user_id, course_id)
                 expected_enrolled = False
-            
-            operation_time = time.time() - start_time
-            
-            # Verify the operation worked by checking enrollment status
-            time.sleep(0.1)  # Small delay to allow for database consistency
+
+            duration = time.time() - start_time
             actual_enrolled = is_user_enrolled(user_id, course_id)
-            
-            # Note: Due to race conditions, the actual state might not match expected
-            # We're more interested in whether the operations complete successfully
-            operation_result = {
-                'operation_num': operation_num,
-                'operation': operation,
-                'time': operation_time,
-                'expected_enrolled': expected_enrolled,
-                'actual_enrolled': actual_enrolled,
-                'consistent': actual_enrolled == expected_enrolled,
-                'success': True
-            }
-            
-            thread_results['operations'].append(operation_result)
-            thread_results['successful_operations'] += 1
-            
-            print(f"[Thread-{thread_id}] Op {operation_num}: {operation} ({'✅' if operation_result['consistent'] else '⚠️'})")
-            
-        except Exception as e:
-            error_info = {
-                'operation_num': operation_num,
-                'operation': operation if 'operation' in locals() else 'unknown',
-                'error': str(e),
-                'success': False
-            }
-            
-            thread_results['operations'].append(error_info)
-            thread_results['failed_operations'] += 1
-            thread_results['errors'].append(str(e))
-            
-            print(f"[Thread-{thread_id}] Op {operation_num}: ❌ {e}")
-        
-        # Small random delay to create more realistic timing
+            consistent = actual_enrolled == expected_enrolled
+
+            thread_results["successful_operations"] += 1
+            thread_results["operations"].append(
+                {
+                    "operation_num": operation_num,
+                    "operation": operation,
+                    "duration": duration,
+                    "success": True,
+                    "consistent": consistent,
+                    "expected_enrolled": expected_enrolled,
+                    "actual_enrolled": actual_enrolled,
+                }
+            )
+
+            consistency = "consistent" if consistent else "state changed by race"
+            print(
+                f"[thread {thread_id}] op {operation_num}: "
+                f"PASS {operation} in {duration:.3f}s ({consistency})"
+            )
+
+        except Exception as error:
+            duration = time.time() - start_time
+            expected_conflict = is_http_status(error, 404, 409)
+
+            if expected_conflict:
+                thread_results["handled_conflicts"] += 1
+                status = "CONFLICT"
+            else:
+                thread_results["failed_operations"] += 1
+                thread_results["errors"].append(str(error))
+                status = "FAIL"
+
+            thread_results["operations"].append(
+                {
+                    "operation_num": operation_num,
+                    "operation": operation,
+                    "duration": duration,
+                    "success": False,
+                    "handled_conflict": expected_conflict,
+                    "error": str(error),
+                }
+            )
+
+            print(f"[thread {thread_id}] op {operation_num}: {status} {operation}: {error}")
+
         time.sleep(random.uniform(0.01, 0.05))
-    
+
     with results_lock:
         test_results.append(thread_results)
-    
-    print(f"[Thread-{thread_id}] Completed: {thread_results['successful_operations']}/{operations_count} successful")
+
+    completed = thread_results["successful_operations"] + thread_results["handled_conflicts"]
+    print(f"[thread {thread_id}] completed {completed}/{operations_count} handled")
     return thread_results
 
 
-def create_test_users(num_users):
-    """Create test users for the stress test."""
-    print(f"📝 Creating {num_users} test users...")
-    
+def create_test_users(num_users: int) -> list[str]:
+    print(f"Creating {num_users} test users")
+
     user_ids = []
-    for i in range(num_users):
+    for index in range(num_users):
         try:
-            user_name = f"enrollment_test_user_{i}_{uuid.uuid4().hex[:8]}"
+            user_name = f"enrollment_test_user_{index}_{uuid.uuid4().hex[:8]}"
             user_id = add_user(name=user_name)
             user_ids.append(user_id)
-            
+
             with users_lock:
                 created_users.append(user_id)
-                
-            print(f"   Created user {i+1}/{num_users}: {user_name}")
-            
-        except Exception as e:
-            print(f"   Failed to create user {i+1}: {e}")
-    
+
+            print(f"- user {index + 1}/{num_users}: {user_id}")
+
+        except Exception as error:
+            print(f"- failed to create user {index + 1}: {error}")
+
     return user_ids
 
 
-def print_results_summary():
-    """Print a comprehensive summary of test results."""
-    print("\n" + "="*80)
+def print_results_summary() -> None:
+    print()
+    print("=" * 80)
     print("CONCURRENT ENROLLMENT STRESS TEST RESULTS")
-    print("="*80)
-    
+    print("=" * 80)
+
     total_threads = len(test_results)
-    total_operations = sum(r['total_operations'] for r in test_results)
-    total_successful = sum(r['successful_operations'] for r in test_results)
-    total_failed = sum(r['failed_operations'] for r in test_results)
-    
+    total_operations = sum(result["total_operations"] for result in test_results)
+    total_successful = sum(result["successful_operations"] for result in test_results)
+    total_conflicts = sum(result["handled_conflicts"] for result in test_results)
+    total_failed = sum(result["failed_operations"] for result in test_results)
+    handled = total_successful + total_conflicts
+    handled_rate = (handled / total_operations * 100) if total_operations else 0
+
     print(f"Total threads: {total_threads}")
     print(f"Total operations: {total_operations}")
-    print(f"Successful operations: {total_successful} ({total_successful/total_operations*100:.1f}%)")
-    print(f"Failed operations: {total_failed} ({total_failed/total_operations*100:.1f}%)")
+    print(f"Successful operations: {total_successful}")
+    print(f"Handled conflicts/races: {total_conflicts}")
+    print(f"Unexpected failures: {total_failed}")
+    print(f"Handled rate: {handled_rate:.1f}%")
     print()
-    
-    # Analyze consistency
-    all_operations = []
-    for result in test_results:
-        all_operations.extend([op for op in result['operations'] if op.get('success', False)])
-    
-    consistent_operations = [op for op in all_operations if op.get('consistent', False)]
-    inconsistent_operations = [op for op in all_operations if not op.get('consistent', True)]
-    
-    if all_operations:
-        print(f"State consistency: {len(consistent_operations)}/{len(all_operations)} operations " +
-              f"({len(consistent_operations)/len(all_operations)*100:.1f}%)")
-        
-        if inconsistent_operations:
-            print(f"⚠️  {len(inconsistent_operations)} operations had state inconsistencies")
-            print("   (This may be expected due to race conditions)")
-    
-    print()
-    
-    # Performance metrics
-    if all_operations:
-        operation_times = [op['time'] for op in all_operations if 'time' in op]
-        if operation_times:
-            avg_time = sum(operation_times) / len(operation_times)
-            max_time = max(operation_times)
-            min_time = min(operation_times)
-            
-            print("PERFORMANCE METRICS:")
-            print(f"  Average operation time: {avg_time:.3f}s")
-            print(f"  Min operation time: {min_time:.3f}s")
-            print(f"  Max operation time: {max_time:.3f}s")
-            print()
-    
-    # Error analysis
-    all_errors = []
-    for result in test_results:
-        all_errors.extend(result['errors'])
-    
-    if all_errors:
-        print("ERROR ANALYSIS:")
-        error_counts = {}
-        for error in all_errors:
-            error_type = error.split(':')[0] if ':' in error else error
-            error_counts[error_type] = error_counts.get(error_type, 0) + 1
-        
-        for error_type, count in error_counts.items():
-            print(f"  {error_type}: {count} occurrences")
+
+    operation_times = [
+        operation["duration"]
+        for result in test_results
+        for operation in result["operations"]
+        if "duration" in operation
+    ]
+    if operation_times:
+        print("Performance:")
+        print(f"- Average operation time: {sum(operation_times) / len(operation_times):.3f}s")
+        print(f"- Fastest operation: {min(operation_times):.3f}s")
+        print(f"- Slowest operation: {max(operation_times):.3f}s")
         print()
-    
-    # Thread performance summary
-    print("THREAD PERFORMANCE:")
-    print("-" * 60)
-    for result in test_results:
-        success_rate = result['successful_operations'] / result['total_operations'] * 100
-        print(f"  Thread {result['thread_id']:2d}: {result['successful_operations']:2d}/{result['total_operations']:2d} " +
-              f"operations ({success_rate:5.1f}%) | User: {result['user_id'][:8]}...")
-    
-    print("\n" + "="*80)
+
+    print(f"{'Thread':<8} {'Success':>8} {'Conflict':>10} {'Failed':>8}")
+    print("-" * 40)
+    for result in sorted(test_results, key=lambda item: item["thread_id"]):
+        print(
+            f"{result['thread_id']:<8} "
+            f"{result['successful_operations']:>8} "
+            f"{result['handled_conflicts']:>10} "
+            f"{result['failed_operations']:>8}"
+        )
+
+    failures = [
+        error
+        for result in test_results
+        for error in result["errors"]
+    ]
+    if failures:
+        print()
+        print("Failure details:")
+        for error in failures[:10]:
+            print(f"- {error}")
+
+    print("=" * 80)
 
 
-def cleanup():
-    """Clean up created test users."""
-    print("\n🧹 Starting cleanup...")
-    
+def cleanup() -> None:
+    print()
+    print("Cleanup:")
+
     deleted_count = 0
     for user_id in created_users:
         try:
             delete_user(user_id)
             deleted_count += 1
-            print(f"   Deleted user: {user_id}")
-        except Exception as e:
-            print(f"   Failed to delete user {user_id}: {e}")
-    
-    print(f"🧹 Cleanup complete. Deleted {deleted_count}/{len(created_users)} users.")
+        except Exception as error:
+            print(f"- Failed to delete user {user_id}: {error}")
+
+    print(f"- Deleted users: {deleted_count}/{len(created_users)}")
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="Concurrent enrollment stress test.")
     parser.add_argument("course_id", type=str, help="Valid course ID")
-    parser.add_argument("--num_threads", type=int, default=5,
-                       help="Number of concurrent threads")
-    parser.add_argument("--operations_per_thread", type=int, default=10,
-                       help="Number of enroll/unenroll operations per thread")
-    parser.add_argument("--users_per_thread", type=int, default=1,
-                       help="Number of users per thread (1 = same user for all operations in thread)")
-    parser.add_argument("--max_workers", type=int, default=10,
-                       help="Maximum number of concurrent workers")
-    parser.add_argument("--cleanup", action="store_true",
-                       help="Delete created users after test")
-    
+    parser.add_argument("--num_threads", type=int, default=5, help="Number of threads")
+    parser.add_argument(
+        "--operations_per_thread",
+        type=int,
+        default=10,
+        help="Number of enroll/leave operations per thread",
+    )
+    parser.add_argument(
+        "--users_per_thread",
+        type=int,
+        default=1,
+        help="Number of users per thread",
+    )
+    parser.add_argument(
+        "--max_workers",
+        type=int,
+        default=10,
+        help="Maximum concurrent workers",
+    )
+    parser.add_argument(
+        "--randomize",
+        action="store_true",
+        help="Randomize enroll/leave choices instead of alternating them",
+    )
+    parser.add_argument("--cleanup", action="store_true", help="Delete created users")
+
     args = parser.parse_args()
-    
+
+    if args.num_threads < 1 or args.operations_per_thread < 1 or args.users_per_thread < 1:
+        print("Failed to run stress test: thread, operation, and user counts must be >= 1")
+        return 1
+
     total_users_needed = args.num_threads * args.users_per_thread
-    
-    print(f"🚀 Starting concurrent enrollment stress test...")
-    print(f"   Course ID: {args.course_id}")
-    print(f"   Threads: {args.num_threads}")
-    print(f"   Operations per thread: {args.operations_per_thread}")
-    print(f"   Users per thread: {args.users_per_thread}")
-    print(f"   Total users needed: {total_users_needed}")
-    print(f"   Max workers: {args.max_workers}")
-    
+
+    print("Starting concurrent enrollment stress test")
+    print(f"Course ID: {args.course_id}")
+    print(f"Threads: {args.num_threads}")
+    print(f"Operations per thread: {args.operations_per_thread}")
+    print(f"Users per thread: {args.users_per_thread}")
+    print(f"Max workers: {args.max_workers}")
+
     try:
-        # Create test users
         user_ids = create_test_users(total_users_needed)
-        
-        if len(user_ids) < total_users_needed:
-            print(f"⚠️  Only created {len(user_ids)}/{total_users_needed} users. Continuing with available users.")
-        
-        print(f"\n🧪 Starting enrollment operations...")
-        
-        # Create tasks for thread pool
+        if not user_ids:
+            print("Failed to run stress test: no users were created")
+            return 1
+
         tasks = []
         user_index = 0
-        
         for thread_id in range(args.num_threads):
-            # Assign users to this thread
-            thread_users = []
-            for _ in range(args.users_per_thread):
-                if user_index < len(user_ids):
-                    thread_users.append(user_ids[user_index])
-                    user_index += 1
-            
-            # For now, let's test with one user per thread doing multiple operations
-            # This tests the same user being enrolled/unenrolled rapidly
-            if thread_users:
-                primary_user = thread_users[0]  # Use first user for rapid operations
-                tasks.append((primary_user, args.course_id, thread_id, args.operations_per_thread))
-        
-        # Execute tasks with thread pool
+            if user_index >= len(user_ids):
+                break
+            primary_user = user_ids[user_index]
+            user_index += args.users_per_thread
+            tasks.append((primary_user, args.course_id, thread_id, args.operations_per_thread))
+
         with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
-            futures = []
-            for user_id, course_id, thread_id, ops_count in tasks:
-                future = executor.submit(rapid_enrollment_operations, user_id, course_id, thread_id, ops_count)
-                futures.append(future)
-            
-            # Wait for all tasks to complete
+            futures = [
+                executor.submit(
+                    run_enrollment_operations,
+                    user_id,
+                    course_id,
+                    thread_id,
+                    operations_count,
+                    args.randomize,
+                )
+                for user_id, course_id, thread_id, operations_count in tasks
+            ]
+
             for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    print(f"Thread failed with exception: {e}")
-        
-        # Print results
+                future.result()
+
         print_results_summary()
-        
-        # Cleanup if requested
+
         if args.cleanup:
             cleanup()
-            
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
+
+        unexpected_failures = sum(
+            result["failed_operations"] for result in test_results
+        )
+        if unexpected_failures:
+            print("Failed to run stress test: unexpected enrollment failures occurred")
+            return 1
+
+        return 0
+
+    except Exception as error:
+        print(f"Failed to run stress test: {error}")
         if args.cleanup:
             cleanup()
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

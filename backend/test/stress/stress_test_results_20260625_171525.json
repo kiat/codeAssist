@@ -1,0 +1,67 @@
+{
+  "test_suite_info": {
+    "course_id": "f57ac0e3-7ff6-4eca-b1af-37f360de2cd7",
+    "start_time": "2026-06-25T17:15:13.309498",
+    "end_time": "2026-06-25T17:15:25.330797",
+    "total_duration": 12.021298885345459,
+    "quick_mode": true,
+    "cleanup_enabled": true
+  },
+  "summary": {
+    "total_tests": 5,
+    "successful_tests": 1,
+    "failed_tests": 4
+  },
+  "test_results": [
+    {
+      "test_name": "Bulk Assignment Uploads",
+      "script_path": "test_bulk_assignment_uploads.py",
+      "duration": 0.4145078659057617,
+      "success": false,
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\17373\\Desktop\\codeAssist25Fall\\TESTING\\codeAssist-pr-test\\backend\\test\\stress\\test_bulk_assignment_uploads.py\", line 492, in <module>\n    main()\n  File \"C:\\Users\\17373\\Desktop\\codeAssist25Fall\\TESTING\\codeAssist-pr-test\\backend\\test\\stress\\test_bulk_assignment_uploads.py\", line 368, in main\n    print(f\"\\U0001f680 Starting bulk assignment upload stress test...\")\n  File \"C:\\Users\\17373\\AppData\\Local\\Programs\\Python\\Python310\\lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\nUnicodeEncodeError: 'charmap' codec can't encode character '\\U0001f680' in position 0: character maps to <undefined>\n",
+      "command": "C:\\Users\\17373\\AppData\\Local\\Programs\\Python\\Python310\\python.exe test_bulk_assignment_uploads.py f57ac0e3-7ff6-4eca-b1af-37f360de2cd7 --num_uploads 10 --max_workers 4 --cleanup"
+    },
+    {
+      "test_name": "Student Submissions",
+      "script_path": "upload_assignments.py",
+      "duration": 0.629694938659668,
+      "success": true,
+      "return_code": 0,
+      "stdout": " Creating shared assignment in course f57ac0e3-7ff6-4eca-b1af-37f360de2cd7...\nCreate assignment payload:\n{'name': 'Multithreaded Test Assignment', 'course_id': 'f57ac0e3-7ff6-4eca-b1af-37f360de2cd7', 'published': True, 'published_date': None, 'due_date': None}\n\nCreate assignment failed\nStatus code: 400\nResponse body: {\n  \"message\": \"An assignment with this name already exists\"\n}\n\n\n Failed to run stress test: 400 Client Error: BAD REQUEST for url: http://localhost:5001/create_assignment\n",
+      "stderr": "",
+      "command": "C:\\Users\\17373\\AppData\\Local\\Programs\\Python\\Python310\\python.exe upload_assignments.py f57ac0e3-7ff6-4eca-b1af-37f360de2cd7 --num_threads 5 --cleanup"
+    },
+    {
+      "test_name": "Long-Running Grader",
+      "script_path": "test_long_running_grader.py",
+      "duration": 0.26943397521972656,
+      "success": false,
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\17373\\Desktop\\codeAssist25Fall\\TESTING\\codeAssist-pr-test\\backend\\test\\stress\\test_long_running_grader.py\", line 302, in <module>\n    main()\n  File \"C:\\Users\\17373\\Desktop\\codeAssist25Fall\\TESTING\\codeAssist-pr-test\\backend\\test\\stress\\test_long_running_grader.py\", line 246, in main\n    print(f\"\\U0001f680 Starting long-running grader stress test...\")\n  File \"C:\\Users\\17373\\AppData\\Local\\Programs\\Python\\Python310\\lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\nUnicodeEncodeError: 'charmap' codec can't encode character '\\U0001f680' in position 0: character maps to <undefined>\n",
+      "command": "C:\\Users\\17373\\AppData\\Local\\Programs\\Python\\Python310\\python.exe test_long_running_grader.py f57ac0e3-7ff6-4eca-b1af-37f360de2cd7 --max_execution_time 10 --num_submissions 2 --cleanup"
+    },
+    {
+      "test_name": "Concurrent Enrollment",
+      "script_path": "test_concurrent_enrollment.py",
+      "duration": 0.347491979598999,
+      "success": false,
+      "return_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\17373\\Desktop\\codeAssist25Fall\\TESTING\\codeAssist-pr-test\\backend\\test\\stress\\test_concurrent_enrollment.py\", line 344, in <module>\n    main()\n  File \"C:\\Users\\17373\\Desktop\\codeAssist25Fall\\TESTING\\codeAssist-pr-test\\backend\\test\\stress\\test_concurrent_enrollment.py\", line 281, in main\n    print(f\"\\U0001f680 Starting concurrent enrollment stress test...\")\n  File \"C:\\Users\\17373\\AppData\\Local\\Programs\\Python\\Python310\\lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\nUnicodeEncodeError: 'charmap' codec can't encode character '\\U0001f680' in position 0: character maps to <undefined>\n",
+      "command": "C:\\Users\\17373\\AppData\\Local\\Programs\\Python\\Python310\\python.exe test_concurrent_enrollment.py f57ac0e3-7ff6-4eca-b1af-37f360de2cd7 --num_threads 3 --operations_per_thread 5 --cleanup"
+    },
+    {
+      "test_name": "CRUD Operations",
+      "script_path": "test_concurrent_crud_operations.py",
+      "duration": 0.2951207160949707,
+      "success": false,
+      "return_code": 2,
+      "stdout": "",
+      "stderr": "usage: test_concurrent_crud_operations.py [-h] [--num_threads NUM_THREADS]\n                                          [--operations_per_thread OPERATIONS_PER_THREAD]\n                                          [--test_type {courses,assignments,mixed,both}]\n                                          [--max_workers MAX_WORKERS]\n                                          [--cleanup]\ntest_concurrent_crud_operations.py: error: unrecognized arguments: f57ac0e3-7ff6-4eca-b1af-37f360de2cd7\n",
+      "command": "C:\\Users\\17373\\AppData\\Local\\Programs\\Python\\Python310\\python.exe test_concurrent_crud_operations.py f57ac0e3-7ff6-4eca-b1af-37f360de2cd7 --num_threads 4 --operations_per_thread 8 --cleanup"
+    }
+  ]
+}
