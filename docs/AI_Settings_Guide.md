@@ -29,7 +29,7 @@ frontend/src/services/course.js
 
 ```text
 backend/routes/course.py
-backend/ai_integration.py
+backend/ai_feedback/integration.py
 backend/api/models.py
 backend/test/unit/test_course.py
 ```

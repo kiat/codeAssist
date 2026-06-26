@@ -1,4 +1,4 @@
-from ai_integration import (
+from ai_feedback.integration import (
     DEFAULT_FEEDBACK_PROMPT,
     RETURN_SPEC,
     build_feedback_prompt,
@@ -129,7 +129,7 @@ def test_gemini_feedback_request_reserves_tokens_for_json(monkeypatch):
         captured_request["json"] = json
         return FakeGeminiResponse()
 
-    monkeypatch.setattr("ai_integration.requests.post", fake_post)
+    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
 
     parsed, new_insights = get_structured_feedback_from_gemini(
         api_key="gemini-key",

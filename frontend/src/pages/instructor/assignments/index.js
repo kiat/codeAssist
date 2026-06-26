@@ -6,6 +6,10 @@ import { createAssignment } from "../../../services/assignment";
 import Assignments from "./Assignments";
 import CreateAssignment from "./CreateAssignment";
 import DuplicateAssignmentModal from "./DuplicateAssignmentModal";
+import {
+  normalizeAiAllowedInputs,
+  normalizeAiFeedbackPrompts,
+} from "../../../constants/aiFeedbackSettings";
 
 export default function InstructorAssignments() {
   const [isCreate, setIsCreate] = useState(false);
@@ -30,11 +34,20 @@ export default function InstructorAssignments() {
 
   const finishForm = async () => {
     const values = form.getFieldsValue();
+
+    const feedbackPrompts = normalizeAiFeedbackPrompts(
+      values.ai_feedback_prompts,
+      values.ai_feedback_prompt
+    );
+
+    const firstPrompt =
+      feedbackPrompts.find((prompt) => prompt.enabled) || feedbackPrompts[0];
+
     const assignmentData = {
-      name: values.name, 
-      course_id: courseId, 
-      due_date: values.dueDate.toISOString(), 
-      autograder_points: values.autograderPoints, 
+      name: values.name,
+      course_id: courseId,
+      due_date: values.dueDate.toISOString(),
+      autograder_points: values.autograderPoints,
       anonymous_grading: values.submissionAnonymization,
       manual_grading: values.manualGrading,
       late_submission: values.allowLateSubmissions,
@@ -43,13 +56,15 @@ export default function InstructorAssignments() {
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
       published_date: values.releaseDate.toISOString(),
-      
 
       // AI Settings
       ai_feedback_enabled: values.ai_feedback_enabled,
-      ai_feedback_prompt: values.ai_feedback_prompt,
+      ai_feedback_prompt: firstPrompt?.prompt ?? null,
+      ai_feedback_prompts: feedbackPrompts,
+      ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
       ai_feedback_model: values.ai_feedback_model,
       ai_feedback_temperature: values.ai_feedback_temperature,
+      ai_feedback_style: values.ai_feedback_style,
     };
     const validData = Object.fromEntries(
       Object.entries(assignmentData).filter(([_, value]) => value !== undefined)

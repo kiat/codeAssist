@@ -52,7 +52,7 @@ def test_update_assignment_duplicate_name(client, mocker):
 def test_update_assignment_not_found(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter.return_value.first.return_value = None
-    mock_query.return_value.filter_by.return_value.update.return_value = 0
+    mock_query.return_value.filter_by.return_value.first.return_value = None
 
     resp = client.put("/update_assignment", json={
         "assignment_id": "notfound-uuid",
@@ -88,6 +88,89 @@ def test_get_assignment_empty(client, mocker):
     resp = client.get("/get_assignment?assignment_id=empty-uuid")
     assert resp.status_code == 404
     assert resp.json["message"] == "Assignment not found"
+
+
+def test_get_assignment_ai_settings_returns_normalized_defaults(client, mocker):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_assignment = Assignment(
+        id="assignment-uuid",
+        name="AI Assignment",
+        ai_feedback_enabled=True,
+        use_course_ai_default=True,
+    )
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.get("/assignments/assignment-uuid/ai-settings")
+
+    assert resp.status_code == 200
+    assert resp.json["ai_feedback_enabled"] is True
+    assert resp.json["feedback_prompts"][0]["id"] == "check_correctness"
+    assert resp.json["allowed_inputs"]["student_code"] is True
+    assert resp.json["allowed_inputs"]["test_cases"] is False
+
+
+def test_update_assignment_ai_settings_saves_prompts_and_allowed_inputs(client, mocker):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_assignment = Assignment(
+        id="assignment-uuid",
+        name="AI Assignment",
+        ai_feedback_enabled=True,
+    )
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+    mock_commit = mocker.patch("routes.assignment.db.session.commit")
+
+    resp = client.put(
+        "/assignments/assignment-uuid/ai-settings",
+        json={
+            "feedback_prompts": [
+                {
+                    "id": "debug_failed_tests",
+                    "title": "Debug Failed Tests",
+                    "prompt": "Explain failed tests without solving.",
+                    "enabled": True,
+                }
+            ],
+            "allowed_inputs": {
+                "assignment_description": True,
+                "student_code": False,
+                "test_results": True,
+                "test_cases": False,
+                "student_output": False,
+            },
+        },
+    )
+
+    assert resp.status_code == 200
+    assert mock_assignment.ai_feedback_prompts[0]["id"] == "debug_failed_tests"
+    assert mock_assignment.ai_feedback_prompt == "Explain failed tests without solving."
+    assert mock_assignment.ai_allowed_inputs["student_code"] is False
+    assert mock_assignment.ai_allowed_inputs["student_output"] is False
+    mock_commit.assert_called_once()
+
+
+def test_update_assignment_ai_settings_rejects_invalid_prompt(client, mocker):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_assignment = Assignment(id="assignment-uuid", name="AI Assignment")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+    mock_rollback = mocker.patch("routes.assignment.db.session.rollback")
+
+    resp = client.put(
+        "/assignments/assignment-uuid/ai-settings",
+        json={
+            "feedback_prompts": [
+                {
+                    "id": "invalid",
+                    "title": "",
+                    "prompt": "Explain failed tests.",
+                    "enabled": True,
+                }
+            ]
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "Prompt title is required" in resp.json["message"]
+    mock_rollback.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

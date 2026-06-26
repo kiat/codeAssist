@@ -1,17 +1,15 @@
-from flask import Blueprint
-
-from .user import user
-from .course import course
-from .assignment import assignment
-from .regrade_request import regrade_request
-from .submission import submission
-from .code_editor import code_editor
+from . import assignment as assignment_routes
+from . import code_editor as code_editor_routes
+from . import course as course_routes
+from . import regrade_request as regrade_request_routes
+from . import submission as submission_routes
+from . import user as user_routes
 
 def register_routes(app):
     # Register all blueprints
-    app.register_blueprint(user)
-    app.register_blueprint(course)
-    app.register_blueprint(assignment)
-    app.register_blueprint(regrade_request)
-    app.register_blueprint(submission)
-    app.register_blueprint(code_editor)
+    app.register_blueprint(user_routes.user)
+    app.register_blueprint(course_routes.course)
+    app.register_blueprint(assignment_routes.assignment)
+    app.register_blueprint(regrade_request_routes.regrade_request)
+    app.register_blueprint(submission_routes.submission)
+    app.register_blueprint(code_editor_routes.code_editor)

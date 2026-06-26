@@ -88,7 +88,7 @@ describe("CreateAssignment AI prompt defaults", () => {
 
     await waitFor(() => expect(getCourseInfo).toHaveBeenCalled());
 
-    await user.click(screen.getAllByRole("switch")[0]);
+    await user.click(screen.getAllByRole("switch")[1]);
 
     const promptInput = await screen.findByLabelText("AI Feedback Prompt");
 
