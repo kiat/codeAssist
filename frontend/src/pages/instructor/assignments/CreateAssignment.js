@@ -628,7 +628,6 @@ export default ({
                           </Form.Item>
                         </>
                       )}
-                    </Card>
 
                     <Form.Item
                       label="CONFIGURE AUTOGRADER"
