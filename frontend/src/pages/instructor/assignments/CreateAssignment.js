@@ -629,7 +629,6 @@ export default ({
                         </>
                       )}
 
-
                     <Form.Item
                       label="CONFIGURE AUTOGRADER"
                       name="autograder_enabled"
