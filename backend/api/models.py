@@ -76,6 +76,8 @@ class Assignment(db.Model):
     ai_feedback_provider = db.Column(db.String, nullable=True)
     ai_feedback_model = db.Column(db.String, nullable=True)
     ai_feedback_prompt = db.Column(db.Text, nullable=True)
+    ai_feedback_prompts = db.Column(db.JSON, nullable=True)
+    ai_allowed_inputs = db.Column(db.JSON, nullable=True)
     ai_feedback_temperature = db.Column(db.Float, nullable=True)
     ai_feedback_style = db.Column(db.String, nullable=True)
 

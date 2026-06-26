@@ -18,7 +18,7 @@ from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, Enrollme
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ServerTimeoutError, SubmissionTimeoutError
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
-from ai_integration import async_get_ai_feedback
+from ai_feedback.integration import async_get_ai_feedback
 import threading
 
 

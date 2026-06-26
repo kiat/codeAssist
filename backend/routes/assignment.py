@@ -5,6 +5,11 @@ from api import db
 from api.models import Assignment, AssignmentExtension, Submission, RegradeRequest, Course
 from api.schemas import AssignmentSchema, CourseSchema, AssignmentExtensionSchema
 from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError
+from ai_feedback.settings import (
+    serialize_assignment_ai_settings,
+    split_ai_settings_payload,
+    update_assignment_ai_settings,
+)
 
 assignment = Blueprint('assignment', __name__)
 
@@ -39,13 +44,23 @@ def update_assignment():
         raise BadRequestError("An assignment with this name already exists")
 
     del data["assignment_id"]
+    assignment_data, ai_settings_data = split_ai_settings_payload(data)
 
-    updated_assignment_info = {getattr(Assignment, name): val for name, val in data.items()}
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment_obj:
+        raise NotFoundError("Assignment not found")
+
+    if ai_settings_data:
+        try:
+            update_assignment_ai_settings(assignment_obj, ai_settings_data)
+        except ValueError as e:
+            raise BadRequestError(str(e))
+
+    for name, val in assignment_data.items():
+        if hasattr(Assignment, name):
+            setattr(assignment_obj, name, val)
 
     try:
-        updated_rows = db.session.query(Assignment).filter_by(id=assignment_id).update(updated_assignment_info)
-        if not updated_rows:
-            raise NotFoundError("Assignment not found")
         db.session.commit()
         return jsonify({"message": "Assignment updated successfully"}), 200
     except (BadRequestError, NotFoundError) as e:
@@ -72,7 +87,40 @@ def get_assignment():
         raise NotFoundError("Assignment not found")
 
     result = AssignmentSchema().dump(assignment_obj, many=False)
+    result.update(serialize_assignment_ai_settings(assignment_obj))
     return jsonify(result), 200
+
+
+@assignment.route('/assignments/<assignment_id>/ai-settings', methods=["GET"])
+@cross_origin()
+def get_assignment_ai_settings(assignment_id):
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
+
+    if not assignment_obj:
+        raise NotFoundError("Assignment not found")
+
+    return jsonify(serialize_assignment_ai_settings(assignment_obj)), 200
+
+
+@assignment.route('/assignments/<assignment_id>/ai-settings', methods=["PUT"])
+@cross_origin()
+def update_assignment_ai_settings_route(assignment_id):
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
+
+    if not assignment_obj:
+        raise NotFoundError("Assignment not found")
+
+    try:
+        update_assignment_ai_settings(assignment_obj, request.json or {})
+        db.session.commit()
+    except ValueError as e:
+        db.session.rollback()
+        raise BadRequestError(str(e))
+    except Exception:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to update assignment AI settings")
+
+    return jsonify(serialize_assignment_ai_settings(assignment_obj)), 200
 
 
 @assignment.route('/create_assignment', methods=["POST"])
@@ -103,9 +151,18 @@ def create_assignment():
         assignment_data["id"] = assignment_id
         # not creating a container yet
         assignment_data["container_id"] = None
+        assignment_data, ai_settings_data = split_ai_settings_payload(assignment_data)
+
         valid_assignment_data = {k: v for k, v in assignment_data.items() if v is not None or isinstance(v, bool)}
 
-        db.session.add(Assignment(**valid_assignment_data))
+        new_assignment = Assignment(**valid_assignment_data)
+        if ai_settings_data:
+            try:
+                update_assignment_ai_settings(new_assignment, ai_settings_data)
+            except ValueError as e:
+                raise BadRequestError(str(e))
+
+        db.session.add(new_assignment)
         db.session.commit()
         
         # Fetch created assignment to return response

@@ -73,7 +73,7 @@ sequenceDiagram
 
 The AI feedback engine is composed of several backend modules and frontend components:
 
-### Backend Integration (`backend/ai_integration.py`)
+### Backend Integration (`backend/ai_feedback/integration.py`)
 
 - **Key Encryption**: Uses `encrypt_api_key` / `decrypt_api_key` with Fernet and the `API_SECRET_KEY` from `.env` to secure the OpenAI key. If the key is not defined in `.env`, it will just be saved as plaintext.
 - **Data Fetching**: `fetch_submission_data` performs SQLAlchemy joins across `Submission`, `Assignment`, `Course`, and `User` models to retrieve all objects relevant to a given submission. 
