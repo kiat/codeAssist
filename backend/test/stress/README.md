@@ -1,101 +1,108 @@
-# Local Stress Test Guide
+# Backend Stress Tests
 
-This folder contains backend stress-test scripts. For local thesis/testing work,
-start with the safer wrapper:
+This folder contains manual backend stress tests for local performance checks.
+They are not pytest tests and are not meant to run inside `make test`.
 
-```bash
-python backend/test/stress/run_local_stress_tests.py --dry-run
-```
+## Fast Path
 
-The old examples use `<course_id>` as a placeholder. Do not type the angle
-brackets in Git Bash. Bash treats `<course_id>` as file input redirection.
-
-Use a real course id:
-
-```bash
-COURSE_ID=replace-with-real-course-id
-python backend/test/stress/run_local_stress_tests.py "$COURSE_ID" --run-safe
-```
-
-## Recommended Workflow
-
-Run these commands from the repository root:
+Start the backend first, then run these commands from the repository root.
 
 ```bash
 python -m compileall backend/test/stress
 python backend/test/stress/run_local_stress_tests.py --check-server
 ```
 
-If the preflight looks good and the backend is running on `http://localhost:5001`,
-run the safe smoke tests:
+Use a real course id. Do not type `<course_id>` in Git Bash because `<...>` is
+shell input redirection.
+
+Git Bash:
 
 ```bash
+# COURSE_ID=f57ac0e3-7ff6-4eca-b1af-37f360de2cd7
 COURSE_ID=replace-with-real-course-id
 python backend/test/stress/run_local_stress_tests.py "$COURSE_ID" --run-safe
 ```
 
-Results are written to:
+PowerShell:
 
-```text
-backend/test/stress/results/
+```powershell
+$env:COURSE_ID = "replace-with-real-course-id"
+python backend/test/stress/run_local_stress_tests.py $env:COURSE_ID --run-safe
 ```
 
-## Getting A Course ID
+The quick safe suite runs all six stress areas with conservative local load:
 
-You can use a course id from the UI, from the local database, or from a course
-created through the API. The current backend requires `name`, `instructor_id`,
-`semester`, `year`, and `entryCode` for `/create_course`.
+- bulk assignment uploads
+- student submissions
+- assignment creation
+- long-running grader submissions
+- concurrent enrollment and leave-course operations
+- concurrent course and assignment CRUD operations
 
-Example API setup:
+Results are saved under `backend/test/stress/results/`.
+
+## Runner Choices
+
+Use `run_local_stress_tests.py` while developing or debugging. It has preflight
+checks, command preview, stable result files, and the safest defaults.
 
 ```bash
-curl -X POST http://localhost:5001/create_user \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Stress Instructor","email_address":"stress-instructor@example.com","password":"test123","eid":"stressinst001","role":"Instructor"}'
+# COURSE_ID=f57ac0e3-7ff6-4eca-b1af-37f360de2cd7
+python backend/test/stress/run_local_stress_tests.py --dry-run
+python backend/test/stress/run_local_stress_tests.py "$COURSE_ID" --run-safe
+python backend/test/stress/run_local_stress_tests.py "$COURSE_ID" --run-safe --full
+python backend/test/stress/run_local_stress_tests.py "$COURSE_ID" --run-safe --only crud_operations
 ```
 
-Copy the returned `id`, then create a course:
+Use `run_all_stress_tests.py` when you want the legacy PR-style report.
 
 ```bash
-curl -X POST http://localhost:5001/create_course \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Stress Test Course","instructor_id":"PASTE_INSTRUCTOR_ID","semester":"Fall","year":"2026","entryCode":"STRESS2026"}'
+python backend/test/stress/run_all_stress_tests.py "$COURSE_ID" --quick --cleanup
+python backend/test/stress/run_all_stress_tests.py "$COURSE_ID" --cleanup
 ```
 
-Copy the returned course `id`.
+## Reading Results
 
-## Test Status
+Each script exits with code `0` only when its own stress checks passed. The
+summary separates:
 
-Safe through `run_local_stress_tests.py`:
+- `PASS`: request completed successfully.
+- `CONFLICT`: expected concurrent race, such as duplicate enrollment or querying
+  something another worker already deleted.
+- `SKIP`: no active resource was available for that operation.
+- `FAIL`: unexpected backend error, request error, or script setup failure.
 
-- `bulk_uploads`
-- `student_submissions`
-- `assignment_creation`
+If the backend logs show `QueuePool limit ... connection timed out`, the test
+found a database connection-pool capacity limit. For a thesis/performance
+report, record the load level, worker count, and endpoint. For local debugging,
+reduce `--max_workers` first, then inspect backend session cleanup and SQLAlchemy
+pool settings.
 
-Manual:
+## Manual Scripts
 
-- `long_running_grader`: slow and currently waits with `sleep` instead of
-  polling real grading status.
-
-Known incompatible with this backend until updated:
-
-- `concurrent_enrollment`: calls `/enroll_user`, `/unenroll_user`, and
-  `/get_user_courses`, but this backend exposes `/create_enrollment`,
-  `/leave_course`, and `/get_user_enrollments`.
-- `crud_operations`: creates courses without `semester`, `year`, and
-  `entryCode`, and calls `/get_course` instead of `/get_course_info`.
-
-## Running Individual Old Scripts
-
-If you run an original script directly, first enter this folder because several
-scripts use relative fixture paths:
+For individual scripts, run from this folder so fixture paths resolve correctly:
 
 ```bash
 cd backend/test/stress
-COURSE_ID=replace-with-real-course-id
 python test_bulk_assignment_uploads.py "$COURSE_ID" --num_uploads 2 --max_workers 1 --cleanup
 python upload_assignments.py "$COURSE_ID" --num_threads 2 --cleanup
-python create_assignments.py 2 "$COURSE_ID"
+python create_assignments.py 2 "$COURSE_ID" --cleanup
+python test_long_running_grader.py "$COURSE_ID" --max_execution_time 1 --num_submissions 1 --max_workers 1 --cleanup
+python test_concurrent_enrollment.py "$COURSE_ID" --num_threads 1 --operations_per_thread 2 --max_workers 1 --cleanup
+python test_concurrent_crud_operations.py --num_threads 1 --operations_per_thread 2 --test_type mixed --max_workers 1 --cleanup
 ```
 
-Prefer the local wrapper for repeatable reports.
+Use `--no-cleanup` only when you intentionally want to inspect created resources
+in the app or database afterward.
+
+
+Short version:
+
+```bash
+python -m compileall backend/test/stress
+python backend/test/stress/run_local_stress_tests.py --check-server
+COURSE_ID=replace-with-real-course-id
+python backend/test/stress/run_local_stress_tests.py "$COURSE_ID" --run-safe
+```
+
+Do not type `<course_id>` literally in Git Bash.

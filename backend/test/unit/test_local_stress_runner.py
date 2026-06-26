@@ -56,7 +56,7 @@ def test_builds_assignment_creation_command_without_duplicate_course_id():
     ]
 
 
-def test_safe_selection_excludes_known_incompatible_api_tests():
+def test_safe_selection_includes_fixed_backend_api_tests():
     runner = load_runner()
 
     selected_names = [case.name for case in runner.select_cases(run_safe=True)]
@@ -64,8 +64,9 @@ def test_safe_selection_excludes_known_incompatible_api_tests():
     assert "bulk_uploads" in selected_names
     assert "student_submissions" in selected_names
     assert "assignment_creation" in selected_names
-    assert "concurrent_enrollment" not in selected_names
-    assert "crud_operations" not in selected_names
+    assert "long_running_grader" in selected_names
+    assert "concurrent_enrollment" in selected_names
+    assert "crud_operations" in selected_names
 
 
 def test_stress_utils_base_url_can_be_overridden(monkeypatch):
@@ -81,6 +82,9 @@ def test_create_assignment_accepts_extra_submission_ready_fields(monkeypatch):
     captured = {}
 
     class FakeResponse:
+        status_code = 200
+        text = "{}"
+
         def raise_for_status(self):
             return None
 
@@ -110,6 +114,82 @@ def test_create_assignment_accepts_extra_submission_ready_fields(monkeypatch):
         "published_date": None,
         "due_date": None,
     }
+
+
+def test_create_course_sends_current_required_fields(monkeypatch):
+    utils = load_stress_module("utils.py", "stress_utils_course_payload_test")
+    captured = {}
+
+    class FakeResponse:
+        status_code = 201
+        text = "{}"
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"id": "course-123"}
+
+    def fake_post(url, json):
+        captured["url"] = url
+        captured["json"] = json
+        return FakeResponse()
+
+    monkeypatch.setattr(utils.requests, "post", fake_post)
+
+    course_id = utils.create_course(
+        "Stress Course",
+        instructor_id="instructor-123",
+        semester="Spring",
+        year="2027",
+        entryCode="STRESS2027",
+    )
+
+    assert course_id == "course-123"
+    assert captured["url"].endswith("/create_course")
+    assert captured["json"] == {
+        "name": "Stress Course",
+        "instructor_id": "instructor-123",
+        "semester": "Spring",
+        "year": "2027",
+        "entryCode": "STRESS2027",
+        "allowEntryCode": True,
+    }
+
+
+def test_enrollment_helpers_use_current_backend_routes(monkeypatch):
+    utils = load_stress_module("utils.py", "stress_utils_enrollment_payload_test")
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+        text = "{}"
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"ok": True}
+
+    def fake_post(url, json):
+        calls.append((url, json))
+        return FakeResponse()
+
+    monkeypatch.setattr(utils.requests, "post", fake_post)
+
+    utils.create_enrollment("student-123", "course-123")
+    utils.leave_course("student-123", "course-123")
+
+    assert calls == [
+        (
+            f"{utils.BASE_URL}/create_enrollment",
+            {"student_id": "student-123", "course_id": "course-123", "role": "student"},
+        ),
+        (
+            f"{utils.BASE_URL}/leave_course",
+            {"user_id": "student-123", "course_id": "course-123"},
+        ),
+    ]
 
 
 def test_assignment_creation_artifact_lives_under_results_folder():
