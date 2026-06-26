@@ -41,10 +41,16 @@ def _check_run_code_rate_limit(student_id):
     """Per-user sliding-window rate limiter for run_code (thread-safe)."""
     now = time.time()
     with _run_code_rate_lock:
-        timestamps = _run_code_timestamps.setdefault(student_id, [])
+        timestamps = _run_code_timestamps.get(student_id, [])
         # Prune timestamps outside the window
         while timestamps and timestamps[0] < now - _RUN_CODE_RATE_WINDOW:
             timestamps.pop(0)
+        # Evict idle keys to prevent memory leak
+        if not timestamps:
+            _run_code_timestamps.pop(student_id, None)
+            # Record this request as the first in the window
+            _run_code_timestamps[student_id] = [now]
+            return
         if len(timestamps) >= _RUN_CODE_RATE_LIMIT:
             raise BadRequestError("Too many run requests. Please wait a moment and try again.")
         timestamps.append(now)
@@ -75,7 +81,7 @@ def _verify_enrollment(student_id, course_id):
         student_id=student_id, course_id=course_id
     ).first()
     if not enrollment:
-        raise BadRequestError("You are not enrolled in this course")
+        raise ForbiddenError("You are not enrolled in this course")
     return enrollment
 
 def get_docker_client():
@@ -239,6 +245,9 @@ def submit_code():
     # Enforce enable_code_editor server-side
     if not assignment.enable_code_editor:
         raise BadRequestError("Code editor is not enabled for this assignment.")
+
+    # Verify student is enrolled in the course
+    _verify_enrollment(student_id, assignment.course_id)
 
     # Check due dates (same logic as upload_submission)
     extension = db.session.query(AssignmentExtension).filter_by(
@@ -760,6 +769,13 @@ def run_code():
 
     if not assignment.published:
         raise BadRequestError("Assignment is not published yet.")
+
+    # Enforce enable_code_editor server-side
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
+
+    # Verify student is enrolled in the course
+    _verify_enrollment(student_id, assignment.course_id)
 
     # Check due dates (same logic as submit_code)
     extension = db.session.query(AssignmentExtension).filter_by(

@@ -259,6 +259,7 @@ def test_submit_code_past_due_date(client, mocker):
     from datetime import datetime, timezone, timedelta
 
     mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
 
     mock_assignment = mocker.Mock()
     mock_assignment.enable_code_editor = True
@@ -371,6 +372,149 @@ def test_submit_code_without_autograder_saves_submission_and_final_draft(client,
         "print('hi')",
         "answer.py",
     )
+
+
+# ---------------------------------------------------------------------------
+# run_code
+# ---------------------------------------------------------------------------
+
+def test_run_code_assignment_not_found(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._check_run_code_rate_limit")
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    resp = client.post("/run_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "notfound",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 404
+    assert "not found" in resp.get_json()["message"].lower()
+
+
+def test_run_code_not_published(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._check_run_code_rate_limit")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.post("/run_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 400
+    assert "not published" in resp.get_json()["message"].lower()
+
+
+def test_run_code_editor_not_enabled(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._check_run_code_rate_limit")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = True
+    mock_assignment.enable_code_editor = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.post("/run_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 400
+    assert "not enabled" in resp.get_json()["message"].lower()
+
+
+def test_run_code_not_enrolled(client, mocker):
+    from util.errors import ForbiddenError
+
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._check_run_code_rate_limit")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = True
+    mock_assignment.enable_code_editor = True
+    mock_assignment.course_id = "course-1"
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    mocker.patch("routes.code_editor._verify_enrollment", side_effect=ForbiddenError("You are not enrolled in this course"))
+
+    resp = client.post("/run_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 403
+    assert "not enrolled" in resp.get_json()["message"].lower()
+
+
+def test_submit_code_editor_not_enabled(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = True
+    mock_assignment.enable_code_editor = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.post("/submit_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 400
+    assert "not enabled" in resp.get_json()["message"].lower()
+
+
+def test_submit_code_not_enrolled(client, mocker):
+    from util.errors import ForbiddenError
+
+    mocker.patch("routes.code_editor._verify_student")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = True
+    mock_assignment.enable_code_editor = True
+    mock_assignment.course_id = "course-1"
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    mocker.patch("routes.code_editor._verify_enrollment", side_effect=ForbiddenError("You are not enrolled in this course"))
+
+    resp = client.post("/submit_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 403
+    assert "not enrolled" in resp.get_json()["message"].lower()
+
+
+def test_rate_limit_evicts_idle_keys(client, mocker):
+    from routes.code_editor import _run_code_timestamps, _run_code_rate_lock, _check_run_code_rate_limit, _RUN_CODE_RATE_WINDOW
+    import time
+
+    # Simulate entries that are outside the window
+    old_time = time.time() - _RUN_CODE_RATE_WINDOW - 10
+    with _run_code_rate_lock:
+        _run_code_timestamps["stu-old"] = [old_time]
+
+    # Call rate limiter — should prune old timestamp and record current request
+    _check_run_code_rate_limit("stu-old")
+
+    # Old timestamp evicted; new request recorded — entry has exactly 1 timestamp
+    with _run_code_rate_lock:
+        assert "stu-old" in _run_code_timestamps
+        assert len(_run_code_timestamps["stu-old"]) == 1
+
+    # Cleanup
+    with _run_code_rate_lock:
+        _run_code_timestamps.pop("stu-old", None)
 
 
 # ---------------------------------------------------------------------------
