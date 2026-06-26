@@ -81,7 +81,7 @@ describe("CreateAssignment AI prompt defaults", () => {
     jest.clearAllMocks();
   });
 
-  it("shows the default AI feedback prompt immediately when AI feedback is enabled", async () => {
+  it("shows the default AI feedback prompts immediately when AI feedback is enabled", async () => {
     const user = userEvent.setup();
 
     render(<CreateAssignmentHarness />);
@@ -90,13 +90,19 @@ describe("CreateAssignment AI prompt defaults", () => {
 
     await user.click(screen.getAllByRole("switch")[1]);
 
-    const promptInput = await screen.findByLabelText("AI Feedback Prompt");
+    expect(await screen.findByText("Feedback Prompts")).toBeInTheDocument();
 
-    expect(promptInput.value).toEqual(
-      expect.stringContaining("Always provide useful feedback")
-    );
-    expect(promptInput.value).toEqual(
-      expect.stringContaining("Improvement Suggestions")
-    );
+    expect(screen.getByDisplayValue("Check correctness")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Debug failed tests")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Review edge cases")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Explain runtime errors")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Review code style")).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue("Suggest algorithmic improvements")
+    ).toBeInTheDocument();
+
+    expect(screen.getByText("AI Input Permissions")).toBeInTheDocument();
+    expect(screen.getByLabelText("Assignment description")).toBeChecked();
+    expect(screen.getByLabelText("Student solution code")).toBeChecked();
   });
 });
