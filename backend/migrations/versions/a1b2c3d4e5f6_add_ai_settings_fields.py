@@ -1,7 +1,7 @@
 """Add AI settings fields.
 
 Revision ID: a1b2c3d4e5f6
-Revises: 92009ca5c92a
+Revises: e1f2a3b4c5d6
 Create Date: 2026-06-18 00:00:00.000000
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "a1b2c3d4e5f6"
-down_revision = "92009ca5c92a"
+down_revision = "e1f2a3b4c5d6"
 branch_labels = None
 depends_on = None
 
