@@ -5,6 +5,7 @@ from .course import course
 from .assignment import assignment
 from .regrade_request import regrade_request
 from .submission import submission
+from .code_editor import code_editor
 
 def register_routes(app):
     # Register all blueprints
@@ -13,3 +14,4 @@ def register_routes(app):
     app.register_blueprint(assignment)
     app.register_blueprint(regrade_request)
     app.register_blueprint(submission)
+    app.register_blueprint(code_editor)

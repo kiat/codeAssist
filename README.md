@@ -58,7 +58,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     `password: 12345`
 
 7. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
-    `Host name/address: host.docker.internal`  
+    `Host name/address: db` (use `db` if connecting from the pgAdmin container, or `host.docker.internal`/`localhost` if running pgAdmin locally outside Docker)  
     `Username: postgres`  
     `Password: postgres`  
 

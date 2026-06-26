@@ -4,8 +4,7 @@ from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, Submission, User, RegradeRequest
 from api.schemas import SubmissionSchema, UserSchema
-# import asyncio
-# from openai import AsyncOpenAI
+from util.errors import NotFoundError, BadRequestError
 
 
 regrade_request = Blueprint('regrade_request', __name__)
@@ -48,14 +47,14 @@ def get_regrade_request():
     '''
     submission_id = request.args.get("submission_id")
     if not submission_id:
-        return jsonify({"message": "no submission id passed"})
-    
-    submission = Submission.query.filter_by(id=submission_id)
+        raise BadRequestError("No submission id passed")
+
+    submission = Submission.query.filter_by(id=submission_id).first()
     if not submission:
-        return jsonify({"message": "no such submission"})
+        raise NotFoundError("No such submission")
     regrade = RegradeRequest.query.filter_by(submission_id=submission_id).first()
     if not regrade :
-        return jsonify({"message": "No regrade request found"})
+        raise NotFoundError("No regrade request found")
     response = {
         "submission": SubmissionSchema().dump(submission),
         "justification": regrade.justification,
@@ -77,17 +76,16 @@ def update_grade():
     new_grade = data.get('new_grade')
 
     if not submission_id or new_grade is None:
-        return jsonify({"message": "Missing submission_id or new_grade"}), 400
-
+        raise BadRequestError("Missing submission_id or new_grade")
     submission = Submission.query.filter_by(id=submission_id).first()
 
     if not submission:
-        return jsonify({"message": "No such submission found"}), 404
+        raise NotFoundError("No such submission found")
 
     try:
         new_grade = float(new_grade)  # Ensure the grade is a float
     except ValueError:
-        return jsonify({"message": "Invalid grade value"}), 400
+        raise BadRequestError("Invalid grade value")
 
     submission.score = new_grade
     db.session.commit()
@@ -102,10 +100,10 @@ def get_student_regrade_requests():
     course_id = request.args.get("course_id")
 
     if not student_id:
-        return jsonify({"message": "Missing student_id"}), 400
-    
+        raise BadRequestError("Missing student_id")
+
     if not course_id:
-        return jsonify({"message": "Missing course_id"}), 400
+        raise BadRequestError("Missing course_id")
 
     regrade_requests = db.session.query(RegradeRequest).join(Submission).join(Assignment).filter(
         Submission.student_id == student_id,
@@ -160,8 +158,7 @@ def set_reviewed():
     entry = db.session.query(RegradeRequest).filter_by(submission_id=submissionid).first()
     
     if entry is None:
-        return jsonify({"error": f"No regrade request found for submission_id: {submissionid}"}), 404
-    
+        raise NotFoundError(f"No regrade request found for submission_id: {submissionid}")
     entry.reviewed = True
     db.session.commit()
 
