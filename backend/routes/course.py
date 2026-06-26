@@ -2,7 +2,7 @@ import uuid
 import os
 import csv
 import requests
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 from api import db
@@ -730,13 +730,15 @@ def fetch_ai_models():
             try:
                 response = requests.get(f"{base_url}/api/tags", timeout=10)
                 if response.status_code >= 400:
-                    return jsonify({"error": f"Ollama returned error: {response.text}"}), response.status_code
+                    current_app.logger.error(f"Ollama returned error: {response.text}")
+                    return jsonify({"error": "Failed to retrieve models from Ollama"}), response.status_code
                 
                 models_data = response.json().get("models", [])
                 model_ids = [m.get("name") for m in models_data if m.get("name")]
                 return jsonify({"models": sorted(list(set(model_ids)))}), 200
             except Exception as e:
-                return jsonify({"error": f"Failed to connect to Ollama at {base_url}: {str(e)}"}), 500
+                current_app.logger.error(f"Failed to connect to Ollama at {base_url}: {str(e)}")
+                return jsonify({"error": "Failed to connect to Ollama server"}), 500
 
         if provider == "openai":
             client = OpenAI(api_key=api_key)
@@ -941,8 +943,9 @@ def test_ai_api_key():
             try:
                 response = requests.get(f"{base_url}/api/tags", timeout=10)
                 if response.status_code >= 400:
+                    current_app.logger.error(f"Ollama connection test failed: {response.text}")
                     return jsonify({
-                        "error": f"Ollama connection test failed: {response.text}"
+                        "error": "Ollama connection test failed"
                     }), response.status_code
 
                 return jsonify({
@@ -950,7 +953,8 @@ def test_ai_api_key():
                     "provider": provider,
                 }), 200
             except Exception as e:
-                return jsonify({"error": f"Ollama connection error: {str(e)}"}), 500
+                current_app.logger.error(f"Ollama connection error at {base_url}: {str(e)}")
+                return jsonify({"error": "Ollama connection error"}), 500
 
         raise BadRequestError("Unsupported AI provider")
 
@@ -1157,14 +1161,16 @@ def test_ai_model():
                     timeout=15
                 )
                 if response.status_code >= 400:
+                    current_app.logger.error(f"Selected Ollama model cannot be used: {response.text}")
                     return jsonify({
-                        "error": f"Selected Ollama model cannot be used: {response.text}"
+                        "error": "Selected Ollama model cannot be used"
                     }), response.status_code
 
                 raw_response = response.json().get("message", {}).get("content", "").strip()
                 parsed_feedback = validate_feedback_response(raw_response, "Ollama")
 
                 if parsed_feedback is None:
+                    current_app.logger.error(f"Selected Ollama model did not return valid JSON feedback. Raw response: {raw_response}")
                     return jsonify({
                         "error": "Selected Ollama model did not return valid JSON feedback"
                     }), 400
@@ -1176,7 +1182,8 @@ def test_ai_model():
                     "response": parsed_feedback,
                 }), 200
             except Exception as e:
-                return jsonify({"error": f"Ollama connection error: {str(e)}"}), 500
+                current_app.logger.error(f"Ollama connection error at {base_url}: {str(e)}")
+                return jsonify({"error": "Ollama connection error"}), 500
 
         raise BadRequestError("Unsupported AI provider")
 
