@@ -86,12 +86,12 @@ const AddCSVModal = ({ open, toggleAddCSVModalOpen, finishCSVForm , getEnrollmen
       <Form layout="vertical" onFinish={handleFinish}>
         <p style={{ marginBottom: 8, color: "#595959" }}>
           Upload a CSV with a header row. The <b>Email</b> column is required.
-          Optionally include <b>Name</b>, <b>EID</b>, and <b>Role</b> columns.
+          Optionally include <b>Name</b>, <b>SID</b>, and <b>Role</b> columns.
         </p>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "monospace", marginBottom: 16 }}>
           <thead>
             <tr style={{ background: "#e8e8e8" }}>
-              {["Name", "Email", "EID", "Role"].map(col => (
+              {["Name", "Email", "SID", "Role"].map(col => (
                 <th key={col} style={{ border: "1px solid #d9d9d9", padding: "4px 8px", textAlign: "left", fontWeight: 600 }}>
                   {col}
                 </th>
