@@ -5,6 +5,7 @@ import requests
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
+from sqlalchemy.exc import IntegrityError
 from api import db
 from api.models import (
     Assignment,
@@ -427,17 +428,21 @@ def create_enrollment_bulk(data):
     for student_id in students:
         try:
             enrollment = Enrollment(
-                student_id=student_id, 
-                course_id=course_id, 
+                student_id=student_id,
+                course_id=course_id,
                 role=role
             )
             db.session.add(enrollment)
             db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            failed_enrollments.append((student_id, "Already enrolled"))
         except Exception:
-            failed_enrollments.append(student_id)
+            db.session.rollback()
+            failed_enrollments.append((student_id, "Enrollment failed"))
     
     return {
-        "failed_enrollments" : failed_enrollments
+        "failed_enrollments": [{"id": sid, "reason": reason} for sid, reason in failed_enrollments]
     }
 
 def allowed_file(filename):
@@ -474,21 +479,63 @@ def create_enrollment_csv():
     if not course_id:
         raise BadRequestError("Missing course_id")
     
+    pre_failed = []
+
     try:
-        with open(file_path, newline='')  as csvfile:
+        with open(file_path, newline='') as csvfile:
             csv_reader = csv.reader(csvfile, delimiter=',')
-            for row in csv_reader:
-                student_ids.append(row[0])
-    except Exception as e:
+            rows = list(csv_reader)
+    except Exception:
         raise InternalProcessingError("Failed to process file")
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
 
+    if not rows:
+        raise BadRequestError("CSV file is empty")
+
+    header = [col.strip().lower() for col in rows[0]]
+    email_aliases = {"email", "email address"}
+    matched = [col for col in header if col in email_aliases]
+    if not matched:
+        raise BadRequestError("CSV must contain an 'Email' or 'Email Address' column header")
+
+    email_col = header.index(matched[0])
+    role_col = header.index("role") if "role" in header else None
+
+    id_to_email = {}
+
+    for row in rows[1:]:
+        if not row or len(row) <= email_col:
+            continue
+        email = row[email_col].strip()
+        if not email:
+            continue
+        user = User.query.filter_by(email_address=email).first()
+        if not user:
+            pre_failed.append({"email": email, "reason": "User not found"})
+            continue
+        uid = str(user.id)
+        id_to_email[uid] = email
+        student_ids.append(uid)
+
+    role = "student"
+    if role_col and len(rows) > 1 and len(rows[1]) > role_col:
+        role = rows[1][role_col].strip().lower() or "student"
+
+    if not student_ids:
+        return jsonify({"failed_enrollments": pre_failed}), 200
+
     response = create_enrollment_bulk({
         "course_id": course_id,
-        "student_ids": student_ids
-        })
+        "student_ids": student_ids,
+        "role": role
+    })
+
+    response["failed_enrollments"] = [
+        {"email": id_to_email.get(f["id"], f["id"]), "reason": f["reason"]}
+        for f in response["failed_enrollments"]
+    ] + pre_failed
 
     return jsonify(response), 200
 
