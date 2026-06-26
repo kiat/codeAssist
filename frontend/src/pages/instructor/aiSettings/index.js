@@ -64,7 +64,7 @@ const getKeyStatus = (course, selectedProviderKey) => {
     return !!course.has_claude_api_key;
   }
   if (selectedProviderKey === "ollama") {
-    return !!course.ollama_base_url;
+    return !!course.has_ollama_api_key;
   }
   return false;
 };
@@ -444,7 +444,7 @@ export default function AISettings() {
                   description={
                     hasSavedKey
                       ? isOllama
-                        ? `Currently set to: ${courseAiInfo.ollama_base_url}`
+                        ? "A connection URL is configured. Enter a new URL only if you want to replace it."
                         : "A saved key exists. Paste a new key only if you want to replace it."
                       : isOllama
                       ? "Provide the URL to your local or remote Ollama server instance."

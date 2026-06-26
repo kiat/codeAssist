@@ -589,7 +589,6 @@ def get_course_info():
         "has_gemini_api_key": bool(course_obj.gemini_api_key),
         "has_claude_api_key": bool(course_obj.claude_api_key),
         "has_ollama_api_key": bool(course_obj.ollama_base_url),
-        "ollama_base_url": course_obj.ollama_base_url,
     })
 
     return jsonify([course_data]), 200

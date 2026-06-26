@@ -454,7 +454,6 @@ def test_get_course_info_success(client, mocker):
             "has_gemini_api_key": False,
             "has_claude_api_key": False,
             "has_ollama_api_key": False,
-            "ollama_base_url": "",
         }
     ]
 
