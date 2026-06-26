@@ -1,0 +1,164 @@
+import { CopyFilled, DownloadOutlined } from "@ant-design/icons";
+import { Button, Form, PageHeader, Popover, Space, Typography } from "antd";
+import { useCallback, useState } from "react";
+import { useParams } from "react-router-dom";
+import { createAssignment } from "../../../services/assignment";
+import Assignments from "./Assignments";
+import CreateAssignment from "./CreateAssignment";
+import DuplicateAssignmentModal from "./DuplicateAssignmentModal";
+import {
+  normalizeAiAllowedInputs,
+  normalizeAiFeedbackPrompts,
+} from "../../../constants/aiFeedbackSettings";
+
+export default function InstructorAssignments() {
+  const [isCreate, setIsCreate] = useState(false);
+  const [isDuplicateAssignmentModalOpen, setIsDuplicateAssignmentModalOpen] =
+    useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [form] = Form.useForm();
+  const { courseId } = useParams();
+  const [nameValidationStatus, setNameValidationStatus] = useState("");
+
+  const updateCurrentStep = useCallback(current => {
+    setCurrentStep(current);
+  }, []);
+
+  const toggleDuplicateAssignmentModal = useCallback(() => {
+    setIsDuplicateAssignmentModalOpen(b => !b);
+  }, []);
+
+  const toggleIsCreate = useCallback(() => {
+    setIsCreate(t => !t);
+  }, []);
+
+  const finishForm = async () => {
+    const values = form.getFieldsValue();
+
+    const feedbackPrompts = normalizeAiFeedbackPrompts(
+      values.ai_feedback_prompts,
+      values.ai_feedback_prompt
+    );
+
+    const firstPrompt =
+      feedbackPrompts.find((prompt) => prompt.enabled) || feedbackPrompts[0];
+
+    const assignmentData = {
+      name: values.name,
+      course_id: courseId,
+      due_date: values.dueDate.toISOString(),
+      autograder_points: values.autograderPoints,
+      anonymous_grading: values.submissionAnonymization,
+      manual_grading: values.manualGrading,
+      late_submission: values.allowLateSubmissions,
+      late_due_date: values.lateDueDate,
+      enable_group: values.groupSubmission,
+      group_size: values.limitGroupSize,
+      leaderboard: values.leaderBoard,
+      published_date: values.releaseDate.toISOString(),
+
+      // AI Settings
+      ai_feedback_enabled: values.ai_feedback_enabled,
+      ai_feedback_prompt: firstPrompt?.prompt ?? null,
+      ai_feedback_prompts: feedbackPrompts,
+      ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
+      ai_feedback_model: values.ai_feedback_model,
+      ai_feedback_temperature: values.ai_feedback_temperature,
+      ai_feedback_style: values.ai_feedback_style,
+    };
+    const validData = Object.fromEntries(
+      Object.entries(assignmentData).filter(([_, value]) => value !== undefined)
+    );
+    createAssignment(validData)
+      .then(res => {
+        toggleIsCreate();
+      })
+    .catch(err => {
+      setNameValidationStatus("error");
+    })
+    
+  };
+
+  return (
+    <>
+      <div
+        style={{
+          height: "calc(100vh - 40px)",
+          overflow: "auto",
+        }}
+      >
+        {/* <PageHeader title={isCreate ? "Create Assignment" : "38 Assignments"} /> */}
+        <div style={{ display: isCreate ? "none" : "inline" }}>
+          {/* <Assignments toggleIsCreate={toggleIsCreate} /> */}
+          <Assignments isCreate={isCreate} />
+        </div>
+        <div style={{ display: isCreate ? "inline" : "none" }}>
+          <CreateAssignment
+            currentStep={currentStep}
+            updateCurrentStep={updateCurrentStep}
+            toggleIsCreate={toggleIsCreate}
+            form={form}
+            nameValidationStatus={nameValidationStatus}
+          />
+        </div>
+      </div>
+      <div
+        style={{
+          backgroundColor: "#1890ff",
+          position: "fixed",
+          width: "100%",
+          bottom: 0,
+          lineHeight: "40px",
+          color: "white",
+          fontWeight: "bold",
+          marginLeft: "-1px",
+        }}
+      >
+        <div
+          style={{
+            float: "right",
+            marginRight: "225px",
+          }}
+        >
+          {isCreate ? (
+            currentStep === 1 ? (
+              <Button onClick={finishForm}>Save Assignment</Button>
+            ) : (
+              <div style={{ height: "40px" }} />
+            )
+          ) : (
+            <Space>
+              <Popover
+                content={
+                  <Space direction='vertical' style={{ color: "black" }}>
+                    <Typography.Link>
+                      <DownloadOutlined />
+                      <span> Download CSV</span>
+                    </Typography.Link>
+                    <Typography.Link>
+                      <DownloadOutlined />
+                      <span> Download for Excel</span>
+                    </Typography.Link>
+                  </Space>
+                }
+              >
+                <Button icon={<DownloadOutlined />}>Download Grades</Button>
+              </Popover>
+              <Button
+                onClick={toggleDuplicateAssignmentModal}
+                icon={<CopyFilled />}
+              >
+                Duplicate Assignment
+              </Button>
+              <Button onClick={toggleIsCreate}>Create Assignment</Button>
+            </Space>
+          )}
+        </div>
+      </div>
+      <DuplicateAssignmentModal
+        open={isDuplicateAssignmentModalOpen}
+        toggleCreateAssignmentModal={toggleDuplicateAssignmentModal}
+      />
+    </>
+  );
+}
