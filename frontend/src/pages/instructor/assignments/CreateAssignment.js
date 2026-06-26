@@ -158,7 +158,7 @@ export default ({
         name: values.name,
         course_id: courseId,
         published_date: toIso(values.releaseDate),
-        published: releaseDate ? releaseDate <= now : false,
+        published: true,
         due_date: toIso(values.dueDate),
         late_due_date: toIso(values.lateDueDate),
         late_submission: !!values.allowLateSubmissions,
