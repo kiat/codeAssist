@@ -33,11 +33,28 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
   };
   const getActive = async () => {
     try {
+      if (!studentId || !assignmentId) {
+        setActiveSubmission(null);
+        setHasRequest(false);
+        return;
+      }
+
       const submissionResponse = await fetch(`${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${studentId}&assignment_id=${assignmentId}`);
+      if (!submissionResponse.ok) {
+        setActiveSubmission(null);
+        setHasRequest(false);
+        return;
+      }
+
       const submissionData = await submissionResponse.json();
-      console.log(submissionData)
-      console.log(submissionData.id)
-      setActiveSubmission(submissionData.id)
+      const submissionId = submissionData?.id ?? null;
+      setActiveSubmission(submissionId);
+
+      if (!submissionId) {
+        setHasRequest(false);
+        return;
+      }
+
       const req = await fetch(
         `${process.env.REACT_APP_API_URL}/check_regrade_request`,
         {
@@ -46,17 +63,15 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            submission_id: submissionData.id,
+            submission_id: submissionId,
           }),
         }
       );
-      // const req = await axios.post(`${process.env.REACT_APP_API_URL}/check_regrade_request`, {
-      //   submission_id: submissionData.id,
-      // });
       const reqData = await req.json();
-      console.log("this is the response data:", reqData.has_request)
-      setHasRequest(reqData.has_request)
+      setHasRequest(Boolean(reqData?.has_request));
     } catch(error){
+      setActiveSubmission(null);
+      setHasRequest(false);
       message.error("Failed")
     }
   }
@@ -151,15 +166,17 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
       title: 'Active',
       key: 'active',
       //new redner to only render the checkmark when the submission is actually active accoridng to the database
-      render: (text, record) => record.active? "✓": <Button onClick={(e) => handleSetDefaultSubmission(record.id, e)}>Activate</Button>
+      render: (text, record) => record.active ? "✓" : <Button onClick={(e) => handleSetDefaultSubmission(record.id, e)}>Activate</Button>
       //render: (text, record, index) => submissions.length && index === 0 ? "✓" : "" 
     },
   ];
 
+  const currentSubmissionId = currSubData?.id ?? null;
+
   const onRowClick = (record) => {
-    if (record.id !== currSubData.id) {
+    if (record?.id && currentSubmissionId && record.id !== currentSubmissionId) {
       navigate(`/assignmentResult/${record.id}`);
-      extra();
+      extra?.();
     }
   }; 
 
@@ -178,7 +195,7 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
         pagination={false}
         onRow={(record) => ({
           onClick: () => onRowClick(record),
-          style: { cursor: 'pointer', backgroundColor: record.id === currSubData.id ? '#e6f7ff' : '' },
+          style: { cursor: 'pointer', backgroundColor: record.id === currentSubmissionId ? '#e6f7ff' : '' },
         })}
       />
        <Modal

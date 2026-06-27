@@ -31,8 +31,16 @@ class Course(db.Model):
     description = db.Column(db.String, default="")
     active = db.Column(db.Boolean, default=True, nullable=False)
 
-    # -- AI Integration Settings --
+    # -- AI Integration Settings -- 
+    default_ai_provider = db.Column(db.String, default="openai")
+    default_ai_model = db.Column(db.String, default="gpt-4o-mini")
+
     openai_api_key = db.Column(db.String, default="")
+    gemini_api_key = db.Column(db.String, default="")
+    claude_api_key = db.Column(db.String, default="")
+
+    default_feedback_style = db.Column(db.String, default="hint-based")
+    default_ai_temperature = db.Column(db.Float, default=0.5)
 
 @dataclass
 class Enrollment(db.Model):
@@ -62,11 +70,22 @@ class Assignment(db.Model):
     autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
 
+    # -- Code Editor Settings --
+    enable_code_editor = db.Column(db.Boolean, default=False)
+
     # -- AI Integration Settings -- 
+
     ai_feedback_enabled = db.Column(db.Boolean, default=False)
+    use_course_ai_default = db.Column(db.Boolean, default=True)
+    ai_feedback_provider = db.Column(db.String, nullable=True)
+    ai_feedback_model = db.Column(db.String, nullable=True)
     ai_feedback_prompt = db.Column(db.Text, nullable=True)
-    ai_feedback_model = db.Column(db.Text, nullable=True)
+    ai_feedback_prompts = db.Column(db.JSON, nullable=True)
+    ai_allowed_inputs = db.Column(db.JSON, nullable=True)
     ai_feedback_temperature = db.Column(db.Float, nullable=True)
+    ai_feedback_style = db.Column(db.String, nullable=True)
+    ai_feedback_max_requests = db.Column(db.Integer, nullable=True)
+    ai_feedback_wait_seconds = db.Column(db.Integer, nullable=False, default=0)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
@@ -134,6 +153,17 @@ class AssignmentExtension(db.Model):
     assignment = db.relationship("Assignment", backref=db.backref("extensions", lazy="dynamic"))
     student = db.relationship("User", backref=db.backref("extensions", lazy="dynamic"))
 
+class CodeDraft(db.Model):
+    __tablename__ = "code_drafts"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id"), nullable=False, index=True)
+    content = db.Column(db.Text, nullable=False)
+    file_name = db.Column(db.String, nullable=True, default="solution.py")
+    version_number = db.Column(db.Integer, nullable=False, default=1)
+    saved_at = db.Column(TIMESTAMP(timezone=True), nullable=False)
+    auto_saved = db.Column(db.Boolean, nullable=False, default=False)
+
 class AdminEmail(db.Model):
     __tablename__ = 'admin_emails'
     id = db.Column(db.Integer, primary_key=True)
@@ -141,4 +171,3 @@ class AdminEmail(db.Model):
 
     def __repr__(self):
         return f"<AdminEmail {self.email}>"   
-
