@@ -49,7 +49,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     DB_CONNECTION_STRING="postgresql://postgres:postgres@host.docker.internal:5432/codeassist"
     PASSWORD_SALT="obtain this value from the main developer or project lead"
     ```
- Note: PASSWORD_SALT is required for password hashing. Without it, the backend will fall back to storing plaintext passwords (unsafe). Make sure all developers use the same salt string in their .env file for consistency.
+Note: PASSWORD_SALT is used for password hashing so the same password produces consistent hashed values across local environments. The backend can still run without this value, but it may fall back to less secure password handling depending on the local configuration. For normal development and testing, developers should use the shared project salt in their .env file when available.
 
 5. run `docker compose up`
 
@@ -58,7 +58,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     `password: 12345`
 
 7. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
-    `Host name/address: host.docker.internal`  
+    `Host name/address: db` (use `db` if connecting from the pgAdmin container, or `host.docker.internal`/`localhost` if running pgAdmin locally outside Docker)  
     `Username: postgres`  
     `Password: postgres`  
 
@@ -85,11 +85,61 @@ Notes:
 - Once again, if you are on macOS, make sure to turn off Airplay because it also runs on `localhost:5000`, otherwise Flask won't run!
 
 ## Testing
-**As of 3/3/2025, only backend tests have started being written.
 
-To run tests, run the the following from root directory:
-```
+As of 6/27/2026, backend tests have started being written. Some frontend tests are also available and can be run separately.
+
+### Run all tests
+
+From the root directory:
+
+```bash
 make test
 ```
+
+### Run backend tests only
+
+From the root directory:
+
+```bash
+cd backend
+python -m pytest
+```
+
+Or, if you want to skip stress tests:
+
+```bash
+cd backend
+python -m pytest test --ignore=test/stress
+```
+
+### Run frontend tests only
+
+From the root directory:
+
+```bash
+cd frontend
+npm test
+```
+
+To run frontend tests once without watch mode:
+
+```bash
+cd frontend
+npm test -- --watchAll=false
+```
+
+### Database migration note
+
+If you are testing a PR that includes a new database migration, restart the containers and run the Flask database upgrade before testing.
+
+From the root directory:
+
+```bash
+docker compose down
+docker compose up -d
+docker compose exec backend flask db upgrade
+```
+
+If the database schema is not updated, new backend fields or tables may not exist locally, and the feature may fail even if the code is correct.
 
 

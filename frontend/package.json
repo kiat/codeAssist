@@ -16,8 +16,8 @@
     "@lezer/highlight": "^1.2.3",
     "@react-oauth/google": "^0.12.2",
     "antd": "^4.24.2",
+    "better-mock": "^0.3.7",
     "classnames": "^2.3.2",
-    "nodemailer": "^6.9.13",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.4.2",
@@ -27,7 +27,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "jest --coverage",
+    "test": "react-scripts test --coverage",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -63,10 +63,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "axios": "^1.5.1",
-    "babel-jest": "^29.7.0",
     "identity-obj-proxy": "^3.0.0",
-    "jest": "^27.5.1",
-    "mockjs": "^1.1.0",
     "moment": "^2.29.4"
   }
 }

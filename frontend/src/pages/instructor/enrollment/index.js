@@ -137,14 +137,7 @@ export default () => {
       formData.append("course_id", courseId);
 
       return createEnrollmentCSV(formData)
-        .then((res) => {
-          if (res.status !== 200) {
-            return res.data.then((error) => {
-              throw new Error(error.error || "Something went wrong");
-            });
-          }
-          return res.data;
-        })
+        .then((res) => res.data)
   }, [courseId]);
   
   const finishMoreUsers = useCallback(
