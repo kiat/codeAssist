@@ -86,6 +86,8 @@ The existing `PUT /update_assignment` endpoint accepts the new fields too. It de
 
 AI settings endpoints are implemented in `backend/routes/ai_feedback.py` and keep the same URL paths so existing frontend callers do not need to change.
 
+The dedicated AI settings endpoints require a `requester_id`. Backend authorization allows only the assignment course instructor or users enrolled in that course with `instructor` or `ta` role to read or update these settings.
+
 ## Frontend Design
 
 The reusable instructor UI lives in:
@@ -144,9 +146,9 @@ Instructors can configure how often students may request AI feedback for an assi
 
 - Empty/null: unlimited requests.
 - `0`: AI feedback requests disabled.
-- Positive number: maximum requests per student.
+- Positive number up to `1000`: maximum requests per student.
 
-### Thinking Time Between Requests
+### Minimum Seconds Between Requests
 
 `ai_feedback_wait_seconds` controls how many seconds students must wait before requesting AI feedback again.
 

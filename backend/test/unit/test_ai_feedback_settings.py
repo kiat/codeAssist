@@ -317,6 +317,23 @@ def test_update_assignment_ai_settings_rejects_invalid_max_requests(value):
         )
 
 
+def test_update_assignment_ai_settings_rejects_excessive_max_requests():
+    assignment = SimpleNamespace(
+        use_course_ai_default=True,
+        ai_feedback_provider=None,
+        ai_feedback_model=None,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="ai_feedback_max_requests must be less than or equal to 1000",
+    ):
+        update_assignment_ai_settings(
+            assignment,
+            {"ai_feedback_max_requests": 1001},
+        )
+
+
 @pytest.mark.parametrize("value", [-1, "60", False, 1.5, None])
 def test_update_assignment_ai_settings_rejects_invalid_wait_seconds(value):
     assignment = SimpleNamespace(

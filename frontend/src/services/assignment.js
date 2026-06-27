@@ -24,8 +24,10 @@ export async function getAssignment(params) {
   return service("get_assignment", params);
 }
 
-export async function getAssignmentAiSettings(assignmentId) {
-  return service(`assignments/${assignmentId}/ai-settings`, {});
+export async function getAssignmentAiSettings(assignmentId, requesterId) {
+  return service(`assignments/${assignmentId}/ai-settings`, {
+    requester_id: requesterId,
+  });
 }
 
 export async function getExtension(params) {
@@ -36,6 +38,13 @@ export async function updateAssignment(params) {
   return service("update_assignment", params, "put");
 }
 
-export async function updateAssignmentAiSettings(assignmentId, params) {
-  return service(`assignments/${assignmentId}/ai-settings`, params, "put");
+export async function updateAssignmentAiSettings(assignmentId, params, requesterId) {
+  return service(
+    `assignments/${assignmentId}/ai-settings`,
+    {
+      ...params,
+      requester_id: requesterId ?? params?.requester_id,
+    },
+    "put"
+  );
 }

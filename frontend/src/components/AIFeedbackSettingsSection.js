@@ -146,13 +146,18 @@ export default function AIFeedbackSettingsSection() {
           name="ai_feedback_max_requests"
           extra="Leave empty for unlimited requests. Use 0 to disable AI feedback requests."
         >
-          <InputNumber min={0} style={{ width: "100%" }} />
+          <InputNumber
+            min={0}
+            max={1000}
+            placeholder="No limit"
+            style={{ width: "100%" }}
+          />
         </Form.Item>
 
         <Form.Item
-          label="Thinking time between requests"
+          label="Minimum seconds between requests (0 = no wait)"
           name="ai_feedback_wait_seconds"
-          extra="Students must wait this many seconds before asking for AI feedback again. Use 0 for no wait time."
+          extra="Students must wait this many seconds before asking for AI feedback again."
         >
           <InputNumber min={0} addonAfter="seconds" style={{ width: "100%" }} />
         </Form.Item>

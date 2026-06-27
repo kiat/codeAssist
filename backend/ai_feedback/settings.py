@@ -4,6 +4,7 @@ import re
 
 
 LEGACY_FEEDBACK_PROMPT_ID = "legacy_feedback_prompt"
+MAX_AI_FEEDBACK_REQUESTS = 1000
 
 DEFAULT_AI_ALLOWED_INPUTS = {
     "assignment_description": True,
@@ -231,7 +232,12 @@ def normalize_allowed_inputs(value, validate=False):
     return normalized_inputs
 
 
-def normalize_non_negative_int(value, field_name, allow_null=False):
+def normalize_non_negative_int(
+    value,
+    field_name,
+    allow_null=False,
+    max_value=None,
+):
     if value is None and allow_null:
         return None
 
@@ -240,6 +246,9 @@ def normalize_non_negative_int(value, field_name, allow_null=False):
 
     if value < 0:
         raise ValueError(f"{field_name} must be a non-negative integer")
+
+    if max_value is not None and value > max_value:
+        raise ValueError(f"{field_name} must be less than or equal to {max_value}")
 
     return value
 
@@ -330,6 +339,7 @@ def update_assignment_ai_settings(assignment, data):
             data.get("ai_feedback_max_requests"),
             "ai_feedback_max_requests",
             allow_null=True,
+            max_value=MAX_AI_FEEDBACK_REQUESTS,
         )
 
     if "ai_feedback_wait_seconds" in data:

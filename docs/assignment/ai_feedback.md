@@ -20,8 +20,8 @@ For each assignments, instructors are able to configure the AI Feedback system:
 - **Prompt** (`ai_feedback_prompt`): Base prompt guiding the LLM’s tone and focus.
 - **Model** (`ai_feedback_model`): LLM identifier (e.g., `gpt-4-turbo`).
 - **Temperature** (`ai_feedback_temperature`): Controls creativity vs. determinism (e.g., `0.5`).
-- **Maximum feedback requests** (`ai_feedback_max_requests`): Maximum number of AI feedback requests each student may make for the assignment. Empty/null means unlimited, `0` disables requests, and a positive number sets the per-student limit.
-- **Thinking time** (`ai_feedback_wait_seconds`): Number of seconds students must wait between AI feedback requests. `0` means no wait time.
+- **Maximum feedback requests** (`ai_feedback_max_requests`): Maximum number of AI feedback requests each student may make for the assignment. Empty/null means unlimited, `0` disables requests, and a positive number up to `1000` sets the per-student limit.
+- **Minimum seconds between requests** (`ai_feedback_wait_seconds`): Number of seconds students must wait between AI feedback requests. `0` means no wait time.
 
 > **Tip:** Tune these settings per assignment to adjust the depth, style, and specificity of feedback.
 
@@ -35,9 +35,9 @@ Controls how many times each student can ask for AI feedback on an assignment.
 
 - Empty/null: unlimited requests
 - 0: AI feedback requests disabled
-- Positive number: maximum requests per student
+- Positive number up to 1000: maximum requests per student
 
-### Thinking Time Between Requests
+### Minimum Seconds Between Requests
 
 Controls how many seconds students must wait before requesting AI feedback again.
 

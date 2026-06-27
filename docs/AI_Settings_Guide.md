@@ -99,9 +99,9 @@ Instructors can configure how often students may request AI feedback for an assi
 
 * Empty/null: unlimited requests
 * 0: AI feedback requests disabled
-* Positive number: maximum requests per student
+* Positive number up to 1000: maximum requests per student
 
-### Thinking Time Between Requests
+### Minimum Seconds Between Requests
 
 `ai_feedback_wait_seconds` controls how many seconds students must wait before requesting AI feedback again.
 

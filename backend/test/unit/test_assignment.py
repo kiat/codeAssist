@@ -1,6 +1,6 @@
 import pytest
 from api import create_app
-from api.models import Assignment, Submission, AssignmentExtension, Course
+from api.models import Assignment, Submission, AssignmentExtension, Course, Enrollment
 
 
 @pytest.fixture
@@ -15,6 +15,32 @@ def app():
 def client(app):
     """Flask test client for sending requests."""
     return app.test_client()
+
+
+def mock_ai_feedback_route_queries(mocker, assignment):
+    course = Course(id=assignment.course_id, instructor_id="instructor-uuid")
+
+    assignment_query = mocker.Mock()
+    assignment_query.filter_by.return_value.first.return_value = assignment
+
+    course_query = mocker.Mock()
+    course_query.filter_by.return_value.first.return_value = course
+
+    enrollment_query = mocker.Mock()
+    enrollment_query.filter_by.return_value.first.return_value = None
+
+    def query_side_effect(model):
+        if model is Assignment:
+            return assignment_query
+        if model is Course:
+            return course_query
+        if model is Enrollment:
+            return enrollment_query
+        raise AssertionError(f"Unexpected model queried: {model}")
+
+    mock_query = mocker.patch("routes.ai_feedback.db.session.query")
+    mock_query.side_effect = query_side_effect
+    return mock_query
 
 
 
@@ -91,16 +117,19 @@ def test_get_assignment_empty(client, mocker):
 
 
 def test_get_assignment_ai_settings_returns_normalized_defaults(client, mocker):
-    mock_query = mocker.patch("routes.ai_feedback.db.session.query")
     mock_assignment = Assignment(
         id="assignment-uuid",
         name="AI Assignment",
+        course_id="course-uuid",
         ai_feedback_enabled=True,
         use_course_ai_default=True,
     )
-    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+    mock_ai_feedback_route_queries(mocker, mock_assignment)
 
-    resp = client.get("/assignments/assignment-uuid/ai-settings")
+    resp = client.get(
+        "/assignments/assignment-uuid/ai-settings",
+        query_string={"requester_id": "instructor-uuid"},
+    )
 
     assert resp.status_code == 200
     assert resp.json["ai_feedback_enabled"] is True
@@ -114,18 +143,19 @@ def test_get_assignment_ai_settings_returns_normalized_defaults(client, mocker):
 
 
 def test_update_assignment_ai_settings_saves_prompts_and_allowed_inputs(client, mocker):
-    mock_query = mocker.patch("routes.ai_feedback.db.session.query")
     mock_assignment = Assignment(
         id="assignment-uuid",
         name="AI Assignment",
+        course_id="course-uuid",
         ai_feedback_enabled=True,
     )
-    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+    mock_ai_feedback_route_queries(mocker, mock_assignment)
     mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
         json={
+            "requester_id": "instructor-uuid",
             "feedback_prompts": [
                 {
                     "id": "debug_failed_tests",
@@ -157,14 +187,18 @@ def test_update_assignment_ai_settings_saves_prompts_and_allowed_inputs(client, 
 
 
 def test_update_assignment_ai_settings_rejects_invalid_prompt(client, mocker):
-    mock_query = mocker.patch("routes.ai_feedback.db.session.query")
-    mock_assignment = Assignment(id="assignment-uuid", name="AI Assignment")
-    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+    mock_assignment = Assignment(
+        id="assignment-uuid",
+        name="AI Assignment",
+        course_id="course-uuid",
+    )
+    mock_ai_feedback_route_queries(mocker, mock_assignment)
     mock_rollback = mocker.patch("routes.ai_feedback.db.session.rollback")
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
         json={
+            "requester_id": "instructor-uuid",
             "feedback_prompts": [
                 {
                     "id": "invalid",

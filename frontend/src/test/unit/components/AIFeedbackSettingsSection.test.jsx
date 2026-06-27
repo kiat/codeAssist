@@ -60,7 +60,15 @@ describe("AIFeedbackSettingsSection", () => {
     expect(
       screen.getByLabelText("Maximum feedback requests per student")
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Thinking time between requests")).toHaveValue("0");
+    expect(screen.getByPlaceholderText("No limit")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Leave empty for unlimited requests. Use 0 to disable AI feedback requests."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Minimum seconds between requests (0 = no wait)")
+    ).toHaveValue("0");
   });
 
   it("adds a blank enabled prompt for the instructor to edit", async () => {

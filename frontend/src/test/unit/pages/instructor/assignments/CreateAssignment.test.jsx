@@ -128,7 +128,9 @@ describe("CreateAssignment AI prompt defaults", () => {
       "3"
     );
 
-    const waitSecondsInput = screen.getByLabelText("Thinking time between requests");
+    const waitSecondsInput = screen.getByLabelText(
+      "Minimum seconds between requests (0 = no wait)"
+    );
     await user.clear(waitSecondsInput);
     await user.type(waitSecondsInput, "60");
 
