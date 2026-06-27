@@ -428,6 +428,7 @@ def test_get_course_info_success(client, mocker):
         openai_api_key="encrypted-key",
         gemini_api_key="",
         claude_api_key="",
+        ollama_base_url="",
     )
 
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -452,6 +453,7 @@ def test_get_course_info_success(client, mocker):
             "has_openai_api_key": True,
             "has_gemini_api_key": False,
             "has_claude_api_key": False,
+            "has_ollama_api_key": False,
         }
     ]
 
@@ -651,6 +653,88 @@ def test_test_ai_api_key_missing_saved_key_returns_400(client, mocker):
         json={
             "course_id": "course-123",
             "provider": "gemini",
+        },
+    )
+
+    assert response.status_code == 400
+
+
+def test_test_ai_model_ollama_success(client, mocker):
+    mock_post = mocker.patch("routes.course.requests.post")
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "message": {
+            "content": '{"insights":["Model test passed."],"annotations":[]}'
+        }
+    }
+    mock_post.return_value = mock_response
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "provider": "ollama",
+            "model": "llama3",
+            "api_key": "http://localhost:11434",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["provider"] == "ollama"
+    assert response.json["model"] == "llama3"
+    
+    mock_post.assert_called_once()
+
+
+def test_test_ai_model_ollama_saved_url_success(client, mocker):
+    mock_post = mocker.patch("routes.course.requests.post")
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "message": {
+            "content": '{"insights":["Model test passed."],"annotations":[]}'
+        }
+    }
+    mock_post.return_value = mock_response
+
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_course = mocker.Mock(
+        id="course-123",
+        ollama_base_url="http://saved-ollama-url:11434",
+    )
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "model": "llama3",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["provider"] == "ollama"
+    assert response.json["model"] == "llama3"
+    
+    mock_post.assert_called_once()
+    assert mock_post.call_args[0][0] == "http://saved-ollama-url:11434/api/chat"
+
+
+def test_test_ai_model_ollama_missing_saved_url_error(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_course = mocker.Mock(
+        id="course-123",
+        ollama_base_url="",
+    )
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "model": "llama3",
         },
     )
 
