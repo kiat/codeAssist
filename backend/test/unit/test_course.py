@@ -204,13 +204,14 @@ def test_delete_course_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_delete = mocker.patch("routes.course.db.session.delete")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
 
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         mocker.Mock(),  # Course exists
         None            # No assignments
     ]
 
-    response = client.delete("/delete_course", query_string={"course_id": "course-123"})
+    response = client.delete("/delete_course", query_string={"course_id": "course-123", "requester_id": "req-123"})
 
     assert response.status_code == 200
     assert response.json["message"] == "Course deleted successfully"
@@ -220,12 +221,13 @@ def test_delete_course_success(client, mocker):
 
 def test_delete_course_with_assignments(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         mocker.Mock(),  # Course exists
         mocker.Mock()   # Assignments exist
     ]
 
-    response = client.delete("/delete_course", query_string={"course_id": "course-123"})
+    response = client.delete("/delete_course", query_string={"course_id": "course-123", "requester_id": "req-123"})
 
     assert response.status_code == 409
     assert response.json["message"] == "Cannot delete course with assignments"
@@ -233,10 +235,11 @@ def test_delete_course_with_assignments(client, mocker):
 def test_delete_all_assignments_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
 
     mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(id="assignment-1")]
 
-    response = client.delete("/delete_all_assignments", query_string={"course_id": "course-123"})
+    response = client.delete("/delete_all_assignments", query_string={"course_id": "course-123", "requester_id": "req-123"})
 
     assert response.status_code == 200
     assert response.json == "Assignments deleted successfully"
@@ -245,9 +248,10 @@ def test_delete_all_assignments_success(client, mocker):
 
 def test_delete_all_assignments_not_found(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.all.return_value = []
 
-    response = client.delete("/delete_all_assignments", query_string={"course_id": "course-123"})
+    response = client.delete("/delete_all_assignments", query_string={"course_id": "course-123", "requester_id": "req-123"})
 
     assert response.status_code == 404
     assert response.json["message"] == "No assignments found for this course"
@@ -288,6 +292,7 @@ def test_create_enrollment_already_enrolled(client, mocker):
 def test_update_role_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
 
     enrollment = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = enrollment
@@ -295,24 +300,27 @@ def test_update_role_success(client, mocker):
     payload = {
         "student_id": "student-123",
         "course_id": "course-123",
-        "new_role": "TA"
+        "new_role": "TA",
+        "requester_id": "req-123"
     }
 
     response = client.post("/update_role", json=payload)
 
     assert response.status_code == 200
-    assert response.json["role"] == "TA"
-    assert enrollment.role == "TA"
+    assert response.json["role"] == "ta"
+    assert enrollment.role == "ta"
     mock_commit.assert_called_once()
 
 def test_update_role_not_found(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.first.return_value = None  # Enrollment not found
 
     payload = {
         "student_id": "student-123",
         "course_id": "course-123",
-        "new_role": "TA"
+        "new_role": "TA",
+        "requester_id": "req-123"
     }
 
     response = client.post("/update_role", json=payload)
@@ -365,7 +373,7 @@ def test_create_enrollment_csv_missing_file(client, mocker):
 
 def test_get_user_enrollments_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mock_query.return_value.filter_by.return_value = [mocker.Mock(course_id="course-123")]
+    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(course_id="course-123", role="student")]
     mock_query.return_value.filter.return_value = [mocker.Mock(id="course-123", name="CS101")]
     mock_schema = mocker.patch("routes.course.CourseSchema")
     mock_schema.return_value.dump.return_value = [{"id": "course-123", "name": "CS101"}]
@@ -373,7 +381,7 @@ def test_get_user_enrollments_success(client, mocker):
     response = client.get("/get_user_enrollments", query_string={"user_id": "user-123"})
 
     assert response.status_code == 200
-    assert response.json == [{"id": "course-123", "name": "CS101"}]
+    assert response.json == [{"id": "course-123", "name": "CS101", "enrollment_role": "student"}]
 
 def test_get_user_enrollments_missing_user_id(client):
     response = client.get("/get_user_enrollments")
@@ -557,8 +565,9 @@ def test_delete_course_db_error(client, mocker):
     mocker.patch("routes.course.db.session.query")
     mocker.patch("routes.course.db.session.commit", side_effect=Exception("fail"))
     mocker.patch("routes.course.db.session.rollback")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
 
-    response = client.delete("/delete_course", query_string={"course_id": "course-123"})
+    response = client.delete("/delete_course", query_string={"course_id": "course-123", "requester_id": "req-123"})
     assert response.status_code == 409
     assert response.json["message"] == "Cannot delete course with assignments"
 
@@ -1285,6 +1294,7 @@ def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker):
         return_value="encrypted-openai-key",
     )
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1298,6 +1308,7 @@ def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker):
             "api_key": "plain-openai-key",
             "feedback_style": "balanced",
             "temperature": 0.3,
+            "requester_id": "req-123",
         },
     )
 
@@ -1316,6 +1327,7 @@ def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker):
 
 def test_update_ai_settings_invalid_temperature_returns_400(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1326,6 +1338,7 @@ def test_update_ai_settings_invalid_temperature_returns_400(client, mocker):
             "course_id": "course-123",
             "provider": "openai",
             "temperature": "hot",
+            "requester_id": "req-123",
         },
     )
 
@@ -1335,6 +1348,7 @@ def test_update_ai_settings_invalid_temperature_returns_400(client, mocker):
 
 def test_update_ai_settings_temperature_out_of_range_returns_400(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1345,6 +1359,7 @@ def test_update_ai_settings_temperature_out_of_range_returns_400(client, mocker)
             "course_id": "course-123",
             "provider": "openai",
             "temperature": 1.5,
+            "requester_id": "req-123",
         },
     )
 
@@ -1355,6 +1370,7 @@ def test_update_ai_settings_temperature_out_of_range_returns_400(client, mocker)
 def test_update_ai_settings_unsupported_provider_without_api_key_returns_400(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1365,6 +1381,7 @@ def test_update_ai_settings_unsupported_provider_without_api_key_returns_400(cli
             "course_id": "course-123",
             "provider": "llama",
             "model_name": "llama-test-model",
+            "requester_id": "req-123",
         },
     )
 
@@ -1375,6 +1392,7 @@ def test_update_ai_settings_unsupported_provider_without_api_key_returns_400(cli
 
 def test_update_ai_settings_unsupported_provider_for_api_key_returns_400(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1385,6 +1403,7 @@ def test_update_ai_settings_unsupported_provider_for_api_key_returns_400(client,
             "course_id": "course-123",
             "provider": "llama",
             "api_key": "plain-key",
+            "requester_id": "req-123",
         },
     )
 
