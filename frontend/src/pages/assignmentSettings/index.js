@@ -38,7 +38,8 @@ export default () => {
   const [publishedBefore, setPubBefore] = useState(undefined);
   const [originalPublish, setOGPub] = useState(undefined);
   const [enableAiFeedback, setEnableAiFeedback] = useState(false);
-
+  const [allowLateSubmissions, setAllowLateSubmissions] = useState(false);
+  
   const [courseAiInfo, setCourseAiInfo] = useState({});
   const [assignmentModels, setAssignmentModels] = useState([]);
   const [assignmentModelsLoading, setAssignmentModelsLoading] = useState(false);
@@ -82,6 +83,8 @@ export default () => {
         autograder_points,
         course_id,
         published_date,
+        late_submission,
+        late_due_date,
         ai_feedback_enabled,
         use_course_ai_default,
         ai_feedback_provider,
@@ -104,7 +107,8 @@ export default () => {
         autograderPoints: autograder_points,
         dueDate: due_date ? moment.utc(due_date).local() : null,
         releaseDate: published_date ? moment.utc(published_date).local() : null,
-
+        allowLateSubmissions: !!late_submission,
+        lateDueDate: late_due_date ? moment.utc(late_due_date).local() : null,
         enableAiFeedback: !!ai_feedback_enabled,
         use_course_ai_default: use_course_ai_default !== false,
         ai_feedback_provider: ai_feedback_provider || "openai",
@@ -113,6 +117,7 @@ export default () => {
         ai_feedback_temperature: ai_feedback_temperature ?? 0.5,
         ai_feedback_style: ai_feedback_style || "balanced",
       });
+      setAllowLateSubmissions(late_submission);
     });
   }, [assignmentId, form, loadCourseAiInfo]);
 
@@ -212,7 +217,7 @@ export default () => {
       anonymous_grading: values.submissionAnonymization,
       manual_grading: values.manualGrading,
       late_submission: values.allowLateSubmissions,
-      late_due_date: values.lateDueDate,
+      late_due_date: values.allowLateSubmissions ? values.lateDueDate : null,
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
@@ -300,9 +305,10 @@ export default () => {
                 >
                   <DatePicker showTime style={{ width: "100%" }} />
                 </Form.Item>
-
                 <Form.Item name="allowLateSubmissions" valuePropName="checked">
-                  <Checkbox>Allow Late Submissions</Checkbox>
+                  <Checkbox onChange={(e) => setAllowLateSubmissions(e.target.checked)}>
+                    Allow Late Submissions
+                  </Checkbox>
                 </Form.Item>
               </Col>
 
@@ -314,9 +320,8 @@ export default () => {
                 >
                   <DatePicker showTime style={{ width: "100%" }} />
                 </Form.Item>
-
-                <Form.Item label="LATE DUE DATE (CST)" name="lateDueDate">
-                  <DatePicker showTime style={{ width: "100%" }} />
+                <Form.Item label='LATE DUE DATE (CST)' name='lateDueDate'>
+                  <DatePicker showTime style={{ width: "100%" }} disabled={!allowLateSubmissions} />
                 </Form.Item>
               </Col>
             </Row>
