@@ -14,3 +14,5 @@ pytest-cov
 cryptography
 psycopg2-binary
 dotenv
+requests
+psutil
