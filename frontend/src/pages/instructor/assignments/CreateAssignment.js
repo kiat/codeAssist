@@ -37,6 +37,11 @@ import { uploadAssignmentAutograder } from "../../../services/submission";
 import { createAssignment, updateAssignment } from "../../../services/assignment";
 import { getCourseInfo, fetchAiModels } from "../../../services/course";
 import { DEFAULT_AI_FEEDBACK_PROMPT } from "../../../constants/aiFeedback";
+import AIFeedbackSettingsSection from "../../../components/AIFeedbackSettingsSection";
+import {
+  normalizeAiAllowedInputs,
+  normalizeAiFeedbackPrompts,
+} from "../../../constants/aiFeedbackSettings";
 const { Sider, Content } = Layout;
 
 export default ({
@@ -64,9 +69,11 @@ export default ({
   const { courseId } = useParams();
 
   useEffect(() => {
-    if (aiFeedbackEnabled && !form.getFieldValue("ai_feedback_prompt")) {
+    if (aiFeedbackEnabled && !form.getFieldValue("ai_feedback_prompts")) {
       form.setFieldsValue({
         ai_feedback_prompt: DEFAULT_AI_FEEDBACK_PROMPT,
+        ai_feedback_prompts: normalizeAiFeedbackPrompts(),
+        ai_allowed_inputs: normalizeAiAllowedInputs(),
       });
     }
   }, [aiFeedbackEnabled, form]);
@@ -85,7 +92,11 @@ export default ({
           ai_feedback_model: course.default_ai_model || undefined,
           ai_feedback_style: course.default_feedback_style || "balanced",
           ai_feedback_prompt: DEFAULT_AI_FEEDBACK_PROMPT,
+          ai_feedback_prompts: normalizeAiFeedbackPrompts(),
+          ai_allowed_inputs: normalizeAiAllowedInputs(),
           ai_feedback_temperature: course.default_ai_temperature ?? 0.5,
+          ai_feedback_max_requests: null,
+          ai_feedback_wait_seconds: 0,
         });
       } catch (e) {
         console.error("Failed to load course AI settings:", e);
@@ -153,7 +164,13 @@ export default ({
       const releaseDate = values.releaseDate
         ? new Date(values.releaseDate.valueOf())
         : null;
-      
+      const feedbackPrompts = normalizeAiFeedbackPrompts(
+        values.ai_feedback_prompts,
+        values.ai_feedback_prompt
+      );
+
+      const firstPrompt =
+        feedbackPrompts.find((prompt) => prompt.enabled) || feedbackPrompts[0];
       const payload = {
       name: values.name,
       course_id: courseId,
@@ -166,12 +183,29 @@ export default ({
       group_size: values.limitGroupSize ? Number(values.limitGroupSize) : null,
       manual_grading: !!values.manualGrading,
       autograder_points: values.autograderPoints ? Number(values.autograderPoints) : null,
+      enable_code_editor: !!values.enable_code_editor,
       ai_feedback_enabled: !!values.ai_feedback_enabled,
+      use_course_ai_default: values.use_course_ai_default !== false,
       ai_feedback_prompt: values.ai_feedback_prompt ?? null,
-      ai_feedback_model: values.ai_feedback_model ?? null,
+      ai_feedback_provider:
+          values.use_course_ai_default === false
+            ? values.ai_feedback_provider
+            : null,
+       ai_feedback_model:
+          values.use_course_ai_default === false
+            ? values.ai_feedback_model
+            : null,
       ai_feedback_temperature: values.ai_feedback_temperature ?? null,
+      ai_feedback_prompt: firstPrompt?.prompt ?? null,
+      ai_feedback_prompts: feedbackPrompts,
+      ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
       hold_results: !!values.hold_results,
+        ai_feedback_style: values.ai_feedback_style ?? null,
+        ai_feedback_max_requests: values.ai_feedback_max_requests ?? null,
+        ai_feedback_wait_seconds: values.ai_feedback_wait_seconds ?? 0,
     };
+        
+      const assignment = await createAssignment(payload);
 
       const assignmentId =
         assignment?.id ??
@@ -312,7 +346,11 @@ export default ({
                   use_course_ai_default: true,
                   ai_feedback_style: "balanced",
                   ai_feedback_prompt: DEFAULT_AI_FEEDBACK_PROMPT,
+                  ai_feedback_prompts: normalizeAiFeedbackPrompts(),
+                  ai_allowed_inputs: normalizeAiAllowedInputs(),
                   ai_feedback_temperature: 0.5,
+                  ai_feedback_max_requests: null,
+                  ai_feedback_wait_seconds: 0,
                 }}
                 onFinish={handleFinish}
               >
@@ -591,15 +629,7 @@ export default ({
                             />
                           </Form.Item>
 
-                          <Form.Item
-                            label="AI Feedback Prompt"
-                            name="ai_feedback_prompt"
-                          >
-                            <Input.TextArea
-                              placeholder="Default feedback prompt"
-                              autoSize={{ minRows: 4, maxRows: 8 }}
-                            />
-                          </Form.Item>
+                          <AIFeedbackSettingsSection />
 
                           <Form.Item
                             label="Model Temperature"
@@ -615,7 +645,6 @@ export default ({
                           </Form.Item>
                         </>
                       )}
-                    </Card>
 
                     <Form.Item
                       label="HOLD RESULTS"
