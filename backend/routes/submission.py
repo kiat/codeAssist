@@ -18,12 +18,18 @@ from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, Enrollme
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ServerTimeoutError, SubmissionTimeoutError
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
-from ai_integration import async_get_ai_feedback
+from ai_feedback.integration import async_get_ai_feedback
 import threading
 
 
 submission = Blueprint('submission', __name__)
-docker_client = docker.from_env()
+_docker_client = None
+
+def get_docker_client():
+    global _docker_client
+    if _docker_client is None:
+        _docker_client = docker.from_env()
+    return _docker_client
 
 ALLOWED_EXTENSIONS = {'py','zip'}
 
@@ -168,7 +174,7 @@ def upload_submission():
 
     # Create a new temporary container from the assignment image
     temp_container_name = f"submission_{uuid.uuid4().hex[:8]}"
-    container = docker_client.containers.run(
+    container = get_docker_client().containers.run(
         image=assignment.autograder_image_name,
         name=temp_container_name,
         detach=True,
@@ -353,7 +359,7 @@ def upload_assignment_autograder():
     # Build image
     try:
         image_name = f"autograder-{assignment_id}"
-        docker_client.images.build(path=assignment_dir, tag=image_name)
+        get_docker_client().images.build(path=assignment_dir, tag=image_name)
     except docker.errors.BuildError as e:
         print("Build failed:", e)
         raise InternalProcessingError("Failed to build Docker image")
@@ -583,10 +589,10 @@ def test_autograder_submission():
 
     try:
         # Build image
-        docker_client.images.build(path=temp_dir, tag=image_tag)
+        get_docker_client().images.build(path=temp_dir, tag=image_tag)
 
         # Start container
-        container = docker_client.containers.run(
+        container = get_docker_client().containers.run(
             image_tag, detach=True, tty=True, command="tail -f /dev/null"
         )
 
@@ -617,7 +623,7 @@ def test_autograder_submission():
             if 'container' in locals():
                 container.stop()
                 container.remove()
-            docker_client.images.remove(image=image_tag, force=True)
+            get_docker_client().images.remove(image=image_tag, force=True)
         except Exception as cleanup_err:
             print(f"Cleanup error: {cleanup_err}")
 

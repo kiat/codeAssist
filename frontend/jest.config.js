@@ -8,7 +8,7 @@ module.exports = {
 
   // transpile axios (and any other ESM-only deps) through Babel
   transformIgnorePatterns: [
-    '/node_modules/(?!(axios)/)',
+    '/node_modules/(?!(axios|@codemirror|@lezer|@marijn)/)',
   ],
 
   // stub CSS imports

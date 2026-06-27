@@ -13,6 +13,7 @@ export default function Assignments() {
   const [isModalOpen, setModalOpen] = useState(false);
   const [assignmentID, setAssignmentID] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
 
   const columns = [
     {
@@ -154,7 +155,7 @@ export default function Assignments() {
     const now = moment();
     const dueDateTime = moment(assignment.due_date).valueOf();
 
-    const lateDueDateTime = moment(assignment.late_due_date).valueOf();
+    const lateDueDateTime = assignment.late_due_date ? moment(assignment.late_due_date) : null;
     // const extension = await fetchAssignmentExtensions(assignment.id);
     // if (extension != null) {
     //   if (extension.due_date_extension) {
@@ -168,14 +169,17 @@ export default function Assignments() {
 
     const isSubmitted = assignment.submitted;
     const dueDateHasPassed = now.isAfter(dueDateTime);
+    const lateDueDateHasPassed = lateDueDateTime ? now.isAfter(lateDueDateTime) : true;
+    const canSubmitOnTime = !dueDateHasPassed;
+    const canSubmitLate = assignment.late_submission && lateDueDateTime && !lateDueDateHasPassed;
 
     if (isSubmitted) {
       navigate(`/assignmentresult/${assignment.submissionId}`);
-    } else if (!dueDateHasPassed) {
+    } else if (canSubmitOnTime || canSubmitLate) {
       setModalOpen(true);
       setAssignmentTitle(assignment.name);
       setAssignmentID(assignment.id);
-    } else if (dueDateHasPassed){
+    } else {
       message.error("Due Date Has Passed");
     }
   };
@@ -209,6 +213,7 @@ export default function Assignments() {
         onCancel={closeModal}
         assignmentID={assignmentID}
         assignmentTitle={assignmentTitle}
+        enableCodeEditor={selectedAssignment?.enable_code_editor}
       />
     </>
   );

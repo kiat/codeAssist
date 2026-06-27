@@ -173,11 +173,18 @@ export default function AssignmentResult() {
   const toggleModal = useCallback(
     (type) => {
       if (type === "upload") {
-        //if the due date hasnt passed open the model or else send an error message saying dude date has passes
         const now = moment();
-        if (!now.isAfter(dueDate)) {
+        const due = dueDate ? moment(dueDate) : null;
+        const late = lateDueDate ? moment(lateDueDate) : null;
+
+        if (!due && !late) {
           setUploadModalOpen((prev) => !prev);
-        } else if (lateAllowed && !now.isAfter(lateDueDate)) {
+          return;
+        }
+
+        if (due && !now.isAfter(due)) {
+          setUploadModalOpen((prev) => !prev);
+        } else if (late && lateAllowed && !now.isAfter(late)) {
           setUploadModalOpen((prev) => !prev);
         } else {
           message.error("Due Date Has Passed");
@@ -185,7 +192,7 @@ export default function AssignmentResult() {
       } else if (type === "history") setHistoryModalOpen((prev) => !prev);
       else if (type === "formatting") setFormattingOpen((prev) => !prev);
     },
-    [dueDate]
+    [dueDate, lateDueDate, lateAllowed]
   );
 
   const handleRadioChange = useCallback((e) => {
