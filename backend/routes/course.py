@@ -1,6 +1,7 @@
 import uuid
 import os
 import csv
+import requests
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
@@ -15,12 +16,106 @@ from api.models import (
 )
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
-from util.encryption_utils import encrypt_api_key
+from util.encryption_utils import encrypt_api_key, decrypt_api_key
+from ai_integration import (
+    CORRECTNESS_SYSTEM_PROMPT,
+    get_gemini_generation_config,
+    parse_feedback_json,
+)
+from openai import OpenAI
 
 course = Blueprint("course", __name__)
 
 ALLOWED_EXTENSIONS = {'csv'}
 UPLOAD_FOLDER = 'uploads'
+SUPPORTED_AI_PROVIDERS = {"openai", "gemini", "claude"}
+
+def is_supported_openai_model(model_id):
+    """
+    Filter OpenAI models shown in the dropdown.
+
+    Keep standard text chat models that work with this app's chat completion
+    request shape. Remove o-series and special-purpose models that may appear
+    in the models API but fail with max_tokens, response_format, or text-only
+    chat completions.
+    """
+    normalized_model_id = (model_id or "").lower()
+    blocked_prefixes = ("o1", "o3", "o4")
+    blocked_keywords = [
+        "audio",
+        "dall-e",
+        "embedding",
+        "image",
+        "instruct",
+        "moderation",
+        "preview",
+        "realtime",
+        "search",
+        "transcribe",
+        "tts",
+        "whisper",
+    ]
+
+    if normalized_model_id.startswith(blocked_prefixes):
+        return False
+
+    if any(keyword in normalized_model_id for keyword in blocked_keywords):
+        return False
+
+    return normalized_model_id.startswith("gpt-")
+
+
+def is_supported_gemini_model(model_id):
+    """
+    Filter Gemini models shown in the dropdown.
+
+    Keep normal Gemini text generation models.
+    Remove research, antigravity, embedding, audio, image, and other special models.
+    """
+    blocked_keywords = [
+        "embedding",
+        "aqa",
+        "imagen",
+        "veo",
+        "tts",
+        "native-audio",
+        "live",
+        "learnlm",
+        "deep-research",
+        "antigravity",
+        "preview",
+        "exp",
+        "experimental",
+    ]
+
+    blocked_models = {
+        "gemini-2.0-flash",
+    }
+
+    if model_id in blocked_models:
+        return False
+
+    if any(keyword in model_id.lower() for keyword in blocked_keywords):
+        return False
+
+    return model_id.startswith("gemini-")
+
+
+def is_supported_claude_model(model_id):
+    """
+    Filter Claude models shown in the dropdown.
+
+    Remove known unavailable or special-access Claude models.
+    """
+    blocked_keywords = [
+        "fable",
+        "mythos",
+    ]
+
+    if any(keyword in model_id.lower() for keyword in blocked_keywords):
+        return False
+
+    return model_id.startswith("claude-")
 
 @course.route("/create_course", methods=["POST", "GET"])
 @cross_origin()
@@ -468,6 +563,7 @@ def get_course_assignments():
 
     return jsonify(assignments), 200
 
+
 @course.route("/get_course_info", methods=["GET"])
 @cross_origin()
 def get_course_info():
@@ -476,12 +572,29 @@ def get_course_info():
     if not course_id or course_id == "":
         raise BadRequestError("Missing course_id argument")
 
-    course = db.session.query(Course).filter_by(id=course_id)
-    course = CourseSchema().dump(course, many=True)
+    course_obj = db.session.query(Course).filter_by(id=course_id).first()
 
-    return jsonify(course), 200
+    if not course_obj:
+        raise NotFoundError("Course not found")
+
+    course_data = CourseSchema().dump(course_obj)
+
+    course_data.update({
+        "default_ai_provider": course_obj.default_ai_provider,
+        "default_ai_model": course_obj.default_ai_model,
+        "default_feedback_style": course_obj.default_feedback_style,
+        "default_ai_temperature": course_obj.default_ai_temperature,
+
+        "has_openai_api_key": bool(course_obj.openai_api_key),
+        "has_gemini_api_key": bool(course_obj.gemini_api_key),
+        "has_claude_api_key": bool(course_obj.claude_api_key),
+    })
+
+    return jsonify([course_data]), 200
 
 @course.route("/store_api_key", methods=["PUT"])
+@cross_origin()
+
 def store_api_key():
     """
     /store_api_key stores an encrypted OpenAI API key for a course.
@@ -511,6 +624,488 @@ def store_api_key():
         db.session.rollback()
         raise InternalProcessingError("Failed to store API key")
 
+@course.route("/update_ai_settings", methods=["PUT"])
+@cross_origin()
+def update_ai_settings():
+    data = request.json
+
+    course_id = data.get("course_id")
+    provider = data.get("provider")
+    model_name = data.get("model_name")
+    api_key = data.get("api_key")
+    feedback_style = data.get("feedback_style")
+    temperature = data.get("temperature")
+
+    if not course_id:
+        raise BadRequestError("Missing course_id")
+
+    course_obj = db.session.query(Course).filter_by(id=course_id).first()
+
+    if not course_obj:
+        raise NotFoundError("Course not found")
+
+    if provider and provider not in SUPPORTED_AI_PROVIDERS:
+        raise BadRequestError("Unsupported AI provider")
+
+    if provider:
+        course_obj.default_ai_provider = provider
+
+    if model_name:
+        course_obj.default_ai_model = model_name
+
+    if feedback_style:
+        course_obj.default_feedback_style = feedback_style
+
+    if temperature is not None:
+        try:
+            temperature_value = float(temperature)
+        except (TypeError, ValueError):
+            raise BadRequestError("Invalid temperature")
+
+        if temperature_value < 0 or temperature_value > 1:
+            raise BadRequestError("Temperature must be between 0 and 1")
+
+        course_obj.default_ai_temperature = temperature_value
+
+    if api_key:
+        if not provider:
+            raise BadRequestError("Missing provider for API key")
+
+        encrypted_api_key = encrypt_api_key(api_key)
+
+        if provider == "openai":
+            course_obj.openai_api_key = encrypted_api_key
+        elif provider == "gemini":
+            course_obj.gemini_api_key = encrypted_api_key
+        elif provider == "claude":
+            course_obj.claude_api_key = encrypted_api_key
+
+    try:
+        db.session.commit()
+        return jsonify({"message": "AI settings updated successfully"}), 200
+    except Exception:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to update AI settings")
+
+
+@course.route("/fetch_ai_models", methods=["POST"])
+@cross_origin()
+def fetch_ai_models():
+    data = request.json
+
+    course_id = data.get("course_id")
+    provider = data.get("provider")
+    api_key = data.get("api_key")
+
+    if not provider:
+        raise BadRequestError("Missing provider")
+
+    try:
+        if not api_key:
+            if not course_id:
+                raise BadRequestError("Missing course_id or api_key")
+
+            course_obj = db.session.query(Course).filter_by(id=course_id).first()
+
+            if not course_obj:
+                raise NotFoundError("Course not found")
+
+            if provider == "openai" and course_obj.openai_api_key:
+                api_key = decrypt_api_key(course_obj.openai_api_key)
+            elif provider == "gemini" and course_obj.gemini_api_key:
+                api_key = decrypt_api_key(course_obj.gemini_api_key)
+            elif provider == "claude" and course_obj.claude_api_key:
+                api_key = decrypt_api_key(course_obj.claude_api_key)
+            else:
+                raise BadRequestError(f"No saved API key for {provider}")
+
+        if provider == "openai":
+            client = OpenAI(api_key=api_key)
+            models_response = client.models.list()
+
+            model_ids = [
+                model.id
+                for model in models_response.data
+                if is_supported_openai_model(model.id)
+            ]
+
+            preferred_order = [
+                "gpt-4o-mini",
+                "gpt-4o",
+                "gpt-4.1-mini",
+                "gpt-4.1",
+            ]
+
+            sorted_models = sorted(
+                set(model_ids),
+                key=lambda model: (
+                    preferred_order.index(model)
+                    if model in preferred_order
+                    else len(preferred_order),
+                    model
+                )
+            )
+
+            return jsonify({"models": sorted_models}), 200
+
+        if provider == "gemini":
+            response = requests.get(
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                params={"key": api_key},
+                timeout=30,
+            )
+
+            if response.status_code >= 400:
+                return jsonify({"error": response.text}), response.status_code
+
+            models_data = response.json().get("models", [])
+
+            model_ids = []
+            for model in models_data:
+                model_name = model.get("name", "").replace("models/", "")
+                supported_methods = model.get("supportedGenerationMethods", [])
+
+                if (
+                    "generateContent" in supported_methods
+                    and is_supported_gemini_model(model_name)
+                ):
+                    model_ids.append(model_name)
+
+            preferred_order = [
+                "gemini-1.5-flash",
+                "gemini-1.5-pro",
+                "gemini-2.5-flash",
+                "gemini-2.5-pro",
+            ]
+
+            sorted_models = sorted(
+                set(model_ids),
+                key=lambda model: (
+                    preferred_order.index(model)
+                    if model in preferred_order
+                    else len(preferred_order),
+                    model
+                )
+            )
+
+            return jsonify({"models": sorted_models}), 200
+
+        if provider == "claude":
+            response = requests.get(
+                "https://api.anthropic.com/v1/models",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+                timeout=30,
+            )
+
+            if response.status_code >= 400:
+                return jsonify({"error": response.text}), response.status_code
+
+            models_data = response.json().get("data", [])
+
+            model_ids = [
+                model.get("id")
+                for model in models_data
+                if model.get("id") and is_supported_claude_model(model.get("id"))
+            ]
+
+            preferred_order = [
+                "claude-3-5-sonnet-20241022",
+                "claude-3-5-haiku-20241022",
+                "claude-3-opus-20240229",
+                "claude-3-5-sonnet-latest",
+                "claude-3-5-haiku-latest",
+                "claude-3-opus-latest",
+            ]
+
+            sorted_models = sorted(
+                set(model_ids),
+                key=lambda model: (
+                    preferred_order.index(model)
+                    if model in preferred_order
+                    else len(preferred_order),
+                    model
+                )
+            )
+
+            return jsonify({"models": sorted_models}), 200
+
+        raise BadRequestError("Unsupported AI provider")
+
+    except (BadRequestError, NotFoundError):
+        raise
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+@course.route("/test_ai_api_key", methods=["POST"])
+@cross_origin()
+def test_ai_api_key():
+    data = request.json
+
+    course_id = data.get("course_id")
+    provider = data.get("provider")
+    api_key = data.get("api_key")
+
+    if not provider:
+        raise BadRequestError("Missing provider")
+
+    try:
+        if not api_key:
+            if not course_id:
+                raise BadRequestError("Missing course_id or api_key")
+
+            course_obj = db.session.query(Course).filter_by(id=course_id).first()
+
+            if not course_obj:
+                raise NotFoundError("Course not found")
+
+            if provider == "openai" and course_obj.openai_api_key:
+                api_key = decrypt_api_key(course_obj.openai_api_key)
+            elif provider == "gemini" and course_obj.gemini_api_key:
+                api_key = decrypt_api_key(course_obj.gemini_api_key)
+            elif provider == "claude" and course_obj.claude_api_key:
+                api_key = decrypt_api_key(course_obj.claude_api_key)
+            else:
+                raise BadRequestError(f"No saved API key for {provider}")
+
+        if provider == "openai":
+            client = OpenAI(api_key=api_key)
+            client.models.list()
+
+            return jsonify({
+                "message": "OpenAI API key is valid",
+                "provider": provider,
+            }), 200
+
+        if provider == "gemini":
+            response = requests.get(
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                params={"key": api_key},
+                timeout=30,
+            )
+
+            if response.status_code >= 400:
+                return jsonify({
+                    "error": f"Gemini API key test failed: {response.text}"
+                }), response.status_code
+
+            return jsonify({
+                "message": "Gemini API key is valid",
+                "provider": provider,
+            }), 200
+
+        if provider == "claude":
+            response = requests.get(
+                "https://api.anthropic.com/v1/models",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+                timeout=30,
+            )
+
+            if response.status_code >= 400:
+                return jsonify({
+                    "error": f"Claude API key test failed: {response.text}"
+                }), response.status_code
+
+            return jsonify({
+                "message": "Claude API key is valid",
+                "provider": provider,
+            }), 200
+
+        raise BadRequestError("Unsupported AI provider")
+
+    except (BadRequestError, NotFoundError):
+        raise
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+
+@course.route("/test_ai_model", methods=["POST"])
+@cross_origin()
+def test_ai_model():
+    data = request.json
+
+    course_id = data.get("course_id")
+    provider = data.get("provider")
+    model = data.get("model")
+    api_key = data.get("api_key")
+
+    if not provider:
+        raise BadRequestError("Missing provider")
+
+    if not model:
+        raise BadRequestError("Missing model")
+
+    try:
+        if not api_key:
+            if not course_id:
+                raise BadRequestError("Missing course_id or api_key")
+
+            course_obj = db.session.query(Course).filter_by(id=course_id).first()
+
+            if not course_obj:
+                raise NotFoundError("Course not found")
+
+            if provider == "openai" and course_obj.openai_api_key:
+                api_key = decrypt_api_key(course_obj.openai_api_key)
+            elif provider == "gemini" and course_obj.gemini_api_key:
+                api_key = decrypt_api_key(course_obj.gemini_api_key)
+            elif provider == "claude" and course_obj.claude_api_key:
+                api_key = decrypt_api_key(course_obj.claude_api_key)
+            else:
+                raise BadRequestError(f"No saved API key for {provider}")
+
+        test_prompt = (
+            "Return only this JSON object: "
+            "{\"insights\":[\"Model test passed.\"],\"annotations\":[]}"
+        )
+
+        def validate_feedback_response(raw_response, provider_name):
+            parsed_feedback, _ = parse_feedback_json(raw_response, provider_name, [])
+
+            if isinstance(parsed_feedback, dict) and parsed_feedback.get("error"):
+                return None
+
+            return parsed_feedback
+
+        if provider == "openai":
+            client = OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Return only valid JSON.",
+                    },
+                    {
+                        "role": "user",
+                        "content": test_prompt,
+                    },
+                ],
+                max_tokens=80,
+                temperature=0,
+                response_format={"type": "json_object"},
+                timeout=30,
+            )
+
+            raw_response = (response.choices[0].message.content or "").strip()
+            parsed_feedback = validate_feedback_response(raw_response, "OpenAI")
+
+            if parsed_feedback is None:
+                return jsonify({
+                    "error": "Selected OpenAI model did not return valid JSON feedback"
+                }), 400
+
+            return jsonify({
+                "message": "OpenAI model is usable",
+                "provider": provider,
+                "model": model,
+                "response": parsed_feedback,
+            }), 200
+
+        if provider == "gemini":
+            response = requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                params={"key": api_key},
+                json={
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [
+                                {
+                                    "text": f"{CORRECTNESS_SYSTEM_PROMPT}\n\n{test_prompt}",
+                                }
+                            ],
+                        }
+                    ],
+                    "generationConfig": get_gemini_generation_config(model, 0),
+                },
+                timeout=30,
+            )
+
+            if response.status_code >= 400:
+                return jsonify({
+                    "error": f"Selected Gemini model cannot be used: {response.text}"
+                }), response.status_code
+
+            data = response.json()
+            candidate = data.get("candidates", [{}])[0]
+            raw_response = "".join(
+                part.get("text", "")
+                for part in candidate.get("content", {}).get("parts", [])
+                if not part.get("thought")
+            )
+            parsed_feedback = validate_feedback_response(raw_response, "Gemini")
+
+            if parsed_feedback is None:
+                return jsonify({
+                    "error": "Selected Gemini model did not return valid JSON feedback"
+                }), 400
+
+            return jsonify({
+                "message": "Gemini model is usable",
+                "provider": provider,
+                "model": model,
+                "response": parsed_feedback,
+            }), 200
+
+        if provider == "claude":
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "max_tokens": 80,
+                    "system": "Return only valid JSON.",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": test_prompt,
+                        }
+                    ],
+                },
+                timeout=30,
+            )
+
+            if response.status_code >= 400:
+                return jsonify({
+                    "error": f"Selected Claude model cannot be used: {response.text}"
+                }), response.status_code
+
+            data = response.json()
+            content = data.get("content", [])
+            raw_response = ""
+            if content and content[0].get("type") == "text":
+                raw_response = content[0].get("text", "")
+
+            parsed_feedback = validate_feedback_response(raw_response, "Claude")
+
+            if parsed_feedback is None:
+                return jsonify({
+                    "error": "Selected Claude model did not return valid JSON feedback"
+                }), 400
+
+            return jsonify({
+                "message": "Claude model is usable",
+                "provider": provider,
+                "model": model,
+                "response": parsed_feedback,
+            }), 200
+
+        raise BadRequestError("Unsupported AI provider")
+
+    except (BadRequestError, NotFoundError):
+        raise
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
 @course.route("/get_courses_by_instructor", methods=["GET"])
 @cross_origin()
 def get_courses_by_instructor():
