@@ -29,13 +29,17 @@ export default () => {
   const { courseId } = useParams();
   const [assignments, setAssignments] = useState([]);
 
-
-
   // Used to manage form state
   const [form] = Form.useForm();
 
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+  const { userInfo, courseInfo, updateCourseInfo, courseRole } = useContext(GlobalContext);
+  const navigate = useNavigate();
 
+  useEffect(() => {
+    if (courseRole && courseRole !== "instructor") {
+      navigate(`/instructorDashboard/${courseId}`);
+    }
+  }, [courseRole, courseId, navigate]);
 
   useEffect(() => {
     fetchCourseData();
@@ -61,11 +65,9 @@ export default () => {
     getAssignments();
   }, [getAssignments]);
 
-  const navigate = useNavigate();
-
   const handleDeleteAllAssignments = async (courseId) => {
     try {
-      await deleteAllAssignments({"course_id": courseId});
+      await deleteAllAssignments({ course_id: courseId, requester_id: userInfo.id });
       message.success("All assignments deleted successfully");
     }
     catch(error) {
@@ -75,7 +77,7 @@ export default () => {
 
   const handleDeleteCourse = async (courseId) => {
     try {
-      await deleteCourse({"course_id" : courseId});
+      await deleteCourse({ course_id: courseId, requester_id: userInfo.id });
       message.success("Course deleted successfully");
       navigateHome();
     }
@@ -95,6 +97,7 @@ export default () => {
   const onFinish = async (values) => {
     const dataToSend = {
       course_id: courseId,
+      requester_id: userInfo.id,
       ...Object.fromEntries(
         Object.entries(values).filter(([_, value]) => value !== undefined)
       ),
