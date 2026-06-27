@@ -28,7 +28,11 @@ import {
 } from "../../services/assignment";
 import { getCourseInfo, fetchAiModels } from "../../services/course";
 import moment from "moment";
-import { DEFAULT_AI_FEEDBACK_PROMPT } from "../../constants/aiFeedback";
+import AIFeedbackSettingsSection from "../../components/AIFeedbackSettingsSection";
+import {
+  normalizeAiAllowedInputs,
+  normalizeAiFeedbackPrompts,
+} from "../../constants/aiFeedbackSettings";
 
 export default () => {
   const { assignmentId } = useParams();
@@ -50,9 +54,10 @@ export default () => {
   const useCourseAiDefault = Form.useWatch("use_course_ai_default", form);
 
   useEffect(() => {
-    if (enableAiFeedback && !form.getFieldValue("ai_feedback_prompt")) {
+    if (enableAiFeedback && !form.getFieldValue("ai_feedback_prompts")) {
       form.setFieldsValue({
-        ai_feedback_prompt: DEFAULT_AI_FEEDBACK_PROMPT,
+        ai_feedback_prompts: normalizeAiFeedbackPrompts(),
+        ai_allowed_inputs: normalizeAiAllowedInputs(),
       });
     }
   }, [enableAiFeedback, form]);
@@ -89,9 +94,13 @@ export default () => {
         use_course_ai_default,
         ai_feedback_provider,
         ai_feedback_prompt,
+        ai_feedback_prompts,
+        ai_allowed_inputs,
         ai_feedback_model,
         ai_feedback_temperature,
         ai_feedback_style,
+        ai_feedback_max_requests,
+        ai_feedback_wait_seconds,
       } = res.data || {};
 
       setPubBefore(published);
@@ -112,10 +121,16 @@ export default () => {
         enableAiFeedback: !!ai_feedback_enabled,
         use_course_ai_default: use_course_ai_default !== false,
         ai_feedback_provider: ai_feedback_provider || "openai",
-        ai_feedback_prompt: ai_feedback_prompt || DEFAULT_AI_FEEDBACK_PROMPT,
+        ai_feedback_prompts: normalizeAiFeedbackPrompts(
+          ai_feedback_prompts,
+          ai_feedback_prompt
+        ),
+        ai_allowed_inputs: normalizeAiAllowedInputs(ai_allowed_inputs),
         ai_feedback_model: ai_feedback_model || undefined,
         ai_feedback_temperature: ai_feedback_temperature ?? 0.5,
         ai_feedback_style: ai_feedback_style || "balanced",
+        ai_feedback_max_requests: ai_feedback_max_requests ?? null,
+        ai_feedback_wait_seconds: ai_feedback_wait_seconds ?? 0,
       });
       setAllowLateSubmissions(late_submission);
     });
@@ -200,6 +215,12 @@ export default () => {
     }
 
     const values = form.getFieldsValue();
+    const feedbackPrompts = normalizeAiFeedbackPrompts(
+      values.ai_feedback_prompts,
+      values.ai_feedback_prompt
+    );
+    const firstPrompt =
+      feedbackPrompts.find((prompt) => prompt.enabled) || feedbackPrompts[0];
 
     let publishedDate = undefined;
     if (values.published === true) {
@@ -230,9 +251,13 @@ export default () => {
         values.use_course_ai_default === false ? values.ai_feedback_provider : null,
       ai_feedback_model:
         values.use_course_ai_default === false ? values.ai_feedback_model : null,
-      ai_feedback_prompt: values.ai_feedback_prompt ?? null,
+      ai_feedback_prompt: firstPrompt?.prompt ?? null,
+      ai_feedback_prompts: feedbackPrompts,
+      ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
       ai_feedback_temperature: values.ai_feedback_temperature ?? null,
       ai_feedback_style: values.ai_feedback_style ?? null,
+      ai_feedback_max_requests: values.ai_feedback_max_requests ?? null,
+      ai_feedback_wait_seconds: values.ai_feedback_wait_seconds ?? 0,
     };
 
     const validData = Object.fromEntries(
@@ -452,15 +477,7 @@ export default () => {
                 />
               </Form.Item>
 
-              <Form.Item
-                label="AI Feedback Prompt"
-                name="ai_feedback_prompt"
-              >
-                <Input.TextArea
-                  placeholder="Default feedback prompt"
-                  autoSize={{ minRows: 4, maxRows: 8 }}
-                />
-              </Form.Item>
+              <AIFeedbackSettingsSection />
 
                 <Form.Item
                   label="Model Temperature"

@@ -20,8 +20,31 @@ For each assignments, instructors are able to configure the AI Feedback system:
 - **Prompt** (`ai_feedback_prompt`): Base prompt guiding the LLM’s tone and focus.
 - **Model** (`ai_feedback_model`): LLM identifier (e.g., `gpt-4-turbo`).
 - **Temperature** (`ai_feedback_temperature`): Controls creativity vs. determinism (e.g., `0.5`).
+- **Maximum feedback requests** (`ai_feedback_max_requests`): Maximum number of AI feedback requests each student may make for the assignment. Empty/null means unlimited, `0` disables requests, and a positive number up to `1000` sets the per-student limit.
+- **Minimum seconds between requests** (`ai_feedback_wait_seconds`): Number of seconds students must wait between AI feedback requests. `0` means no wait time.
 
 > **Tip:** Tune these settings per assignment to adjust the depth, style, and specificity of feedback.
+
+## AI Feedback Usage Limits
+
+Instructors can configure how often students may request AI feedback.
+
+### Maximum Feedback Requests
+
+Controls how many times each student can ask for AI feedback on an assignment.
+
+- Empty/null: unlimited requests
+- 0: AI feedback requests disabled
+- Positive number up to 1000: maximum requests per student
+
+### Minimum Seconds Between Requests
+
+Controls how many seconds students must wait before requesting AI feedback again.
+
+- 0: no wait time
+- Positive number: required wait time in seconds
+
+These settings are stored at the assignment level. Student-facing enforcement and countdown display will be implemented in a follow-up student-side workflow.
 
 ## Course-Level OpenAI API Key
 
@@ -73,7 +96,7 @@ sequenceDiagram
 
 The AI feedback engine is composed of several backend modules and frontend components:
 
-### Backend Integration (`backend/ai_integration.py`)
+### Backend Integration (`backend/ai_feedback/integration.py`)
 
 - **Key Encryption**: Uses `encrypt_api_key` / `decrypt_api_key` with Fernet and the `API_SECRET_KEY` from `.env` to secure the OpenAI key. If the key is not defined in `.env`, it will just be saved as plaintext.
 - **Data Fetching**: `fetch_submission_data` performs SQLAlchemy joins across `Submission`, `Assignment`, `Course`, and `User` models to retrieve all objects relevant to a given submission. 
