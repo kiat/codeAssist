@@ -14,7 +14,7 @@ from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
 from openai import OpenAI
 from util.encryption_utils import decrypt_api_key
-from ai_integration import async_get_ai_feedback
+from ai_feedback.integration import async_get_ai_feedback
 import docker
 
 code_editor = Blueprint('code_editor', __name__)

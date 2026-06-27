@@ -17,7 +17,7 @@ from api.models import (
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
-from ai_integration import (
+from ai_feedback.integration import (
     CORRECTNESS_SYSTEM_PROMPT,
     get_gemini_generation_config,
     parse_feedback_json,

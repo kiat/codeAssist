@@ -1,7 +1,7 @@
 """Add code_drafts table.
 
 Revision ID: a1b2c3d4e5f6
-Revises: 03dd583914d0
+Revises: 92009ca5c92a
 Create Date: 2026-06-12 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'a1b2c3d4e5f6'
-down_revision = '03dd583914d0'
+down_revision = '92009ca5c92a'
 branch_labels = None
 depends_on = None
 
