@@ -95,6 +95,8 @@ export default ({
           ai_feedback_prompts: normalizeAiFeedbackPrompts(),
           ai_allowed_inputs: normalizeAiAllowedInputs(),
           ai_feedback_temperature: course.default_ai_temperature ?? 0.5,
+          ai_feedback_max_requests: null,
+          ai_feedback_wait_seconds: 0,
         });
       } catch (e) {
         console.error("Failed to load course AI settings:", e);
@@ -199,6 +201,8 @@ export default ({
         ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
         ai_feedback_temperature: values.ai_feedback_temperature ?? null,
         ai_feedback_style: values.ai_feedback_style ?? null,
+        ai_feedback_max_requests: values.ai_feedback_max_requests ?? null,
+        ai_feedback_wait_seconds: values.ai_feedback_wait_seconds ?? 0,
       };
 
       const assignment = await createAssignment(payload);
@@ -345,6 +349,8 @@ export default ({
                   ai_feedback_prompts: normalizeAiFeedbackPrompts(),
                   ai_allowed_inputs: normalizeAiAllowedInputs(),
                   ai_feedback_temperature: 0.5,
+                  ai_feedback_max_requests: null,
+                  ai_feedback_wait_seconds: 0,
                 }}
                 onFinish={handleFinish}
               >

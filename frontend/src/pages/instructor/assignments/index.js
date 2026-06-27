@@ -65,6 +65,8 @@ export default function InstructorAssignments() {
       ai_feedback_model: values.ai_feedback_model,
       ai_feedback_temperature: values.ai_feedback_temperature,
       ai_feedback_style: values.ai_feedback_style,
+      ai_feedback_max_requests: values.ai_feedback_max_requests ?? null,
+      ai_feedback_wait_seconds: values.ai_feedback_wait_seconds ?? 0,
     };
     const validData = Object.fromEntries(
       Object.entries(assignmentData).filter(([_, value]) => value !== undefined)

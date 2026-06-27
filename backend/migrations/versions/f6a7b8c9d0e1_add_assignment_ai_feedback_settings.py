@@ -17,8 +17,12 @@ depends_on = None
 def upgrade():
     op.execute("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ai_feedback_prompts JSON")
     op.execute("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ai_allowed_inputs JSON")
+    op.execute("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ai_feedback_max_requests INTEGER")
+    op.execute("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ai_feedback_wait_seconds INTEGER DEFAULT 0")
 
 
 def downgrade():
+    op.execute("ALTER TABLE assignments DROP COLUMN IF EXISTS ai_feedback_wait_seconds")
+    op.execute("ALTER TABLE assignments DROP COLUMN IF EXISTS ai_feedback_max_requests")
     op.execute("ALTER TABLE assignments DROP COLUMN IF EXISTS ai_allowed_inputs")
     op.execute("ALTER TABLE assignments DROP COLUMN IF EXISTS ai_feedback_prompts")

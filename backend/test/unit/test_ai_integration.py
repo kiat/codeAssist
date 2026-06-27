@@ -33,6 +33,27 @@ def test_build_feedback_prompt_uses_professional_default_prompt():
     assert "Improvement Suggestions" in prompt
 
 
+def test_build_feedback_prompt_uses_filtered_context_without_old_code_block():
+    prompt = build_feedback_prompt(
+        base_prompt="Review this submission.",
+        past_insights="No prior insights.",
+        code="print('secret implementation')",
+        autograder_results='{"output":"secret stdout"}',
+        style_instruction="Feedback style: balanced.",
+        feedback_context={
+            "assignment_description": "Practice recursion.",
+            "test_results": '{"score": 1}',
+        },
+    )
+
+    assert "Practice recursion." in prompt
+    assert '{"score": 1}' in prompt
+    assert "Student code:" not in prompt
+    assert prompt.count("Autograder results:") == 1
+    assert "print('secret implementation')" not in prompt
+    assert "secret stdout" not in prompt
+
+
 def test_parse_feedback_json_accepts_escaped_newlines_inside_code_patterns():
     raw_response = (
         '{"insights":["Overall Summary: Feedback is available."],'

@@ -79,6 +79,8 @@ ai_feedback_model
 ai_feedback_prompt
 ai_feedback_temperature
 ai_feedback_style
+ai_feedback_max_requests
+ai_feedback_wait_seconds
 ```
 
 Recommended default:
@@ -86,6 +88,27 @@ Recommended default:
 ```text
 Use course default
 ```
+
+## AI Feedback Usage Limits
+
+Instructors can configure how often students may request AI feedback for an assignment.
+
+### Maximum Feedback Requests
+
+`ai_feedback_max_requests` controls how many times each student can ask for AI feedback on an assignment.
+
+* Empty/null: unlimited requests
+* 0: AI feedback requests disabled
+* Positive number: maximum requests per student
+
+### Thinking Time Between Requests
+
+`ai_feedback_wait_seconds` controls how many seconds students must wait before requesting AI feedback again.
+
+* 0: no wait time
+* Positive number: required wait time in seconds
+
+These settings are stored at the assignment level. Student-facing enforcement, countdown display, and remaining request count will be handled in a follow-up student-side workflow.
 
 ---
 

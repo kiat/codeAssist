@@ -4,6 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CreateAssignment from "../../../../../pages/instructor/assignments/CreateAssignment";
 import { getCourseInfo } from "../../../../../services/course";
+import { createAssignment } from "../../../../../services/assignment";
 
 jest.mock("../../../../../services/course", () => ({
   getCourseInfo: jest.fn(),
@@ -25,6 +26,10 @@ jest.mock("../../../../../pages/configureAutograder/AutograderSection", () => ()
 
 jest.mock("../../../../../pages/configureAutograder/TestAutograder", () => () => (
   <div data-testid="test-autograder" />
+));
+
+jest.mock("../../../../../pages/result/TestResultsDisplay", () => () => (
+  <div data-testid="test-results-display" />
 ));
 
 jest.mock("react-router-dom", () => ({
@@ -75,6 +80,7 @@ describe("CreateAssignment AI prompt defaults", () => {
         },
       ],
     });
+    createAssignment.mockResolvedValue({ id: "assignment-1" });
   });
 
   afterEach(() => {
@@ -102,7 +108,39 @@ describe("CreateAssignment AI prompt defaults", () => {
     ).toBeInTheDocument();
 
     expect(screen.getByText("AI Input Permissions")).toBeInTheDocument();
+    expect(screen.getByText("AI Feedback Usage Limits")).toBeInTheDocument();
     expect(screen.getByLabelText("Assignment description")).toBeChecked();
     expect(screen.getByLabelText("Student solution code")).toBeChecked();
+  });
+
+  it("includes AI usage limits in the create assignment payload", async () => {
+    const user = userEvent.setup();
+
+    render(<CreateAssignmentHarness />);
+
+    await waitFor(() => expect(getCourseInfo).toHaveBeenCalled());
+
+    await user.type(screen.getByLabelText(/assignment name/i), "Loops");
+    await user.click(screen.getAllByRole("switch")[1]);
+
+    await user.type(
+      await screen.findByLabelText("Maximum feedback requests per student"),
+      "3"
+    );
+
+    const waitSecondsInput = screen.getByLabelText("Thinking time between requests");
+    await user.clear(waitSecondsInput);
+    await user.type(waitSecondsInput, "60");
+
+    await user.click(screen.getByRole("button", { name: /create assignment/i }));
+
+    await waitFor(() => {
+      expect(createAssignment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ai_feedback_max_requests: 3,
+          ai_feedback_wait_seconds: 60,
+        })
+      );
+    });
   });
 });

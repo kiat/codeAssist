@@ -1,5 +1,16 @@
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Card, Checkbox, Col, Form, Input, Row, Space, Typography } from "antd";
+import {
+  Button,
+  Card,
+  Checkbox,
+  Col,
+  Form,
+  Input,
+  InputNumber,
+  Row,
+  Space,
+  Typography,
+} from "antd";
 import { createAiFeedbackPrompt } from "../constants/aiFeedbackSettings";
 
 const INPUT_PERMISSIONS = [
@@ -125,6 +136,26 @@ export default function AIFeedbackSettingsSection() {
             </Col>
           ))}
         </Row>
+      </div>
+
+      <div>
+        <Typography.Title level={5}>AI Feedback Usage Limits</Typography.Title>
+
+        <Form.Item
+          label="Maximum feedback requests per student"
+          name="ai_feedback_max_requests"
+          extra="Leave empty for unlimited requests. Use 0 to disable AI feedback requests."
+        >
+          <InputNumber min={0} style={{ width: "100%" }} />
+        </Form.Item>
+
+        <Form.Item
+          label="Thinking time between requests"
+          name="ai_feedback_wait_seconds"
+          extra="Students must wait this many seconds before asking for AI feedback again. Use 0 for no wait time."
+        >
+          <InputNumber min={0} addonAfter="seconds" style={{ width: "100%" }} />
+        </Form.Item>
       </div>
     </Space>
   );

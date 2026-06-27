@@ -9,6 +9,7 @@ from ai_feedback.settings import (
     get_enabled_feedback_prompt,
     normalize_allowed_inputs,
     normalize_feedback_prompts,
+    normalize_non_negative_int,
     serialize_assignment_ai_settings,
     split_ai_settings_payload,
     update_assignment_ai_settings,
@@ -154,6 +155,22 @@ def test_split_ai_settings_payload_separates_settings_without_mutating_source():
     assert "feedback_prompts" in payload
 
 
+def test_split_ai_settings_payload_separates_usage_limit_settings():
+    payload = {
+        "name": "Loops",
+        "ai_feedback_max_requests": 3,
+        "ai_feedback_wait_seconds": 60,
+    }
+
+    assignment_payload, ai_settings_payload = split_ai_settings_payload(payload)
+
+    assert assignment_payload == {"name": "Loops"}
+    assert ai_settings_payload == {
+        "ai_feedback_max_requests": 3,
+        "ai_feedback_wait_seconds": 60,
+    }
+
+
 def test_build_allowed_feedback_context_excludes_unapproved_code_and_outputs():
     assignment = SimpleNamespace(
         name="Recursion Lab",
@@ -214,6 +231,8 @@ def test_serialize_assignment_ai_settings_combines_existing_model_and_feedback_s
         ],
         ai_feedback_temperature=0.3,
         ai_feedback_style="balanced",
+        ai_feedback_max_requests=5,
+        ai_feedback_wait_seconds=120,
         ai_allowed_inputs={"student_code": False},
     )
 
@@ -223,5 +242,99 @@ def test_serialize_assignment_ai_settings_combines_existing_model_and_feedback_s
     assert settings["use_course_ai_default"] is False
     assert settings["ai_feedback_provider"] == "gemini"
     assert settings["ai_feedback_model"] == "gemini-1.5-flash"
-    assert settings["feedback_prompts"][0]["id"] == "edge_cases"
-    assert settings["allowed_inputs"]["student_code"] is False
+    assert settings["ai_feedback_prompts"][0]["id"] == "edge_cases"
+    assert settings["ai_allowed_inputs"]["student_code"] is False
+    assert "feedback_prompts" not in settings
+    assert "allowed_inputs" not in settings
+    assert settings["ai_feedback_max_requests"] == 5
+    assert settings["ai_feedback_wait_seconds"] == 120
+
+
+def test_serialize_assignment_ai_settings_defaults_wait_seconds_to_zero():
+    assignment = SimpleNamespace(
+        ai_feedback_prompts=None,
+        ai_feedback_prompt=None,
+        ai_allowed_inputs=None,
+        ai_feedback_wait_seconds=None,
+    )
+
+    settings = serialize_assignment_ai_settings(assignment)
+
+    assert settings["ai_feedback_max_requests"] is None
+    assert settings["ai_feedback_wait_seconds"] == 0
+
+
+def test_update_assignment_ai_settings_saves_usage_limit_settings():
+    assignment = SimpleNamespace(
+        use_course_ai_default=True,
+        ai_feedback_provider="openai",
+        ai_feedback_model="gpt-4o-mini",
+        ai_feedback_max_requests=None,
+        ai_feedback_wait_seconds=0,
+    )
+
+    update_assignment_ai_settings(
+        assignment,
+        {
+            "ai_feedback_max_requests": 3,
+            "ai_feedback_wait_seconds": 300,
+        },
+    )
+
+    assert assignment.ai_feedback_max_requests == 3
+    assert assignment.ai_feedback_wait_seconds == 300
+
+
+def test_update_assignment_ai_settings_allows_unlimited_max_requests():
+    assignment = SimpleNamespace(
+        use_course_ai_default=True,
+        ai_feedback_provider=None,
+        ai_feedback_model=None,
+        ai_feedback_max_requests=3,
+        ai_feedback_wait_seconds=0,
+    )
+
+    update_assignment_ai_settings(assignment, {"ai_feedback_max_requests": None})
+
+    assert assignment.ai_feedback_max_requests is None
+
+
+@pytest.mark.parametrize("value", [-1, "3", True, 1.5])
+def test_update_assignment_ai_settings_rejects_invalid_max_requests(value):
+    assignment = SimpleNamespace(
+        use_course_ai_default=True,
+        ai_feedback_provider=None,
+        ai_feedback_model=None,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="ai_feedback_max_requests must be a non-negative integer",
+    ):
+        update_assignment_ai_settings(
+            assignment,
+            {"ai_feedback_max_requests": value},
+        )
+
+
+@pytest.mark.parametrize("value", [-1, "60", False, 1.5, None])
+def test_update_assignment_ai_settings_rejects_invalid_wait_seconds(value):
+    assignment = SimpleNamespace(
+        use_course_ai_default=True,
+        ai_feedback_provider=None,
+        ai_feedback_model=None,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="ai_feedback_wait_seconds must be a non-negative integer",
+    ):
+        update_assignment_ai_settings(
+            assignment,
+            {"ai_feedback_wait_seconds": value},
+        )
+
+
+def test_normalize_non_negative_int_allows_zero_and_positive_values():
+    assert normalize_non_negative_int(0, "field") == 0
+    assert normalize_non_negative_int(10, "field") == 10

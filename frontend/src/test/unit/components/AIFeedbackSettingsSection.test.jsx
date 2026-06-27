@@ -17,6 +17,8 @@ function Harness() {
       initialValues={{
         ai_feedback_prompts: DEFAULT_AI_FEEDBACK_PROMPTS,
         ai_allowed_inputs: DEFAULT_AI_ALLOWED_INPUTS,
+        ai_feedback_max_requests: null,
+        ai_feedback_wait_seconds: 0,
       }}
     >
       <AIFeedbackSettingsSection />
@@ -49,6 +51,16 @@ describe("AIFeedbackSettingsSection", () => {
     expect(screen.getByLabelText("Assignment description")).toBeChecked();
     expect(screen.getByLabelText("Student solution code")).toBeChecked();
     expect(screen.getByLabelText("Test cases")).not.toBeChecked();
+  });
+
+  it("renders usage limit inputs with default wait time", () => {
+    render(<Harness />);
+
+    expect(screen.getByText("AI Feedback Usage Limits")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Maximum feedback requests per student")
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Thinking time between requests")).toHaveValue("0");
   });
 
   it("adds a blank enabled prompt for the instructor to edit", async () => {

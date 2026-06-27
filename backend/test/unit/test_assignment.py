@@ -91,7 +91,7 @@ def test_get_assignment_empty(client, mocker):
 
 
 def test_get_assignment_ai_settings_returns_normalized_defaults(client, mocker):
-    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query = mocker.patch("routes.ai_feedback.db.session.query")
     mock_assignment = Assignment(
         id="assignment-uuid",
         name="AI Assignment",
@@ -104,20 +104,24 @@ def test_get_assignment_ai_settings_returns_normalized_defaults(client, mocker):
 
     assert resp.status_code == 200
     assert resp.json["ai_feedback_enabled"] is True
-    assert resp.json["feedback_prompts"][0]["id"] == "check_correctness"
-    assert resp.json["allowed_inputs"]["student_code"] is True
-    assert resp.json["allowed_inputs"]["test_cases"] is False
+    assert resp.json["ai_feedback_prompts"][0]["id"] == "check_correctness"
+    assert resp.json["ai_allowed_inputs"]["student_code"] is True
+    assert resp.json["ai_allowed_inputs"]["test_cases"] is False
+    assert "feedback_prompts" not in resp.json
+    assert "allowed_inputs" not in resp.json
+    assert resp.json["ai_feedback_max_requests"] is None
+    assert resp.json["ai_feedback_wait_seconds"] == 0
 
 
 def test_update_assignment_ai_settings_saves_prompts_and_allowed_inputs(client, mocker):
-    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query = mocker.patch("routes.ai_feedback.db.session.query")
     mock_assignment = Assignment(
         id="assignment-uuid",
         name="AI Assignment",
         ai_feedback_enabled=True,
     )
     mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
-    mock_commit = mocker.patch("routes.assignment.db.session.commit")
+    mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
@@ -137,6 +141,8 @@ def test_update_assignment_ai_settings_saves_prompts_and_allowed_inputs(client, 
                 "test_cases": False,
                 "student_output": False,
             },
+            "ai_feedback_max_requests": 3,
+            "ai_feedback_wait_seconds": 60,
         },
     )
 
@@ -145,14 +151,16 @@ def test_update_assignment_ai_settings_saves_prompts_and_allowed_inputs(client, 
     assert mock_assignment.ai_feedback_prompt == "Explain failed tests without solving."
     assert mock_assignment.ai_allowed_inputs["student_code"] is False
     assert mock_assignment.ai_allowed_inputs["student_output"] is False
+    assert mock_assignment.ai_feedback_max_requests == 3
+    assert mock_assignment.ai_feedback_wait_seconds == 60
     mock_commit.assert_called_once()
 
 
 def test_update_assignment_ai_settings_rejects_invalid_prompt(client, mocker):
-    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query = mocker.patch("routes.ai_feedback.db.session.query")
     mock_assignment = Assignment(id="assignment-uuid", name="AI Assignment")
     mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
-    mock_rollback = mocker.patch("routes.assignment.db.session.rollback")
+    mock_rollback = mocker.patch("routes.ai_feedback.db.session.rollback")
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",

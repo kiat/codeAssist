@@ -96,6 +96,8 @@ export default () => {
         ai_feedback_model,
         ai_feedback_temperature,
         ai_feedback_style,
+        ai_feedback_max_requests,
+        ai_feedback_wait_seconds,
       } = res.data || {};
 
       setPubBefore(published);
@@ -123,6 +125,8 @@ export default () => {
         ai_feedback_model: ai_feedback_model || undefined,
         ai_feedback_temperature: ai_feedback_temperature ?? 0.5,
         ai_feedback_style: ai_feedback_style || "balanced",
+        ai_feedback_max_requests: ai_feedback_max_requests ?? null,
+        ai_feedback_wait_seconds: ai_feedback_wait_seconds ?? 0,
       });
     });
   }, [assignmentId, form, loadCourseAiInfo]);
@@ -247,6 +251,8 @@ export default () => {
       ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
       ai_feedback_temperature: values.ai_feedback_temperature ?? null,
       ai_feedback_style: values.ai_feedback_style ?? null,
+      ai_feedback_max_requests: values.ai_feedback_max_requests ?? null,
+      ai_feedback_wait_seconds: values.ai_feedback_wait_seconds ?? 0,
     };
 
     const validData = Object.fromEntries(

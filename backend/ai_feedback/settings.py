@@ -82,6 +82,8 @@ AI_FEEDBACK_SETTING_KEYS = {
     "ai_feedback_model",
     "ai_feedback_temperature",
     "ai_feedback_style",
+    "ai_feedback_max_requests",
+    "ai_feedback_wait_seconds",
 }
 
 
@@ -229,6 +231,19 @@ def normalize_allowed_inputs(value, validate=False):
     return normalized_inputs
 
 
+def normalize_non_negative_int(value, field_name, allow_null=False):
+    if value is None and allow_null:
+        return None
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field_name} must be a non-negative integer")
+
+    if value < 0:
+        raise ValueError(f"{field_name} must be a non-negative integer")
+
+    return value
+
+
 def serialize_assignment_ai_settings(assignment):
     feedback_prompts = normalize_feedback_prompts(
         getattr(assignment, "ai_feedback_prompts", None),
@@ -255,8 +270,16 @@ def serialize_assignment_ai_settings(assignment):
             None,
         ),
         "ai_feedback_style": getattr(assignment, "ai_feedback_style", None),
-        "feedback_prompts": feedback_prompts,
-        "allowed_inputs": allowed_inputs,
+        "ai_feedback_max_requests": getattr(
+            assignment,
+            "ai_feedback_max_requests",
+            None,
+        ),
+        "ai_feedback_wait_seconds": getattr(
+            assignment,
+            "ai_feedback_wait_seconds",
+            None,
+        ) or 0,
         "ai_feedback_prompts": feedback_prompts,
         "ai_allowed_inputs": allowed_inputs,
     }
@@ -301,6 +324,19 @@ def update_assignment_ai_settings(assignment, data):
 
     if "ai_feedback_style" in data:
         assignment.ai_feedback_style = data["ai_feedback_style"]
+
+    if "ai_feedback_max_requests" in data:
+        assignment.ai_feedback_max_requests = normalize_non_negative_int(
+            data.get("ai_feedback_max_requests"),
+            "ai_feedback_max_requests",
+            allow_null=True,
+        )
+
+    if "ai_feedback_wait_seconds" in data:
+        assignment.ai_feedback_wait_seconds = normalize_non_negative_int(
+            data.get("ai_feedback_wait_seconds"),
+            "ai_feedback_wait_seconds",
+        )
 
     if "ai_feedback_temperature" in data:
         temperature = data["ai_feedback_temperature"]
