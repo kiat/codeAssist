@@ -1,4 +1,4 @@
-import { mock, setup } from "mockjs";
+import { mock, setup } from "better-mock";
 
 export default function IMock(url, func, type = "get") {
   setup({
