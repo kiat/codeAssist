@@ -28,9 +28,10 @@ def upgrade():
     op.create_foreign_key('enrollments_student_id_fkey', 'enrollments', 'users', ['student_id'], ['id'], ondelete='CASCADE')
     op.create_foreign_key('enrollments_course_id_fkey', 'enrollments', 'courses', ['course_id'], ['id'], ondelete='CASCADE')
 
-    # Table: courses
+    # Table: courses — instructor_id uses RESTRICT to prevent accidental deletion
+    # of all courses, assignments, and student grades when removing an instructor.
     op.drop_constraint('courses_instructor_id_fkey', 'courses', type_='foreignkey')
-    op.create_foreign_key('courses_instructor_id_fkey', 'courses', 'users', ['instructor_id'], ['id'], ondelete='CASCADE')
+    op.create_foreign_key('courses_instructor_id_fkey', 'courses', 'users', ['instructor_id'], ['id'], ondelete='RESTRICT')
 
     # Table: assignments
     op.drop_constraint('assignments_course_id_fkey', 'assignments', type_='foreignkey')

@@ -9,11 +9,10 @@ import time
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, current_app, session
-from flask_cors import cross_origin
 from api import db
 from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course, Enrollment
 from api.schemas import CodeDraftSchema, SubmissionSchema
-from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError, ForbiddenError
+from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError, ForbiddenError, TooManyRequestsError
 from openai import OpenAI
 from util.encryption_utils import decrypt_api_key
 from ai_feedback.integration import async_get_ai_feedback
@@ -46,26 +45,26 @@ def _check_run_code_rate_limit(student_id):
             _run_code_timestamps[student_id] = [now]
             return
         if len(timestamps) >= _RUN_CODE_RATE_LIMIT:
-            raise BadRequestError("Too many run requests. Please wait a moment and try again.")
+            raise TooManyRequestsError("Too many run requests. Please wait a moment and try again.")
         timestamps.append(now)
 
 
 def _verify_student(student_id):
     """Verify that the authenticated session user matches the requested student_id.
-    Checks Flask session first, then falls back to DB lookup.
-    Raises 403 if session doesn't match, 400 if student_id is invalid."""
+    Checks session first (cheap, no DB), then queries the DB only if authenticated.
+    This avoids leaking which UUIDs exist via different error messages."""
     if not student_id:
         raise BadRequestError("Missing student_id")
-    # Check that the user exists in the database
-    user = db.session.query(User).filter_by(id=student_id).first()
-    if not user:
-        raise BadRequestError("Invalid student_id: user not found")
-    # Check that the authenticated session matches the requested student_id
+    # Check session FIRST — avoids leaking valid UUIDs to unauthenticated callers
     session_user_id = session.get("user_id")
     if not session_user_id:
         raise ForbiddenError("Not authenticated. Please log in.")
     if session_user_id != student_id:
         raise ForbiddenError("You can only access your own data")
+    # Session matches — now verify the user actually exists in the database
+    user = db.session.query(User).filter_by(id=student_id).first()
+    if not user:
+        raise NotFoundError("User not found")
     return user
 
 
@@ -86,7 +85,6 @@ def get_docker_client():
 
 
 @code_editor.route('/save_code_draft', methods=["POST"])
-@cross_origin()
 def save_code_draft():
     """
     Save a code draft (auto-save or manual save).
@@ -134,7 +132,6 @@ def save_code_draft():
 
 
 @code_editor.route('/get_code_drafts', methods=["GET"])
-@cross_origin()
 def get_code_drafts():
     """
     Get code drafts for a student/assignment.
@@ -175,7 +172,6 @@ def get_code_drafts():
 
 
 @code_editor.route('/get_latest_draft', methods=["GET"])
-@cross_origin()
 def get_latest_draft():
     """
     Get the latest code draft for a student/assignment.
@@ -203,7 +199,6 @@ def get_latest_draft():
 
 
 @code_editor.route('/submit_code', methods=["POST"])
-@cross_origin()
 def submit_code():
     """
     Submit code directly from the code editor (no file upload needed).
@@ -609,7 +604,6 @@ def _run_autograder_in_container(image, content, file_name, assignment_id, timeo
 
 
 @code_editor.route('/run_code', methods=["POST"])
-@cross_origin()
 def run_code():
     """
     Run code without creating a submission.
@@ -748,7 +742,6 @@ def run_code():
 
 
 @code_editor.route('/ai_chat', methods=["POST"])
-@cross_origin()
 def ai_chat():
     """
     Chat with AI about the current code.
