@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from functools import reduce
 from flask import Blueprint, request, jsonify, current_app
-from flask_cors import CORS, cross_origin
 from api import db
 from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
@@ -38,7 +37,6 @@ def allowed_file(filename):
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @submission.route('/get_submissions', methods=["GET"])
-@cross_origin()
 def get_submissions():
     '''
     /get_submissions gets all submissions by a student for an assignment
@@ -66,7 +64,6 @@ def get_submissions():
 
     
 @submission.route('/upload_submission', methods=["POST"])
-@cross_origin()
 def upload_submission():
     if "file" not in request.files:
         raise BadRequestError("No file part")
@@ -315,7 +312,6 @@ def upload_submission():
 
 
 @submission.route('/upload_assignment_autograder', methods=["POST"])
-@cross_origin()
 def upload_assignment_autograder():
     if "file" not in request.files:
         raise BadRequestError("No file part")
@@ -380,7 +376,6 @@ def upload_assignment_autograder():
 
 
 @submission.route('/get_results', methods=["GET"])
-@cross_origin(origins='*')
 def get_results():
     '''
     /get_results gets reseults of a student's submission
@@ -406,7 +401,6 @@ def get_results():
 
 
 @submission.route('/get_latest_submission', methods=["GET"])
-@cross_origin()
 def get_latest_submission():
     student_id = request.args.get("student_id")
     assignment_id = request.args.get("assignment_id")
@@ -430,7 +424,6 @@ def get_latest_submission():
     return jsonify(submission_data), 200
 
 @submission.route('/get_all_assignment_submissions', methods=["GET"])
-@cross_origin()
 def get_all_assignment_submissions():
     assignment_id = request.args.get("assignment_id")
 
@@ -453,7 +446,6 @@ def get_all_assignment_submissions():
     return jsonify(submissions_data), 200
 
 @submission.route('/delete_submission', methods=["DELETE"])
-@cross_origin()
 def delete_submission():
     submission_id = request.args.get("submission_id")
 
@@ -475,7 +467,6 @@ def delete_submission():
     return jsonify({"message": "Submission successfully deleted"}), 200
 
 @submission.route('/get_submission_details', methods=["GET"])
-@cross_origin()
 def get_submission_details():
     '''
     /get_student_by_id gets the submission details from the db
@@ -677,7 +668,6 @@ def rerun_submission_autograder():
 
 
 @submission.route('/get_active_submission', methods=["GET"])
-@cross_origin()
 def get_active_submission():
     '''
 
@@ -699,7 +689,6 @@ def get_active_submission():
 
 
 @submission.route('/activate_submission', methods=["POST"])
-@cross_origin()
 def activate_submission():
     '''
     Activates a submission and deactivates any currently active submission for the same assignment and student.
@@ -733,7 +722,6 @@ def activate_submission():
 
 
 @submission.route('/test_autograder_submission', methods=["POST"])
-@cross_origin()
 def test_autograder_submission():
     if "submission_file" not in request.files or "autograder_zip" not in request.files:
         raise BadRequestError("Missing required files: submission_file and autograder_zip")

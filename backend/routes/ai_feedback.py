@@ -1,5 +1,4 @@
 from flask import Blueprint, jsonify, request
-from flask_cors import cross_origin
 
 from ai_feedback.settings import (
     serialize_assignment_ai_settings,
@@ -53,7 +52,6 @@ def _require_instructor_or_ta_for_assignment(assignment_obj):
 
 
 @ai_feedback.route("/assignments/<assignment_id>/ai-settings", methods=["GET"])
-@cross_origin()
 def get_assignment_ai_settings(assignment_id):
     assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
 
@@ -66,7 +64,6 @@ def get_assignment_ai_settings(assignment_id):
 
 
 @ai_feedback.route("/assignments/<assignment_id>/ai-settings", methods=["PUT"])
-@cross_origin()
 def update_assignment_ai_settings_route(assignment_id):
     assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
 
