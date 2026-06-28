@@ -1,4 +1,4 @@
-from ai_integration import (
+from ai_feedback.integration import (
     DEFAULT_FEEDBACK_PROMPT,
     RETURN_SPEC,
     build_feedback_prompt,
@@ -31,6 +31,27 @@ def test_build_feedback_prompt_uses_professional_default_prompt():
 
     assert "Always provide useful feedback" in prompt
     assert "Improvement Suggestions" in prompt
+
+
+def test_build_feedback_prompt_uses_filtered_context_without_old_code_block():
+    prompt = build_feedback_prompt(
+        base_prompt="Review this submission.",
+        past_insights="No prior insights.",
+        code="print('secret implementation')",
+        autograder_results='{"output":"secret stdout"}',
+        style_instruction="Feedback style: balanced.",
+        feedback_context={
+            "assignment_description": "Practice recursion.",
+            "test_results": '{"score": 1}',
+        },
+    )
+
+    assert "Practice recursion." in prompt
+    assert '{"score": 1}' in prompt
+    assert "Student code:" not in prompt
+    assert prompt.count("Autograder results:") == 1
+    assert "print('secret implementation')" not in prompt
+    assert "secret stdout" not in prompt
 
 
 def test_parse_feedback_json_accepts_escaped_newlines_inside_code_patterns():
@@ -129,7 +150,7 @@ def test_gemini_feedback_request_reserves_tokens_for_json(monkeypatch):
         captured_request["json"] = json
         return FakeGeminiResponse()
 
-    monkeypatch.setattr("ai_integration.requests.post", fake_post)
+    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
 
     parsed, new_insights = get_structured_feedback_from_gemini(
         api_key="gemini-key",

@@ -18,6 +18,11 @@ from util.errors import InternalProcessingError, NotFoundError
 from util.encryption_utils import decrypt_api_key
 from api.models import Assignment, Submission, User, Course
 from api import db
+from ai_feedback.settings import (
+    build_allowed_feedback_context,
+    get_enabled_feedback_prompt,
+    render_feedback_context,
+)
 
 
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -201,18 +206,26 @@ def build_feedback_prompt(
     code,
     autograder_results,
     style_instruction,
+    feedback_context=None,
 ):
     """Constructs the full prompt sent to the AI model."""
+    if feedback_context is None:
+        context_text = (
+            "Student code:\n"
+            f"{code}\n\n"
+            "Autograder results:\n"
+            f"{autograder_results}\n\n"
+        )
+    else:
+        context_text = f"{render_feedback_context(feedback_context)}\n\n"
+
     return (
         f"{base_prompt or DEFAULT_FEEDBACK_PROMPT}\n\n"
         f"{style_instruction}\n\n"
         f"{RETURN_SPEC}\n\n"
         "Past student insights:\n"
         f"{past_insights}\n\n"
-        "Student code:\n"
-        f"{code}\n\n"
-        "Autograder results:\n"
-        f"{autograder_results}\n\n"
+        f"{context_text}"
     )
 
 
@@ -590,8 +603,8 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
 
         past_insights = student.coding_insights or "No prior insights."
 
-        custom_prompt = (assignment.ai_feedback_prompt or "").strip()
-        base_prompt = custom_prompt if custom_prompt else DEFAULT_FEEDBACK_PROMPT
+        prompt_config = get_enabled_feedback_prompt(assignment)
+        base_prompt = prompt_config.get("prompt") or DEFAULT_FEEDBACK_PROMPT
         style_instruction = get_feedback_style_instruction(assignment, course)
 
         provider, model = get_provider_and_model(assignment, course)
@@ -603,12 +616,19 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
             flush=True,
         )
 
+        feedback_context = build_allowed_feedback_context(
+            assignment=assignment,
+            code_text=code_text,
+            autograder_results=results_json_content,
+        )
+
         prompt = build_feedback_prompt(
             base_prompt,
             past_insights,
             code_text,
             results_json_content,
             style_instruction,
+            feedback_context=feedback_context,
         )
 
         print(f"AI_FEEDBACK: Calling {provider}", flush=True)
