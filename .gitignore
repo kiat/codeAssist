@@ -139,4 +139,4 @@ node_modules
 
 # Local stress test outputs
 backend/test/stress/results/
-backend/test/stress/generated_assignments.json
+backend/test/stress/generated_assignments.jsonbackend/test/stress/stress_test_results_*.json
