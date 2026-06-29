@@ -494,6 +494,10 @@ def test_ai_chat_not_enabled(client, mocker):
 def test_ai_chat_no_api_key(client, mocker):
     mocker.patch("routes.code_editor._verify_student")
     mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
 
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True

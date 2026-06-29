@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from ai_feedback.settings import (
+    normalize_feedback_prompts,
     serialize_assignment_ai_settings,
     update_assignment_ai_settings,
 )

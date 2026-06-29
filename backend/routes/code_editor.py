@@ -16,6 +16,14 @@ from util.errors import BadRequestError, NotFoundError, InternalProcessingError,
 from openai import OpenAI
 from util.encryption_utils import decrypt_api_key
 from ai_feedback.integration import async_get_ai_feedback
+from ai_feedback.settings import (
+    check_feedback_limits,
+    get_enabled_feedback_prompt,
+    record_feedback_request,
+    get_student_feedback_status,
+    get_chat_history,
+    store_chat_message,
+)
 import docker
 
 logger = logging.getLogger(__name__)
@@ -745,14 +753,15 @@ def run_code():
 def ai_chat():
     """
     Chat with AI about the current code.
-    Expects JSON: { student_id, assignment_id, message, code }
-    Returns: { reply: "..." }
+    Expects JSON: { student_id, assignment_id, message, code, prompt_id? }
+    Returns: { reply: "...", feedback_status: { remaining, wait_seconds } }
     """
     data = request.json
     student_id = data.get("student_id")
     assignment_id = data.get("assignment_id")
     user_message = data.get("message")
     code = data.get("code", "")
+    prompt_id = data.get("prompt_id")
 
     _verify_student(student_id)
 
@@ -772,6 +781,20 @@ def ai_chat():
     # Verify student is enrolled in the course to prevent quota abuse
     _verify_enrollment(student_id, assignment.course_id)
 
+    # Check feedback limits (max_requests + wait_seconds)
+    limits = check_feedback_limits(assignment, student_id)
+    if not limits["allowed"]:
+        raise TooManyRequestsError(limits["message"])
+
+    # Validate prompt_id if provided
+    if prompt_id:
+        try:
+            prompt_config = get_enabled_feedback_prompt(assignment, prompt_id)
+            # Use the instructor-configured prompt as the system context
+            user_message = f"{prompt_config['prompt']}\n\n{user_message}"
+        except ValueError as e:
+            raise BadRequestError(str(e))
+
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
     if not course or not course.openai_api_key:
         raise BadRequestError("AI is not configured for this course. Please ask your instructor to set up an API key.")
@@ -788,21 +811,42 @@ def ai_chat():
         model = "gpt-4-turbo"
     temperature = assignment.ai_feedback_temperature if assignment and assignment.ai_feedback_temperature else 0.5
 
-    system_prompt = (
+    # Get conversation history for AI memory
+    chat_history = get_chat_history(student_id, assignment_id)
+
+    # Get student's coding insights for personalized feedback
+    student = db.session.query(User).filter_by(id=student_id).first()
+    coding_insights = getattr(student, 'coding_insights', None) or "No prior coding history available."
+
+    # Get assignment description for reference solution comparison
+    assignment_description = str(getattr(assignment, 'description', '') or '')
+    if not assignment_description:
+        assignment_description = str(getattr(assignment, 'name', '') or '')
+
+    # Build enhanced system prompt with student history context
+    system_content = (
         "You are an AI coding assistant for a programming course. "
         "Help students understand their code, debug issues, and improve their solutions. "
         "Do NOT provide the complete solution. Give hints, guiding questions, and explanations. "
-        "Keep responses concise and encouraging."
+        "Keep responses concise and encouraging.\n\n"
+        f"Student's past coding patterns and areas for improvement:\n{coding_insights}\n\n"
+        f"Assignment context: {assignment_description}"
     )
 
+    # Build messages array with history
+    messages = [{"role": "system", "content": system_content}]
+
+    # Add conversation history (last 20 messages for context)
+    for msg in chat_history[-20:]:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+
+    # Add current user message with code context
     user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
+    messages.append({"role": "user", "content": user_prompt})
 
     try:
         response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             model=model,
             max_tokens=500,
             temperature=float(temperature),
@@ -820,4 +864,53 @@ def ai_chat():
             raise BadRequestError(f"AI model '{model}' is not available. Please contact your instructor.")
         raise InternalProcessingError(f"Failed to get AI response: {type(e).__name__}")
 
-    return jsonify({"reply": reply}), 200
+    # Store messages for AI memory (wrapped in try/except so failures don't break the response)
+    try:
+        # Store a concise version of the student message (not the full code dump)
+        store_chat_message(student_id, assignment_id, "user", user_message, prompt_id)
+        store_chat_message(student_id, assignment_id, "assistant", reply)
+    except Exception as e:
+        logger.warning(f"AI_CHAT: Failed to store chat message: {e}")
+
+    # Record the feedback request
+    record_feedback_request(student_id, assignment_id, prompt_id)
+
+    # Get updated status
+    status = get_student_feedback_status(assignment, student_id)
+
+    return jsonify({"reply": reply, "feedback_status": status}), 200
+
+
+@code_editor.route('/ai_feedback_status', methods=["GET"])
+def ai_feedback_status():
+    """
+    Get the student's current AI feedback request status for an assignment.
+    Query params: student_id, assignment_id
+    Returns: { remaining, wait_seconds, max_requests, total_requests }
+    """
+    student_id = request.args.get("student_id")
+    assignment_id = request.args.get("assignment_id")
+
+    _verify_student(student_id)
+
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    if not assignment.ai_feedback_enabled:
+        return jsonify({
+            "remaining": 0,
+            "wait_seconds": 0,
+            "max_requests": 0,
+            "total_requests": 0,
+            "ai_feedback_enabled": False,
+        }), 200
+
+    _verify_enrollment(student_id, assignment.course_id)
+
+    status = get_student_feedback_status(assignment, student_id)
+    status["ai_feedback_enabled"] = True
+    return jsonify(status), 200
