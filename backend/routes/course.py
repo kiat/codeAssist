@@ -2,7 +2,7 @@ import uuid
 import os
 import csv
 import requests
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 from sqlalchemy.exc import IntegrityError
@@ -259,8 +259,10 @@ def update_course():
     if not all(field in data for field in required_fields):
         raise BadRequestError("Missing required fields")
 
-    requester_id = data.get("requester_id")
-    if requester_id and get_user_course_role(requester_id, data["course_id"]) != "instructor":
+    requester_id = session.get("user_id")
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+    if get_user_course_role(requester_id, data["course_id"]) != "instructor":
         raise ForbiddenError("Only instructors can update course settings")
 
     # Check that updated entryCode is unique or already owned by the class
@@ -286,10 +288,13 @@ def update_course():
 @cross_origin()
 def delete_course():
     course_id = request.args.get("course_id")
-    requester_id = request.args.get("requester_id")
+    requester_id = session.get("user_id")
 
-    if not course_id or not requester_id:
+    if not course_id:
         raise BadRequestError("Missing required fields")
+
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
 
     if get_user_course_role(requester_id, course_id) != "instructor":
         raise ForbiddenError("Only instructors can delete a course")
@@ -323,12 +328,15 @@ def delete_course():
 @cross_origin()
 def delete_all_assignments():
     course_id = request.args.get("course_id")
-    requester_id = request.args.get("requester_id")
+    requester_id = session.get("user_id")
 
     if not course_id or course_id == "":
         raise BadRequestError("Missing course_id argument")
 
-    if not requester_id or get_user_course_role(requester_id, course_id) != "instructor":
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    if get_user_course_role(requester_id, course_id) != "instructor":
         raise ForbiddenError("Only instructors can delete all assignments")
 
     # Check if there are any assignments for this course
@@ -403,12 +411,16 @@ def create_enrollment():
 @cross_origin()
 def update_role():
     data = request.json
-    required_fields = ["student_id", "course_id", "new_role", "requester_id"]
+    required_fields = ["student_id", "course_id", "new_role"]
 
     if not all(field in data for field in required_fields):
         raise BadRequestError("Missing required fields")
 
-    if get_user_course_role(data["requester_id"], data["course_id"]) != "instructor":
+    requester_id = session.get("user_id")
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    if get_user_course_role(requester_id, data["course_id"]) != "instructor":
         raise ForbiddenError("Only instructors can change enrollment roles")
 
     # Update the role in the database
@@ -571,7 +583,7 @@ def get_my_enrollment_role():
 
     role = get_user_course_role(user_id, course_id)
     if role is None:
-        raise NotFoundError("Enrollment not found")
+        raise ForbiddenError("Not authorized")
 
     return jsonify({"role": role.lower()}), 200
 
@@ -718,7 +730,7 @@ def update_ai_settings():
     data = request.json
 
     course_id = data.get("course_id")
-    requester_id = data.get("requester_id")
+    requester_id = session.get("user_id")
     provider = data.get("provider")
     model_name = data.get("model_name")
     api_key = data.get("api_key")
@@ -728,7 +740,10 @@ def update_ai_settings():
     if not course_id:
         raise BadRequestError("Missing course_id")
 
-    if not requester_id or get_user_course_role(requester_id, course_id) != "instructor":
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    if get_user_course_role(requester_id, course_id) != "instructor":
         raise ForbiddenError("Only instructors can update AI settings")
 
     course_obj = db.session.query(Course).filter_by(id=course_id).first()
