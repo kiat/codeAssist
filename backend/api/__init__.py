@@ -1,4 +1,5 @@
 import os
+import logging
 from flask import Flask
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import SQLAlchemy
@@ -31,8 +32,15 @@ def create_app(config_class='config.Config'):
     
     # Initialize the extensions with the app
     # Lock CORS to the actual frontend origin to prevent CSRF on credentialed requests.
-    # FRONTEND_ORIGIN must be set in production; defaults to localhost only for dev.
-    frontend_origin = os.environ.get('FRONTEND_ORIGIN', 'http://localhost:3000')
+    # FRONTEND_ORIGIN must be set in production; defaults to localhost only for dev.        frontend_origin = os.environ.get('FRONTEND_ORIGIN')
+    if not frontend_origin:
+        _logger = logging.getLogger(__name__)
+        _logger.warning(
+            "FRONTEND_ORIGIN environment variable is not set. "
+            "Defaulting to http://localhost:3000 for development only. "
+            "Set FRONTEND_ORIGIN to your actual frontend URL in production."
+        )
+        frontend_origin = 'http://localhost:3000'
     CORS(app, supports_credentials=True, origins=[frontend_origin])
     ma.init_app(app)
     db.init_app(app)
