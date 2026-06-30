@@ -32,7 +32,8 @@ def create_app(config_class='config.Config'):
     
     # Initialize the extensions with the app
     # Lock CORS to the actual frontend origin to prevent CSRF on credentialed requests.
-    # FRONTEND_ORIGIN must be set in production; defaults to localhost only for dev.        frontend_origin = os.environ.get('FRONTEND_ORIGIN')
+    # FRONTEND_ORIGIN must be set in production; defaults to localhost only for dev.
+    frontend_origin = os.environ.get('FRONTEND_ORIGIN')
     if not frontend_origin:
         _logger = logging.getLogger(__name__)
         _logger.warning(
