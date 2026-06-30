@@ -4,6 +4,7 @@ import { URL_PREFIX } from "../config/url";
 
 const instance = axios.create({
   baseURL: URL_PREFIX,
+  withCredentials: true,
 });
 
 instance.interceptors.response.use(

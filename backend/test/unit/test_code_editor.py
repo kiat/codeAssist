@@ -31,6 +31,9 @@ def test_save_code_draft_success(client, mocker):
     # No existing drafts — version should be 1
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = None
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
         "assignment_id": "asgn-1",
@@ -49,7 +52,8 @@ def test_save_code_draft_success(client, mocker):
     mock_commit.assert_called_once()
 
 
-def test_save_code_draft_missing_fields(client):
+def test_save_code_draft_missing_fields(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
         # missing assignment_id and content
@@ -58,7 +62,8 @@ def test_save_code_draft_missing_fields(client):
     assert "Missing required fields" in resp.get_json()["message"]
 
 
-def test_save_code_draft_content_too_long(client):
+def test_save_code_draft_content_too_long(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
         "assignment_id": "asgn-1",
@@ -78,6 +83,9 @@ def test_save_code_draft_increments_version(client, mocker):
     existing_draft.version_number = 3
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = existing_draft
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
         "assignment_id": "asgn-1",
@@ -94,6 +102,9 @@ def test_save_code_draft_auto_saved_flag(client, mocker):
     mock_commit = mocker.patch("routes.code_editor.db.session.commit")
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = None
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
 
     resp = client.post("/save_code_draft", json={
         "student_id": "stu-1",
@@ -119,6 +130,9 @@ def test_get_code_drafts_success(client, mocker):
     mock_query.return_value.filter_by.return_value.order_by.return_value.all.return_value = fake_drafts
     mock_schema.return_value.dump.return_value = fake_drafts
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
     resp = client.get("/get_code_drafts?student_id=stu-1&assignment_id=asgn-1")
     assert resp.status_code == 200
     assert resp.get_json() == fake_drafts
@@ -135,6 +149,9 @@ def test_get_code_drafts_empty(client, mocker):
     mock_schema = mocker.patch("routes.code_editor.CodeDraftSchema")
     mock_query.return_value.filter_by.return_value.order_by.return_value.all.return_value = []
     mock_schema.return_value.dump.return_value = []
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
 
     resp = client.get("/get_code_drafts?student_id=stu-1&assignment_id=asgn-1")
     assert resp.status_code == 200
@@ -153,6 +170,9 @@ def test_get_latest_draft_success(client, mocker):
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = fake_draft
     mock_schema.return_value.dump.return_value = fake_draft
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
     resp = client.get("/get_latest_draft?student_id=stu-1&assignment_id=asgn-1")
     assert resp.status_code == 200
     assert resp.get_json()["content"] == "print('latest')"
@@ -161,6 +181,9 @@ def test_get_latest_draft_success(client, mocker):
 def test_get_latest_draft_not_found(client, mocker):
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = None
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
 
     resp = client.get("/get_latest_draft?student_id=stu-1&assignment_id=asgn-1")
     assert resp.status_code == 200
@@ -178,7 +201,8 @@ def test_get_latest_draft_missing_params(client):
 # submit_code
 # ---------------------------------------------------------------------------
 
-def test_submit_code_missing_fields(client):
+def test_submit_code_missing_fields(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/submit_code", json={
         "student_id": "stu-1",
         # missing assignment_id and content
@@ -187,7 +211,8 @@ def test_submit_code_missing_fields(client):
     assert "Missing required fields" in resp.get_json()["message"]
 
 
-def test_submit_code_content_too_long(client):
+def test_submit_code_content_too_long(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/submit_code", json={
         "student_id": "stu-1",
         "assignment_id": "asgn-1",
@@ -198,6 +223,7 @@ def test_submit_code_content_too_long(client):
 
 
 def test_submit_code_assignment_not_found(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None
 
@@ -211,6 +237,7 @@ def test_submit_code_assignment_not_found(client, mocker):
 
 
 def test_submit_code_assignment_not_published(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     mock_assignment = mocker.Mock()
     mock_assignment.published = False
 
@@ -230,8 +257,12 @@ def test_submit_code_assignment_not_published(client, mocker):
 def test_submit_code_past_due_date(client, mocker):
     from datetime import datetime, timezone, timedelta
 
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
+
     mock_assignment = mocker.Mock()
     mock_assignment.published = True
+    mock_assignment.enable_code_editor = True
     mock_assignment.late_submission = False
     mock_assignment.published_date = None
     mock_assignment.due_date = datetime.now(timezone.utc) - timedelta(days=1)
@@ -260,10 +291,154 @@ def test_submit_code_past_due_date(client, mocker):
 
 
 # ---------------------------------------------------------------------------
+# run_code
+# ---------------------------------------------------------------------------
+
+def test_run_code_assignment_not_found(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._check_run_code_rate_limit")
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    resp = client.post("/run_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "notfound",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 404
+    assert "not found" in resp.get_json()["message"].lower()
+
+
+def test_run_code_not_published(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._check_run_code_rate_limit")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.post("/run_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 400
+    assert "not published" in resp.get_json()["message"].lower()
+
+
+def test_run_code_editor_not_enabled(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._check_run_code_rate_limit")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = True
+    mock_assignment.enable_code_editor = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.post("/run_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 400
+    assert "not enabled" in resp.get_json()["message"].lower()
+
+
+def test_run_code_not_enrolled(client, mocker):
+    from util.errors import ForbiddenError
+
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._check_run_code_rate_limit")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = True
+    mock_assignment.enable_code_editor = True
+    mock_assignment.course_id = "course-1"
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    mocker.patch("routes.code_editor._verify_enrollment", side_effect=ForbiddenError("You are not enrolled in this course"))
+
+    resp = client.post("/run_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 403
+    assert "not enrolled" in resp.get_json()["message"].lower()
+
+
+def test_submit_code_editor_not_enabled(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = True
+    mock_assignment.enable_code_editor = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.post("/submit_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 400
+    assert "not enabled" in resp.get_json()["message"].lower()
+
+
+def test_submit_code_not_enrolled(client, mocker):
+    from util.errors import ForbiddenError
+
+    mocker.patch("routes.code_editor._verify_student")
+    mock_assignment = mocker.Mock()
+    mock_assignment.published = True
+    mock_assignment.enable_code_editor = True
+    mock_assignment.course_id = "course-1"
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    mocker.patch("routes.code_editor._verify_enrollment", side_effect=ForbiddenError("You are not enrolled in this course"))
+
+    resp = client.post("/submit_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 403
+    assert "not enrolled" in resp.get_json()["message"].lower()
+
+
+def test_rate_limit_evicts_idle_keys(client, mocker):
+    from routes.code_editor import _run_code_timestamps, _run_code_rate_lock, _check_run_code_rate_limit, _RUN_CODE_RATE_WINDOW
+    import time
+
+    # Simulate entries that are outside the window
+    old_time = time.time() - _RUN_CODE_RATE_WINDOW - 10
+    with _run_code_rate_lock:
+        _run_code_timestamps["stu-old"] = [old_time]
+
+    # Call rate limiter — should prune old timestamp and record current request
+    _check_run_code_rate_limit("stu-old")
+
+    # Old timestamp evicted; new request recorded — entry has exactly 1 timestamp
+    with _run_code_rate_lock:
+        assert "stu-old" in _run_code_timestamps
+        assert len(_run_code_timestamps["stu-old"]) == 1
+
+    # Cleanup
+    with _run_code_rate_lock:
+        _run_code_timestamps.pop("stu-old", None)
+
+
+# ---------------------------------------------------------------------------
 # ai_chat
 # ---------------------------------------------------------------------------
 
-def test_ai_chat_missing_fields(client):
+def test_ai_chat_missing_fields(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/ai_chat", json={
         "student_id": "stu-1",
         # missing message
@@ -272,7 +447,8 @@ def test_ai_chat_missing_fields(client):
     assert "Missing" in resp.get_json()["message"]
 
 
-def test_ai_chat_missing_assignment(client):
+def test_ai_chat_missing_assignment(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     resp = client.post("/ai_chat", json={
         "student_id": "stu-1",
         "message": "help me",
@@ -283,6 +459,7 @@ def test_ai_chat_missing_assignment(client):
 
 
 def test_ai_chat_assignment_not_found(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None
 
@@ -297,6 +474,7 @@ def test_ai_chat_assignment_not_found(client, mocker):
 
 
 def test_ai_chat_not_enabled(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = False
 
@@ -314,6 +492,9 @@ def test_ai_chat_not_enabled(client, mocker):
 
 
 def test_ai_chat_no_api_key(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
+
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
 
