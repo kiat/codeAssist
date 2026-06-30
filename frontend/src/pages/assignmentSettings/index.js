@@ -80,28 +80,11 @@ export default () => {
   );
 
   const getAssignmentInfo = useCallback(() => {
-    getAssignment({ assignment_id: assignmentId }).then((res) => {
-      const {
-        name,
-        published,
-        due_date,
-        autograder_points,
-        course_id,
-        published_date,
-        late_submission,
-        late_due_date,
-        ai_feedback_enabled,
-        use_course_ai_default,
-        ai_feedback_provider,
-        ai_feedback_prompt,
-        ai_feedback_prompts,
-        ai_allowed_inputs,
-        ai_feedback_model,
-        ai_feedback_temperature,
-        ai_feedback_style,
-        ai_feedback_max_requests,
-        ai_feedback_wait_seconds,
-      } = res.data || {};
+    getAssignment({ assignment_id: assignmentId }).then(res => {
+      const { name, published, due_date, autograder_points, course_id, published_date,
+        hold_results,
+        ai_feedback_enabled, ai_feedback_prompt, ai_feedback_model, ai_feedback_temperature } = res.data || {};
+        setPubBefore(published);
 
       setPubBefore(published);
       setOGPub(published_date);
@@ -113,6 +96,7 @@ export default () => {
       form.setFieldsValue({
         name,
         published,
+        hold_results: hold_results ?? false,
         autograderPoints: autograder_points,
         dueDate: due_date ? moment.utc(due_date).local() : null,
         releaseDate: published_date ? moment.utc(published_date).local() : null,
@@ -245,6 +229,9 @@ export default () => {
       published: values.published,
       published_date: publishedDate,
 
+      hold_results: values.hold_results ?? false,
+
+      // AI Feedback Config
       ai_feedback_enabled: !!values.enableAiFeedback,
       use_course_ai_default: values.use_course_ai_default !== false,
       ai_feedback_provider:
@@ -317,7 +304,31 @@ export default () => {
               ]}
             />
           </Form.Item>
-
+          <Form.Item
+            label='HOLD RESULTS'
+            name='hold_results'
+            valuePropName='checked'
+            extra='When enabled, students see their submission was received but cannot view scores or test results until you release them.'
+          >
+            <Checkbox>Hold results from students</Checkbox>
+          </Form.Item>
+          {/* NEED TO CONNECT TO BACKEND  */}
+          {/* <Form.Item label='SUBMISSION ANONYMIZATION'>
+            <Checkbox>Enable Anonymous Grading</Checkbox>
+            <div style={{ marginLeft: "24px", color: "grey" }}>
+              Hide identifiable student information from being listed with
+              submissions.
+            </div>
+          </Form.Item> */} 
+          {/* <Form.Item label='CANVAS ASSIGNMENT'>
+            <Space>
+              <Input style={{ width: "205px" }} />
+              <Button>Change</Button>
+              <Button danger type='primary'>
+                Unlink
+              </Button>
+            </Space>
+          </Form.Item> */}
           <Form.Item>
             <Row gutter={20}>
               <Col>

@@ -38,6 +38,7 @@ export default function AssignmentResult() {
 
   // used to check if AI Feedback has been enabled on this assignment
   const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true);
+  const [holdResults, setHoldResults] = useState(false);
   
   useEffect(() => {
     // Fetching student and assignment IDs based on this submission ID
@@ -125,6 +126,7 @@ export default function AssignmentResult() {
           setLateAllowed(res.data.late_submission);
           setLateDueDate(moment(res.data.late_due_date).valueOf());
           setAiFeedbackEnabled(res.data.ai_feedback_enabled);
+          setHoldResults(res.data.hold_results ?? false);
           if (extension?.data.due_date_extension) {
             setDueDate(moment(extension.data.due_date_extension).valueOf());
           }
@@ -238,12 +240,17 @@ export default function AssignmentResult() {
               ]}
             />
             <Card bordered={false}>
-              {toSend && (
+              {toSend && userInfo?.isStudent && holdResults ? (
+                <div style={{ padding: "40px 0", textAlign: "center", color: "#888" }}>
+                  <p style={{ fontSize: 16 }}>Your submission was received.</p>
+                  <p>Results will be visible once the instructor releases them.</p>
+                </div>
+              ) : toSend && (
                 <TestResultsDisplay
                   viewMode={viewMode}
                   assignmentName={assignmentName}
                   studentName={assignmentInfo?.studentName ?? userInfo?.name}
-                  score={assignmentInfo?.score ?? "Unknown"} // Replace with actual score data as needed
+                  score={assignmentInfo?.score ?? "Unknown"}
                   totalPoints={autoGraderPoints}
                   data={toSend}
                   aiFeedbackEnabled={aiFeedbackEnabled}

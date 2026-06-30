@@ -172,39 +172,39 @@ export default ({
       const firstPrompt =
         feedbackPrompts.find((prompt) => prompt.enabled) || feedbackPrompts[0];
       const payload = {
-        name: values.name,
-        course_id: courseId,
-        published_date: toIso(values.releaseDate),
-        published: releaseDate ? releaseDate <= now : false,
-        due_date: toIso(values.dueDate),
-        late_due_date: toIso(values.lateDueDate),
-        late_submission: !!values.allowLateSubmissions,
-        enable_group: !!values.groupSubmission,
-        group_size: values.limitGroupSize ? Number(values.limitGroupSize) : null,
-        manual_grading: !!values.manualGrading,
-        autograder_points: values.autograderPoints
-          ? Number(values.autograderPoints)
-          : null,
-        enable_code_editor: !!values.enable_code_editor,
-        ai_feedback_enabled: !!values.ai_feedback_enabled,
-        use_course_ai_default: values.use_course_ai_default !== false,
-        ai_feedback_provider:
+      name: values.name,
+      course_id: courseId,
+      published_date: toIso(values.releaseDate),
+      published: releaseDate ? releaseDate <= now : false,
+      due_date: toIso(values.dueDate),
+      late_due_date: toIso(values.lateDueDate),
+      late_submission: !!values.allowLateSubmissions,
+      enable_group: !!values.groupSubmission, 
+      group_size: values.limitGroupSize ? Number(values.limitGroupSize) : null,
+      manual_grading: !!values.manualGrading,
+      autograder_points: values.autograderPoints ? Number(values.autograderPoints) : null,
+      enable_code_editor: !!values.enable_code_editor,
+      ai_feedback_enabled: !!values.ai_feedback_enabled,
+      use_course_ai_default: values.use_course_ai_default !== false,
+      ai_feedback_prompt: values.ai_feedback_prompt ?? null,
+      ai_feedback_provider:
           values.use_course_ai_default === false
             ? values.ai_feedback_provider
             : null,
-        ai_feedback_model:
+       ai_feedback_model:
           values.use_course_ai_default === false
             ? values.ai_feedback_model
             : null,
-        ai_feedback_prompt: firstPrompt?.prompt ?? null,
-        ai_feedback_prompts: feedbackPrompts,
-        ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
-        ai_feedback_temperature: values.ai_feedback_temperature ?? null,
+      ai_feedback_temperature: values.ai_feedback_temperature ?? null,
+      ai_feedback_prompt: firstPrompt?.prompt ?? null,
+      ai_feedback_prompts: feedbackPrompts,
+      ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
+      hold_results: !!values.hold_results,
         ai_feedback_style: values.ai_feedback_style ?? null,
         ai_feedback_max_requests: values.ai_feedback_max_requests ?? null,
         ai_feedback_wait_seconds: values.ai_feedback_wait_seconds ?? 0,
-      };
-
+    };
+        
       const assignment = await createAssignment(payload);
 
       const assignmentId =
@@ -645,6 +645,15 @@ export default ({
                           </Form.Item>
                         </>
                       )}
+
+                    <Form.Item
+                      label="HOLD RESULTS"
+                      name="hold_results"
+                      valuePropName="checked"
+                      extra="When enabled, students see their submission was received but cannot view scores or test results until you release them."
+                    >
+                      <Checkbox>Hold results from students</Checkbox>
+                    </Form.Item>
 
                     <Form.Item
                       label="CONFIGURE AUTOGRADER"
