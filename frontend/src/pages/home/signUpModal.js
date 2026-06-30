@@ -2,6 +2,7 @@ import { Button, Form, Input, Modal, Radio } from "antd";
 import { useContext } from "react";
 import { GlobalContext } from "../../App";
 import { createUser } from "../../services/user";
+import { getPasswordRules } from "../../utils/assignmentData";
 
 /**
  * user signup window modal
@@ -66,10 +67,7 @@ export default function SignUpModal({ open, onCancel }) {
         <Form.Item
           label="Password"
           name="password"
-          rules={[
-            { required: true, message: "Please enter a password" },
-            { min: 6, message: "Password must be at least 6 characters" },
-          ]}
+          rules={getPasswordRules()}
         >
           <Input.Password placeholder="Your Password" />
         </Form.Item>
