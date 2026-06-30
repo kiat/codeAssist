@@ -6,8 +6,8 @@ import ExpandedSidebar from "./ExpandedSidebar";
 
 export default function RootSider({ pathname, courseInfo, userInfo, assignmentInfo, onLeaveCourse }) {
   const [collapsed, setCollapsed] = useState(false);
-  const { updateCourseInfo } = useContext(GlobalContext);
-  
+  const { updateCourseInfo, updateCourseRole } = useContext(GlobalContext);
+
   const toggleCollapsed = () => {
     setCollapsed(!collapsed);
   };
@@ -31,6 +31,15 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
         });
     }
   }, [courseInfo, updateCourseInfo]);
+
+  useEffect(() => {
+    if (courseInfo.id && userInfo.id) {
+      fetch(`${process.env.REACT_APP_API_URL}/get_my_enrollment_role?user_id=${userInfo.id}&course_id=${courseInfo.id}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => { if (data?.role) updateCourseRole(data.role); })
+        .catch(() => {});
+    }
+  }, [courseInfo.id, userInfo.id, updateCourseRole]);
 
   return (
     <Layout.Sider

@@ -5,14 +5,15 @@ import { CheckCircleOutlined } from '@ant-design/icons';
 import { GlobalContext } from '../App';
 
 function RegradeRequests() {
-  const { userInfo, courseInfo } = useContext(GlobalContext);
+  const { userInfo, courseInfo, courseRole } = useContext(GlobalContext);
+  const isStudent = (courseRole || (userInfo?.isStudent ? "student" : "instructor")) === "student";
   const [requests, setRequests] = useState([]);
 
   useEffect(() => {
     const fetchRequests = async () => {
       try {
         console.log("course info:", courseInfo.id)
-        const endpoint = userInfo.isStudent
+        const endpoint = isStudent
           ? `${process.env.REACT_APP_API_URL}/get_student_regrade_requests?student_id=${userInfo.id}&course_id=${courseInfo.id}`
           : `${process.env.REACT_APP_API_URL}/get_instructor_regrade_requests?course_id=${courseInfo.id}`;
 
@@ -83,7 +84,7 @@ function RegradeRequests() {
       <Card bordered={false}>
         <Table
           dataSource={requests}
-          columns={userInfo.isStudent ? studentColumns : columns}
+          columns={isStudent ? studentColumns : columns}
           rowKey="id"
         />
       </Card>

@@ -317,6 +317,9 @@ def test_delete_assignment_not_found(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
     resp = client.delete("/delete_assignment?assignment_id=notfound-id")
     assert resp.status_code == 404
     assert "Assignment not found" in resp.json["message"]
@@ -324,12 +327,23 @@ def test_delete_assignment_not_found(client, mocker):
 
 def test_delete_assignment_with_submissions(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
-    mock_submission = Submission(id="sub-id", assignment_id="assign-id")
-    mock_query.return_value.filter_by.return_value.all.return_value = [mock_submission]
-    mock_query.return_value.get.return_value = Assignment(id="assign-id")
-
     mock_delete = mocker.patch("routes.assignment.db.session.delete")
     mock_commit = mocker.patch("routes.assignment.db.session.commit")
+
+    mock_assignment = Assignment(id="assign-id", course_id="course-uuid")
+    mock_enrollment = mocker.Mock()
+    mock_enrollment.role = "instructor"
+    mock_submission = Submission(id="sub-id", assignment_id="assign-id")
+
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,   # assignment auth lookup
+        mock_enrollment,   # enrollment auth lookup
+    ]
+    mock_query.return_value.filter.return_value.all.return_value = [mock_submission]
+    mock_query.return_value.filter_by.return_value.delete.return_value = None
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
 
     resp = client.delete("/delete_assignment?assignment_id=assign-id")
     assert resp.status_code == 200
@@ -343,10 +357,20 @@ def test_delete_submissions(client, mocker):
     mock_commit = mocker.patch("routes.assignment.db.session.commit")
     mock_delete = mocker.patch("routes.assignment.db.session.delete")
 
-    mock_query.return_value.filter_by.return_value.all.side_effect = [
-        [Submission(id="sub-1"), Submission(id="sub-2")],
-        []
+    mock_assignment = Assignment(id="assign-id", course_id="course-uuid")
+    mock_enrollment = mocker.Mock()
+    mock_enrollment.role = "instructor"
+
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,  # assignment_for_auth lookup
+        mock_enrollment,  # enrollment auth lookup
     ]
+    mock_query.return_value.filter_by.return_value.all.return_value = [
+        Submission(id="sub-1"), Submission(id="sub-2")
+    ]
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
 
     resp = client.delete("/delete_submissions?assignment_id=assign-id")
     assert resp.status_code == 200
@@ -469,3 +493,51 @@ def test_get_courses_instructor(client, mocker):
     assert resp.status_code == 200
     assert len(resp.json) == 1
     assert resp.json[0]["id"] == "course-3"
+
+
+# ---------------------------------------------------------------------------
+# Negative-path auth tests (session-based guards)
+# ---------------------------------------------------------------------------
+
+def test_delete_assignment_unauthenticated(client):
+    resp = client.delete("/delete_assignment?assignment_id=assign-id")
+    assert resp.status_code == 403
+    assert "Not authenticated" in resp.json["message"]
+
+
+def test_delete_assignment_student_forbidden(client, mocker):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_assignment = Assignment(id="assign-id", course_id="course-uuid")
+    mock_enrollment = mocker.Mock()
+    mock_enrollment.role = "student"
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,
+        mock_enrollment,
+    ]
+    with client.session_transaction() as sess:
+        sess["user_id"] = "student-uuid"
+    resp = client.delete("/delete_assignment?assignment_id=assign-id")
+    assert resp.status_code == 403
+    assert "Only instructors" in resp.json["message"]
+
+
+def test_delete_submissions_unauthenticated(client):
+    resp = client.delete("/delete_submissions?assignment_id=assign-id")
+    assert resp.status_code == 403
+    assert "Not authenticated" in resp.json["message"]
+
+
+def test_delete_submissions_ta_forbidden(client, mocker):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_assignment = Assignment(id="assign-id", course_id="course-uuid")
+    mock_enrollment = mocker.Mock()
+    mock_enrollment.role = "ta"
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,
+        mock_enrollment,
+    ]
+    with client.session_transaction() as sess:
+        sess["user_id"] = "ta-uuid"
+    resp = client.delete("/delete_submissions?assignment_id=assign-id")
+    assert resp.status_code == 403
+    assert "Only instructors" in resp.json["message"]

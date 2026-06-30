@@ -47,8 +47,8 @@ const courseFooterStyle = {
 
 export default function Course({ courseInfo }) {
     const navigate = useNavigate();
-    const { userInfo, updateCourseInfo } = useContext(GlobalContext);
-    const { name, assignments, description, id, semester } = courseInfo;
+    const { updateCourseInfo, updateCourseRole } = useContext(GlobalContext);
+    const { name, assignments, description, id, semester, enrollment_role } = courseInfo;
 
     function handleCourseClick() {
         updateCourseInfo({
@@ -58,7 +58,10 @@ export default function Course({ courseInfo }) {
             year: courseInfo.year || "",
         });
 
-        const destination = userInfo.isStudent ? `/assignments/${id}` : `/instructorDashboard/${id}`;
+        const role = enrollment_role || "student";
+        updateCourseRole(role);
+
+        const destination = role === "student" ? `/assignments/${id}` : `/instructorDashboard/${id}`;
         navigate(destination);
     }
 

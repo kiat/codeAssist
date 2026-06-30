@@ -16,7 +16,7 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('assignments', sa.Column('enable_code_editor', sa.Boolean(), server_default='false', nullable=False))
+    op.execute("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS enable_code_editor BOOLEAN DEFAULT 'false' NOT NULL")
 
 
 def downgrade():

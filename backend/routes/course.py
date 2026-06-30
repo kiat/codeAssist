@@ -2,7 +2,7 @@ import uuid
 import os
 import csv
 import requests
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 from sqlalchemy.exc import IntegrityError
@@ -28,6 +28,12 @@ from openai import OpenAI
 course = Blueprint("course", __name__)
 
 ALLOWED_EXTENSIONS = {'csv'}
+
+def get_user_course_role(user_id, course_id):
+    enrollment = db.session.query(Enrollment).filter_by(
+        student_id=user_id, course_id=course_id
+    ).first()
+    return enrollment.role if enrollment else None
 UPLOAD_FOLDER = 'uploads'
 SUPPORTED_AI_PROVIDERS = {"openai", "gemini", "claude"}
 
@@ -252,7 +258,13 @@ def update_course():
 
     if not all(field in data for field in required_fields):
         raise BadRequestError("Missing required fields")
-    
+
+    requester_id = session.get("user_id")
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+    if get_user_course_role(requester_id, data["course_id"]) != "instructor":
+        raise ForbiddenError("Only instructors can update course settings")
+
     # Check that updated entryCode is unique or already owned by the class
     existing_class = db.session.query(Course).filter_by(entryCode=data["entryCode"]).first()
     if existing_class and existing_class.id != data["course_id"]:
@@ -276,11 +288,17 @@ def update_course():
 @cross_origin()
 def delete_course():
     course_id = request.args.get("course_id")
-    
-    # Check for course_id
+    requester_id = session.get("user_id")
+
     if not course_id:
         raise BadRequestError("Missing required fields")
-    
+
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    if get_user_course_role(requester_id, course_id) != "instructor":
+        raise ForbiddenError("Only instructors can delete a course")
+
     course = db.session.query(Course).filter_by(id=course_id).first()
     
     if not course:
@@ -310,8 +328,16 @@ def delete_course():
 @cross_origin()
 def delete_all_assignments():
     course_id = request.args.get("course_id")
+    requester_id = session.get("user_id")
+
     if not course_id or course_id == "":
         raise BadRequestError("Missing course_id argument")
+
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    if get_user_course_role(requester_id, course_id) != "instructor":
+        raise ForbiddenError("Only instructors can delete all assignments")
 
     # Check if there are any assignments for this course
     assignments = (db.session.query(Assignment).filter_by(course_id=course_id).all())
@@ -390,13 +416,20 @@ def update_role():
     if not all(field in data for field in required_fields):
         raise BadRequestError("Missing required fields")
 
+    requester_id = session.get("user_id")
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    if get_user_course_role(requester_id, data["course_id"]) != "instructor":
+        raise ForbiddenError("Only instructors can change enrollment roles")
+
     # Update the role in the database
     enrollment = db.session.query(Enrollment).filter_by(student_id=data["student_id"], course_id=data["course_id"]).first()
     if not enrollment:
         raise NotFoundError("Enrollment not found")
     
     try:
-        enrollment.role = data["new_role"]
+        enrollment.role = data["new_role"].lower()
         db.session.commit()
         newEnrollment = EnrollmentSchema().dump(enrollment, many=False)
         return jsonify(newEnrollment), 200
@@ -539,6 +572,22 @@ def create_enrollment_csv():
 
     return jsonify(response), 200
 
+@course.route("/get_my_enrollment_role", methods=["GET"])
+@cross_origin()
+def get_my_enrollment_role():
+    user_id = request.args.get("user_id")
+    course_id = request.args.get("course_id")
+
+    if not user_id or not course_id:
+        raise BadRequestError("Missing user_id or course_id")
+
+    role = get_user_course_role(user_id, course_id)
+    if role is None:
+        raise ForbiddenError("Not authorized")
+
+    return jsonify({"role": role.lower()}), 200
+
+
 @course.route("/get_user_enrollments", methods=["GET"])
 @cross_origin()
 def get_user_enrollments():
@@ -550,11 +599,15 @@ def get_user_enrollments():
     user_id = request.args.get("user_id")
     if not user_id or user_id == "":
         raise BadRequestError("Missing user_id argument")
-    
-    enrollments = db.session.query(Enrollment).filter_by(student_id=user_id)
-    course_ids = [course.course_id for course in enrollments]
+
+    enrollments = db.session.query(Enrollment).filter_by(student_id=user_id).all()
+    enrollment_role_by_course = {e.course_id: e.role for e in enrollments}
+    course_ids = list(enrollment_role_by_course.keys())
     courses_query = db.session.query(Course).filter(Course.id.in_(course_ids))
     courses = CourseSchema().dump(courses_query, many=True)
+
+    for c in courses:
+        c["enrollment_role"] = (enrollment_role_by_course.get(c["id"]) or "student").lower()
 
     return jsonify(courses), 200
 
@@ -677,6 +730,7 @@ def update_ai_settings():
     data = request.json
 
     course_id = data.get("course_id")
+    requester_id = session.get("user_id")
     provider = data.get("provider")
     model_name = data.get("model_name")
     api_key = data.get("api_key")
@@ -685,6 +739,12 @@ def update_ai_settings():
 
     if not course_id:
         raise BadRequestError("Missing course_id")
+
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    if get_user_course_role(requester_id, course_id) != "instructor":
+        raise ForbiddenError("Only instructors can update AI settings")
 
     course_obj = db.session.query(Course).filter_by(id=course_id).first()
 
