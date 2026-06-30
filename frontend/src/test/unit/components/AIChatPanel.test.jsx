@@ -138,7 +138,7 @@ describe("AIChatPanel", () => {
 
     await waitFor(() => {
       expect(onSendMessage).toHaveBeenCalledWith(
-        "Check correctness prompt",
+        "Check correctness",
         "print('hello')",
         "check_correctness"
       );

@@ -160,12 +160,16 @@ const AIChatPanel = forwardRef(function AIChatPanel(
   const handlePromptClick = async (prompt) => {
     if (isDisabled) return;
 
+    // Send the prompt title as the user message, NOT the full prompt text.
+    // The backend resolves the full prompt via prompt_id and prepends it only
+    // for the OpenAI API call — this avoids inflating chat history with
+    // redundant prompt text and prevents the prompt being sent twice.
     const userMsg = { role: "user", content: prompt.title };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
     try {
-      const result = await onSendMessage(prompt.prompt, code, prompt.id);
+      const result = await onSendMessage(prompt.title, code, prompt.id);
       // Handle both old format (string) and new format (object with reply + feedback_status)
       const reply =
         typeof result === "string" ? result : result?.reply || "No response received.";

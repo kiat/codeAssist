@@ -291,12 +291,23 @@ def delete_user():
         raise BadRequestError("Invalid user id") 
 
     
-    user = db.session.query(User).filter_by(id=user_id).first()
-    if not user:
+    user_obj = db.session.query(User).filter_by(id=user_id).first()
+    if not user_obj:
         raise NotFoundError("User Not Found")
-    # user = UserSchema().dump(user)
+
+    # Guard: prevent deleting an instructor who still has courses.
+    # The courses.instructor_id FK uses RESTRICT, so a plain delete would
+    # raise an IntegrityError.  Check here to return a clear 409 instead.
+    if user_obj.role == "instructor":
+        course_count = db.session.query(Course).filter_by(instructor_id=user_id).count()
+        if course_count > 0:
+            raise ConflictError(
+                f"Cannot delete instructor: they are assigned to {course_count} course(s). "
+                "Reassign or remove their courses first."
+            )
+
     try:
-        db.session.delete(user)
+        db.session.delete(user_obj)
         db.session.commit()
     except Exception as e:
         db.session.rollback()

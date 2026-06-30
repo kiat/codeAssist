@@ -786,12 +786,12 @@ def ai_chat():
     if not limits["allowed"]:
         raise TooManyRequestsError(limits["message"])
 
-    # Validate prompt_id if provided
+    # Validate prompt_id if provided and resolve the instructor prompt for API context
+    instructor_prompt_text = None
     if prompt_id:
         try:
             prompt_config = get_enabled_feedback_prompt(assignment, prompt_id)
-            # Use the instructor-configured prompt as the system context
-            user_message = f"{prompt_config['prompt']}\n\n{user_message}"
+            instructor_prompt_text = prompt_config['prompt']
         except ValueError as e:
             raise BadRequestError(str(e))
 
@@ -840,8 +840,9 @@ def ai_chat():
     for msg in chat_history[-20:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
 
-    # Add current user message with code context
-    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
+    # Build the user prompt for the API (prepend instructor prompt if available)
+    api_user_message = f"{instructor_prompt_text}\n\n{user_message}" if instructor_prompt_text else user_message
+    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {api_user_message}"
     messages.append({"role": "user", "content": user_prompt})
 
     try:
@@ -864,16 +865,21 @@ def ai_chat():
             raise BadRequestError(f"AI model '{model}' is not available. Please contact your instructor.")
         raise InternalProcessingError(f"Failed to get AI response: {type(e).__name__}")
 
-    # Store messages for AI memory (wrapped in try/except so failures don't break the response)
+    # Store messages for AI memory — store the raw user message only (without
+    # the instructor prompt prepended) so chat history stays concise and avoids
+    # redundant prompt text when loaded for subsequent requests.
     try:
-        # Store a concise version of the student message (not the full code dump)
         store_chat_message(student_id, assignment_id, "user", user_message, prompt_id)
         store_chat_message(student_id, assignment_id, "assistant", reply)
     except Exception as e:
         logger.warning(f"AI_CHAT: Failed to store chat message: {e}")
 
-    # Record the feedback request
-    record_feedback_request(student_id, assignment_id, prompt_id)
+    # Record the feedback request (wrapped so a DB error doesn't 500 after a
+    # successful AI reply has already been generated).
+    try:
+        record_feedback_request(student_id, assignment_id, prompt_id)
+    except Exception as e:
+        logger.warning(f"AI_CHAT: Failed to record feedback request: {e}")
 
     # Get updated status
     status = get_student_feedback_status(assignment, student_id)
