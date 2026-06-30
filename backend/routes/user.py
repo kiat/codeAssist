@@ -2,8 +2,7 @@ import uuid
 import requests
 import random
 import string
-from flask import Blueprint, request, jsonify, current_app
-from flask_cors import cross_origin
+from flask import Blueprint, request, jsonify, current_app, session
 from api import db
 from api.models import User, Course, AdminEmail
 from api.schemas import UserSchema, CourseSchema
@@ -14,7 +13,6 @@ from util.encryption_utils import hash_password, verify_password, needs_rehash, 
 user = Blueprint('user', __name__)
 
 @user.route('/create_user', methods=["POST"])
-@cross_origin()
 def create_user():
     '''
     /create_user creates a user and generates a sis_user_id in the database
@@ -79,7 +77,6 @@ def create_user():
     return jsonify(res), 201
 
 @user.route('/user_login', methods=["POST"])
-@cross_origin()
 def user_login():
     email = request.json.get('email')
     password = request.json.get('password')
@@ -115,12 +112,14 @@ def user_login():
             db_user.password = hash_password(password)
             db.session.commit()
 
+    # Store user in session for auth on protected endpoints
+    session["user_id"] = str(db_user.id)
+
     # Serialize and return
     result = UserSchema().dump(db_user)
     return jsonify(result), 200
 
 @user.route('/create_google_user', methods=["GET", "POST"])
-@cross_origin()
 def create_google_user():
     '''
     /create_user creates a student and generates a sis_user_id in the database
@@ -176,7 +175,6 @@ def create_google_user():
     return jsonify(res)
 
 @user.route('/google_login', methods=["POST", "GET"])
-@cross_origin()
 def google_login():
     '''
     /google_login logs in a user that exists in the database
@@ -214,6 +212,7 @@ def google_login():
         )
         db.session.add(user)
         db.session.commit()
+        session["user_id"] = str(user.id)
         user_data = UserSchema().dump(user)
         return jsonify(user_data)
 
@@ -222,11 +221,13 @@ def google_login():
         user.role = "admin"
         db.session.commit()
 
+    # Store user in session for auth on protected endpoints
+    session["user_id"] = str(user.id)
+
     user_data = UserSchema().dump(user)
     return jsonify(user_data)
 
 @user.route('/get_user_by_email', methods = ["GET"])
-@cross_origin()
 def get_user():
     email = request.args.get("email")
     if not email or email == "":
@@ -249,7 +250,6 @@ def get_user():
 
 
 @user.route('/get_user_by_id', methods=["GET"])
-@cross_origin()
 def get_user_by_id():
     '''
     /get_instructor_by_id gets the student from the database
@@ -278,7 +278,6 @@ def get_user_by_id():
     return jsonify(instructor)
 
 @user.route('/delete_user', methods=["DELETE"])
-@cross_origin()
 def delete_user():
     assert current_app
 
@@ -292,12 +291,23 @@ def delete_user():
         raise BadRequestError("Invalid user id") 
 
     
-    user = db.session.query(User).filter_by(id=user_id).first()
-    if not user:
+    user_obj = db.session.query(User).filter_by(id=user_id).first()
+    if not user_obj:
         raise NotFoundError("User Not Found")
-    # user = UserSchema().dump(user)
+
+    # Guard: prevent deleting an instructor who still has courses.
+    # The courses.instructor_id FK uses RESTRICT, so a plain delete would
+    # raise an IntegrityError.  Check here to return a clear 409 instead.
+    if user_obj.role == "instructor":
+        course_count = db.session.query(Course).filter_by(instructor_id=user_id).count()
+        if course_count > 0:
+            raise ConflictError(
+                f"Cannot delete instructor: they are assigned to {course_count} course(s). "
+                "Reassign or remove their courses first."
+            )
+
     try:
-        db.session.delete(user)
+        db.session.delete(user_obj)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -305,7 +315,6 @@ def delete_user():
     return "Success", 200
 
 @user.route('/update_account', methods=["PUT", "POST"])
-@cross_origin()
 def update_account():
     '''
     /update_account updates the name and/or password of a user.
@@ -353,28 +362,24 @@ def update_account():
     return jsonify({"message": "Account updated successfully"}), 200
 
 @user.route('/get_all_courses', methods=["GET"])
-@cross_origin()
 def get_all_courses():
     """Get all courses in the system."""
     courses = db.session.query(Course).all()
     return jsonify(CourseSchema().dump(courses, many=True)), 200
 
 @user.route('/get_all_instructors', methods=["GET"])
-@cross_origin()
 def get_all_instructors():
     """Get all instructors in the system."""
     instructors = db.session.query(User).filter_by(role="instructor").all()
     return jsonify(UserSchema().dump(instructors, many=True)), 200
 
 @user.route('/get_all_students', methods=["GET"])
-@cross_origin()
 def get_all_students():
     """Get all students in the system."""
     students = db.session.query(User).filter_by(role="student").all()
     return jsonify(UserSchema().dump(students, many=True)), 200
 
 @user.route('/admin_update_account', methods=["PUT", "POST"])
-@cross_origin()
 def admin_update_account():
     '''
     /admin_update_account allows admins to update user account details.
@@ -419,7 +424,6 @@ def admin_update_account():
 
 # New route to retrieve an instructor's id using their EID
 @user.route('/get_instructor_by_eid', methods=["GET"])
-@cross_origin()
 def get_instructor_by_eid():
     eid = request.args.get("eid")
     if not eid:
@@ -432,7 +436,6 @@ def get_instructor_by_eid():
     return jsonify(UserSchema().dump(user)), 200
 
 @user.route('/get_user_by_eid', methods=["GET"])
-@cross_origin()
 def get_user_by_eid():
     eid = request.args.get("eid")
     if not eid:

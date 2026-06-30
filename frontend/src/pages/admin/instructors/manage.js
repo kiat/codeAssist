@@ -112,12 +112,16 @@ export default function AdminInstructorManage() {
           <Button onClick={() => navigate("/admin/instructors")}>Cancel</Button>
           <Popconfirm
             title="Remove Instructor"
-            description="This will completely remove the instructor from the system. All data including courses will be deleted. Are you sure?"
+            description={teachingCourses.length > 0
+              ? `This instructor is assigned to ${teachingCourses.length} course(s). You must reassign or remove their courses before deleting this instructor.`
+              : "This will permanently remove the instructor account. Are you sure?"
+            }
             onConfirm={handleRemove}
-            okText="Yes"
-            cancelText="No"
+            okText="Yes, Delete"
+            cancelText="Cancel"
+            disabled={teachingCourses.length > 0}
           >
-            <Button danger loading={removing}>Remove Instructor</Button>
+            <Button danger loading={removing} disabled={teachingCourses.length > 0}>Remove Instructor</Button>
           </Popconfirm>
         </Space>
       </Form>

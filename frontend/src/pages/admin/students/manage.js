@@ -113,10 +113,10 @@ export default function AdminStudentManage() {
           <Button onClick={() => navigate("/admin/students")}>Cancel</Button>
           <Popconfirm
             title="Remove Student"
-            description="This will completely remove the student from the system. All data including grades will be deleted. Are you sure?"
+            description="This will permanently delete the student and ALL associated data, including enrollments, submissions, grades, extensions, and code drafts. This action cannot be undone. Are you sure?"
             onConfirm={handleRemove}
-            okText="Yes"
-            cancelText="No"
+            okText="Yes, Delete Everything"
+            cancelText="Cancel"
           >
             <Button danger loading={removing}>Remove Student</Button>
           </Popconfirm>

@@ -48,3 +48,7 @@ export async function updateAssignmentAiSettings(assignmentId, params, requester
     "put"
   );
 }
+
+export async function getAssignmentPrompts(assignmentId) {
+  return service(`assignments/${assignmentId}/prompts`);
+}
