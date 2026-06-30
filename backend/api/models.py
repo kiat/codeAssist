@@ -76,8 +76,12 @@ class Assignment(db.Model):
     ai_feedback_provider = db.Column(db.String, nullable=True)
     ai_feedback_model = db.Column(db.String, nullable=True)
     ai_feedback_prompt = db.Column(db.Text, nullable=True)
+    ai_feedback_prompts = db.Column(db.JSON, nullable=True)
+    ai_allowed_inputs = db.Column(db.JSON, nullable=True)
     ai_feedback_temperature = db.Column(db.Float, nullable=True)
     ai_feedback_style = db.Column(db.String, nullable=True)
+    ai_feedback_max_requests = db.Column(db.Integer, nullable=True)
+    ai_feedback_wait_seconds = db.Column(db.Integer, nullable=False, default=0)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
@@ -163,4 +167,3 @@ class AdminEmail(db.Model):
 
     def __repr__(self):
         return f"<AdminEmail {self.email}>"   
-

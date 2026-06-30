@@ -162,6 +162,8 @@ export default function Assignments() {
   const handleAssignmentInteraction = (assignment) => {
     const now = moment();
     const dueDateTime = moment(assignment.due_date).valueOf();
+
+    const lateDueDateTime = assignment.late_due_date ? moment(assignment.late_due_date) : null;
     // const extension = await fetchAssignmentExtensions(assignment.id);
     // if (extension != null) {
     //   if (extension.due_date_extension) {
@@ -175,15 +177,17 @@ export default function Assignments() {
 
     const isSubmitted = assignment.submitted;
     const dueDateHasPassed = now.isAfter(dueDateTime);
+    const lateDueDateHasPassed = lateDueDateTime ? now.isAfter(lateDueDateTime) : true;
+    const canSubmitOnTime = !dueDateHasPassed;
+    const canSubmitLate = assignment.late_submission && lateDueDateTime && !lateDueDateHasPassed;
 
     if (isSubmitted) {
       navigate(`/assignmentresult/${assignment.submissionId}`);
-    } else if (!dueDateHasPassed) {
+    } else if (canSubmitOnTime || canSubmitLate) {
       setModalOpen(true);
       setAssignmentTitle(assignment.name);
       setAssignmentID(assignment.id);
-      setSelectedAssignment(assignment);
-    } else if (dueDateHasPassed){
+    } else {
       message.error("Due Date Has Passed");
     }
   };
