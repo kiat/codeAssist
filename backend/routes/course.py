@@ -128,11 +128,6 @@ def _request_ollama(api_key, endpoint, method="GET", json_data=None, timeout=10,
     Returns (jsonify_response, status_code) on failure.
     """
     base_url = (api_key or "http://host.docker.internal:11434").strip()
-    try:
-        validate_ollama_url(base_url)
-    except BadRequestError as e:
-        return jsonify({"error": str(e)}), 400
-
     url = f"{base_url}{endpoint}"
     
     if error_msg_400 is None:
@@ -821,6 +816,9 @@ def fetch_ai_models():
                 raise BadRequestError(f"No saved API key for {provider}")
 
         if provider == "ollama":
+            validate_ollama_url((api_key or "http://host.docker.internal:11434").strip())
+
+        if provider == "ollama":
             response, err_response = _request_ollama(
                 api_key,
                 "/api/tags",
@@ -1095,6 +1093,9 @@ def test_ai_model():
                 api_key = course_obj.ollama_base_url
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
+
+        if provider == "ollama":
+            validate_ollama_url((api_key or "http://host.docker.internal:11434").strip())
 
         test_prompt = (
             "Return only this JSON object: "

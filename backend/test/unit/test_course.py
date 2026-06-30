@@ -1052,6 +1052,34 @@ def test_fetch_ai_models_claude_filters_unavailable_models(client, mocker):
     assert "claude-mythos-5" not in response.json["models"]
     assert response.json["models"][0] == "claude-3-5-sonnet-20241022"
 
+
+def test_fetch_ai_models_ollama_success(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "models": [
+            {"name": "llama3:latest"},
+            {"name": "mistral:7b"},
+            {"name": "codegemma"}
+        ]
+    }
+
+    mock_get = mocker.patch("routes.course.requests.get", return_value=mock_response)
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={
+            "provider": "ollama",
+            "api_key": "http://host.docker.internal:11434",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["models"] == ["codegemma", "llama3:latest", "mistral:7b"]
+    mock_get.assert_called_once()
+    assert mock_get.call_args[0][0] == "http://host.docker.internal:11434/api/tags"
+
+
 def test_test_ai_api_key_missing_provider_returns_400(client):
     response = client.post(
         "/test_ai_api_key",
