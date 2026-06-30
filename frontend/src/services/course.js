@@ -51,3 +51,23 @@ export async function updateCourse(params) {
 export async function updateRole(params) {
   return service("update_role", params, "post");
 }
+
+export async function storeApiKey(params) {
+  return service("store_api_key", params, "put");
+}
+
+export async function updateAiSettings(params) {
+  return service("update_ai_settings", params, "put");
+}
+
+export async function fetchAiModels(params) {
+  return service("fetch_ai_models", params, "post");
+}
+
+export async function testAiApiKey(params) {
+  return service("test_ai_api_key", params, "post");
+}
+
+export async function testAiModel(params) {
+  return service("test_ai_model", params, "post");
+}

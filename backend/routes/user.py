@@ -176,7 +176,7 @@ def create_google_user():
 
     # or data['aud'] != google_client_id_link - maybe should be added as a precaution
     if 'error' in data:
-        return "Invalid google token", 400
+        raise BadRequestError("Invalid google token")
 
     # TODO Create new database tables to unify all users
     if request.method != "POST":
@@ -224,7 +224,7 @@ def google_login():
     data = response.json()
 
     if 'error' in data:
-        return "Invalid google token", 400
+        raise BadRequestError("Invalid google token")
 
     email = data['email']
 

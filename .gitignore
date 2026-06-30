@@ -102,7 +102,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-# .env
+.env
 .venv
 env/
 venv/
@@ -136,3 +136,7 @@ backend/routes/upload_autograder/runs/
 
 /backend/runs
 node_modules
+
+# Local stress test outputs
+backend/test/stress/results/
+backend/test/stress/generated_assignments.jsonbackend/test/stress/stress_test_results_*.json

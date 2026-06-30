@@ -23,7 +23,9 @@ import GradeSubmissions from "./pages/gradeSubmissions";
 import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
+import HelpPage from "./pages/help";
 import RegradeRequests from './components/RegradeRequests';
+import CodeEditorPage from "./pages/codeEditor";
 import AdminDashboard from "./pages/admin/dashboard";
 import AdminSidebar from "./components/layout/AdminSidebar";
 import { leaveCourse } from "./services/course";
@@ -219,11 +221,11 @@ function App() {
               <Route
                 path='/assignment/assignmentSettings/:assignmentId'
                 element={<AssignmentSettings />}
-              />
-              <Route
-                path = '/editAccount/:userId'
+              />              <Route path='/codeEditor/:assignmentId' element={<CodeEditorPage />} />
+              <Route path='/editAccount/:userId'
                 element={<EditAccount />} 
               />
+              <Route path="/help" element={<HelpPage />} />
               <Route path="/regradeRequests" element={<RegradeRequests />} />
               <Route path='/admin/students/manage/:studentId' element={<AdminStudentManage />} />
               <Route path='/admin/students/add' element={<AdminStudentAdd />} />
