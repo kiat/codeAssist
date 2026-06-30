@@ -46,7 +46,7 @@ export default function Dashboard() {
         const releaseDate = assignment.published_date
           ? moment(assignment.published_date)
           : null;
-        return assignment.published && releaseDate && !now.isBefore(releaseDate);
+        return assignment.published && (!releaseDate || !now.isBefore(releaseDate));
       });
       return visibleAssignments.length;
     } catch (error) {

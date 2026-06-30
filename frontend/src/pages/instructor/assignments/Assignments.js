@@ -5,16 +5,8 @@ import { useEffect } from "react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getCourseAssignments } from "../../../services/course";
+import { getPublishStatus } from "../../../common/assignmentVisibility";
 // import { tableData } from "./constant";
-const getPublishStatus = (record) => {
-  if (!record.published) {
-    return "unpublished";
-  }
-  if (record.published_date && moment().isBefore(moment(record.published_date))) {
-    return "scheduled";
-  }
-  return "published";
-};
 const columns = [
   {
     title: "NAME",

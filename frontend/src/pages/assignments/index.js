@@ -99,7 +99,7 @@ export default function Assignments() {
           const releaseDate = assignment.published_date
             ? moment(assignment.published_date)
             : null;
-          return assignment.published && releaseDate && !now.isBefore(releaseDate);
+          return assignment.published && (!releaseDate || !now.isBefore(releaseDate));
         });
         
         const updatedAssignments = await Promise.all(

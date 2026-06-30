@@ -16,16 +16,9 @@ import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
+import { getPublishStatus } from "../../../common/assignmentVisibility";
 //for now change this to a course_id you have in the database
-const getPublishStatus = (record) => {
-  if (!record.published) {
-    return "unpublished";
-  }
-  if (record.published_date && moment().isBefore(moment(record.published_date))) {
-    return "scheduled";
-  }
-  return "published";
-};
+
 const columns = [
   {
     title: "ACTIVE ASSIGNMENTS",
