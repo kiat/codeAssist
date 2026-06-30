@@ -38,6 +38,7 @@ const PROVIDERS = [
   { key: "openai", label: "ChatGPT", displayName: "OpenAI / ChatGPT" },
   { key: "gemini", label: "Gemini", displayName: "Google Gemini" },
   { key: "claude", label: "Claude", displayName: "Anthropic Claude" },
+  { key: "ollama", label: "Ollama", displayName: "Ollama (Local LLM)" },
 ];
 
 const FEEDBACK_STYLES = [
@@ -49,6 +50,7 @@ const PROVIDER_DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
   gemini: "gemini-1.5-flash",
   claude: "claude-3-5-sonnet-20241022",
+  ollama: "llama3",
 };
 
 const getKeyStatus = (course, selectedProviderKey) => {
@@ -60,6 +62,9 @@ const getKeyStatus = (course, selectedProviderKey) => {
   }
   if (selectedProviderKey === "claude") {
     return !!course.has_claude_api_key;
+  }
+  if (selectedProviderKey === "ollama") {
+    return !!course.has_ollama_api_key;
   }
   return false;
 };
@@ -78,6 +83,7 @@ export default function AISettings() {
   const [apiTestStatus, setApiTestStatus] = useState(null);
 
   const selectedProvider = PROVIDERS.find((item) => item.key === provider);
+  const isOllama = provider === "ollama";
 
   const fetchModelsForProvider = useCallback(async ({
     targetProvider,
@@ -309,7 +315,8 @@ export default function AISettings() {
                 color={hasSavedKey ? "success" : "warning"}
                 icon={hasSavedKey ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
               >
-                API key: {hasSavedKey ? "Connected" : "Not saved"}
+                {isOllama ? "Ollama URL: " : "API key: "}
+                {hasSavedKey ? "Connected" : isOllama ? "Using Default" : "Not saved"}
               </Tag>
 
               <Tag
@@ -417,7 +424,7 @@ export default function AISettings() {
               title={
                 <Space>
                   <KeyOutlined />
-                  <span>Provider API Key</span>
+                  <span>{isOllama ? "Ollama Server URL" : "Provider API Key"}</span>
                 </Space>
               }
             >
@@ -427,23 +434,39 @@ export default function AISettings() {
                   showIcon
                   message={
                     hasSavedKey
-                      ? `${selectedProvider?.label} API key is saved`
+                      ? isOllama
+                        ? `Ollama connection URL is configured`
+                        : `${selectedProvider?.label} API key is saved`
+                      : isOllama
+                      ? "Ollama URL is not configured (defaults to http://host.docker.internal:11434)"
                       : `${selectedProvider?.label} API key is not configured`
                   }
                   description={
                     hasSavedKey
-                      ? "A saved key exists. Paste a new key only if you want to replace it."
+                      ? isOllama
+                        ? "A connection URL is configured. Enter a new URL only if you want to replace it."
+                        : "A saved key exists. Paste a new key only if you want to replace it."
+                      : isOllama
+                      ? "Provide the URL to your local or remote Ollama server instance."
                       : "Paste an API key below and save it for this provider."
                   }
                 />
 
-                <Form.Item label="Add or Replace API Key">
-                  <Input.Password
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Paste a new API key to add or replace"
-                    visibilityToggle
-                  />
+                <Form.Item label={isOllama ? "Ollama Base URL" : "Add or Replace API Key"}>
+                  {isOllama ? (
+                    <Input
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="e.g. http://host.docker.internal:11434"
+                    />
+                  ) : (
+                    <Input.Password
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Paste a new API key to add or replace"
+                      visibilityToggle
+                    />
+                  )}
                 </Form.Item>
 
                 <Space>

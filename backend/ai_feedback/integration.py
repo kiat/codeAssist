@@ -14,7 +14,7 @@ from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 from sqlalchemy.orm import aliased
 
-from util.errors import InternalProcessingError, NotFoundError
+from util.errors import BadRequestError, InternalProcessingError, NotFoundError
 from util.encryption_utils import decrypt_api_key
 from api.models import Assignment, Submission, User, Course
 from api import db
@@ -465,6 +465,40 @@ def get_structured_feedback_from_claude(api_key, prompt, model, temperature, pas
     return parse_feedback_json(raw_response, "Claude", past_insights)
 
 
+def get_structured_feedback_from_ollama(base_url, prompt, model, temperature, past_insights):
+    """Sends request to Ollama and parses JSON feedback."""
+    response = requests.post(
+        f"{base_url}/api/chat",
+        json={
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": CORRECTNESS_SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            "options": {
+                "temperature": temperature,
+            },
+            "stream": False,
+            "format": "json",
+        },
+        timeout=60,
+    )
+
+    if response.status_code >= 400:
+        raise ValueError(f"Ollama API error: {response.text}")
+
+    data = response.json()
+    raw_response = data.get("message", {}).get("content", "").strip()
+
+    return parse_feedback_json(raw_response, "Ollama", past_insights)
+
+
 def update_submission_feedback(submission_id, ai_feedback_json, new_insights):
     """Updates the database with the AI feedback and new student insights."""
     submission = Submission.query.get(submission_id)
@@ -516,36 +550,39 @@ def get_temperature(assignment, course):
 
 
 def get_provider_credentials(provider, course):
-    """Returns API key and OpenAI client if needed."""
-    api_key = None
+    """Returns credential (API key or base URL) and OpenAI client if needed."""
+    credential = None
     client = None
 
     if provider == "openai":
         if not course.openai_api_key:
             raise ValueError("Missing OpenAI API key for this course")
 
-        api_key = decrypt_api_key(course.openai_api_key)
-        client = OpenAI(api_key=api_key)
+        credential = decrypt_api_key(course.openai_api_key)
+        client = OpenAI(api_key=credential)
 
     elif provider == "gemini":
         if not course.gemini_api_key:
             raise ValueError("Missing Gemini API key for this course")
 
-        api_key = decrypt_api_key(course.gemini_api_key)
+        credential = decrypt_api_key(course.gemini_api_key)
 
     elif provider == "claude":
         if not course.claude_api_key:
             raise ValueError("Missing Claude API key for this course")
 
-        api_key = decrypt_api_key(course.claude_api_key)
+        credential = decrypt_api_key(course.claude_api_key)
+
+    elif provider == "ollama":
+        credential = (course.ollama_base_url or "http://host.docker.internal:11434").strip()
 
     else:
         raise ValueError(f"Unsupported AI provider: {provider}")
 
-    return api_key, client
+    return credential, client
 
 
-def get_feedback_by_provider(provider, api_key, client, prompt, model, temperature, past_insights):
+def get_feedback_by_provider(provider, credential, client, prompt, model, temperature, past_insights):
     """Calls the selected AI provider."""
     if provider == "openai":
         return get_structured_feedback_from_openai(
@@ -558,7 +595,7 @@ def get_feedback_by_provider(provider, api_key, client, prompt, model, temperatu
 
     if provider == "gemini":
         return get_structured_feedback_from_gemini(
-            api_key,
+            credential,
             prompt,
             model,
             temperature,
@@ -567,7 +604,16 @@ def get_feedback_by_provider(provider, api_key, client, prompt, model, temperatu
 
     if provider == "claude":
         return get_structured_feedback_from_claude(
-            api_key,
+            credential,
+            prompt,
+            model,
+            temperature,
+            past_insights,
+        )
+
+    if provider == "ollama":
+        return get_structured_feedback_from_ollama(
+            credential,
             prompt,
             model,
             temperature,
@@ -609,7 +655,7 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
 
         provider, model = get_provider_and_model(assignment, course)
         temperature = get_temperature(assignment, course)
-        api_key, client = get_provider_credentials(provider, course)
+        credential, client = get_provider_credentials(provider, course)
 
         print(
             f"AI_FEEDBACK: Using provider={provider}, model={model}, temperature={temperature}",
@@ -635,7 +681,7 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
 
         ai_feedback_json, new_insights = get_feedback_by_provider(
             provider,
-            api_key,
+            credential,
             client,
             prompt,
             model,

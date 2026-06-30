@@ -34,6 +34,7 @@ class Course(db.Model):
     openai_api_key = db.Column(db.String, default="")
     gemini_api_key = db.Column(db.String, default="")
     claude_api_key = db.Column(db.String, default="")
+    ollama_base_url = db.Column(db.String, default="", server_default="")
 
     default_feedback_style = db.Column(db.String, default="hint-based")
     default_ai_temperature = db.Column(db.Float, default=0.5)

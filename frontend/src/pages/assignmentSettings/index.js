@@ -369,7 +369,8 @@ export default () => {
                   type={
                     courseAiInfo.has_openai_api_key ||
                     courseAiInfo.has_gemini_api_key ||
-                    courseAiInfo.has_claude_api_key
+                    courseAiInfo.has_claude_api_key ||
+                    courseAiInfo.has_ollama_api_key
                       ? "success"
                       : "warning"
                   }
@@ -422,6 +423,7 @@ export default () => {
                           { label: "ChatGPT", value: "openai" },
                           { label: "Gemini", value: "gemini" },
                           { label: "Claude", value: "claude" },
+                          { label: "Ollama (Local LLM)", value: "ollama" },
                         ]}
                         onChange={() => {
                           setAssignmentModels([]);
