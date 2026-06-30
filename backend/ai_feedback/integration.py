@@ -14,8 +14,9 @@ from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 from sqlalchemy.orm import aliased
 
-from util.errors import InternalProcessingError, NotFoundError
+from util.errors import BadRequestError, InternalProcessingError, NotFoundError
 from util.encryption_utils import decrypt_api_key
+from util.url_utils import validate_ollama_url
 from api.models import Assignment, Submission, User, Course
 from api import db
 from ai_feedback.settings import (
@@ -467,6 +468,7 @@ def get_structured_feedback_from_claude(api_key, prompt, model, temperature, pas
 
 def get_structured_feedback_from_ollama(base_url, prompt, model, temperature, past_insights):
     """Sends request to Ollama and parses JSON feedback."""
+    validate_ollama_url(base_url)
     response = requests.post(
         f"{base_url}/api/chat",
         json={

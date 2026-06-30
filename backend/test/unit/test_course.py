@@ -698,7 +698,8 @@ def test_test_ai_model_ollama_success(client, mocker):
     mock_post.assert_called_once()
 
 
-def test_test_ai_model_ollama_saved_url_success(client, mocker):
+def test_test_ai_model_ollama_saved_url_success(client, mocker, monkeypatch):
+    monkeypatch.setenv("ALLOWED_OLLAMA_HOSTS", "saved-ollama-url")
     mock_post = mocker.patch("routes.course.requests.post")
     mock_response = mocker.Mock()
     mock_response.status_code = 200
@@ -1489,3 +1490,22 @@ def test_update_ai_settings_unsupported_provider_for_api_key_returns_400(client,
 
     assert response.status_code == 400
     assert response.json["message"] == "Unsupported AI provider"
+
+
+def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "api_key": "http://169.254.169.254/latest/meta-data/",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Ollama host is not permitted" in response.json["message"]

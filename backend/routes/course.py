@@ -18,6 +18,7 @@ from api.models import (
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
+from util.url_utils import validate_ollama_url
 from ai_feedback.integration import (
     CORRECTNESS_SYSTEM_PROMPT,
     get_gemini_generation_config,
@@ -127,6 +128,11 @@ def _request_ollama(api_key, endpoint, method="GET", json_data=None, timeout=10,
     Returns (jsonify_response, status_code) on failure.
     """
     base_url = (api_key or "http://host.docker.internal:11434").strip()
+    try:
+        validate_ollama_url(base_url)
+    except BadRequestError as e:
+        return jsonify({"error": str(e)}), 400
+
     url = f"{base_url}{endpoint}"
     
     if error_msg_400 is None:
@@ -759,7 +765,10 @@ def update_ai_settings():
             raise BadRequestError("Missing provider for API key")
 
         if provider == "ollama":
-            course_obj.ollama_base_url = api_key.strip() if api_key else ""
+            url = api_key.strip() if api_key else ""
+            if url:
+                validate_ollama_url(url)
+            course_obj.ollama_base_url = url
         else:
             encrypted_api_key = encrypt_api_key(api_key)
 
