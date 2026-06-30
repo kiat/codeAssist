@@ -27,6 +27,10 @@ Deferred to #328:
 - Uploaded .py/.zip feedback request selection.
 - AIChatPanel integration changes.
 
+Future work outside the current PR:
+
+- Student history and AI memory are intentionally deferred. See `docs/AI_Student_History_Memory.md` for the future design covering previous submissions, previous AI feedback, previous conversations, repeated mistakes, privacy rules, and possible LangChain orchestration.
+
 ## Data Model
 
 The existing `Assignment` model remains the owner of assignment-level AI settings.
