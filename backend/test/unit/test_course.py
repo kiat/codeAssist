@@ -733,7 +733,17 @@ def test_test_ai_model_ollama_saved_url_success(client, mocker):
     assert mock_post.call_args[0][0] == "http://saved-ollama-url:11434/api/chat"
 
 
-def test_test_ai_model_ollama_missing_saved_url_error(client, mocker):
+def test_test_ai_model_ollama_missing_saved_url_fallback(client, mocker):
+    mock_post = mocker.patch("routes.course.requests.post")
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "message": {
+            "content": '{"insights":["Model test passed."],"annotations":[]}'
+        }
+    }
+    mock_post.return_value = mock_response
+
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_course = mocker.Mock(
         id="course-123",
@@ -750,7 +760,12 @@ def test_test_ai_model_ollama_missing_saved_url_error(client, mocker):
         },
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 200
+    assert response.json["provider"] == "ollama"
+    assert response.json["model"] == "llama3"
+    
+    mock_post.assert_called_once()
+    assert mock_post.call_args[0][0] == "http://host.docker.internal:11434/api/chat"
 
 
 def test_test_ai_model_openai_success(client, mocker):

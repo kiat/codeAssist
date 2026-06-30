@@ -118,6 +118,45 @@ def is_supported_claude_model(model_id):
 
     return model_id.startswith("claude-")
 
+
+def _request_ollama(api_key, endpoint, method="GET", json_data=None, timeout=10, error_msg_500="Ollama connection error", error_msg_400=None):
+    """
+    Helper function to send requests to Ollama and handle connection errors/failures.
+    
+    Returns (response, None) on success.
+    Returns (jsonify_response, status_code) on failure.
+    """
+    base_url = (api_key or "http://host.docker.internal:11434").strip()
+    url = f"{base_url}{endpoint}"
+    
+    if error_msg_400 is None:
+        if endpoint == "/api/tags":
+            error_msg_400 = "Failed to retrieve models from Ollama"
+        else:
+            error_msg_400 = "Selected Ollama model cannot be used"
+
+    try:
+        if method.upper() == "POST":
+            response = requests.post(url, json=json_data, timeout=timeout)
+        else:
+            response = requests.get(url, timeout=timeout)
+    except Exception as e:
+        log_prefix = "Failed to connect to Ollama" if "Failed" in error_msg_500 else "Ollama connection error"
+        current_app.logger.error(f"{log_prefix} at {base_url}: {str(e)}")
+        return jsonify({"error": error_msg_500}), 500
+
+    if response.status_code >= 400:
+        if "test failed" in error_msg_400:
+            current_app.logger.error(f"Ollama connection test failed: {response.text}")
+        elif "cannot be used" in error_msg_400:
+            current_app.logger.error(f"Selected Ollama model cannot be used: {response.text}")
+        else:
+            current_app.logger.error(f"Ollama returned error: {response.text}")
+        return jsonify({"error": error_msg_400}), response.status_code
+
+    return response, None
+
+
 @course.route("/create_course", methods=["POST", "GET"])
 @cross_origin()
 def create_course():
@@ -767,25 +806,26 @@ def fetch_ai_models():
                 api_key = decrypt_api_key(course_obj.gemini_api_key)
             elif provider == "claude" and course_obj.claude_api_key:
                 api_key = decrypt_api_key(course_obj.claude_api_key)
-            elif provider == "ollama" and course_obj.ollama_base_url:
+            elif provider == "ollama":
                 api_key = course_obj.ollama_base_url
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
 
         if provider == "ollama":
-            base_url = (api_key or "http://host.docker.internal:11434").strip()
-            try:
-                response = requests.get(f"{base_url}/api/tags", timeout=10)
-                if response.status_code >= 400:
-                    current_app.logger.error(f"Ollama returned error: {response.text}")
-                    return jsonify({"error": "Failed to retrieve models from Ollama"}), response.status_code
+            response, err_response = _request_ollama(
+                api_key,
+                "/api/tags",
+                method="GET",
+                timeout=10,
+                error_msg_500="Failed to connect to Ollama server",
+                error_msg_400="Failed to retrieve models from Ollama"
+            )
+            if err_response:
+                return response, err_response
                 
-                models_data = response.json().get("models", [])
-                model_ids = [m.get("name") for m in models_data if m.get("name")]
-                return jsonify({"models": sorted(list(set(model_ids)))}), 200
-            except Exception as e:
-                current_app.logger.error(f"Failed to connect to Ollama at {base_url}: {str(e)}")
-                return jsonify({"error": "Failed to connect to Ollama server"}), 500
+            models_data = response.json().get("models", [])
+            model_ids = [m.get("name") for m in models_data if m.get("name")]
+            return jsonify({"models": sorted(list(set(model_ids)))}), 200
 
         if provider == "openai":
             client = OpenAI(api_key=api_key)
@@ -934,7 +974,7 @@ def test_ai_api_key():
                 api_key = decrypt_api_key(course_obj.gemini_api_key)
             elif provider == "claude" and course_obj.claude_api_key:
                 api_key = decrypt_api_key(course_obj.claude_api_key)
-            elif provider == "ollama" and course_obj.ollama_base_url:
+            elif provider == "ollama":
                 api_key = course_obj.ollama_base_url
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
@@ -986,22 +1026,21 @@ def test_ai_api_key():
             }), 200
 
         if provider == "ollama":
-            base_url = (api_key or "http://host.docker.internal:11434").strip()
-            try:
-                response = requests.get(f"{base_url}/api/tags", timeout=10)
-                if response.status_code >= 400:
-                    current_app.logger.error(f"Ollama connection test failed: {response.text}")
-                    return jsonify({
-                        "error": "Ollama connection test failed"
-                    }), response.status_code
+            response, err_response = _request_ollama(
+                api_key,
+                "/api/tags",
+                method="GET",
+                timeout=10,
+                error_msg_500="Ollama connection error",
+                error_msg_400="Ollama connection test failed"
+            )
+            if err_response:
+                return response, err_response
 
-                return jsonify({
-                    "message": "Ollama connection is valid",
-                    "provider": provider,
-                }), 200
-            except Exception as e:
-                current_app.logger.error(f"Ollama connection error at {base_url}: {str(e)}")
-                return jsonify({"error": "Ollama connection error"}), 500
+            return jsonify({
+                "message": "Ollama connection is valid",
+                "provider": provider,
+            }), 200
 
         raise BadRequestError("Unsupported AI provider")
 
@@ -1043,7 +1082,7 @@ def test_ai_model():
                 api_key = decrypt_api_key(course_obj.gemini_api_key)
             elif provider == "claude" and course_obj.claude_api_key:
                 api_key = decrypt_api_key(course_obj.claude_api_key)
-            elif provider == "ollama" and course_obj.ollama_base_url:
+            elif provider == "ollama":
                 api_key = course_obj.ollama_base_url
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
@@ -1190,47 +1229,43 @@ def test_ai_model():
             }), 200
 
         if provider == "ollama":
-            base_url = (api_key or "http://host.docker.internal:11434").strip()
-            try:
-                response = requests.post(
-                    f"{base_url}/api/chat",
-                    json={
-                        "model": model,
-                        "messages": [
-                            {"role": "user", "content": test_prompt}
-                        ],
-                        "options": {
-                            "temperature": 0
-                        },
-                        "stream": False,
-                        "format": "json"
-                    },
-                    timeout=15
-                )
-                if response.status_code >= 400:
-                    current_app.logger.error(f"Selected Ollama model cannot be used: {response.text}")
-                    return jsonify({
-                        "error": "Selected Ollama model cannot be used"
-                    }), response.status_code
-
-                raw_response = response.json().get("message", {}).get("content", "").strip()
-                parsed_feedback = validate_feedback_response(raw_response, "Ollama")
-
-                if parsed_feedback is None:
-                    current_app.logger.error(f"Selected Ollama model did not return valid JSON feedback. Raw response: {raw_response}")
-                    return jsonify({
-                        "error": "Selected Ollama model did not return valid JSON feedback"
-                    }), 400
-
-                return jsonify({
-                    "message": "Ollama model is usable",
-                    "provider": provider,
+            response, err_response = _request_ollama(
+                api_key,
+                "/api/chat",
+                method="POST",
+                json_data={
                     "model": model,
-                    "response": parsed_feedback,
-                }), 200
-            except Exception as e:
-                current_app.logger.error(f"Ollama connection error at {base_url}: {str(e)}")
-                return jsonify({"error": "Ollama connection error"}), 500
+                    "messages": [
+                        {"role": "user", "content": test_prompt}
+                    ],
+                    "options": {
+                        "temperature": 0
+                    },
+                    "stream": False,
+                    "format": "json"
+                },
+                timeout=15,
+                error_msg_500="Ollama connection error",
+                error_msg_400="Selected Ollama model cannot be used"
+            )
+            if err_response:
+                return response, err_response
+
+            raw_response = response.json().get("message", {}).get("content", "").strip()
+            parsed_feedback = validate_feedback_response(raw_response, "Ollama")
+
+            if parsed_feedback is None:
+                current_app.logger.error(f"Selected Ollama model did not return valid JSON feedback. Raw response: {raw_response}")
+                return jsonify({
+                    "error": "Selected Ollama model did not return valid JSON feedback"
+                }), 400
+
+            return jsonify({
+                "message": "Ollama model is usable",
+                "provider": provider,
+                "model": model,
+                "response": parsed_feedback,
+            }), 200
 
         raise BadRequestError("Unsupported AI provider")
 
