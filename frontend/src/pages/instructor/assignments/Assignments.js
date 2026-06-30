@@ -5,13 +5,14 @@ import { useEffect } from "react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getCourseAssignments } from "../../../services/course";
+import { normalizeAssignmentForTable } from "../../../utils/assignmentData";
 // import { tableData } from "./constant";
 
 const columns = [
   {
     title: "NAME",
     dataIndex: "name",
-    sorter: (a, b) => a.name > b.name,
+    sorter: (a, b) => a.name.localeCompare(b.name),
     render: (text, record) => (
       <Link to={`/assignment/reviewGrades/${record.id}`}>{text}</Link>
     ),
@@ -26,14 +27,14 @@ const columns = [
     dataIndex: "released",
     render: text =>
       text ? moment(new Date(text)).format("MMM DD [AT] h:mmA").toUpperCase() : null,
-    sorter: (a, b) => a.released - b.released,
+    sorter: (a, b) => new Date(a.released || 0) - new Date(b.released || 0),
   },
   {
     title: "DUE(CDT)",
     dataIndex: "due",
     render: text =>
       text ? moment(new Date(text)).format("MMM DD [AT] h:mmA").toUpperCase() : null,
-    sorter: (a, b) => a.due - b.due,
+    sorter: (a, b) => new Date(a.due || 0) - new Date(b.due || 0),
   },
   {
     title: "SUBMISSIONS",
@@ -65,7 +66,7 @@ export default ({ isCreate }) => {
 
   const getAssignments = useCallback(() => {
     getCourseAssignments({ course_id: courseId }).then(res => {
-      setAssignments(res.data);
+      setAssignments((res.data || []).map(normalizeAssignmentForTable));
     });
   }, [courseId]);
 
