@@ -93,9 +93,17 @@ export default function Assignments() {
           new URLSearchParams({ course_id: urlParams.courseId })
         );
         const assignmentsData = await assignmentsResponse.json();
-
+        
+        const now = moment();
+        const visibleAssignments = assignmentsData.filter((assignment) => {
+          const releaseDate = assignment.published_date
+            ? moment(assignment.published_date)
+            : null;
+          return assignment.published && (!releaseDate || !now.isBefore(releaseDate));
+        });
+        
         const updatedAssignments = await Promise.all(
-          assignmentsData.map(async (assignment) => {
+          visibleAssignments.map(async (assignment) => {
             try {
               const extension = await fetchAssignmentExtensions(assignment.id);
               const activeSubmissions = await fetch(

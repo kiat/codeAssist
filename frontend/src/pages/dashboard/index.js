@@ -1,5 +1,6 @@
 import { PageHeader } from "antd";
 import { useCallback, useContext, useEffect, useState } from "react";
+import moment from "moment";
 import { GlobalContext } from "../../App";
 import SemesterCourses from "./semesterCourses";
 import CourseModal from "./courseModal";
@@ -37,7 +38,17 @@ export default function Dashboard() {
   const getAssignmentsCount = async (courseId) => {
     try {
       const res = await getCourseAssignments({ course_id: courseId });
-      return res.data.length;
+      if (!userInfo?.isStudent) {
+        return res.data.length;
+      }
+      const now = moment();
+      const visibleAssignments = res.data.filter((assignment) => {
+        const releaseDate = assignment.published_date
+          ? moment(assignment.published_date)
+          : null;
+        return assignment.published && (!releaseDate || !now.isBefore(releaseDate));
+      });
+      return visibleAssignments.length;
     } catch (error) {
       console.error(`Error fetching assignments for course ${courseId}:`, error);
       return 0; 

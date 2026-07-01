@@ -5,8 +5,8 @@ import { useEffect } from "react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getCourseAssignments } from "../../../services/course";
+import { getPublishStatus } from "../../../common/assignmentVisibility";
 // import { tableData } from "./constant";
-
 const columns = [
   {
     title: "NAME",
@@ -49,11 +49,20 @@ const columns = [
   {
     title: "PUBLISHED",
     dataIndex: "published",
-    render: text => (
-      <Button type={text ? "primary" : "default"} shape='circle' size='small'>
-        {" "}
-      </Button>
-    ),
+    sorter: (a, b) => a.published - b.published,
+    render: (_, record) => {
+      const status = getPublishStatus(record);
+      return (
+        <Button
+          type={status === "published" ? "primary" : "default"}
+          shape="circle"
+          size="small"
+          title={status}
+        >
+          {" "}
+        </Button>
+      );
+    },
   },
   { title: "REGRADES", dataIndex: "regrades" },
 ];

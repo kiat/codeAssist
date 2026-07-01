@@ -16,7 +16,9 @@ import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
+import { getPublishStatus } from "../../../common/assignmentVisibility";
 //for now change this to a course_id you have in the database
+
 const columns = [
   {
     title: "ACTIVE ASSIGNMENTS",
@@ -53,11 +55,19 @@ const columns = [
     title: "PUBLISHED",
     dataIndex: "published",
     sorter: (a, b) => a.published - b.published,
-    render: (text) => (
-      <Button type={text ? "primary" : "default"} shape="circle" size="small">
-        {" "}
-      </Button>
-    ),
+    render: (_, record) => {
+      const status = getPublishStatus(record);
+      return (
+        <Button
+          type={status === "published" ? "primary" : "default"}
+          shape="circle"
+          size="small"
+          title={status}
+        >
+          {" "}
+        </Button>
+      );
+    },
   },
   {
     title: "REGRADES",
