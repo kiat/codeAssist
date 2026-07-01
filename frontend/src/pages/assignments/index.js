@@ -176,6 +176,7 @@ export default function Assignments() {
     if (isSubmitted) {
       navigate(`/assignmentresult/${assignment.submissionId}`);
     } else if (canSubmitOnTime || canSubmitLate) {
+      setSelectedAssignment(assignment);
       setModalOpen(true);
       setAssignmentTitle(assignment.name);
       setAssignmentID(assignment.id);
@@ -186,6 +187,7 @@ export default function Assignments() {
 
   const closeModal = () => {
     setModalOpen(false);
+    setSelectedAssignment(null);
   };
 
   return (
@@ -213,6 +215,7 @@ export default function Assignments() {
         onCancel={closeModal}
         assignmentID={assignmentID}
         assignmentTitle={assignmentTitle}
+        allowFileUpload={selectedAssignment?.allow_file_upload}
         enableCodeEditor={selectedAssignment?.enable_code_editor}
       />
     </>

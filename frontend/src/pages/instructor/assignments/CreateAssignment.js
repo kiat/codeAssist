@@ -54,6 +54,8 @@ export default ({
   const [assignmentType, setAssignmentType] = useState(0);
   const aiFeedbackEnabled = Form.useWatch("ai_feedback_enabled", form);
   const useCourseAiDefault = Form.useWatch("use_course_ai_default", form);
+  const allowFileUpload = Form.useWatch("allow_file_upload", form);
+  const enableCodeEditor = Form.useWatch("enable_code_editor", form);
 
   const [configureAutograderNow, setConfigureAutograderNow] = useState(false);
   const [autograderFile, setAutograderFile] = useState(null);
@@ -185,6 +187,7 @@ export default ({
         autograder_points: values.autograderPoints
           ? Number(values.autograderPoints)
           : null,
+        allow_file_upload: values.allow_file_upload !== false,
         enable_code_editor: !!values.enable_code_editor,
         ai_feedback_enabled: !!values.ai_feedback_enabled,
         use_course_ai_default: values.use_course_ai_default !== false,
@@ -343,6 +346,8 @@ export default ({
                   dueDate: moment().add(7, "day"),
                   autograderPoints: "100",
                   autograder: { operation: "zip", timeout: "300" },
+                  allow_file_upload: true,
+                  enable_code_editor: false,
                   use_course_ai_default: true,
                   ai_feedback_style: "balanced",
                   ai_feedback_prompt: DEFAULT_AI_FEEDBACK_PROMPT,
@@ -495,13 +500,38 @@ export default ({
                     </Form.Item>
 
                     <Form.Item
-                      label="ENABLE CODE EDITOR"
-                      name="enable_code_editor"
+                      label="SUBMISSION METHODS"
+                      style={{ marginBottom: 4 }}
+                    />
+
+                    <Form.Item
+                      label="Allow File Upload"
+                      name="allow_file_upload"
                       valuePropName="checked"
-                      tooltip="Allow students to write and submit code directly in the browser instead of uploading a file"
+                      initialValue={true}
+                      tooltip="Allow students to upload a file as their submission"
                     >
                       <Switch />
                     </Form.Item>
+
+                    <Form.Item
+                      label="Enable Code Editor"
+                      name="enable_code_editor"
+                      valuePropName="checked"
+                      initialValue={false}
+                      tooltip="Allow students to write and submit code directly in the browser"
+                    >
+                      <Switch />
+                    </Form.Item>
+
+                    {allowFileUpload === false && enableCodeEditor === false && (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        message="At least one submission method must be enabled"
+                        style={{ marginBottom: 16 }}
+                      />
+                    )}
 
                     <Form.Item
                       label="ENABLE AI FEEDBACK"
