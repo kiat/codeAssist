@@ -15,6 +15,7 @@ import {
   Space,
   Popconfirm,
   Select,
+  Switch,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useContext } from "react";
@@ -90,6 +91,8 @@ export default () => {
         published_date,
         late_submission,
         late_due_date,
+        allow_file_upload,
+        enable_code_editor,
         ai_feedback_enabled,
         use_course_ai_default,
         ai_feedback_provider,
@@ -118,6 +121,8 @@ export default () => {
         releaseDate: published_date ? moment.utc(published_date).local() : null,
         allowLateSubmissions: !!late_submission,
         lateDueDate: late_due_date ? moment.utc(late_due_date).local() : null,
+        allow_file_upload: allow_file_upload !== false,
+        enable_code_editor: !!enable_code_editor,
         enableAiFeedback: !!ai_feedback_enabled,
         use_course_ai_default: use_course_ai_default !== false,
         ai_feedback_provider: ai_feedback_provider || "openai",
@@ -239,6 +244,8 @@ export default () => {
       manual_grading: values.manualGrading,
       late_submission: values.allowLateSubmissions,
       late_due_date: values.allowLateSubmissions ? values.lateDueDate : null,
+      allow_file_upload: values.allow_file_upload !== false,
+      enable_code_editor: !!values.enable_code_editor,
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
@@ -309,6 +316,26 @@ export default () => {
             <Input />
           </Form.Item>
 
+          <Form.Item label="SUBMISSION METHODS" style={{ marginBottom: 4 }} />
+
+          <Form.Item
+            label="Allow File Upload"
+            name="allow_file_upload"
+            valuePropName="checked"
+            tooltip="Allow students to upload a file as their submission"
+          >
+            <Switch />
+          </Form.Item>
+
+          <Form.Item
+            label="Enable Code Editor"
+            name="enable_code_editor"
+            valuePropName="checked"
+            tooltip="Allow students to write and submit code directly in the browser"
+          >
+            <Switch />
+          </Form.Item>
+
           <Form.Item label="PUBLISHED" name="published">
             <Radio.Group
               options={[
@@ -369,7 +396,8 @@ export default () => {
                   type={
                     courseAiInfo.has_openai_api_key ||
                     courseAiInfo.has_gemini_api_key ||
-                    courseAiInfo.has_claude_api_key
+                    courseAiInfo.has_claude_api_key ||
+                    courseAiInfo.has_ollama_api_key
                       ? "success"
                       : "warning"
                   }
@@ -422,6 +450,7 @@ export default () => {
                           { label: "ChatGPT", value: "openai" },
                           { label: "Gemini", value: "gemini" },
                           { label: "Claude", value: "claude" },
+                          { label: "Ollama (Local LLM)", value: "ollama" },
                         ]}
                         onChange={() => {
                           setAssignmentModels([]);
