@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
 import threading
+import time
 
 
 submission = Blueprint('submission', __name__)
@@ -36,6 +37,68 @@ ALLOWED_EXTENSIONS = {'py','zip'}
 def allowed_file(filename):
     return "." in filename and \
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_or_create_assignment_container(assignment):
+    '''
+    Returns a running container dedicated to this assignment, reusing
+    assignment.container_id when possible instead of creating a new
+    container per submission. Recreates the container if it was removed
+    or if the autograder image has since changed.
+    '''
+    container_name = f"assignment_container_{assignment.id}"
+    container = None
+
+    if assignment.container_id:
+        try:
+            container = get_docker_client().containers.get(assignment.container_id)
+        except docker.errors.NotFound:
+            container = None
+
+    if container is None:
+        try:
+            container = get_docker_client().containers.get(container_name)
+        except docker.errors.NotFound:
+            container = None
+
+    if container is not None:
+        container.reload()
+        current_image = container.image.tags[0] if container.image.tags else None
+        if current_image != assignment.autograder_image_name:
+            container.stop()
+            container.remove(force=True)
+            container = None
+
+    if container is None:
+        container = get_docker_client().containers.run(
+            image=assignment.autograder_image_name,
+            name=container_name,
+            detach=True,
+            tty=True,
+            command="tail -f /dev/null"
+        )
+    elif container.status != "running":
+        container.start()
+
+    if assignment.container_id != container.id:
+        assignment.container_id = container.id
+        db.session.commit()
+
+    return container
+
+
+def reset_assignment_container(assignment):
+    '''Discards the persistent container for an assignment, e.g. after a stuck/timed-out run.'''
+    if not assignment.container_id:
+        return
+    try:
+        container = get_docker_client().containers.get(assignment.container_id)
+        container.stop()
+        container.remove(force=True)
+    except docker.errors.NotFound:
+        pass
+    finally:
+        assignment.container_id = None
+        db.session.commit()
 
 @submission.route('/get_submissions', methods=["GET"])
 @cross_origin()
@@ -172,17 +235,17 @@ def upload_submission():
         }), 200
 
 
-    # Create a new temporary container from the assignment image
-    temp_container_name = f"submission_{uuid.uuid4().hex[:8]}"
-    container = get_docker_client().containers.run(
-        image=assignment.autograder_image_name,
-        name=temp_container_name,
-        detach=True,
-        tty=True,
-        command="tail -f /dev/null"  # Keep container alive for copying & exec
-    )
+    # Reuse (or create, on first submission) a persistent container for this assignment
+    t_start = time.time()
+    container = get_or_create_assignment_container(assignment)
+    t_end = time.time()
+    print(f"[METRICS] Container startup time: {t_end - t_start:.2f}s", flush=True)
+    container_name = container.name
 
     try:
+        # Clear out any leftovers from a previous submission run
+        container.exec_run("sh -c 'rm -rf /autograder/submission/* /autograder/results/*'")
+
         # Copy the submission into /autograder/submission/
         tar_stream = io.BytesIO()
         with tarfile.open(fileobj=tar_stream, mode="w") as tar:
@@ -192,15 +255,14 @@ def upload_submission():
 
         # Run the autograder inside the container
         exec_proc = subprocess.run(
-            f"docker exec {temp_container_name} /bin/bash /autograder/source/run_autograder".split(),
+            f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(),
             capture_output=True,
             timeout=assignment.autograder_timeout
         )
 
     except subprocess.TimeoutExpired:
         # clean up container
-        container.stop()
-        container.remove()
+        reset_assignment_container(assignment)
         os.chdir(current_dir)
 
         # upload failed submission to db
@@ -247,14 +309,14 @@ def upload_submission():
 
     if exec_proc.returncode != 0:
         os.chdir(current_dir)
-        print(f"Error: Autograder failed, details: {exec_proc.output.decode()}")
+        print(f"Error: Autograder failed, details: {exec_proc.output.decode()}", flush=True)
         raise InternalProcessingError("Failed to grade submission")
 
     # get results
     cat_result = container.exec_run("cat /autograder/results/results.json")
     if cat_result.exit_code != 0:
         os.chdir(current_dir)
-        print(f"Error: Failed to retrieve results.json, details: {cat_result.output.decode()}")
+        print(f"Error: Failed to retrieve results.json, details: {cat_result.output.decode()}", flush=True)
         raise InternalProcessingError("Failed to grade submission")
 
     results_json_content = cat_result.output.decode()
@@ -289,9 +351,8 @@ def upload_submission():
     db.session.add(new_submission)
     db.session.commit()
 
-    # Clean up container
-    container.stop()
-    container.remove()
+    # Container is intentionally left running so it can be reused by the next submission
+
     os.chdir(current_dir)
 
     # Capture the app object and launch a background thread to get AI feedback asynchronously.
