@@ -94,7 +94,7 @@ describe("CreateAssignment AI prompt defaults", () => {
 
     await waitFor(() => expect(getCourseInfo).toHaveBeenCalled());
 
-    await user.click(screen.getAllByRole("switch")[1]);
+    await user.click(screen.getByRole("switch", { name: /enable ai feedback/i }));
 
     expect(await screen.findByText("Feedback Prompts")).toBeInTheDocument();
 
@@ -121,7 +121,7 @@ describe("CreateAssignment AI prompt defaults", () => {
     await waitFor(() => expect(getCourseInfo).toHaveBeenCalled());
 
     await user.type(screen.getByLabelText(/assignment name/i), "Loops");
-    await user.click(screen.getAllByRole("switch")[1]);
+    await user.click(screen.getByRole("switch", { name: /enable ai feedback/i }));
 
     await user.type(
       await screen.findByLabelText("Maximum feedback requests per student"),

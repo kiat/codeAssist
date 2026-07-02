@@ -83,6 +83,10 @@ def upload_submission():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
+    # Enforce submission method restriction
+    if not assignment.allow_file_upload:
+        raise BadRequestError("File uploads are not allowed for this assignment.")
+
     # Retreive any extension for this student
     extension = db.session.query(AssignmentExtension).filter_by(
         assignment_id=assignment_id,
