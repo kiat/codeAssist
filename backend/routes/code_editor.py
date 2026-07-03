@@ -163,6 +163,10 @@ def submit_code():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
+    # Enforce submission method restriction
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor submissions are not allowed for this assignment.")
+
     if not assignment.published:
         raise BadRequestError("Assignment is not published yet.")
 
@@ -556,6 +560,10 @@ def run_code():
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
         raise NotFoundError("Assignment not found")
+
+    # Enforce submission method restriction
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor submissions are not allowed for this assignment.")
 
     if not assignment.published:
         raise BadRequestError("Assignment is not published yet.")

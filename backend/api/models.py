@@ -34,6 +34,7 @@ class Course(db.Model):
     openai_api_key = db.Column(db.String, default="")
     gemini_api_key = db.Column(db.String, default="")
     claude_api_key = db.Column(db.String, default="")
+    ollama_base_url = db.Column(db.String, default="")
 
     default_feedback_style = db.Column(db.String, default="hint-based")
     default_ai_temperature = db.Column(db.Float, default=0.5)
@@ -66,7 +67,8 @@ class Assignment(db.Model):
     autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
 
-    # -- Code Editor Settings --
+    # -- Submission Method Settings --
+    allow_file_upload = db.Column(db.Boolean, default=True)
     enable_code_editor = db.Column(db.Boolean, default=False)
 
     # -- AI Integration Settings -- 

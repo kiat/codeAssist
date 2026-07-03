@@ -14,8 +14,9 @@ from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 from sqlalchemy.orm import aliased
 
-from util.errors import InternalProcessingError, NotFoundError
+from util.errors import BadRequestError, InternalProcessingError, NotFoundError
 from util.encryption_utils import decrypt_api_key
+from util.url_utils import validate_ollama_url
 from api.models import Assignment, Submission, User, Course
 from api import db
 from ai_feedback.settings import (
@@ -465,6 +466,41 @@ def get_structured_feedback_from_claude(api_key, prompt, model, temperature, pas
     return parse_feedback_json(raw_response, "Claude", past_insights)
 
 
+def get_structured_feedback_from_ollama(base_url, prompt, model, temperature, past_insights):
+    """Sends request to Ollama and parses JSON feedback."""
+    validate_ollama_url(base_url)
+    response = requests.post(
+        f"{base_url}/api/chat",
+        json={
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": CORRECTNESS_SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            "options": {
+                "temperature": temperature,
+            },
+            "stream": False,
+            "format": "json",
+        },
+        timeout=60,
+    )
+
+    if response.status_code >= 400:
+        raise ValueError(f"Ollama API error: {response.text}")
+
+    data = response.json()
+    raw_response = data.get("message", {}).get("content", "").strip()
+
+    return parse_feedback_json(raw_response, "Ollama", past_insights)
+
+
 def update_submission_feedback(submission_id, ai_feedback_json, new_insights):
     """Updates the database with the AI feedback and new student insights."""
     submission = Submission.query.get(submission_id)
@@ -539,6 +575,9 @@ def get_provider_credentials(provider, course):
 
         api_key = decrypt_api_key(course.claude_api_key)
 
+    elif provider == "ollama":
+        api_key = (course.ollama_base_url or "http://host.docker.internal:11434").strip()
+
     else:
         raise ValueError(f"Unsupported AI provider: {provider}")
 
@@ -567,6 +606,15 @@ def get_feedback_by_provider(provider, api_key, client, prompt, model, temperatu
 
     if provider == "claude":
         return get_structured_feedback_from_claude(
+            api_key,
+            prompt,
+            model,
+            temperature,
+            past_insights,
+        )
+
+    if provider == "ollama":
+        return get_structured_feedback_from_ollama(
             api_key,
             prompt,
             model,
