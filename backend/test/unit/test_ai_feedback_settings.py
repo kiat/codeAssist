@@ -160,6 +160,7 @@ def test_split_ai_settings_payload_separates_usage_limit_settings():
         "name": "Loops",
         "ai_feedback_max_requests": 3,
         "ai_feedback_wait_seconds": 60,
+        "ai_feedback_api_key": "assignment-key",
     }
 
     assignment_payload, ai_settings_payload = split_ai_settings_payload(payload)
@@ -168,6 +169,7 @@ def test_split_ai_settings_payload_separates_usage_limit_settings():
     assert ai_settings_payload == {
         "ai_feedback_max_requests": 3,
         "ai_feedback_wait_seconds": 60,
+        "ai_feedback_api_key": "assignment-key",
     }
 
 
@@ -220,6 +222,7 @@ def test_serialize_assignment_ai_settings_combines_existing_model_and_feedback_s
         use_course_ai_default=False,
         ai_feedback_provider="gemini",
         ai_feedback_model="gemini-1.5-flash",
+        ai_feedback_api_key="encrypted-assignment-key",
         ai_feedback_prompt=None,
         ai_feedback_prompts=[
             {
@@ -244,6 +247,8 @@ def test_serialize_assignment_ai_settings_combines_existing_model_and_feedback_s
     assert settings["ai_feedback_model"] == "gemini-1.5-flash"
     assert settings["ai_feedback_prompts"][0]["id"] == "edge_cases"
     assert settings["ai_allowed_inputs"]["student_code"] is False
+    assert settings["has_assignment_ai_key"] is True
+    assert "ai_feedback_api_key" not in settings
     assert "feedback_prompts" not in settings
     assert "allowed_inputs" not in settings
     assert settings["ai_feedback_max_requests"] == 5
@@ -283,6 +288,94 @@ def test_update_assignment_ai_settings_saves_usage_limit_settings():
 
     assert assignment.ai_feedback_max_requests == 3
     assert assignment.ai_feedback_wait_seconds == 300
+
+
+def test_update_assignment_ai_settings_encrypts_assignment_api_key(mocker):
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_provider="gemini",
+        ai_feedback_model="gemini-1.5-flash",
+        ai_feedback_api_key="",
+    )
+    mock_encrypt = mocker.patch(
+        "ai_feedback.settings.encrypt_api_key",
+        return_value="encrypted-assignment-key",
+    )
+
+    update_assignment_ai_settings(
+        assignment,
+        {
+            "use_course_ai_default": False,
+            "ai_feedback_api_key": "plain-assignment-key",
+        },
+    )
+
+    assert assignment.ai_feedback_api_key == "encrypted-assignment-key"
+    mock_encrypt.assert_called_once_with("plain-assignment-key")
+
+
+def test_update_assignment_ai_settings_keeps_existing_key_when_blank_is_submitted(mocker):
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_provider="gemini",
+        ai_feedback_model="gemini-1.5-flash",
+        ai_feedback_api_key="encrypted-existing-key",
+    )
+    mock_encrypt = mocker.patch("ai_feedback.settings.encrypt_api_key")
+
+    update_assignment_ai_settings(
+        assignment,
+        {
+            "use_course_ai_default": False,
+            "ai_feedback_api_key": "   ",
+        },
+    )
+
+    assert assignment.ai_feedback_api_key == "encrypted-existing-key"
+    mock_encrypt.assert_not_called()
+
+
+def test_update_assignment_ai_settings_clears_existing_key_when_provider_changes_without_new_key(mocker):
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_provider="gemini",
+        ai_feedback_model="gemini-1.5-flash",
+        ai_feedback_api_key="encrypted-existing-gemini-key",
+    )
+    mock_encrypt = mocker.patch("ai_feedback.settings.encrypt_api_key")
+
+    update_assignment_ai_settings(
+        assignment,
+        {
+            "use_course_ai_default": False,
+            "ai_feedback_provider": "claude",
+            "ai_feedback_model": "claude-3-5-sonnet-20241022",
+            "ai_feedback_api_key": "   ",
+        },
+    )
+
+    assert assignment.ai_feedback_provider == "claude"
+    assert assignment.ai_feedback_model == "claude-3-5-sonnet-20241022"
+    assert assignment.ai_feedback_api_key == ""
+    mock_encrypt.assert_not_called()
+
+
+def test_update_assignment_ai_settings_clears_assignment_key_when_using_course_default():
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_provider="gemini",
+        ai_feedback_model="gemini-1.5-flash",
+        ai_feedback_api_key="encrypted-existing-key",
+    )
+
+    update_assignment_ai_settings(
+        assignment,
+        {
+            "use_course_ai_default": True,
+        },
+    )
+
+    assert assignment.ai_feedback_api_key == ""
 
 
 def test_update_assignment_ai_settings_allows_unlimited_max_requests():

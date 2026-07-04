@@ -1,7 +1,12 @@
+from types import SimpleNamespace
+
+import pytest
+
 from ai_feedback.integration import (
     DEFAULT_FEEDBACK_PROMPT,
     RETURN_SPEC,
     build_feedback_prompt,
+    get_provider_credentials,
     get_structured_feedback_from_gemini,
     parse_feedback_json,
 )
@@ -166,3 +171,149 @@ def test_gemini_feedback_request_reserves_tokens_for_json(monkeypatch):
     assert new_insights == ["Overall Summary: Feedback is ready."]
     assert generation_config["maxOutputTokens"] >= 1400
     assert generation_config["thinkingConfig"]["thinkingBudget"] == 0
+
+
+@pytest.mark.parametrize(
+    ("provider", "course_key_attr", "expects_client"),
+    [
+        ("openai", "openai_api_key", True),
+        ("gemini", "gemini_api_key", False),
+        ("claude", "claude_api_key", False),
+    ],
+)
+def test_get_provider_credentials_uses_assignment_key_for_custom_provider(
+    monkeypatch,
+    provider,
+    course_key_attr,
+    expects_client,
+):
+    course = SimpleNamespace(**{course_key_attr: ""})
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_api_key=f"encrypted-assignment-{provider}-key",
+    )
+    fake_client = object()
+
+    monkeypatch.setattr(
+        "ai_feedback.integration.decrypt_api_key",
+        lambda encrypted_key: {
+            f"encrypted-assignment-{provider}-key": f"assignment-{provider}-key",
+        }[encrypted_key],
+    )
+    monkeypatch.setattr(
+        "ai_feedback.integration.OpenAI",
+        lambda api_key: fake_client,
+    )
+
+    api_key, client = get_provider_credentials(provider, course, assignment)
+
+    assert api_key == f"assignment-{provider}-key"
+    if expects_client:
+        assert client is fake_client
+    else:
+        assert client is None
+
+
+@pytest.mark.parametrize(
+    ("provider", "course_key_attr", "expects_client"),
+    [
+        ("openai", "openai_api_key", True),
+        ("gemini", "gemini_api_key", False),
+        ("claude", "claude_api_key", False),
+    ],
+)
+def test_get_provider_credentials_falls_back_to_course_key_for_custom_provider(
+    monkeypatch,
+    provider,
+    course_key_attr,
+    expects_client,
+):
+    course = SimpleNamespace(**{course_key_attr: f"encrypted-course-{provider}-key"})
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_api_key="",
+    )
+    fake_client = object()
+
+    monkeypatch.setattr(
+        "ai_feedback.integration.decrypt_api_key",
+        lambda encrypted_key: {
+            f"encrypted-course-{provider}-key": f"course-{provider}-key",
+        }[encrypted_key],
+    )
+    monkeypatch.setattr(
+        "ai_feedback.integration.OpenAI",
+        lambda api_key: fake_client,
+    )
+
+    api_key, client = get_provider_credentials(provider, course, assignment)
+
+    assert api_key == f"course-{provider}-key"
+    if expects_client:
+        assert client is fake_client
+    else:
+        assert client is None
+
+
+@pytest.mark.parametrize(
+    ("provider", "course_key_attr", "expects_client"),
+    [
+        ("openai", "openai_api_key", True),
+        ("gemini", "gemini_api_key", False),
+        ("claude", "claude_api_key", False),
+    ],
+)
+def test_get_provider_credentials_ignores_assignment_key_when_using_course_default(
+    monkeypatch,
+    provider,
+    course_key_attr,
+    expects_client,
+):
+    course = SimpleNamespace(**{course_key_attr: f"encrypted-course-{provider}-key"})
+    assignment = SimpleNamespace(
+        use_course_ai_default=True,
+        ai_feedback_api_key=f"encrypted-assignment-{provider}-key",
+    )
+    fake_client = object()
+
+    monkeypatch.setattr(
+        "ai_feedback.integration.decrypt_api_key",
+        lambda encrypted_key: {
+            f"encrypted-course-{provider}-key": f"course-{provider}-key",
+        }[encrypted_key],
+    )
+    monkeypatch.setattr(
+        "ai_feedback.integration.OpenAI",
+        lambda api_key: fake_client,
+    )
+
+    api_key, client = get_provider_credentials(provider, course, assignment)
+
+    assert api_key == f"course-{provider}-key"
+    if expects_client:
+        assert client is fake_client
+    else:
+        assert client is None
+
+
+@pytest.mark.parametrize(
+    ("provider", "course_key_attr", "provider_label"),
+    [
+        ("openai", "openai_api_key", "OpenAI"),
+        ("gemini", "gemini_api_key", "Gemini"),
+        ("claude", "claude_api_key", "Claude"),
+    ],
+)
+def test_get_provider_credentials_requires_saved_provider_key(
+    provider,
+    course_key_attr,
+    provider_label,
+):
+    course = SimpleNamespace(**{course_key_attr: ""})
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_api_key="",
+    )
+
+    with pytest.raises(ValueError, match=f"Missing {provider_label} API key"):
+        get_provider_credentials(provider, course, assignment)

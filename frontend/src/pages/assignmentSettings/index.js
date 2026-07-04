@@ -104,6 +104,7 @@ export default () => {
         ai_feedback_style,
         ai_feedback_max_requests,
         ai_feedback_wait_seconds,
+        has_assignment_ai_key,
       } = res.data || {};
 
       setPubBefore(published);
@@ -136,6 +137,8 @@ export default () => {
         ai_feedback_style: ai_feedback_style || "balanced",
         ai_feedback_max_requests: ai_feedback_max_requests ?? null,
         ai_feedback_wait_seconds: ai_feedback_wait_seconds ?? 0,
+        has_assignment_ai_key: !!has_assignment_ai_key,
+        ai_feedback_api_key: "",
       });
       setAllowLateSubmissions(late_submission);
     });
@@ -147,14 +150,22 @@ export default () => {
 
   const handleFetchAssignmentModels = async () => {
     const provider = form.getFieldValue("ai_feedback_provider") || "openai";
+    const assignmentApiKey = (
+      form.getFieldValue("ai_feedback_api_key") || ""
+    ).trim();
 
     try {
       setAssignmentModelsLoading(true);
 
-      const response = await fetchAiModels({
+      const fetchPayload = {
         course_id: courseId,
         provider,
-      });
+      };
+      if (assignmentApiKey) {
+        fetchPayload.api_key = assignmentApiKey;
+      }
+
+      const response = await fetchAiModels(fetchPayload);
 
       const fetchedModels = response?.data?.models || [];
       setAssignmentModels(fetchedModels);
@@ -258,6 +269,10 @@ export default () => {
         values.use_course_ai_default === false ? values.ai_feedback_provider : null,
       ai_feedback_model:
         values.use_course_ai_default === false ? values.ai_feedback_model : null,
+      ...(values.use_course_ai_default === false &&
+      (values.ai_feedback_api_key || "").trim()
+        ? { ai_feedback_api_key: values.ai_feedback_api_key.trim() }
+        : {}),
       ai_feedback_prompt: firstPrompt?.prompt ?? null,
       ai_feedback_prompts: feedbackPrompts,
       ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
@@ -454,9 +469,38 @@ export default () => {
                         ]}
                         onChange={() => {
                           setAssignmentModels([]);
-                          form.setFieldsValue({ ai_feedback_model: undefined });
+                          form.setFieldsValue({
+                            ai_feedback_model: undefined,
+                            ai_feedback_api_key: "",
+                          });
                         }}
                       />
+                    </Form.Item>
+
+                    <Form.Item shouldUpdate noStyle>
+                      {({ getFieldValue }) => (
+                        <>
+                          {getFieldValue("has_assignment_ai_key") && (
+                            <Alert
+                              type="info"
+                              showIcon
+                              style={{ marginBottom: 16 }}
+                              message="Assignment credential saved"
+                              description="Paste a new value only when replacing it."
+                            />
+                          )}
+
+                          <Form.Item
+                            label="Assignment API Key / Base URL"
+                            name="ai_feedback_api_key"
+                          >
+                            <Input.Password
+                              autoComplete="new-password"
+                              placeholder="Use a custom credential for this assignment"
+                            />
+                          </Form.Item>
+                        </>
+                      )}
                     </Form.Item>
 
                     <Form.Item

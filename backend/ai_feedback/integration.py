@@ -551,32 +551,61 @@ def get_temperature(assignment, course):
         return DEFAULT_TEMPERATURE
 
 
-def get_provider_credentials(provider, course):
+def get_assignment_provider_credential(assignment):
+    """Returns decrypted assignment credential when custom AI settings provide one."""
+    if not assignment or getattr(assignment, "use_course_ai_default", True):
+        return None
+
+    encrypted_credential = (
+        getattr(assignment, "ai_feedback_api_key", None)
+        or ""
+    ).strip()
+    if not encrypted_credential:
+        return None
+
+    return decrypt_api_key(encrypted_credential)
+
+
+def get_provider_credentials(provider, course, assignment=None):
     """Returns API key and OpenAI client if needed."""
     api_key = None
     client = None
+    assignment_credential = get_assignment_provider_credential(assignment)
 
     if provider == "openai":
-        if not course.openai_api_key:
-            raise ValueError("Missing OpenAI API key for this course")
+        if assignment_credential:
+            api_key = assignment_credential
+        else:
+            if not course.openai_api_key:
+                raise ValueError("Missing OpenAI API key for this course or assignment")
 
-        api_key = decrypt_api_key(course.openai_api_key)
+            api_key = decrypt_api_key(course.openai_api_key)
         client = OpenAI(api_key=api_key)
 
     elif provider == "gemini":
-        if not course.gemini_api_key:
-            raise ValueError("Missing Gemini API key for this course")
+        if assignment_credential:
+            api_key = assignment_credential
+        else:
+            if not course.gemini_api_key:
+                raise ValueError("Missing Gemini API key for this course or assignment")
 
-        api_key = decrypt_api_key(course.gemini_api_key)
+            api_key = decrypt_api_key(course.gemini_api_key)
 
     elif provider == "claude":
-        if not course.claude_api_key:
-            raise ValueError("Missing Claude API key for this course")
+        if assignment_credential:
+            api_key = assignment_credential
+        else:
+            if not course.claude_api_key:
+                raise ValueError("Missing Claude API key for this course or assignment")
 
-        api_key = decrypt_api_key(course.claude_api_key)
+            api_key = decrypt_api_key(course.claude_api_key)
 
     elif provider == "ollama":
-        api_key = (course.ollama_base_url or "http://host.docker.internal:11434").strip()
+        api_key = (
+            assignment_credential
+            or course.ollama_base_url
+            or "http://host.docker.internal:11434"
+        ).strip()
 
     else:
         raise ValueError(f"Unsupported AI provider: {provider}")
@@ -657,7 +686,7 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
 
         provider, model = get_provider_and_model(assignment, course)
         temperature = get_temperature(assignment, course)
-        api_key, client = get_provider_credentials(provider, course)
+        api_key, client = get_provider_credentials(provider, course, assignment)
 
         print(
             f"AI_FEEDBACK: Using provider={provider}, model={model}, temperature={temperature}",

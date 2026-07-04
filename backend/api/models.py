@@ -77,6 +77,7 @@ class Assignment(db.Model):
     use_course_ai_default = db.Column(db.Boolean, default=True)
     ai_feedback_provider = db.Column(db.String, nullable=True)
     ai_feedback_model = db.Column(db.String, nullable=True)
+    ai_feedback_api_key = db.Column(db.String, default="")
     ai_feedback_prompt = db.Column(db.Text, nullable=True)
     ai_feedback_prompts = db.Column(db.JSON, nullable=True)
     ai_allowed_inputs = db.Column(db.JSON, nullable=True)

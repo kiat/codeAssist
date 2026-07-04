@@ -316,9 +316,15 @@ def test_ai_chat_not_enabled(client, mocker):
 def test_ai_chat_no_api_key(client, mocker):
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
+    mock_assignment.use_course_ai_default = True
 
     mock_course = mocker.Mock()
     mock_course.openai_api_key = ""
+    mock_course.gemini_api_key = ""
+    mock_course.claude_api_key = ""
+    mock_course.ollama_base_url = ""
+    mock_course.default_ai_provider = "openai"
+    mock_course.default_ai_model = "gpt-4o-mini"
 
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.first.side_effect = [
@@ -334,3 +340,175 @@ def test_ai_chat_no_api_key(client, mocker):
     })
     assert resp.status_code == 400
     assert "not configured" in resp.get_json()["message"].lower()
+
+
+def test_ai_chat_uses_custom_openai_provider_with_assignment_key(client, mocker):
+    mock_assignment = mocker.Mock()
+    mock_assignment.ai_feedback_enabled = True
+    mock_assignment.course_id = "course-1"
+    mock_assignment.use_course_ai_default = False
+    mock_assignment.ai_feedback_provider = "openai"
+    mock_assignment.ai_feedback_model = "gpt-4o-mini"
+    mock_assignment.ai_feedback_temperature = 0.3
+    mock_assignment.ai_feedback_api_key = "encrypted-assignment-openai-key"
+
+    mock_course = mocker.Mock()
+    mock_course.openai_api_key = ""
+    mock_course.gemini_api_key = ""
+    mock_course.claude_api_key = ""
+    mock_course.ollama_base_url = ""
+    mock_course.default_ai_provider = "gemini"
+    mock_course.default_ai_model = "gemini-1.5-flash"
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,
+        mock_course,
+    ]
+    mocker.patch(
+        "ai_feedback.integration.decrypt_api_key",
+        return_value="decrypted-openai-key",
+    )
+
+    fake_client = mocker.Mock()
+    fake_client.chat.completions.create.return_value = mocker.Mock(
+        choices=[
+            mocker.Mock(
+                message=mocker.Mock(
+                    content="Start by checking the accumulator update.",
+                )
+            )
+        ]
+    )
+    mock_openai = mocker.patch(
+        "ai_feedback.integration.OpenAI",
+        return_value=fake_client,
+    )
+
+    resp = client.post("/ai_chat", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "message": "help me",
+        "code": "print('hi')",
+    })
+
+    assert resp.status_code == 200
+    assert resp.get_json()["reply"] == "Start by checking the accumulator update."
+    mock_openai.assert_called_once_with(api_key="decrypted-openai-key")
+    fake_client.chat.completions.create.assert_called_once()
+    assert fake_client.chat.completions.create.call_args.kwargs["model"] == "gpt-4o-mini"
+
+
+def test_ai_chat_uses_custom_gemini_provider_without_openai_key(client, mocker):
+    mock_assignment = mocker.Mock()
+    mock_assignment.ai_feedback_enabled = True
+    mock_assignment.course_id = "course-1"
+    mock_assignment.use_course_ai_default = False
+    mock_assignment.ai_feedback_provider = "gemini"
+    mock_assignment.ai_feedback_model = "gemini-1.5-flash"
+    mock_assignment.ai_feedback_temperature = 0.4
+    mock_assignment.ai_feedback_api_key = ""
+
+    mock_course = mocker.Mock()
+    mock_course.openai_api_key = ""
+    mock_course.gemini_api_key = "encrypted-gemini-key"
+    mock_course.claude_api_key = ""
+    mock_course.ollama_base_url = ""
+    mock_course.default_ai_provider = "openai"
+    mock_course.default_ai_model = "gpt-4o-mini"
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,
+        mock_course,
+    ]
+    mocker.patch(
+        "ai_feedback.integration.decrypt_api_key",
+        return_value="decrypted-gemini-key",
+    )
+
+    fake_response = mocker.Mock()
+    fake_response.status_code = 200
+    fake_response.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": "Try checking the loop boundary first.",
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    mock_post = mocker.patch("requests.post", return_value=fake_response)
+
+    resp = client.post("/ai_chat", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "message": "help me",
+        "code": "print('hi')",
+    })
+
+    assert resp.status_code == 200
+    assert resp.get_json()["reply"] == "Try checking the loop boundary first."
+    assert "gemini-1.5-flash:generateContent" in mock_post.call_args.args[0]
+    assert mock_post.call_args.kwargs["params"]["key"] == "decrypted-gemini-key"
+
+
+def test_ai_chat_uses_custom_claude_provider_without_openai_key(client, mocker):
+    mock_assignment = mocker.Mock()
+    mock_assignment.ai_feedback_enabled = True
+    mock_assignment.course_id = "course-1"
+    mock_assignment.use_course_ai_default = False
+    mock_assignment.ai_feedback_provider = "claude"
+    mock_assignment.ai_feedback_model = "claude-3-5-sonnet-20241022"
+    mock_assignment.ai_feedback_temperature = 0.4
+    mock_assignment.ai_feedback_api_key = ""
+
+    mock_course = mocker.Mock()
+    mock_course.openai_api_key = ""
+    mock_course.gemini_api_key = ""
+    mock_course.claude_api_key = "encrypted-claude-key"
+    mock_course.ollama_base_url = ""
+    mock_course.default_ai_provider = "openai"
+    mock_course.default_ai_model = "gpt-4o-mini"
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,
+        mock_course,
+    ]
+    mocker.patch(
+        "ai_feedback.integration.decrypt_api_key",
+        return_value="decrypted-claude-key",
+    )
+
+    fake_response = mocker.Mock()
+    fake_response.status_code = 200
+    fake_response.json.return_value = {
+        "content": [
+            {
+                "type": "text",
+                "text": "Look at the base case before changing the recursion.",
+            }
+        ]
+    }
+    mock_post = mocker.patch("requests.post", return_value=fake_response)
+
+    resp = client.post("/ai_chat", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "message": "help me",
+        "code": "print('hi')",
+    })
+
+    assert resp.status_code == 200
+    assert resp.get_json()["reply"] == "Look at the base case before changing the recursion."
+    assert mock_post.call_args.args[0] == "https://api.anthropic.com/v1/messages"
+    assert mock_post.call_args.kwargs["headers"]["x-api-key"] == "decrypted-claude-key"
+    assert (
+        mock_post.call_args.kwargs["json"]["model"]
+        == "claude-3-5-sonnet-20241022"
+    )

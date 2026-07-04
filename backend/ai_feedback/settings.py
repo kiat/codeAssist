@@ -2,6 +2,8 @@ import copy
 import json
 import re
 
+from util.encryption_utils import encrypt_api_key
+
 
 LEGACY_FEEDBACK_PROMPT_ID = "legacy_feedback_prompt"
 MAX_AI_FEEDBACK_REQUESTS = 1000
@@ -81,6 +83,7 @@ AI_FEEDBACK_SETTING_KEYS = {
     "use_course_ai_default",
     "ai_feedback_provider",
     "ai_feedback_model",
+    "ai_feedback_api_key",
     "ai_feedback_temperature",
     "ai_feedback_style",
     "ai_feedback_max_requests",
@@ -273,6 +276,9 @@ def serialize_assignment_ai_settings(assignment):
         ) is not False,
         "ai_feedback_provider": getattr(assignment, "ai_feedback_provider", None),
         "ai_feedback_model": getattr(assignment, "ai_feedback_model", None),
+        "has_assignment_ai_key": bool(
+            getattr(assignment, "ai_feedback_api_key", None)
+        ),
         "ai_feedback_temperature": getattr(
             assignment,
             "ai_feedback_temperature",
@@ -322,14 +328,30 @@ def update_assignment_ai_settings(assignment, data):
     if "use_course_ai_default" in data:
         assignment.use_course_ai_default = data["use_course_ai_default"] is not False
 
+    previous_provider = getattr(assignment, "ai_feedback_provider", None)
+
     if assignment.use_course_ai_default:
         assignment.ai_feedback_provider = None
         assignment.ai_feedback_model = None
+        if hasattr(assignment, "ai_feedback_api_key"):
+            assignment.ai_feedback_api_key = ""
     else:
+        provider_changed = (
+            "ai_feedback_provider" in data
+            and data["ai_feedback_provider"] != previous_provider
+        )
         if "ai_feedback_provider" in data:
             assignment.ai_feedback_provider = data["ai_feedback_provider"]
         if "ai_feedback_model" in data:
             assignment.ai_feedback_model = data["ai_feedback_model"]
+        if "ai_feedback_api_key" in data:
+            credential = str(data.get("ai_feedback_api_key") or "").strip()
+            if credential:
+                assignment.ai_feedback_api_key = encrypt_api_key(credential)
+            elif provider_changed and hasattr(assignment, "ai_feedback_api_key"):
+                assignment.ai_feedback_api_key = ""
+        elif provider_changed and hasattr(assignment, "ai_feedback_api_key"):
+            assignment.ai_feedback_api_key = ""
 
     if "ai_feedback_style" in data:
         assignment.ai_feedback_style = data["ai_feedback_style"]
