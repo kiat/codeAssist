@@ -1,5 +1,5 @@
 import React, { useContext, useCallback, useEffect, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Card, PageHeader, Radio, message } from "antd";
 
 import { GlobalContext } from "../../App";
@@ -28,6 +28,7 @@ export default function AssignmentResult() {
   const [studentId, setStudentId] = useState("");
   // const { assignmentId, studentId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   // adding global context variable
   const { userInfo, assignmentInfo, updateAssignmentInfo } =
     useContext(GlobalContext);
@@ -38,6 +39,8 @@ export default function AssignmentResult() {
 
   // used to check if AI Feedback has been enabled on this assignment
   const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true);
+  // used to check if code editor is enabled for this assignment
+  const [enableCodeEditor, setEnableCodeEditor] = useState(false);
   
   useEffect(() => {
     // Fetching student and assignment IDs based on this submission ID
@@ -125,6 +128,7 @@ export default function AssignmentResult() {
           setLateAllowed(res.data.late_submission);
           setLateDueDate(moment(res.data.late_due_date).valueOf());
           setAiFeedbackEnabled(res.data.ai_feedback_enabled);
+          setEnableCodeEditor(!!res.data.enable_code_editor);
           if (extension?.data.due_date_extension) {
             setDueDate(moment(extension.data.due_date_extension).valueOf());
           }
@@ -264,9 +268,21 @@ export default function AssignmentResult() {
           <ActionButtons
             onRerun={() => {}} // Implement or replace with actual function
             onUpload={() => toggleModal("upload")}
+            onResubmitEditor={() => {
+              const now = moment();
+              const due = dueDate ? moment(dueDate) : null;
+              const late = lateDueDate ? moment(lateDueDate) : null;
+              const canSubmit = (!due || !now.isAfter(due)) || (late && lateAllowed && !now.isAfter(late));
+              if (!canSubmit) {
+                message.error("Due Date Has Passed");
+                return;
+              }
+              navigate(`/codeEditor/${assignmentId}`);
+            }}
             onDownload={handleDownload} // Implement or replace with actual function
             onHistoryOpen={() => toggleModal("history")}
             isStudent={userInfo?.isStudent}
+            enableCodeEditor={enableCodeEditor}
           />
         </PageBottom>
       ) : (
