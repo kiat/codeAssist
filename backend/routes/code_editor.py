@@ -5,6 +5,7 @@ import subprocess
 import io
 import tarfile
 import threading
+import requests
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
@@ -14,7 +15,11 @@ from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
 from openai import OpenAI
 from util.encryption_utils import decrypt_api_key
-from ai_feedback.integration import async_get_ai_feedback
+from ai_feedback.integration import (
+    async_get_ai_feedback,
+    get_provider_and_model,
+    get_provider_credentials,
+)
 import docker
 
 code_editor = Blueprint('code_editor', __name__)
@@ -692,20 +697,12 @@ def ai_chat():
         raise BadRequestError("AI chat is not enabled for this assignment.")
 
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
-    if not course or not course.openai_api_key:
-        raise BadRequestError("AI is not configured for this course. Please ask your instructor to set up an API key.")
+    if not course:
+        raise BadRequestError("Course not found for this assignment.")
 
-    try:
-        decrypted_api_key = decrypt_api_key(course.openai_api_key)
-        client = OpenAI(api_key=decrypted_api_key)
-    except Exception:
-        raise InternalProcessingError("Failed to initialize AI client")
-
-    VALID_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"}
-    model = assignment.ai_feedback_model if assignment and assignment.ai_feedback_model else "gpt-4-turbo"
-    if model not in VALID_MODELS:
-        model = "gpt-4-turbo"
-    temperature = assignment.ai_feedback_temperature if assignment and assignment.ai_feedback_temperature else 0.5
+    # Determine provider and model using the shared helper (respects assignment
+    # overrides and falls back to course defaults).
+    provider, model = get_provider_and_model(assignment, course)
 
     system_prompt = (
         "You are an AI coding assistant for a programming course. "
@@ -716,19 +713,109 @@ def ai_chat():
 
     user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
 
+    temperature = 0.5
     try:
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            model=model,
-            max_tokens=500,
-            temperature=float(temperature),
-            timeout=30,
-        )
-        reply = response.choices[0].message.content.strip()
-    except Exception as e:
+        temperature = float(assignment.ai_feedback_temperature or 0.5)
+    except (TypeError, ValueError):
+        temperature = 0.5
+
+    try:
+        api_key, client = get_provider_credentials(provider, course)
+    except ValueError as e:
+        raise BadRequestError(str(e))
+    except Exception:
+        raise InternalProcessingError("Failed to initialize AI client")
+
+    try:
+        if provider == "openai":
+            response = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                model=model,
+                max_tokens=500,
+                temperature=temperature,
+                timeout=30,
+            )
+            reply = response.choices[0].message.content.strip()
+
+        elif provider == "gemini":
+            gemini_response = requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                params={"key": api_key},
+                json={
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [
+                                {"text": f"{system_prompt}\n\n{user_prompt}"}
+                            ],
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": temperature,
+                        "maxOutputTokens": 500,
+                    },
+                },
+                timeout=30,
+            )
+            if gemini_response.status_code >= 400:
+                raise ValueError(f"Gemini API error: {gemini_response.text}")
+            gemini_data = gemini_response.json()
+            candidate = gemini_data.get("candidates", [{}])[0]
+            reply = "".join(
+                part.get("text", "")
+                for part in candidate.get("content", {}).get("parts", [])
+                if not part.get("thought")
+            ).strip()
+
+        elif provider == "claude":
+            claude_response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "max_tokens": 500,
+                    "temperature": temperature,
+                    "system": system_prompt,
+                    "messages": [{"role": "user", "content": user_prompt}],
+                },
+                timeout=30,
+            )
+            if claude_response.status_code >= 400:
+                raise ValueError(f"Claude API error: {claude_response.text}")
+            claude_data = claude_response.json()
+            content_parts = claude_data.get("content", [])
+            reply = content_parts[0].get("text", "").strip() if content_parts else ""
+
+        elif provider == "ollama":
+            base_url = (api_key or "http://host.docker.internal:11434").strip()
+            ollama_response = requests.post(
+                f"{base_url}/api/chat",
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "options": {"temperature": temperature},
+                    "stream": False,
+                },
+                timeout=60,
+            )
+            if ollama_response.status_code >= 400:
+                raise ValueError(f"Ollama API error: {ollama_response.text}")
+            reply = ollama_response.json().get("message", {}).get("content", "").strip()
+
+        else:
+            raise BadRequestError(f"Unsupported AI provider: {provider}")
+
+    except ValueError as e:
         error_msg = str(e)
         print(f"AI_CHAT error: {e}", flush=True)
         if "insufficient_quota" in error_msg or "429" in error_msg:
@@ -737,6 +824,11 @@ def ai_chat():
             raise BadRequestError("Invalid API key. Please contact your instructor.")
         elif "does not exist" in error_msg or "model_not_found" in error_msg:
             raise BadRequestError(f"AI model '{model}' is not available. Please contact your instructor.")
+        raise BadRequestError(str(e))
+    except BadRequestError:
+        raise
+    except Exception as e:
+        print(f"AI_CHAT error: {e}", flush=True)
         raise InternalProcessingError(f"Failed to get AI response: {type(e).__name__}")
 
     return jsonify({"reply": reply}), 200
