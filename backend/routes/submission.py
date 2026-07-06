@@ -45,30 +45,52 @@ def get_or_create_assignment_container(assignment):
     container per submission. Recreates the container if it was removed
     or if the autograder image has since changed.
     '''
+    # Force a DB read to bypass any stale SQLAlchemy identity-map entry from
+    # earlier in the same request (e.g. the first query on line 148 vs 207).
+    db.session.refresh(assignment)
+    print(f"[DEBUG] assignment.id={assignment.id} container_id={assignment.container_id}", flush=True)
+
     container_name = f"assignment_container_{assignment.id}"
     container = None
+
+    print(f"[DEBUG] container_id in DB: {assignment.container_id}", flush=True)
 
     if assignment.container_id:
         try:
             container = get_docker_client().containers.get(assignment.container_id)
         except docker.errors.NotFound:
-            container = None
-
-    if container is None:
-        try:
-            container = get_docker_client().containers.get(container_name)
-        except docker.errors.NotFound:
+            # Stored ID is stale — fall back to lookup by name in case the
+            # container is still alive (e.g. was recreated and we missed the commit).
+            try:
+                container = get_docker_client().containers.get(container_name)
+                print(f"[DEBUG] found container by name after ID miss", flush=True)
+            except docker.errors.NotFound:
+                container = None
+        except Exception as e:
+            print(f"[DEBUG] unexpected error getting container: {e}", flush=True)
             container = None
 
     if container is not None:
         container.reload()
-        current_image = container.image.tags[0] if container.image.tags else None
-        if current_image != assignment.autograder_image_name:
+        # Docker deduplicates identical image content: when two assignments share
+        # the same autograder zip, their images hash to the same object and Docker
+        # gives it multiple tags. tags[0] may return any of those tags, so checking
+        # only [0] produces false mismatches. Check whether the expected tag appears
+        # anywhere in the list instead.
+        def _canonical(name):
+            if name and ':' not in name:
+                return name + ':latest'
+            return name
+        expected = _canonical(assignment.autograder_image_name)
+        container_tags = {_canonical(t) for t in container.image.tags}
+        if expected not in container_tags:
+            print(f"[DEBUG] image changed (tags={container_tags!r} → expected {expected!r}), recreating container", flush=True)
             container.stop()
             container.remove(force=True)
             container = None
 
     if container is None:
+        print(f"[DEBUG] creating new container", flush=True)
         container = get_docker_client().containers.run(
             image=assignment.autograder_image_name,
             name=container_name,
@@ -77,7 +99,10 @@ def get_or_create_assignment_container(assignment):
             command="tail -f /dev/null"
         )
     elif container.status != "running":
+        print(f"[DEBUG] restarting stopped container", flush=True)
         container.start()
+    else:
+        print(f"[DEBUG] reusing existing running container", flush=True)
 
     if assignment.container_id != container.id:
         assignment.container_id = container.id
