@@ -21,6 +21,7 @@ class AssignmentSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Assignment
         include_fk = True
+        exclude = ("ai_feedback_api_key",)
 
 class SubmissionSchema(ma.SQLAlchemyAutoSchema):
     class Meta:

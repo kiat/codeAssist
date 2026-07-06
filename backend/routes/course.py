@@ -189,6 +189,10 @@ def create_course():
     if db.session.query(Course).filter_by(entryCode=data["entryCode"]).first():
         raise ConflictError("Course with the provided entry code already exists")
 
+    instructor = db.session.query(User).filter_by(id=data["instructor_id"]).first()
+    if not instructor:
+        raise NotFoundError("Instructor not found")
+
     course = Course(id = str(uuid.uuid4()), **data)
 
     enrollment = Enrollment(

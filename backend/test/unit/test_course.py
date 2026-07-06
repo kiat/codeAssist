@@ -30,7 +30,11 @@ def mock_course_query(mocker):
 def test_create_course_success(client, mocker, mock_course_query):
     mock_query, mock_schema = mock_course_query
 
-    mock_query.return_value.filter_by.return_value.first.return_value = None
+    mock_instructor = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        None,
+        mock_instructor,
+    ]
     mock_add = mocker.patch("routes.course.db.session.add")
     mock_commit = mocker.patch("routes.course.db.session.commit")
     
@@ -53,6 +57,29 @@ def test_create_course_success(client, mocker, mock_course_query):
     assert response.json["name"] == "CS101"
     mock_commit.assert_called_once()
     assert mock_add.call_count == 2
+
+
+def test_create_course_missing_instructor_returns_not_found(client, mocker, mock_course_query):
+    mock_query, _ = mock_course_query
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        None,
+        None,
+    ]
+    mock_add = mocker.patch("routes.course.db.session.add")
+
+    payload = {
+        "name": "CS101",
+        "instructor_id": "missing-user",
+        "semester": "Fall",
+        "year": "2025",
+        "entryCode": "ABCD1234"
+    }
+
+    response = client.post("/create_course", json=payload)
+
+    assert response.status_code == 404
+    assert response.json["message"] == "Instructor not found"
+    mock_add.assert_not_called()
 
 
 def test_create_course_duplicate_entry_code(client, mock_course_query):
@@ -520,6 +547,11 @@ def test_create_course_get_not_allowed(client):
     assert response.status_code == 415
 
 def test_create_course_db_error(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        None,
+        mocker.Mock(),
+    ]
     mocker.patch("routes.course.db.session.add")
     mocker.patch("routes.course.db.session.commit", side_effect=Exception("fail"))
     mocker.patch("routes.course.db.session.rollback")

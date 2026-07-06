@@ -29,6 +29,19 @@ from ai_feedback.settings import (
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_TEMPERATURE = 0.5
 GEMINI_MAX_OUTPUT_TOKENS = 1600
+GEMINI_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
+GEMINI_MAX_ATTEMPTS = 3
+GEMINI_RETRY_BACKOFF_SECONDS = 1
+GEMINI_TRANSIENT_EXCEPTIONS = (
+    requests.ConnectionError,
+    requests.Timeout,
+)
+PROVIDER_DISPLAY_NAMES = {
+    "openai": "OpenAI",
+    "gemini": "Gemini",
+    "claude": "Claude",
+    "ollama": "Ollama",
+}
 CORRECTNESS_SYSTEM_PROMPT = (
     "You are an AI feedback assistant for programming assignments. "
     "Give short, student-facing feedback about correctness, test results, "
@@ -36,6 +49,47 @@ CORRECTNESS_SYSTEM_PROMPT = (
     "Do not provide corrected code, copy-paste fixes, or the full solution. "
     "Return only valid JSON."
 )
+
+
+def get_gemini_retry_delay(attempt):
+    """Returns the exponential backoff delay before the next Gemini retry."""
+    return GEMINI_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+
+
+def post_gemini_with_retry(url, *, params, payload, timeout):
+    """Retry Gemini requests for temporary provider-side failures."""
+    response = None
+    for attempt in range(1, GEMINI_MAX_ATTEMPTS + 1):
+        try:
+            response = requests.post(
+                url,
+                params=params,
+                json=payload,
+                timeout=timeout,
+            )
+        except GEMINI_TRANSIENT_EXCEPTIONS as e:
+            if attempt >= GEMINI_MAX_ATTEMPTS:
+                raise
+            print(
+                f"GEMINI_RETRY: {type(e).__name__} on attempt "
+                f"{attempt}/{GEMINI_MAX_ATTEMPTS}; retrying",
+                flush=True,
+            )
+            time.sleep(get_gemini_retry_delay(attempt))
+            continue
+
+        if response.status_code not in GEMINI_TRANSIENT_STATUS_CODES:
+            return response
+        if attempt < GEMINI_MAX_ATTEMPTS:
+            print(
+                f"GEMINI_RETRY: status {response.status_code} on attempt "
+                f"{attempt}/{GEMINI_MAX_ATTEMPTS}; retrying",
+                flush=True,
+            )
+            time.sleep(get_gemini_retry_delay(attempt))
+    return response
+
+
 DEFAULT_FEEDBACK_PROMPT = """
 You are giving short, student-facing feedback on a programming assignment.
 
@@ -392,10 +446,10 @@ def get_structured_feedback_from_openai(client, prompt, model, temperature, past
 
 def get_structured_feedback_from_gemini(api_key, prompt, model, temperature, past_insights):
     """Sends request to Gemini and parses JSON feedback."""
-    response = requests.post(
+    response = post_gemini_with_retry(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         params={"key": api_key},
-        json={
+        payload={
             "contents": [
                 {
                     "role": "user",
@@ -551,32 +605,100 @@ def get_temperature(assignment, course):
         return DEFAULT_TEMPERATURE
 
 
-def get_provider_credentials(provider, course):
+def get_assignment_provider_credential(assignment):
+    """Returns decrypted assignment credential when custom AI settings provide one."""
+    if not assignment or getattr(assignment, "use_course_ai_default", True):
+        return None
+
+    encrypted_credential = (
+        getattr(assignment, "ai_feedback_api_key", None)
+        or ""
+    ).strip()
+    if not encrypted_credential:
+        return None
+
+    return decrypt_api_key(encrypted_credential)
+
+
+def infer_api_key_provider(api_key):
+    """Infers provider from common API key prefixes when possible."""
+    normalized_key = (api_key or "").strip()
+
+    if normalized_key.startswith("sk-ant-"):
+        return "claude"
+    if normalized_key.startswith(("sk-proj-", "sk-")):
+        return "openai"
+    if normalized_key.startswith("AIza"):
+        return "gemini"
+
+    return None
+
+
+def validate_assignment_provider_credential(provider, api_key):
+    """Rejects assignment keys that clearly belong to a different provider."""
+    if provider not in {"openai", "gemini", "claude"}:
+        return
+
+    detected_provider = infer_api_key_provider(api_key)
+    if not detected_provider:
+        print(
+            "AI_FEEDBACK: Could not infer assignment API key provider; "
+            f"using it for {PROVIDER_DISPLAY_NAMES.get(provider, provider)}.",
+            flush=True,
+        )
+        return
+
+    if detected_provider != provider:
+        raise ValueError(
+            "Assignment API key appears to be for "
+            f"{PROVIDER_DISPLAY_NAMES.get(detected_provider, detected_provider)}, "
+            f"but {PROVIDER_DISPLAY_NAMES.get(provider, provider)} is selected."
+        )
+
+
+def get_provider_credentials(provider, course, assignment=None):
     """Returns API key and OpenAI client if needed."""
     api_key = None
     client = None
+    assignment_credential = get_assignment_provider_credential(assignment)
 
     if provider == "openai":
-        if not course.openai_api_key:
-            raise ValueError("Missing OpenAI API key for this course")
+        if assignment_credential:
+            validate_assignment_provider_credential(provider, assignment_credential)
+            api_key = assignment_credential
+        else:
+            if not course.openai_api_key:
+                raise ValueError("Missing OpenAI API key for this course or assignment")
 
-        api_key = decrypt_api_key(course.openai_api_key)
+            api_key = decrypt_api_key(course.openai_api_key)
         client = OpenAI(api_key=api_key)
 
     elif provider == "gemini":
-        if not course.gemini_api_key:
-            raise ValueError("Missing Gemini API key for this course")
+        if assignment_credential:
+            validate_assignment_provider_credential(provider, assignment_credential)
+            api_key = assignment_credential
+        else:
+            if not course.gemini_api_key:
+                raise ValueError("Missing Gemini API key for this course or assignment")
 
-        api_key = decrypt_api_key(course.gemini_api_key)
+            api_key = decrypt_api_key(course.gemini_api_key)
 
     elif provider == "claude":
-        if not course.claude_api_key:
-            raise ValueError("Missing Claude API key for this course")
+        if assignment_credential:
+            validate_assignment_provider_credential(provider, assignment_credential)
+            api_key = assignment_credential
+        else:
+            if not course.claude_api_key:
+                raise ValueError("Missing Claude API key for this course or assignment")
 
-        api_key = decrypt_api_key(course.claude_api_key)
+            api_key = decrypt_api_key(course.claude_api_key)
 
     elif provider == "ollama":
-        api_key = (course.ollama_base_url or "http://host.docker.internal:11434").strip()
+        api_key = (
+            assignment_credential
+            or course.ollama_base_url
+            or "http://host.docker.internal:11434"
+        ).strip()
 
     else:
         raise ValueError(f"Unsupported AI provider: {provider}")
@@ -657,7 +779,7 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
 
         provider, model = get_provider_and_model(assignment, course)
         temperature = get_temperature(assignment, course)
-        api_key, client = get_provider_credentials(provider, course)
+        api_key, client = get_provider_credentials(provider, course, assignment)
 
         print(
             f"AI_FEEDBACK: Using provider={provider}, model={model}, temperature={temperature}",

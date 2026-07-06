@@ -1,5 +1,5 @@
 import React, { useContext, useCallback, useEffect, useState } from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, PageHeader, Radio, message } from "antd";
 
 import { GlobalContext } from "../../App";
@@ -13,6 +13,7 @@ import SubmissionHistoryModal from "./submissionHistoryModal";
 import FormattingModal from "./FormattingModal";
 
 import { getAssignment, getExtension } from "../../services/assignment";
+import { rerunSubmissionAutograder } from "../../services/submission";
 import moment from "moment";
 
 export default function AssignmentResult() {
@@ -27,7 +28,6 @@ export default function AssignmentResult() {
   const [assignmentId, setAssignmentId] = useState("");
   const [studentId, setStudentId] = useState("");
   // const { assignmentId, studentId } = useParams();
-  const location = useLocation();
   const navigate = useNavigate();
   // adding global context variable
   const { userInfo, assignmentInfo, updateAssignmentInfo } =
@@ -40,7 +40,9 @@ export default function AssignmentResult() {
   // used to check if AI Feedback has been enabled on this assignment
   const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true);
   // used to check if code editor is enabled for this assignment
+  const [allowFileUpload, setAllowFileUpload] = useState(false);
   const [enableCodeEditor, setEnableCodeEditor] = useState(false);
+  const [rerunLoading, setRerunLoading] = useState(false);
   
   useEffect(() => {
     // Fetching student and assignment IDs based on this submission ID
@@ -128,6 +130,7 @@ export default function AssignmentResult() {
           setLateAllowed(res.data.late_submission);
           setLateDueDate(moment(res.data.late_due_date).valueOf());
           setAiFeedbackEnabled(res.data.ai_feedback_enabled);
+          setAllowFileUpload(res.data.allow_file_upload !== false);
           setEnableCodeEditor(!!res.data.enable_code_editor);
           if (extension?.data.due_date_extension) {
             setDueDate(moment(extension.data.due_date_extension).valueOf());
@@ -221,6 +224,28 @@ export default function AssignmentResult() {
     }
   };
 
+  const handleRerunAutograder = useCallback(async () => {
+    if (!toSend?.id) {
+      message.error("Submission is still loading");
+      return;
+    }
+
+    setRerunLoading(true);
+    try {
+      const response = await rerunSubmissionAutograder({
+        submission_id: toSend.id,
+      });
+      if (response?.data?.submission) {
+        setToSend(response.data.submission);
+      }
+      message.success(response?.data?.message || "Autograder rerun completed");
+    } catch (error) {
+      console.error("Failed to rerun autograder:", error);
+    } finally {
+      setRerunLoading(false);
+    }
+  }, [toSend]);
+
   return (
     <>
       <PageContent>
@@ -266,7 +291,7 @@ export default function AssignmentResult() {
       {userInfo.isStudent ? (
         <PageBottom>
           <ActionButtons
-            onRerun={() => {}} // Implement or replace with actual function
+            onRerun={handleRerunAutograder}
             onUpload={() => toggleModal("upload")}
             onResubmitEditor={() => {
               const now = moment();
@@ -282,7 +307,9 @@ export default function AssignmentResult() {
             onDownload={handleDownload} // Implement or replace with actual function
             onHistoryOpen={() => toggleModal("history")}
             isStudent={userInfo?.isStudent}
+            allowFileUpload={allowFileUpload}
             enableCodeEditor={enableCodeEditor}
+            rerunLoading={rerunLoading}
           />
         </PageBottom>
       ) : (

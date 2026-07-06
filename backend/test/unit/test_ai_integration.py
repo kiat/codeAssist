@@ -1,7 +1,13 @@
+from types import SimpleNamespace
+
+import pytest
+import requests
+
 from ai_feedback.integration import (
     DEFAULT_FEEDBACK_PROMPT,
     RETURN_SPEC,
     build_feedback_prompt,
+    get_provider_credentials,
     get_structured_feedback_from_gemini,
     parse_feedback_json,
 )
@@ -166,3 +172,288 @@ def test_gemini_feedback_request_reserves_tokens_for_json(monkeypatch):
     assert new_insights == ["Overall Summary: Feedback is ready."]
     assert generation_config["maxOutputTokens"] >= 1400
     assert generation_config["thinkingConfig"]["thinkingBudget"] == 0
+
+
+def test_gemini_feedback_retries_transient_unavailable(monkeypatch, capsys):
+    calls = []
+    sleeps = []
+
+    class FakeGeminiResponse:
+        def __init__(self, status_code, text, payload):
+            self.status_code = status_code
+            self.text = text
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_post(url, params, json, timeout):
+        calls.append({"url": url, "params": params, "json": json, "timeout": timeout})
+        if len(calls) == 1:
+            return FakeGeminiResponse(
+                503,
+                '{"error":{"status":"UNAVAILABLE"}}',
+                {"error": {"status": "UNAVAILABLE"}},
+            )
+        return FakeGeminiResponse(
+            200,
+            "",
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": (
+                                        '{"insights":["Overall Summary: Feedback recovered."],'
+                                        '"annotations":[]}'
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
+    monkeypatch.setattr(
+        "ai_feedback.integration.time.sleep",
+        lambda seconds: sleeps.append(seconds),
+    )
+
+    parsed, new_insights = get_structured_feedback_from_gemini(
+        api_key="gemini-key",
+        prompt="Return JSON feedback.",
+        model="gemini-2.5-flash",
+        temperature=0.5,
+        past_insights=[],
+    )
+
+    assert len(calls) == 2
+    assert "error" not in parsed
+    assert new_insights == ["Overall Summary: Feedback recovered."]
+    assert sleeps == [1]
+    assert "GEMINI_RETRY: status 503" in capsys.readouterr().out
+
+
+def test_gemini_feedback_retries_transient_network_error(monkeypatch):
+    calls = []
+    sleeps = []
+
+    class FakeGeminiResponse:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": (
+                                        '{"insights":["Overall Summary: Feedback recovered after timeout."],'
+                                        '"annotations":[]}'
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+
+    def fake_post(url, params, json, timeout):
+        calls.append({"url": url, "params": params, "json": json, "timeout": timeout})
+        if len(calls) == 1:
+            raise requests.Timeout("temporary timeout")
+        return FakeGeminiResponse()
+
+    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
+    monkeypatch.setattr(
+        "ai_feedback.integration.time.sleep",
+        lambda seconds: sleeps.append(seconds),
+    )
+
+    parsed, new_insights = get_structured_feedback_from_gemini(
+        api_key="gemini-key",
+        prompt="Return JSON feedback.",
+        model="gemini-2.5-flash",
+        temperature=0.5,
+        past_insights=[],
+    )
+
+    assert len(calls) == 2
+    assert sleeps == [1]
+    assert "error" not in parsed
+    assert new_insights == ["Overall Summary: Feedback recovered after timeout."]
+
+
+@pytest.mark.parametrize(
+    ("provider", "course_key_attr", "expects_client"),
+    [
+        ("openai", "openai_api_key", True),
+        ("gemini", "gemini_api_key", False),
+        ("claude", "claude_api_key", False),
+    ],
+)
+def test_get_provider_credentials_uses_assignment_key_for_custom_provider(
+    monkeypatch,
+    provider,
+    course_key_attr,
+    expects_client,
+):
+    course = SimpleNamespace(**{course_key_attr: ""})
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_api_key=f"encrypted-assignment-{provider}-key",
+    )
+    fake_client = object()
+
+    monkeypatch.setattr(
+        "ai_feedback.integration.decrypt_api_key",
+        lambda encrypted_key: {
+            f"encrypted-assignment-{provider}-key": f"assignment-{provider}-key",
+        }[encrypted_key],
+    )
+    monkeypatch.setattr(
+        "ai_feedback.integration.OpenAI",
+        lambda api_key: fake_client,
+    )
+
+    api_key, client = get_provider_credentials(provider, course, assignment)
+
+    assert api_key == f"assignment-{provider}-key"
+    if expects_client:
+        assert client is fake_client
+    else:
+        assert client is None
+
+
+def test_get_provider_credentials_rejects_assignment_key_for_different_provider(
+    monkeypatch,
+):
+    course = SimpleNamespace(gemini_api_key="encrypted-course-gemini-key")
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_api_key="encrypted-openai-assignment-key",
+    )
+
+    monkeypatch.setattr(
+        "ai_feedback.integration.decrypt_api_key",
+        lambda encrypted_key: {
+            "encrypted-openai-assignment-key": "sk-proj-openai-key",
+            "encrypted-course-gemini-key": "AIza-gemini-key",
+        }[encrypted_key],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Assignment API key appears to be for OpenAI",
+    ):
+        get_provider_credentials("gemini", course, assignment)
+
+
+@pytest.mark.parametrize(
+    ("provider", "course_key_attr", "expects_client"),
+    [
+        ("openai", "openai_api_key", True),
+        ("gemini", "gemini_api_key", False),
+        ("claude", "claude_api_key", False),
+    ],
+)
+def test_get_provider_credentials_falls_back_to_course_key_for_custom_provider(
+    monkeypatch,
+    provider,
+    course_key_attr,
+    expects_client,
+):
+    course = SimpleNamespace(**{course_key_attr: f"encrypted-course-{provider}-key"})
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_api_key="",
+    )
+    fake_client = object()
+
+    monkeypatch.setattr(
+        "ai_feedback.integration.decrypt_api_key",
+        lambda encrypted_key: {
+            f"encrypted-course-{provider}-key": f"course-{provider}-key",
+        }[encrypted_key],
+    )
+    monkeypatch.setattr(
+        "ai_feedback.integration.OpenAI",
+        lambda api_key: fake_client,
+    )
+
+    api_key, client = get_provider_credentials(provider, course, assignment)
+
+    assert api_key == f"course-{provider}-key"
+    if expects_client:
+        assert client is fake_client
+    else:
+        assert client is None
+
+
+@pytest.mark.parametrize(
+    ("provider", "course_key_attr", "expects_client"),
+    [
+        ("openai", "openai_api_key", True),
+        ("gemini", "gemini_api_key", False),
+        ("claude", "claude_api_key", False),
+    ],
+)
+def test_get_provider_credentials_ignores_assignment_key_when_using_course_default(
+    monkeypatch,
+    provider,
+    course_key_attr,
+    expects_client,
+):
+    course = SimpleNamespace(**{course_key_attr: f"encrypted-course-{provider}-key"})
+    assignment = SimpleNamespace(
+        use_course_ai_default=True,
+        ai_feedback_api_key=f"encrypted-assignment-{provider}-key",
+    )
+    fake_client = object()
+
+    monkeypatch.setattr(
+        "ai_feedback.integration.decrypt_api_key",
+        lambda encrypted_key: {
+            f"encrypted-course-{provider}-key": f"course-{provider}-key",
+        }[encrypted_key],
+    )
+    monkeypatch.setattr(
+        "ai_feedback.integration.OpenAI",
+        lambda api_key: fake_client,
+    )
+
+    api_key, client = get_provider_credentials(provider, course, assignment)
+
+    assert api_key == f"course-{provider}-key"
+    if expects_client:
+        assert client is fake_client
+    else:
+        assert client is None
+
+
+@pytest.mark.parametrize(
+    ("provider", "course_key_attr", "provider_label"),
+    [
+        ("openai", "openai_api_key", "OpenAI"),
+        ("gemini", "gemini_api_key", "Gemini"),
+        ("claude", "claude_api_key", "Claude"),
+    ],
+)
+def test_get_provider_credentials_requires_saved_provider_key(
+    provider,
+    course_key_attr,
+    provider_label,
+):
+    course = SimpleNamespace(**{course_key_attr: ""})
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_api_key="",
+    )
+
+    with pytest.raises(ValueError, match=f"Missing {provider_label} API key"):
+        get_provider_credentials(provider, course, assignment)

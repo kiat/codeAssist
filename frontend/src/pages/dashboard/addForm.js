@@ -9,7 +9,7 @@ export default function AddForm({ onFinish, onCancel }) {
   };
 
   return (
-    <Form layout="vertical" onFinish={handleFinish} initialValues={{ allowEntryCode: true }}>
+    <Form layout="vertical" onFinish={handleFinish}>
       <Form.Item label='COURSE NAME' name='courseName'>
         <Input />
       </Form.Item>
@@ -30,12 +30,6 @@ export default function AddForm({ onFinish, onCancel }) {
         <Input />
       </Form.Item>
 
-      {/* ensure allowEntryCode is included even without a visible field */}
-      {/* while the allowEntryCode option (allowing students to enroll themselves to course) is not enabled, leaving it for 
-          potential future usage */}
-      <Form.Item name='allowEntryCode' initialValue={true} hidden>
-        <Input type='hidden' />
-      </Form.Item>
       <Form.Item style={{ textAlign: "center" }}>
         <Button
           type='primary'

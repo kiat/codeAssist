@@ -13,12 +13,13 @@ from api import db
 from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course
 from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
-from openai import OpenAI
-from util.encryption_utils import decrypt_api_key
+from util.url_utils import validate_ollama_url
 from ai_feedback.integration import (
     async_get_ai_feedback,
     get_provider_and_model,
     get_provider_credentials,
+    get_temperature,
+    post_gemini_with_retry,
 )
 import docker
 
@@ -419,6 +420,13 @@ def _save_final_draft(student_id, assignment_id, content, file_name):
 # Default Python image used when no autograder is configured
 _DEFAULT_PYTHON_IMAGE = "python:3.11-slim"
 
+AI_CHAT_SYSTEM_PROMPT = (
+    "You are an AI coding assistant for a programming course. "
+    "Help students understand their code, debug issues, and improve their solutions. "
+    "Do NOT provide the complete solution. Give hints, guiding questions, and explanations. "
+    "Keep responses concise and encouraging."
+)
+
 
 def _run_code_in_container(image, content, file_name, timeout):
     """
@@ -535,6 +543,112 @@ def _run_autograder_in_container(image, content, file_name, assignment_id, timeo
                 container.remove()
             except Exception:
                 pass
+
+
+def _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperature):
+    if provider == "openai":
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": AI_CHAT_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            model=model,
+            max_tokens=500,
+            temperature=float(temperature),
+            timeout=30,
+        )
+        return response.choices[0].message.content.strip()
+
+    if provider == "gemini":
+        response = post_gemini_with_retry(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            params={"key": api_key},
+            payload={
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": f"{AI_CHAT_SYSTEM_PROMPT}\n\n{user_prompt}",
+                            }
+                        ],
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": float(temperature),
+                    "maxOutputTokens": 700,
+                },
+            },
+            timeout=30,
+        )
+
+        if response.status_code >= 400:
+            raise ValueError(f"Gemini API error: {response.text}")
+
+        data = response.json()
+        candidate = data.get("candidates", [{}])[0]
+        return "".join(
+            part.get("text", "")
+            for part in candidate.get("content", {}).get("parts", [])
+            if not part.get("thought")
+        ).strip()
+
+    if provider == "claude":
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": model,
+                "max_tokens": 500,
+                "temperature": float(temperature),
+                "system": AI_CHAT_SYSTEM_PROMPT,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    }
+                ],
+            },
+            timeout=30,
+        )
+
+        if response.status_code >= 400:
+            raise ValueError(f"Claude API error: {response.text}")
+
+        data = response.json()
+        content = data.get("content", [])
+        if content and content[0].get("type") == "text":
+            return content[0].get("text", "").strip()
+        return ""
+
+    if provider == "ollama":
+        validate_ollama_url(api_key)
+        response = requests.post(
+            f"{api_key}/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": AI_CHAT_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "options": {
+                    "temperature": float(temperature),
+                },
+                "stream": False,
+            },
+            timeout=60,
+        )
+
+        if response.status_code >= 400:
+            raise ValueError(f"Ollama API error: {response.text}")
+
+        return response.json().get("message", {}).get("content", "").strip()
+
+    raise ValueError(f"Unsupported AI provider: {provider}")
 
 
 @code_editor.route('/run_code', methods=["POST"])
@@ -689,7 +803,7 @@ def ai_chat():
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
 
-    # Fetch assignment and course for API key
+    # Fetch assignment and course for provider settings and credentials.
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
         raise NotFoundError("Assignment not found")
@@ -700,122 +814,23 @@ def ai_chat():
     if not course:
         raise BadRequestError("Course not found for this assignment.")
 
-    # Determine provider and model using the shared helper (respects assignment
-    # overrides and falls back to course defaults).
-    provider, model = get_provider_and_model(assignment, course)
-
-    system_prompt = (
-        "You are an AI coding assistant for a programming course. "
-        "Help students understand their code, debug issues, and improve their solutions. "
-        "Do NOT provide the complete solution. Give hints, guiding questions, and explanations. "
-        "Keep responses concise and encouraging."
-    )
-
     user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
-
-    temperature = 0.5
-    try:
-        temperature = float(assignment.ai_feedback_temperature or 0.5)
-    except (TypeError, ValueError):
-        temperature = 0.5
+    provider, model = get_provider_and_model(assignment, course)
+    temperature = get_temperature(assignment, course)
 
     try:
-        api_key, client = get_provider_credentials(provider, course)
+        api_key, client = get_provider_credentials(provider, course, assignment)
     except ValueError as e:
-        raise BadRequestError(str(e))
+        error_message = str(e)
+        if error_message.startswith("Missing "):
+            raise BadRequestError("AI is not configured for this course or assignment. Please ask your instructor to set up an API key.")
+        raise BadRequestError(error_message)
     except Exception:
         raise InternalProcessingError("Failed to initialize AI client")
 
     try:
-        if provider == "openai":
-            response = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                model=model,
-                max_tokens=500,
-                temperature=temperature,
-                timeout=30,
-            )
-            reply = response.choices[0].message.content.strip()
-
-        elif provider == "gemini":
-            gemini_response = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                params={"key": api_key},
-                json={
-                    "contents": [
-                        {
-                            "role": "user",
-                            "parts": [
-                                {"text": f"{system_prompt}\n\n{user_prompt}"}
-                            ],
-                        }
-                    ],
-                    "generationConfig": {
-                        "temperature": temperature,
-                        "maxOutputTokens": 500,
-                    },
-                },
-                timeout=30,
-            )
-            if gemini_response.status_code >= 400:
-                raise ValueError(f"Gemini API error: {gemini_response.text}")
-            gemini_data = gemini_response.json()
-            candidate = gemini_data.get("candidates", [{}])[0]
-            reply = "".join(
-                part.get("text", "")
-                for part in candidate.get("content", {}).get("parts", [])
-                if not part.get("thought")
-            ).strip()
-
-        elif provider == "claude":
-            claude_response = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": model,
-                    "max_tokens": 500,
-                    "temperature": temperature,
-                    "system": system_prompt,
-                    "messages": [{"role": "user", "content": user_prompt}],
-                },
-                timeout=30,
-            )
-            if claude_response.status_code >= 400:
-                raise ValueError(f"Claude API error: {claude_response.text}")
-            claude_data = claude_response.json()
-            content_parts = claude_data.get("content", [])
-            reply = content_parts[0].get("text", "").strip() if content_parts else ""
-
-        elif provider == "ollama":
-            base_url = (api_key or "http://host.docker.internal:11434").strip()
-            ollama_response = requests.post(
-                f"{base_url}/api/chat",
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    "options": {"temperature": temperature},
-                    "stream": False,
-                },
-                timeout=60,
-            )
-            if ollama_response.status_code >= 400:
-                raise ValueError(f"Ollama API error: {ollama_response.text}")
-            reply = ollama_response.json().get("message", {}).get("content", "").strip()
-
-        else:
-            raise BadRequestError(f"Unsupported AI provider: {provider}")
-
-    except ValueError as e:
+        reply = _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperature)
+    except Exception as e:
         error_msg = str(e)
         print(f"AI_CHAT error: {e}", flush=True)
         if "insufficient_quota" in error_msg or "429" in error_msg:

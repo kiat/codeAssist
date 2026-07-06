@@ -122,14 +122,22 @@ export default ({
 
   const handleFetchAssignmentModels = async () => {
     const provider = form.getFieldValue("ai_feedback_provider") || "openai";
+    const assignmentApiKey = (
+      form.getFieldValue("ai_feedback_api_key") || ""
+    ).trim();
 
     try {
       setAssignmentModelsLoading(true);
 
-      const response = await fetchAiModels({
+      const fetchPayload = {
         course_id: courseId,
         provider,
-      });
+      };
+      if (assignmentApiKey) {
+        fetchPayload.api_key = assignmentApiKey;
+      }
+
+      const response = await fetchAiModels(fetchPayload);
 
       const fetchedModels = response?.data?.models || [];
       setAssignmentModels(fetchedModels);
@@ -199,6 +207,10 @@ export default ({
           values.use_course_ai_default === false
             ? values.ai_feedback_model
             : null,
+        ai_feedback_api_key:
+          values.use_course_ai_default === false
+            ? (values.ai_feedback_api_key || "").trim()
+            : "",
         ai_feedback_prompt: firstPrompt?.prompt ?? null,
         ai_feedback_prompts: feedbackPrompts,
         ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
@@ -585,10 +597,18 @@ export default ({
                                 </Radio>
                               </Space>
                             </Radio.Group>
-                          </Form.Item>
+                            </Form.Item>
 
                           {useCourseAiDefault === false && (
                             <Card size="small" title="Custom Assignment Model">
+                              <Alert
+                                type="info"
+                                showIcon
+                                style={{ marginBottom: 16 }}
+                                message="Assignment credential behavior"
+                                description="If you later switch back to course defaults, the saved assignment credential will be cleared."
+                              />
+
                               <Form.Item
                                 label="Provider"
                                 name="ai_feedback_provider"
@@ -610,8 +630,19 @@ export default ({
                                     setAssignmentModels([]);
                                     form.setFieldsValue({
                                       ai_feedback_model: undefined,
+                                      ai_feedback_api_key: "",
                                     });
                                   }}
+                                />
+                              </Form.Item>
+
+                              <Form.Item
+                                label="Assignment API Key / Base URL"
+                                name="ai_feedback_api_key"
+                              >
+                                <Input.Password
+                                  autoComplete="new-password"
+                                  placeholder="Use a custom credential for this assignment"
                                 />
                               </Form.Item>
 
