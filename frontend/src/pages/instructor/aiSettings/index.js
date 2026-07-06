@@ -46,8 +46,9 @@ const FEEDBACK_STYLES = [
   { label: "Balanced", value: "balanced" },
   { label: "Detailed debugging", value: "detailed-debugging" },
 ];
+
 const PROVIDER_DEFAULT_MODELS = {
-  openai: "gpt-4o-mini",
+  openai: "gpt-4o",
   gemini: "gemini-1.5-flash",
   claude: "claude-3-5-sonnet-20241022",
   ollama: "llama3",
@@ -84,56 +85,60 @@ export default function AISettings() {
 
   const selectedProvider = PROVIDERS.find((item) => item.key === provider);
   const isOllama = provider === "ollama";
+  const hasSavedKey = getKeyStatus(courseAiInfo, provider);
 
-  const fetchModelsForProvider = useCallback(async ({
-    targetProvider,
-    keyOverride = "",
-    currentModel = "",
-    silent = false,
-  } = {}) => {
-    try {
-      setModelsLoading(true);
+  const fetchModelsForProvider = useCallback(
+    async ({
+      targetProvider,
+      keyOverride = "",
+      currentModel = "",
+      silent = false,
+    } = {}) => {
+      try {
+        setModelsLoading(true);
 
-      const response = await fetchAiModels({
-        course_id: courseId,
-        provider: targetProvider,
-        api_key: keyOverride || undefined,
-      });
+        const response = await fetchAiModels({
+          course_id: courseId,
+          provider: targetProvider,
+          api_key: keyOverride || undefined,
+        });
 
-      const fetchedModels = response?.data?.models || [];
-      setModels(fetchedModels);
+        const fetchedModels = response?.data?.models || [];
+        setModels(fetchedModels);
 
-      if (fetchedModels.length === 0) {
-        if (!silent) {
-          message.warning("No models found for this provider");
+        if (fetchedModels.length === 0) {
+          if (!silent) {
+            message.warning("No models found for this provider");
+          }
+          return;
         }
-        return;
-      }
 
-      const providerPreferredModel = PROVIDER_DEFAULT_MODELS[targetProvider];
+        const providerPreferredModel = PROVIDER_DEFAULT_MODELS[targetProvider];
 
-      const preferredModel =
-        providerPreferredModel && fetchedModels.includes(providerPreferredModel)
-          ? providerPreferredModel
-          : fetchedModels[0];
+        const preferredModel =
+          providerPreferredModel && fetchedModels.includes(providerPreferredModel)
+            ? providerPreferredModel
+            : fetchedModels[0];
 
-      if (!currentModel || !fetchedModels.includes(currentModel)) {
-        setModelName(preferredModel);
-        form.setFieldsValue({ model_name: preferredModel });
-      }
+        if (!currentModel || !fetchedModels.includes(currentModel)) {
+          setModelName(preferredModel);
+          form.setFieldsValue({ model_name: preferredModel });
+        }
 
-      if (!silent) {
-        message.success("Models refreshed successfully");
+        if (!silent) {
+          message.success("Models refreshed successfully");
+        }
+      } catch (e) {
+        console.error("Failed to fetch models:", e.response?.data || e);
+        if (!silent) {
+          message.error(e.response?.data?.error || "Failed to refresh models");
+        }
+      } finally {
+        setModelsLoading(false);
       }
-    } catch (e) {
-      console.error("Failed to fetch models:", e.response?.data || e);
-      if (!silent) {
-        message.error(e.response?.data?.error || "Failed to refresh models");
-      }
-    } finally {
-      setModelsLoading(false);
-    }
-  }, [courseId, form]);
+    },
+    [courseId, form]
+  );
 
   const loadCourseAiInfo = useCallback(async () => {
     try {
@@ -181,20 +186,18 @@ export default function AISettings() {
     setProvider(newProvider);
     setModels([]);
     setApiTestStatus(null);
-
-    const fallbackModel = PROVIDER_DEFAULT_MODELS[newProvider] || "";
-
     setApiKey("");
 
+    const fallbackModel = PROVIDER_DEFAULT_MODELS[newProvider] || "";
     let nextModel = fallbackModel;
 
     if (newProvider === courseAiInfo.default_ai_provider) {
       const savedModel = courseAiInfo.default_ai_model || fallbackModel;
-
       nextModel = savedModel;
     }
 
     setModelName(nextModel);
+
     form.setFieldsValue({
       provider: newProvider,
       model_name: nextModel,
@@ -274,8 +277,6 @@ export default function AISettings() {
     }
   };
 
-  const hasSavedKey = getKeyStatus(courseAiInfo, provider);
-
   return (
     <Layout style={{ background: "#fff", minHeight: "100%" }}>
       <Sider
@@ -313,10 +314,16 @@ export default function AISettings() {
             <Space wrap>
               <Tag
                 color={hasSavedKey ? "success" : "warning"}
-                icon={hasSavedKey ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                icon={
+                  hasSavedKey ? <CheckCircleOutlined /> : <CloseCircleOutlined />
+                }
               >
                 {isOllama ? "Ollama URL: " : "API key: "}
-                {hasSavedKey ? "Connected" : isOllama ? "Using Default" : "Not saved"}
+                {hasSavedKey
+                  ? "Connected"
+                  : isOllama
+                  ? "Using Default"
+                  : "Not saved"}
               </Tag>
 
               <Tag
@@ -347,6 +354,102 @@ export default function AISettings() {
             <Card
               title={
                 <Space>
+                  <KeyOutlined />
+                  <span>
+                    {isOllama ? "Ollama Server URL" : "Provider API Key"}
+                  </span>
+                </Space>
+              }
+            >
+              <Space direction="vertical" style={{ width: "100%" }}>
+                <Form.Item label="Provider" name="provider">
+                  <Select
+                    value={provider}
+                    onChange={handleProviderChange}
+                    options={PROVIDERS.map((item) => ({
+                      label: item.displayName,
+                      value: item.key,
+                    }))}
+                  />
+                </Form.Item>
+
+                <Alert
+                  type={hasSavedKey ? "success" : "info"}
+                  showIcon
+                  message={
+                    hasSavedKey
+                      ? isOllama
+                        ? "Ollama connection URL is configured"
+                        : `${selectedProvider?.label} API key is saved`
+                      : isOllama
+                      ? "Ollama URL is not configured (defaults to http://host.docker.internal:11434)"
+                      : `${selectedProvider?.label} API key is not configured`
+                  }
+                  description={
+                    hasSavedKey
+                      ? isOllama
+                        ? "A connection URL is configured. Enter a new URL only if you want to replace it."
+                        : "A saved key exists. Paste a new key only if you want to replace it."
+                      : isOllama
+                      ? "Provide the URL to your local or remote Ollama server instance."
+                      : "Paste an API key below and save it for this provider."
+                  }
+                />
+
+                <Form.Item
+                  label={isOllama ? "Ollama Base URL" : "Add or Replace API Key"}
+                >
+                  {isOllama ? (
+                    <Input
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="e.g. http://host.docker.internal:11434"
+                    />
+                  ) : (
+                    <Input.Password
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Paste a new API key to add or replace"
+                      visibilityToggle
+                    />
+                  )}
+                </Form.Item>
+
+                <Space wrap>
+                  <Button type="primary" onClick={handleSave}>
+                    Save API Key / Settings
+                  </Button>
+
+                  <Button onClick={testConnection} disabled={isTesting}>
+                    Test Selected Model
+                  </Button>
+
+                  {isTesting && (
+                    <Spin
+                      indicator={
+                        <LoadingOutlined style={{ fontSize: 16 }} spin />
+                      }
+                    />
+                  )}
+
+                  {apiTestStatus === "success" && (
+                    <Typography.Text type="success">
+                      <CheckCircleOutlined /> Selected model tested successfully
+                    </Typography.Text>
+                  )}
+
+                  {apiTestStatus === "error" && (
+                    <Typography.Text type="danger">
+                      <CloseCircleOutlined /> Selected model test failed
+                    </Typography.Text>
+                  )}
+                </Space>
+              </Space>
+            </Card>
+
+            <Card
+              title={
+                <Space>
                   <RobotOutlined />
                   <span>Course Default Model</span>
                 </Space>
@@ -361,20 +464,9 @@ export default function AISettings() {
                 type="info"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message="Refresh models before choosing"
-                description="Use Refresh Models to load the current usable models for this provider. A saved model may appear before the model list is refreshed."
+                message="Save API key before refreshing models"
+                description="Enter or save the provider API key first, then use Refresh Models to load the current usable models for this provider."
               />
-
-              <Form.Item label="Provider" name="provider">
-                <Select
-                  value={provider}
-                  onChange={handleProviderChange}
-                  options={PROVIDERS.map((item) => ({
-                    label: item.displayName,
-                    value: item.key,
-                  }))}
-                />
-              </Form.Item>
 
               <Form.Item
                 label="Default Model"
@@ -418,83 +510,6 @@ export default function AISettings() {
                   />
                 </Space.Compact>
               </Form.Item>
-            </Card>
-
-            <Card
-              title={
-                <Space>
-                  <KeyOutlined />
-                  <span>{isOllama ? "Ollama Server URL" : "Provider API Key"}</span>
-                </Space>
-              }
-            >
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Alert
-                  type={hasSavedKey ? "success" : "info"}
-                  showIcon
-                  message={
-                    hasSavedKey
-                      ? isOllama
-                        ? `Ollama connection URL is configured`
-                        : `${selectedProvider?.label} API key is saved`
-                      : isOllama
-                      ? "Ollama URL is not configured (defaults to http://host.docker.internal:11434)"
-                      : `${selectedProvider?.label} API key is not configured`
-                  }
-                  description={
-                    hasSavedKey
-                      ? isOllama
-                        ? "A connection URL is configured. Enter a new URL only if you want to replace it."
-                        : "A saved key exists. Paste a new key only if you want to replace it."
-                      : isOllama
-                      ? "Provide the URL to your local or remote Ollama server instance."
-                      : "Paste an API key below and save it for this provider."
-                  }
-                />
-
-                <Form.Item label={isOllama ? "Ollama Base URL" : "Add or Replace API Key"}>
-                  {isOllama ? (
-                    <Input
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="e.g. http://host.docker.internal:11434"
-                    />
-                  ) : (
-                    <Input.Password
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="Paste a new API key to add or replace"
-                      visibilityToggle
-                    />
-                  )}
-                </Form.Item>
-
-                <Space>
-                  <Button onClick={testConnection} disabled={isTesting}>
-                    Test Selected Model
-                  </Button>
-
-                  {isTesting && (
-                    <Spin
-                      indicator={
-                        <LoadingOutlined style={{ fontSize: 16 }} spin />
-                      }
-                    />
-                  )}
-
-                  {apiTestStatus === "success" && (
-                    <Typography.Text type="success">
-                      <CheckCircleOutlined /> Selected model tested successfully
-                    </Typography.Text>
-                  )}
-
-                  {apiTestStatus === "error" && (
-                    <Typography.Text type="danger">
-                      <CloseCircleOutlined /> Selected model test failed
-                    </Typography.Text>
-                  )}
-                </Space>
-              </Space>
             </Card>
 
             <Card title="Feedback Defaults">
