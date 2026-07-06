@@ -13,9 +13,13 @@ from api import db
 from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course
 from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
-from openai import OpenAI
-from util.encryption_utils import decrypt_api_key
-from ai_feedback.integration import async_get_ai_feedback
+from ai_feedback.integration import (
+    async_get_ai_feedback,
+    get_provider_and_model,
+    get_provider_credentials,
+    get_temperature,
+    post_gemini_with_retry,
+)
 import docker
 
 code_editor = Blueprint('code_editor', __name__)
@@ -555,10 +559,10 @@ def _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperatur
         return response.choices[0].message.content.strip()
 
     if provider == "gemini":
-        response = requests.post(
+        response = post_gemini_with_retry(
             f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
             params={"key": api_key},
-            json={
+            payload={
                 "contents": [
                     {
                         "role": "user",
@@ -805,55 +809,25 @@ def ai_chat():
         raise BadRequestError("AI chat is not enabled for this assignment.")
 
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
-    if not course or not course.openai_api_key:
+    if not course:
         raise BadRequestError("AI is not configured for this course. Please ask your instructor to set up an API key.")
 
-    try:
-        decrypted_api_key = decrypt_api_key(course.openai_api_key)
-        client = OpenAI(api_key=decrypted_api_key)
-    except Exception:
-        raise InternalProcessingError("Failed to initialize AI client")
-
-    VALID_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"}
-    model = assignment.ai_feedback_model if assignment and assignment.ai_feedback_model else "gpt-4-turbo"
-    if model not in VALID_MODELS:
-        model = "gpt-4-turbo"
-    temperature = assignment.ai_feedback_temperature if assignment and assignment.ai_feedback_temperature else 0.5
-
-    system_prompt = (
-        "You are an AI coding assistant for a programming course. "
-        "Help students understand their code, debug issues, and improve their solutions. "
-        "Do NOT provide the complete solution. Give hints, guiding questions, and explanations. "
-        "Keep responses concise and encouraging."
-    )
-
     user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
-
-    temperature = 0.5
-    try:
-        temperature = float(assignment.ai_feedback_temperature or 0.5)
-    except (TypeError, ValueError):
-        temperature = 0.5
+    provider, model = get_provider_and_model(assignment, course)
+    temperature = get_temperature(assignment, course)
 
     try:
-        api_key, client = get_provider_credentials(provider, course)
+        api_key, client = get_provider_credentials(provider, course, assignment)
     except ValueError as e:
-        raise BadRequestError(str(e))
+        error_message = str(e)
+        if error_message.startswith("Missing "):
+            raise BadRequestError("AI is not configured for this course or assignment. Please ask your instructor to set up an API key.")
+        raise BadRequestError(error_message)
     except Exception:
         raise InternalProcessingError("Failed to initialize AI client")
 
     try:
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            model=model,
-            max_tokens=500,
-            temperature=float(temperature),
-            timeout=30,
-        )
-        reply = response.choices[0].message.content.strip()
+        reply = _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperature)
     except Exception as e:
         error_msg = str(e)
         print(f"AI_CHAT error: {e}", flush=True)

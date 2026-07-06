@@ -29,6 +29,9 @@ from ai_feedback.settings import (
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_TEMPERATURE = 0.5
 GEMINI_MAX_OUTPUT_TOKENS = 1600
+GEMINI_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
+GEMINI_MAX_ATTEMPTS = 3
+GEMINI_RETRY_BACKOFF_SECONDS = 1
 CORRECTNESS_SYSTEM_PROMPT = (
     "You are an AI feedback assistant for programming assignments. "
     "Give short, student-facing feedback about correctness, test results, "
@@ -36,6 +39,25 @@ CORRECTNESS_SYSTEM_PROMPT = (
     "Do not provide corrected code, copy-paste fixes, or the full solution. "
     "Return only valid JSON."
 )
+
+
+def post_gemini_with_retry(url, *, params, payload, timeout):
+    """Retry Gemini requests for temporary provider-side failures."""
+    response = None
+    for attempt in range(1, GEMINI_MAX_ATTEMPTS + 1):
+        response = requests.post(
+            url,
+            params=params,
+            json=payload,
+            timeout=timeout,
+        )
+        if response.status_code not in GEMINI_TRANSIENT_STATUS_CODES:
+            return response
+        if attempt < GEMINI_MAX_ATTEMPTS:
+            time.sleep(GEMINI_RETRY_BACKOFF_SECONDS * attempt)
+    return response
+
+
 DEFAULT_FEEDBACK_PROMPT = """
 You are giving short, student-facing feedback on a programming assignment.
 
@@ -392,10 +414,10 @@ def get_structured_feedback_from_openai(client, prompt, model, temperature, past
 
 def get_structured_feedback_from_gemini(api_key, prompt, model, temperature, past_insights):
     """Sends request to Gemini and parses JSON feedback."""
-    response = requests.post(
+    response = post_gemini_with_retry(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         params={"key": api_key},
-        json={
+        payload={
             "contents": [
                 {
                     "role": "user",

@@ -173,6 +173,63 @@ def test_gemini_feedback_request_reserves_tokens_for_json(monkeypatch):
     assert generation_config["thinkingConfig"]["thinkingBudget"] == 0
 
 
+def test_gemini_feedback_retries_transient_unavailable(monkeypatch):
+    calls = []
+
+    class FakeGeminiResponse:
+        def __init__(self, status_code, text, payload):
+            self.status_code = status_code
+            self.text = text
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_post(url, params, json, timeout):
+        calls.append({"url": url, "params": params, "json": json, "timeout": timeout})
+        if len(calls) == 1:
+            return FakeGeminiResponse(
+                503,
+                '{"error":{"status":"UNAVAILABLE"}}',
+                {"error": {"status": "UNAVAILABLE"}},
+            )
+        return FakeGeminiResponse(
+            200,
+            "",
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": (
+                                        '{"insights":["Overall Summary: Feedback recovered."],'
+                                        '"annotations":[]}'
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
+    monkeypatch.setattr("ai_feedback.integration.time.sleep", lambda seconds: None)
+
+    parsed, new_insights = get_structured_feedback_from_gemini(
+        api_key="gemini-key",
+        prompt="Return JSON feedback.",
+        model="gemini-2.5-flash",
+        temperature=0.5,
+        past_insights=[],
+    )
+
+    assert len(calls) == 2
+    assert "error" not in parsed
+    assert new_insights == ["Overall Summary: Feedback recovered."]
+
+
 @pytest.mark.parametrize(
     ("provider", "course_key_attr", "expects_client"),
     [

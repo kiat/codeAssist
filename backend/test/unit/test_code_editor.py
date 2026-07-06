@@ -231,6 +231,7 @@ def test_submit_code_past_due_date(client, mocker):
     from datetime import datetime, timezone, timedelta
 
     mock_assignment = mocker.Mock()
+    mock_assignment.enable_code_editor = True
     mock_assignment.published = True
     mock_assignment.late_submission = False
     mock_assignment.published_date = None
@@ -257,6 +258,88 @@ def test_submit_code_past_due_date(client, mocker):
     })
     assert resp.status_code == 400
     assert "past due date" in resp.get_json()["message"].lower()
+
+
+def test_submit_code_rejects_when_code_editor_disabled(client, mocker):
+    mock_assignment = mocker.Mock()
+    mock_assignment.enable_code_editor = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.post("/submit_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+
+    assert resp.status_code == 400
+    assert "not allowed" in resp.get_json()["message"].lower()
+
+
+def test_submit_code_without_autograder_saves_submission_and_final_draft(client, mocker):
+    from datetime import datetime, timezone, timedelta
+
+    mock_assignment = mocker.Mock()
+    mock_assignment.enable_code_editor = True
+    mock_assignment.published = True
+    mock_assignment.late_submission = False
+    mock_assignment.published_date = datetime.now(timezone.utc) - timedelta(days=1)
+    mock_assignment.due_date = datetime.now(timezone.utc) + timedelta(days=1)
+    mock_assignment.late_due_date = None
+    mock_assignment.autograder_image_name = ""
+
+    assignment_query = mocker.Mock()
+    assignment_query.filter_by.return_value.first.return_value = mock_assignment
+
+    extension_query = mocker.Mock()
+    extension_query.filter_by.return_value.first.return_value = None
+
+    submission_count_query = mocker.Mock()
+    submission_count_query.filter_by.return_value.count.return_value = 2
+
+    old_submission_filter = mocker.Mock()
+    old_submission_query = mocker.Mock()
+    old_submission_query.filter_by.return_value = old_submission_filter
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.side_effect = [
+        assignment_query,
+        extension_query,
+        submission_count_query,
+        old_submission_query,
+    ]
+    mock_add = mocker.patch("routes.code_editor.db.session.add")
+    mock_commit = mocker.patch("routes.code_editor.db.session.commit")
+    mocker.patch("routes.code_editor.os.makedirs")
+    mocker.patch("builtins.open", mocker.mock_open())
+    mock_save_final_draft = mocker.patch("routes.code_editor._save_final_draft")
+
+    resp = client.post("/submit_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+        "file_name": "answer.py",
+    })
+
+    assert resp.status_code == 200
+    assert resp.get_json()["message"] == "Code submitted. No autograder found."
+
+    saved_submission = mock_add.call_args.args[0]
+    assert saved_submission.file_name == "answer.py"
+    assert saved_submission.student_id == "stu-1"
+    assert saved_submission.assignment_id == "asgn-1"
+    assert saved_submission.student_code_file == b"print('hi')"
+    assert saved_submission.completed is True
+    assert saved_submission.submission_number == 3
+    old_submission_filter.update.assert_called_once_with({'active': False})
+    mock_commit.assert_called_once()
+    mock_save_final_draft.assert_called_once_with(
+        "stu-1",
+        "asgn-1",
+        "print('hi')",
+        "answer.py",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -455,6 +538,71 @@ def test_ai_chat_uses_custom_gemini_provider_without_openai_key(client, mocker):
     assert resp.get_json()["reply"] == "Try checking the loop boundary first."
     assert "gemini-1.5-flash:generateContent" in mock_post.call_args.args[0]
     assert mock_post.call_args.kwargs["params"]["key"] == "decrypted-gemini-key"
+
+
+def test_ai_chat_retries_transient_gemini_unavailable(client, mocker):
+    mock_assignment = mocker.Mock()
+    mock_assignment.ai_feedback_enabled = True
+    mock_assignment.course_id = "course-1"
+    mock_assignment.use_course_ai_default = False
+    mock_assignment.ai_feedback_provider = "gemini"
+    mock_assignment.ai_feedback_model = "gemini-1.5-flash"
+    mock_assignment.ai_feedback_temperature = 0.4
+    mock_assignment.ai_feedback_api_key = ""
+
+    mock_course = mocker.Mock()
+    mock_course.openai_api_key = ""
+    mock_course.gemini_api_key = "encrypted-gemini-key"
+    mock_course.claude_api_key = ""
+    mock_course.ollama_base_url = ""
+    mock_course.default_ai_provider = "openai"
+    mock_course.default_ai_model = "gpt-4o-mini"
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,
+        mock_course,
+    ]
+    mocker.patch(
+        "ai_feedback.integration.decrypt_api_key",
+        return_value="decrypted-gemini-key",
+    )
+    mocker.patch("ai_feedback.integration.time.sleep")
+
+    unavailable_response = mocker.Mock()
+    unavailable_response.status_code = 503
+    unavailable_response.text = '{"error":{"status":"UNAVAILABLE"}}'
+
+    success_response = mocker.Mock()
+    success_response.status_code = 200
+    success_response.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": "The temporary Gemini issue recovered.",
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    mock_post = mocker.patch(
+        "requests.post",
+        side_effect=[unavailable_response, success_response],
+    )
+
+    resp = client.post("/ai_chat", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "message": "help me",
+        "code": "print('hi')",
+    })
+
+    assert resp.status_code == 200
+    assert resp.get_json()["reply"] == "The temporary Gemini issue recovered."
+    assert mock_post.call_count == 2
 
 
 def test_ai_chat_uses_custom_claude_provider_without_openai_key(client, mocker):

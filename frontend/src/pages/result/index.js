@@ -1,5 +1,5 @@
 import React, { useContext, useCallback, useEffect, useState } from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, PageHeader, Radio, message } from "antd";
 
 import { GlobalContext } from "../../App";
@@ -27,7 +27,6 @@ export default function AssignmentResult() {
   const [assignmentId, setAssignmentId] = useState("");
   const [studentId, setStudentId] = useState("");
   // const { assignmentId, studentId } = useParams();
-  const location = useLocation();
   const navigate = useNavigate();
   // adding global context variable
   const { userInfo, assignmentInfo, updateAssignmentInfo } =
@@ -40,6 +39,7 @@ export default function AssignmentResult() {
   // used to check if AI Feedback has been enabled on this assignment
   const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true);
   // used to check if code editor is enabled for this assignment
+  const [allowFileUpload, setAllowFileUpload] = useState(false);
   const [enableCodeEditor, setEnableCodeEditor] = useState(false);
   
   useEffect(() => {
@@ -128,6 +128,7 @@ export default function AssignmentResult() {
           setLateAllowed(res.data.late_submission);
           setLateDueDate(moment(res.data.late_due_date).valueOf());
           setAiFeedbackEnabled(res.data.ai_feedback_enabled);
+          setAllowFileUpload(res.data.allow_file_upload !== false);
           setEnableCodeEditor(!!res.data.enable_code_editor);
           if (extension?.data.due_date_extension) {
             setDueDate(moment(extension.data.due_date_extension).valueOf());
@@ -282,6 +283,7 @@ export default function AssignmentResult() {
             onDownload={handleDownload} // Implement or replace with actual function
             onHistoryOpen={() => toggleModal("history")}
             isStudent={userInfo?.isStudent}
+            allowFileUpload={allowFileUpload}
             enableCodeEditor={enableCodeEditor}
           />
         </PageBottom>

@@ -1,23 +1,32 @@
 import { Button, Space } from "antd";
 import { ReloadOutlined, UploadOutlined, DownloadOutlined, ClockCircleOutlined, CodeOutlined } from "@ant-design/icons";
 
-export default function ActionButtons({ onRerun, onUpload, onResubmitEditor, onDownload, onHistoryOpen, isStudent, enableCodeEditor }) {
+export default function ActionButtons({
+  onRerun,
+  onUpload,
+  onResubmitEditor,
+  onDownload,
+  onHistoryOpen,
+  isStudent,
+  allowFileUpload = true,
+  enableCodeEditor,
+}) {
   return (
-    <Space>
+    <Space wrap>
       <Button icon={<ReloadOutlined />} onClick={onRerun}>Rerun Autograder</Button>
       {!isStudent && (
         <Button onClick={onUpload}>Grades</Button>
       )}
       <Button icon={<ClockCircleOutlined />} onClick={onHistoryOpen}>Submission History</Button>
       <Button icon={<DownloadOutlined />} onClick={onDownload}>Download Submission</Button>
-      {enableCodeEditor ? (
-        <Button type="primary" icon={<CodeOutlined />} onClick={onResubmitEditor}>
-          Resubmit via Editor
+      {allowFileUpload && (
+        <Button icon={<UploadOutlined />} onClick={onUpload}>
+          Resubmit via Upload
         </Button>
-      ) : (
-        <Button onClick={onUpload}>
-          Resubmit
-          <UploadOutlined />
+      )}
+      {enableCodeEditor && (
+        <Button icon={<CodeOutlined />} onClick={onResubmitEditor}>
+          Resubmit via Editor
         </Button>
       )}
     </Space>
