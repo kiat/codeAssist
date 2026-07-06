@@ -597,10 +597,18 @@ export default ({
                                 </Radio>
                               </Space>
                             </Radio.Group>
-                          </Form.Item>
+                            </Form.Item>
 
                           {useCourseAiDefault === false && (
                             <Card size="small" title="Custom Assignment Model">
+                              <Alert
+                                type="info"
+                                showIcon
+                                style={{ marginBottom: 16 }}
+                                message="Assignment credential behavior"
+                                description="If you later switch back to course defaults, the saved assignment credential will be cleared."
+                              />
+
                               <Form.Item
                                 label="Provider"
                                 name="ai_feedback_provider"

@@ -13,6 +13,7 @@ import SubmissionHistoryModal from "./submissionHistoryModal";
 import FormattingModal from "./FormattingModal";
 
 import { getAssignment, getExtension } from "../../services/assignment";
+import { rerunSubmissionAutograder } from "../../services/submission";
 import moment from "moment";
 
 export default function AssignmentResult() {
@@ -41,6 +42,7 @@ export default function AssignmentResult() {
   // used to check if code editor is enabled for this assignment
   const [allowFileUpload, setAllowFileUpload] = useState(false);
   const [enableCodeEditor, setEnableCodeEditor] = useState(false);
+  const [rerunLoading, setRerunLoading] = useState(false);
   
   useEffect(() => {
     // Fetching student and assignment IDs based on this submission ID
@@ -222,6 +224,28 @@ export default function AssignmentResult() {
     }
   };
 
+  const handleRerunAutograder = useCallback(async () => {
+    if (!toSend?.id) {
+      message.error("Submission is still loading");
+      return;
+    }
+
+    setRerunLoading(true);
+    try {
+      const response = await rerunSubmissionAutograder({
+        submission_id: toSend.id,
+      });
+      if (response?.data?.submission) {
+        setToSend(response.data.submission);
+      }
+      message.success(response?.data?.message || "Autograder rerun completed");
+    } catch (error) {
+      console.error("Failed to rerun autograder:", error);
+    } finally {
+      setRerunLoading(false);
+    }
+  }, [toSend]);
+
   return (
     <>
       <PageContent>
@@ -267,7 +291,7 @@ export default function AssignmentResult() {
       {userInfo.isStudent ? (
         <PageBottom>
           <ActionButtons
-            onRerun={() => {}} // Implement or replace with actual function
+            onRerun={handleRerunAutograder}
             onUpload={() => toggleModal("upload")}
             onResubmitEditor={() => {
               const now = moment();
@@ -285,6 +309,7 @@ export default function AssignmentResult() {
             isStudent={userInfo?.isStudent}
             allowFileUpload={allowFileUpload}
             enableCodeEditor={enableCodeEditor}
+            rerunLoading={rerunLoading}
           />
         </PageBottom>
       ) : (

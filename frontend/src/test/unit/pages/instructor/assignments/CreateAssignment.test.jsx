@@ -141,6 +141,9 @@ describe("CreateAssignment AI prompt defaults", () => {
     await user.type(screen.getByLabelText(/assignment name/i), "Loops");
     await user.click(screen.getByRole("switch", { name: /enable ai feedback/i }));
     await user.click(await screen.findByLabelText(/customize for this assignment only/i));
+    expect(
+      await screen.findByText(/switch back to course defaults/i)
+    ).toBeInTheDocument();
     await user.type(
       await screen.findByLabelText(/assignment api key/i),
       "assignment-provider-key"

@@ -10,10 +10,13 @@ export default function ActionButtons({
   isStudent,
   allowFileUpload = true,
   enableCodeEditor,
+  rerunLoading = false,
 }) {
   return (
     <Space wrap>
-      <Button icon={<ReloadOutlined />} onClick={onRerun}>Rerun Autograder</Button>
+      <Button icon={<ReloadOutlined />} loading={rerunLoading} onClick={onRerun}>
+        Rerun Autograder
+      </Button>
       {!isStudent && (
         <Button onClick={onUpload}>Grades</Button>
       )}

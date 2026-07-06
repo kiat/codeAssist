@@ -63,6 +63,8 @@ describe("ActionButtons resubmit methods", () => {
       name: /resubmit via editor/i,
     });
 
+    expect(uploadButton).toBeInTheDocument();
+    expect(editorButton).toBeInTheDocument();
     expect(uploadButton).not.toHaveClass("ant-btn-primary");
     expect(editorButton).not.toHaveClass("ant-btn-primary");
   });

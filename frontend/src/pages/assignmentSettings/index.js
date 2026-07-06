@@ -486,7 +486,7 @@ export default () => {
                               showIcon
                               style={{ marginBottom: 16 }}
                               message="Assignment credential saved"
-                              description="Paste a new value only when replacing it."
+                              description="Paste a new value only when replacing it. Switching back to course defaults will clear the saved assignment credential."
                             />
                           )}
 
