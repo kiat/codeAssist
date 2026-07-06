@@ -13,12 +13,9 @@ from api import db
 from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course
 from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
-from ai_feedback.integration import (
-    async_get_ai_feedback,
-    get_provider_and_model,
-    get_provider_credentials,
-    get_temperature,
-)
+from openai import OpenAI
+from util.encryption_utils import decrypt_api_key
+from ai_feedback.integration import async_get_ai_feedback
 import docker
 
 code_editor = Blueprint('code_editor', __name__)
@@ -808,33 +805,55 @@ def ai_chat():
         raise BadRequestError("AI chat is not enabled for this assignment.")
 
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
-    try:
-        if not course:
-            raise ValueError("Missing course for assignment")
+    if not course or not course.openai_api_key:
+        raise BadRequestError("AI is not configured for this course. Please ask your instructor to set up an API key.")
 
-        provider, model = get_provider_and_model(assignment, course)
-        temperature = get_temperature(assignment, course)
-        api_key, client = get_provider_credentials(provider, course, assignment)
+    try:
+        decrypted_api_key = decrypt_api_key(course.openai_api_key)
+        client = OpenAI(api_key=decrypted_api_key)
+    except Exception:
+        raise InternalProcessingError("Failed to initialize AI client")
+
+    VALID_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"}
+    model = assignment.ai_feedback_model if assignment and assignment.ai_feedback_model else "gpt-4-turbo"
+    if model not in VALID_MODELS:
+        model = "gpt-4-turbo"
+    temperature = assignment.ai_feedback_temperature if assignment and assignment.ai_feedback_temperature else 0.5
+
+    system_prompt = (
+        "You are an AI coding assistant for a programming course. "
+        "Help students understand their code, debug issues, and improve their solutions. "
+        "Do NOT provide the complete solution. Give hints, guiding questions, and explanations. "
+        "Keep responses concise and encouraging."
+    )
+
+    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
+
+    temperature = 0.5
+    try:
+        temperature = float(assignment.ai_feedback_temperature or 0.5)
+    except (TypeError, ValueError):
+        temperature = 0.5
+
+    try:
+        api_key, client = get_provider_credentials(provider, course)
     except ValueError as e:
-        if "Missing" in str(e) and "API key" in str(e):
-            raise BadRequestError(
-                "AI is not configured for this course. Please ask your instructor to set up an API key."
-            )
         raise BadRequestError(str(e))
     except Exception:
         raise InternalProcessingError("Failed to initialize AI client")
 
-    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
-
     try:
-        reply = _get_ai_chat_reply(
-            provider,
-            api_key,
-            client,
-            user_prompt,
-            model,
-            temperature,
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            model=model,
+            max_tokens=500,
+            temperature=float(temperature),
+            timeout=30,
         )
+        reply = response.choices[0].message.content.strip()
     except Exception as e:
         error_msg = str(e)
         print(f"AI_CHAT error: {e}", flush=True)
@@ -844,6 +863,11 @@ def ai_chat():
             raise BadRequestError("Invalid API key. Please contact your instructor.")
         elif "does not exist" in error_msg or "model_not_found" in error_msg:
             raise BadRequestError(f"AI model '{model}' is not available. Please contact your instructor.")
+        raise BadRequestError(str(e))
+    except BadRequestError:
+        raise
+    except Exception as e:
+        print(f"AI_CHAT error: {e}", flush=True)
         raise InternalProcessingError(f"Failed to get AI response: {type(e).__name__}")
 
     return jsonify({"reply": reply}), 200
