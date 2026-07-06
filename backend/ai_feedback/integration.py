@@ -32,6 +32,16 @@ GEMINI_MAX_OUTPUT_TOKENS = 1600
 GEMINI_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 GEMINI_MAX_ATTEMPTS = 3
 GEMINI_RETRY_BACKOFF_SECONDS = 1
+GEMINI_TRANSIENT_EXCEPTIONS = (
+    requests.ConnectionError,
+    requests.Timeout,
+)
+PROVIDER_DISPLAY_NAMES = {
+    "openai": "OpenAI",
+    "gemini": "Gemini",
+    "claude": "Claude",
+    "ollama": "Ollama",
+}
 CORRECTNESS_SYSTEM_PROMPT = (
     "You are an AI feedback assistant for programming assignments. "
     "Give short, student-facing feedback about correctness, test results, "
@@ -41,20 +51,42 @@ CORRECTNESS_SYSTEM_PROMPT = (
 )
 
 
+def get_gemini_retry_delay(attempt):
+    """Returns the exponential backoff delay before the next Gemini retry."""
+    return GEMINI_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+
+
 def post_gemini_with_retry(url, *, params, payload, timeout):
     """Retry Gemini requests for temporary provider-side failures."""
     response = None
     for attempt in range(1, GEMINI_MAX_ATTEMPTS + 1):
-        response = requests.post(
-            url,
-            params=params,
-            json=payload,
-            timeout=timeout,
-        )
+        try:
+            response = requests.post(
+                url,
+                params=params,
+                json=payload,
+                timeout=timeout,
+            )
+        except GEMINI_TRANSIENT_EXCEPTIONS as e:
+            if attempt >= GEMINI_MAX_ATTEMPTS:
+                raise
+            print(
+                f"GEMINI_RETRY: {type(e).__name__} on attempt "
+                f"{attempt}/{GEMINI_MAX_ATTEMPTS}; retrying",
+                flush=True,
+            )
+            time.sleep(get_gemini_retry_delay(attempt))
+            continue
+
         if response.status_code not in GEMINI_TRANSIENT_STATUS_CODES:
             return response
         if attempt < GEMINI_MAX_ATTEMPTS:
-            time.sleep(GEMINI_RETRY_BACKOFF_SECONDS * attempt)
+            print(
+                f"GEMINI_RETRY: status {response.status_code} on attempt "
+                f"{attempt}/{GEMINI_MAX_ATTEMPTS}; retrying",
+                flush=True,
+            )
+            time.sleep(get_gemini_retry_delay(attempt))
     return response
 
 
@@ -588,6 +620,42 @@ def get_assignment_provider_credential(assignment):
     return decrypt_api_key(encrypted_credential)
 
 
+def infer_api_key_provider(api_key):
+    """Infers provider from common API key prefixes when possible."""
+    normalized_key = (api_key or "").strip()
+
+    if normalized_key.startswith("sk-ant-"):
+        return "claude"
+    if normalized_key.startswith(("sk-proj-", "sk-")):
+        return "openai"
+    if normalized_key.startswith("AIza"):
+        return "gemini"
+
+    return None
+
+
+def validate_assignment_provider_credential(provider, api_key):
+    """Rejects assignment keys that clearly belong to a different provider."""
+    if provider not in {"openai", "gemini", "claude"}:
+        return
+
+    detected_provider = infer_api_key_provider(api_key)
+    if not detected_provider:
+        print(
+            "AI_FEEDBACK: Could not infer assignment API key provider; "
+            f"using it for {PROVIDER_DISPLAY_NAMES.get(provider, provider)}.",
+            flush=True,
+        )
+        return
+
+    if detected_provider != provider:
+        raise ValueError(
+            "Assignment API key appears to be for "
+            f"{PROVIDER_DISPLAY_NAMES.get(detected_provider, detected_provider)}, "
+            f"but {PROVIDER_DISPLAY_NAMES.get(provider, provider)} is selected."
+        )
+
+
 def get_provider_credentials(provider, course, assignment=None):
     """Returns API key and OpenAI client if needed."""
     api_key = None
@@ -596,6 +664,7 @@ def get_provider_credentials(provider, course, assignment=None):
 
     if provider == "openai":
         if assignment_credential:
+            validate_assignment_provider_credential(provider, assignment_credential)
             api_key = assignment_credential
         else:
             if not course.openai_api_key:
@@ -606,6 +675,7 @@ def get_provider_credentials(provider, course, assignment=None):
 
     elif provider == "gemini":
         if assignment_credential:
+            validate_assignment_provider_credential(provider, assignment_credential)
             api_key = assignment_credential
         else:
             if not course.gemini_api_key:
@@ -615,6 +685,7 @@ def get_provider_credentials(provider, course, assignment=None):
 
     elif provider == "claude":
         if assignment_credential:
+            validate_assignment_provider_credential(provider, assignment_credential)
             api_key = assignment_credential
         else:
             if not course.claude_api_key:

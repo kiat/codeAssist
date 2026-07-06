@@ -204,6 +204,40 @@ def test_get_submission_details_success(client, mocker):
     assert response.get_json() == fake_submission
 
 
+def test_rerun_submission_autograder_missing_id(client):
+    response = client.post("/rerun_submission_autograder", json={})
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing submission_id"
+
+
+def test_rerun_submission_autograder_requires_configured_autograder(client, mocker):
+    existing_submission = mocker.Mock()
+    existing_submission.id = "sub1"
+    existing_submission.assignment_id = "assgn1"
+
+    assignment = mocker.Mock()
+    assignment.id = "assgn1"
+    assignment.autograder_image_name = ""
+
+    def fake_get(model, item_id):
+        if model.__name__ == "Submission":
+            return existing_submission
+        if model.__name__ == "Assignment":
+            return assignment
+        return None
+
+    mocker.patch("routes.submission.db.session.get", side_effect=fake_get)
+
+    response = client.post(
+        "/rerun_submission_autograder",
+        json={"submission_id": "sub1"},
+    )
+
+    assert response.status_code == 400
+    assert "No autograder configured" in response.get_json()["message"]
+
+
 #  Tests for getting active submission
 
 

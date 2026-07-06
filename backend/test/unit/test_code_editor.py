@@ -2,6 +2,7 @@
 import pytest
 from api import create_app, db
 from api.models import CodeDraft, Assignment, Course
+from util.errors import BadRequestError
 
 
 @pytest.fixture
@@ -603,6 +604,51 @@ def test_ai_chat_retries_transient_gemini_unavailable(client, mocker):
     assert resp.status_code == 200
     assert resp.get_json()["reply"] == "The temporary Gemini issue recovered."
     assert mock_post.call_count == 2
+
+
+def test_ai_chat_ollama_validates_base_url_before_request(mocker):
+    from routes.code_editor import _get_ai_chat_reply
+
+    mock_validate = mocker.patch(
+        "routes.code_editor.validate_ollama_url",
+        side_effect=BadRequestError("blocked host"),
+    )
+    mock_post = mocker.patch("routes.code_editor.requests.post")
+
+    with pytest.raises(BadRequestError, match="blocked host"):
+        _get_ai_chat_reply(
+            "ollama",
+            "http://169.254.169.254",
+            None,
+            "help me",
+            "llama3",
+            0.4,
+        )
+
+    mock_validate.assert_called_once_with("http://169.254.169.254")
+    mock_post.assert_not_called()
+
+
+def test_ai_chat_course_not_found_reports_course_issue(client, mocker):
+    mock_assignment = mocker.Mock()
+    mock_assignment.ai_feedback_enabled = True
+    mock_assignment.course_id = "missing-course"
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,
+        None,
+    ]
+
+    resp = client.post("/ai_chat", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "message": "help me",
+        "code": "print('hi')",
+    })
+
+    assert resp.status_code == 400
+    assert "Course not found" in resp.get_json()["message"]
 
 
 def test_ai_chat_uses_custom_claude_provider_without_openai_key(client, mocker):

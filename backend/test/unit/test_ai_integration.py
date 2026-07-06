@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+import requests
 
 from ai_feedback.integration import (
     DEFAULT_FEEDBACK_PROMPT,
@@ -173,8 +174,9 @@ def test_gemini_feedback_request_reserves_tokens_for_json(monkeypatch):
     assert generation_config["thinkingConfig"]["thinkingBudget"] == 0
 
 
-def test_gemini_feedback_retries_transient_unavailable(monkeypatch):
+def test_gemini_feedback_retries_transient_unavailable(monkeypatch, capsys):
     calls = []
+    sleeps = []
 
     class FakeGeminiResponse:
         def __init__(self, status_code, text, payload):
@@ -215,7 +217,10 @@ def test_gemini_feedback_retries_transient_unavailable(monkeypatch):
         )
 
     monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
-    monkeypatch.setattr("ai_feedback.integration.time.sleep", lambda seconds: None)
+    monkeypatch.setattr(
+        "ai_feedback.integration.time.sleep",
+        lambda seconds: sleeps.append(seconds),
+    )
 
     parsed, new_insights = get_structured_feedback_from_gemini(
         api_key="gemini-key",
@@ -228,6 +233,60 @@ def test_gemini_feedback_retries_transient_unavailable(monkeypatch):
     assert len(calls) == 2
     assert "error" not in parsed
     assert new_insights == ["Overall Summary: Feedback recovered."]
+    assert sleeps == [1]
+    assert "GEMINI_RETRY: status 503" in capsys.readouterr().out
+
+
+def test_gemini_feedback_retries_transient_network_error(monkeypatch):
+    calls = []
+    sleeps = []
+
+    class FakeGeminiResponse:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": (
+                                        '{"insights":["Overall Summary: Feedback recovered after timeout."],'
+                                        '"annotations":[]}'
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+
+    def fake_post(url, params, json, timeout):
+        calls.append({"url": url, "params": params, "json": json, "timeout": timeout})
+        if len(calls) == 1:
+            raise requests.Timeout("temporary timeout")
+        return FakeGeminiResponse()
+
+    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
+    monkeypatch.setattr(
+        "ai_feedback.integration.time.sleep",
+        lambda seconds: sleeps.append(seconds),
+    )
+
+    parsed, new_insights = get_structured_feedback_from_gemini(
+        api_key="gemini-key",
+        prompt="Return JSON feedback.",
+        model="gemini-2.5-flash",
+        temperature=0.5,
+        past_insights=[],
+    )
+
+    assert len(calls) == 2
+    assert sleeps == [1]
+    assert "error" not in parsed
+    assert new_insights == ["Overall Summary: Feedback recovered after timeout."]
 
 
 @pytest.mark.parametrize(
@@ -269,6 +328,30 @@ def test_get_provider_credentials_uses_assignment_key_for_custom_provider(
         assert client is fake_client
     else:
         assert client is None
+
+
+def test_get_provider_credentials_rejects_assignment_key_for_different_provider(
+    monkeypatch,
+):
+    course = SimpleNamespace(gemini_api_key="encrypted-course-gemini-key")
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_api_key="encrypted-openai-assignment-key",
+    )
+
+    monkeypatch.setattr(
+        "ai_feedback.integration.decrypt_api_key",
+        lambda encrypted_key: {
+            "encrypted-openai-assignment-key": "sk-proj-openai-key",
+            "encrypted-course-gemini-key": "AIza-gemini-key",
+        }[encrypted_key],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Assignment API key appears to be for OpenAI",
+    ):
+        get_provider_credentials("gemini", course, assignment)
 
 
 @pytest.mark.parametrize(

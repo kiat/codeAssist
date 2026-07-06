@@ -13,6 +13,7 @@ from api import db
 from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course
 from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
+from util.url_utils import validate_ollama_url
 from ai_feedback.integration import (
     async_get_ai_feedback,
     get_provider_and_model,
@@ -625,6 +626,7 @@ def _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperatur
         return ""
 
     if provider == "ollama":
+        validate_ollama_url(api_key)
         response = requests.post(
             f"{api_key}/api/chat",
             json={
@@ -810,7 +812,7 @@ def ai_chat():
 
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
     if not course:
-        raise BadRequestError("AI is not configured for this course. Please ask your instructor to set up an API key.")
+        raise BadRequestError("Course not found for this assignment.")
 
     user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
     provider, model = get_provider_and_model(assignment, course)
