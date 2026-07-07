@@ -56,6 +56,11 @@
       "last 1 safari version"
     ]
   },
+  "jest": {
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(axios|@codemirror|@marijn|@lezer|crelt|style-mod|w3c-keyname)/).+\\.(js|mjs|jsx|cjs|ts|tsx)$"
+    ]
+  },
   "devDependencies": {
     "@babel/preset-env": "^7.27.2",
     "@babel/preset-react": "^7.27.1",
