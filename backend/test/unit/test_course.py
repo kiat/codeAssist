@@ -30,7 +30,11 @@ def mock_course_query(mocker):
 def test_create_course_success(client, mocker, mock_course_query):
     mock_query, mock_schema = mock_course_query
 
-    mock_query.return_value.filter_by.return_value.first.return_value = None
+    mock_instructor = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        None,
+        mock_instructor,
+    ]
     mock_add = mocker.patch("routes.course.db.session.add")
     mock_commit = mocker.patch("routes.course.db.session.commit")
     
@@ -53,6 +57,29 @@ def test_create_course_success(client, mocker, mock_course_query):
     assert response.json["name"] == "CS101"
     mock_commit.assert_called_once()
     assert mock_add.call_count == 2
+
+
+def test_create_course_missing_instructor_returns_not_found(client, mocker, mock_course_query):
+    mock_query, _ = mock_course_query
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        None,
+        None,
+    ]
+    mock_add = mocker.patch("routes.course.db.session.add")
+
+    payload = {
+        "name": "CS101",
+        "instructor_id": "missing-user",
+        "semester": "Fall",
+        "year": "2025",
+        "entryCode": "ABCD1234"
+    }
+
+    response = client.post("/create_course", json=payload)
+
+    assert response.status_code == 404
+    assert response.json["message"] == "Instructor not found"
+    mock_add.assert_not_called()
 
 
 def test_create_course_duplicate_entry_code(client, mock_course_query):
@@ -494,6 +521,7 @@ def test_get_course_info_success(client, mocker):
         openai_api_key="encrypted-key",
         gemini_api_key="",
         claude_api_key="",
+        ollama_base_url="",
     )
 
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -518,6 +546,7 @@ def test_get_course_info_success(client, mocker):
             "has_openai_api_key": True,
             "has_gemini_api_key": False,
             "has_claude_api_key": False,
+            "has_ollama_api_key": False,
         }
     ]
 
@@ -574,6 +603,11 @@ def test_create_course_get_not_allowed(client):
     assert response.status_code == 415
 
 def test_create_course_db_error(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        None,
+        mocker.Mock(),
+    ]
     mocker.patch("routes.course.db.session.add")
     mocker.patch("routes.course.db.session.commit", side_effect=Exception("fail"))
     mocker.patch("routes.course.db.session.rollback")
@@ -731,6 +765,104 @@ def test_test_ai_api_key_missing_saved_key_returns_400(client, mocker):
     )
 
     assert response.status_code == 400
+
+
+def test_test_ai_model_ollama_success(client, mocker):
+    mock_post = mocker.patch("routes.course.requests.post")
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "message": {
+            "content": '{"insights":["Model test passed."],"annotations":[]}'
+        }
+    }
+    mock_post.return_value = mock_response
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "provider": "ollama",
+            "model": "llama3",
+            "api_key": "http://localhost:11434",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["provider"] == "ollama"
+    assert response.json["model"] == "llama3"
+    
+    mock_post.assert_called_once()
+
+
+def test_test_ai_model_ollama_saved_url_success(client, mocker, monkeypatch):
+    monkeypatch.setenv("ALLOWED_OLLAMA_HOSTS", "saved-ollama-url")
+    mock_post = mocker.patch("routes.course.requests.post")
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "message": {
+            "content": '{"insights":["Model test passed."],"annotations":[]}'
+        }
+    }
+    mock_post.return_value = mock_response
+
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_course = mocker.Mock(
+        id="course-123",
+        ollama_base_url="http://saved-ollama-url:11434",
+    )
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "model": "llama3",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["provider"] == "ollama"
+    assert response.json["model"] == "llama3"
+    
+    mock_post.assert_called_once()
+    assert mock_post.call_args[0][0] == "http://saved-ollama-url:11434/api/chat"
+
+
+def test_test_ai_model_ollama_missing_saved_url_fallback(client, mocker):
+    mock_post = mocker.patch("routes.course.requests.post")
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "message": {
+            "content": '{"insights":["Model test passed."],"annotations":[]}'
+        }
+    }
+    mock_post.return_value = mock_response
+
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_course = mocker.Mock(
+        id="course-123",
+        ollama_base_url="",
+    )
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "model": "llama3",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["provider"] == "ollama"
+    assert response.json["model"] == "llama3"
+    
+    mock_post.assert_called_once()
+    assert mock_post.call_args[0][0] == "http://host.docker.internal:11434/api/chat"
 
 
 def test_test_ai_model_openai_success(client, mocker):
@@ -1534,3 +1666,26 @@ def test_update_ai_settings_ta_forbidden(client, mocker):
     })
     assert response.status_code == 403
     assert "Only instructors" in response.json["message"]
+
+
+def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "api_key": "http://169.254.169.254/latest/meta-data/",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Ollama host is not permitted" in response.json["message"]

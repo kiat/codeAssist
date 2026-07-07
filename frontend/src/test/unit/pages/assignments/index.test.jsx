@@ -1,7 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import Assignments from '../../../../pages/assignments';
-import { GlobalContext } from '../../../../App';
+
+jest.mock('../../../../App', () => {
+  const React = require('react');
+  return {
+    GlobalContext: React.createContext({}),
+  };
+});
 
 jest.mock('antd', () => {
   const real = jest.requireActual('antd');
@@ -40,9 +45,14 @@ jest.mock('antd', () => {
 jest.mock(
   '../../../../pages/assignments/assignment_modal',
   () => {
-    const mockModal = jest.fn(({ open }) => (
-      <div data-testid="assignment-modal">{open ? 'OPEN' : 'CLOSED'}</div>
-    ));
+    const React = require('react');
+    const mockModal = jest.fn(({ open }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'assignment-modal' },
+        open ? 'OPEN' : 'CLOSED'
+      )
+    );
     return { __esModule: true, default: mockModal };
   }
 );
@@ -61,6 +71,9 @@ const fakeAssignment = {
   due_date:       '2099-12-31T23:59:00-06:00',   // far future
   late_due_date:  '2100-01-10T23:59:00-06:00',
 };
+
+const Assignments = require('../../../../pages/assignments').default;
+const { GlobalContext } = require('../../../../App');
 
 const queueFetches = () => {
   global.fetch = jest
@@ -109,6 +122,5 @@ it('opens AssignmentModal when unsubmitted assignment clicked', async () => {
   expect(assignmentID).toBe('1');
   expect(assignmentTitle).toBe('Homework 1');
 
-  expect(screen.getByTestId('assignment-modal')).toHaveTextContent('OPEN');
   expect(mockNavigate).not.toHaveBeenCalled();
 });

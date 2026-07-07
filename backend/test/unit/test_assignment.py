@@ -107,6 +107,24 @@ def test_get_assignment_success(client, mocker):
     mock_query.return_value.filter_by.assert_called_once_with(id="assignment-uuid")
 
 
+def test_get_assignment_does_not_return_assignment_api_key(client, mocker):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_assignment = Assignment(
+        id="assignment-uuid",
+        name="AI Assignment",
+        course_id="course-uuid",
+        ai_feedback_api_key="encrypted-assignment-key",
+    )
+
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.get("/get_assignment?assignment_id=assignment-uuid")
+
+    assert resp.status_code == 200
+    assert resp.json["has_assignment_ai_key"] is True
+    assert "ai_feedback_api_key" not in resp.json
+
+
 def test_get_assignment_empty(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None

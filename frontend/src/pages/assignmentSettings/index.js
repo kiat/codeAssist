@@ -15,6 +15,7 @@ import {
   Space,
   Popconfirm,
   Select,
+  Switch,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useContext } from "react";
@@ -91,6 +92,8 @@ export default () => {
         published_date,
         late_submission,
         late_due_date,
+        allow_file_upload,
+        enable_code_editor,
         ai_feedback_enabled,
         use_course_ai_default,
         ai_feedback_provider,
@@ -102,6 +105,7 @@ export default () => {
         ai_feedback_style,
         ai_feedback_max_requests,
         ai_feedback_wait_seconds,
+        has_assignment_ai_key,
       } = res.data || {};
 
       setPubBefore(published);
@@ -119,6 +123,8 @@ export default () => {
         releaseDate: published_date ? moment.utc(published_date).local() : null,
         allowLateSubmissions: !!late_submission,
         lateDueDate: late_due_date ? moment.utc(late_due_date).local() : null,
+        allow_file_upload: allow_file_upload !== false,
+        enable_code_editor: !!enable_code_editor,
         enableAiFeedback: !!ai_feedback_enabled,
         use_course_ai_default: use_course_ai_default !== false,
         ai_feedback_provider: ai_feedback_provider || "openai",
@@ -132,6 +138,8 @@ export default () => {
         ai_feedback_style: ai_feedback_style || "balanced",
         ai_feedback_max_requests: ai_feedback_max_requests ?? null,
         ai_feedback_wait_seconds: ai_feedback_wait_seconds ?? 0,
+        has_assignment_ai_key: !!has_assignment_ai_key,
+        ai_feedback_api_key: "",
       });
       setAllowLateSubmissions(late_submission);
     });
@@ -143,14 +151,22 @@ export default () => {
 
   const handleFetchAssignmentModels = async () => {
     const provider = form.getFieldValue("ai_feedback_provider") || "openai";
+    const assignmentApiKey = (
+      form.getFieldValue("ai_feedback_api_key") || ""
+    ).trim();
 
     try {
       setAssignmentModelsLoading(true);
 
-      const response = await fetchAiModels({
+      const fetchPayload = {
         course_id: courseId,
         provider,
-      });
+      };
+      if (assignmentApiKey) {
+        fetchPayload.api_key = assignmentApiKey;
+      }
+
+      const response = await fetchAiModels(fetchPayload);
 
       const fetchedModels = response?.data?.models || [];
       setAssignmentModels(fetchedModels);
@@ -240,6 +256,8 @@ export default () => {
       manual_grading: values.manualGrading,
       late_submission: values.allowLateSubmissions,
       late_due_date: values.allowLateSubmissions ? values.lateDueDate : null,
+      allow_file_upload: values.allow_file_upload !== false,
+      enable_code_editor: !!values.enable_code_editor,
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
@@ -252,6 +270,10 @@ export default () => {
         values.use_course_ai_default === false ? values.ai_feedback_provider : null,
       ai_feedback_model:
         values.use_course_ai_default === false ? values.ai_feedback_model : null,
+      ...(values.use_course_ai_default === false &&
+      (values.ai_feedback_api_key || "").trim()
+        ? { ai_feedback_api_key: values.ai_feedback_api_key.trim() }
+        : {}),
       ai_feedback_prompt: firstPrompt?.prompt ?? null,
       ai_feedback_prompts: feedbackPrompts,
       ai_allowed_inputs: normalizeAiAllowedInputs(values.ai_allowed_inputs),
@@ -308,6 +330,26 @@ export default () => {
             rules={[{ required: true, message: "Please enter points" }]}
           >
             <Input />
+          </Form.Item>
+
+          <Form.Item label="SUBMISSION METHODS" style={{ marginBottom: 4 }} />
+
+          <Form.Item
+            label="Allow File Upload"
+            name="allow_file_upload"
+            valuePropName="checked"
+            tooltip="Allow students to upload a file as their submission"
+          >
+            <Switch />
+          </Form.Item>
+
+          <Form.Item
+            label="Enable Code Editor"
+            name="enable_code_editor"
+            valuePropName="checked"
+            tooltip="Allow students to write and submit code directly in the browser"
+          >
+            <Switch />
           </Form.Item>
 
           <Form.Item label="PUBLISHED" name="published">
@@ -370,7 +412,8 @@ export default () => {
                   type={
                     courseAiInfo.has_openai_api_key ||
                     courseAiInfo.has_gemini_api_key ||
-                    courseAiInfo.has_claude_api_key
+                    courseAiInfo.has_claude_api_key ||
+                    courseAiInfo.has_ollama_api_key
                       ? "success"
                       : "warning"
                   }
@@ -423,12 +466,42 @@ export default () => {
                           { label: "ChatGPT", value: "openai" },
                           { label: "Gemini", value: "gemini" },
                           { label: "Claude", value: "claude" },
+                          { label: "Ollama (Local LLM)", value: "ollama" },
                         ]}
                         onChange={() => {
                           setAssignmentModels([]);
-                          form.setFieldsValue({ ai_feedback_model: undefined });
+                          form.setFieldsValue({
+                            ai_feedback_model: undefined,
+                            ai_feedback_api_key: "",
+                          });
                         }}
                       />
+                    </Form.Item>
+
+                    <Form.Item shouldUpdate noStyle>
+                      {({ getFieldValue }) => (
+                        <>
+                          {getFieldValue("has_assignment_ai_key") && (
+                            <Alert
+                              type="info"
+                              showIcon
+                              style={{ marginBottom: 16 }}
+                              message="Assignment credential saved"
+                              description="Paste a new value only when replacing it. Switching back to course defaults will clear the saved assignment credential."
+                            />
+                          )}
+
+                          <Form.Item
+                            label="Assignment API Key / Base URL"
+                            name="ai_feedback_api_key"
+                          >
+                            <Input.Password
+                              autoComplete="new-password"
+                              placeholder="Use a custom credential for this assignment"
+                            />
+                          </Form.Item>
+                        </>
+                      )}
                     </Form.Item>
 
                     <Form.Item

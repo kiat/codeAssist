@@ -15,6 +15,7 @@ EXPECTED_AI_SETTINGS_KEYS = {
     "ai_feedback_wait_seconds",
     "ai_feedback_prompts",
     "ai_allowed_inputs",
+    "has_assignment_ai_key",
 }
 
 
@@ -213,6 +214,31 @@ def test_update_assignment_ai_settings_saves_usage_limits(client, mocker):
     assert resp.status_code == 200
     assert mock_assignment.ai_feedback_max_requests == 0
     assert mock_assignment.ai_feedback_wait_seconds == 60
+    mock_commit.assert_called_once()
+
+
+def test_update_assignment_ai_settings_saves_assignment_api_key(client, mocker):
+    mock_assignment = _mock_ai_settings_queries(mocker)
+    mock_encrypt = mocker.patch(
+        "ai_feedback.settings.encrypt_api_key",
+        return_value="encrypted-assignment-key",
+    )
+    mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
+
+    resp = client.put(
+        "/assignments/assignment-uuid/ai-settings",
+        json={
+            "requester_id": "instructor-uuid",
+            "use_course_ai_default": False,
+            "ai_feedback_provider": "gemini",
+            "ai_feedback_model": "gemini-1.5-flash",
+            "ai_feedback_api_key": "plain-assignment-key",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert mock_assignment.ai_feedback_api_key == "encrypted-assignment-key"
+    mock_encrypt.assert_called_once_with("plain-assignment-key")
     mock_commit.assert_called_once()
 
 
