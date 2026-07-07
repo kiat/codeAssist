@@ -15,10 +15,19 @@ def client(app):
     return app.test_client()
 
 def test_create_course_integration(client):
-    # Assumes instructor with UUID '00000000-0000-0000-0000-000000000001' exists or bypass check
+    instructor_response = client.post('/create_user', json={
+        "name": "Test Instructor",
+        "password": "password",
+        "email_address": "instructor@example.com",
+        "eid": "instructor-eid",
+        "role": "instructor",
+    })
+    assert instructor_response.status_code == 201
+    instructor_id = instructor_response.json["id"]
+
     course = {
         "name": "CS101",
-        "instructor_id": "00000000-0000-0000-0000-000000000001",
+        "instructor_id": instructor_id,
         "semester": "Fall",
         "year": 2025,
         "entryCode": "ABC123"

@@ -48,6 +48,19 @@ def update_assignment():
     if not assignment_obj:
         raise NotFoundError("Assignment not found")
 
+    # Validate that at least one submission method is enabled
+    allow_upload = data.get("allow_file_upload")
+    enable_editor = data.get("enable_code_editor")
+    if allow_upload is not None and enable_editor is not None:
+        if not allow_upload and not enable_editor:
+            raise BadRequestError("At least one submission method (file upload or code editor) must be enabled")
+    elif allow_upload is not None:
+        if not allow_upload and not getattr(assignment_obj, 'enable_code_editor', False):
+            raise BadRequestError("At least one submission method (file upload or code editor) must be enabled")
+    elif enable_editor is not None:
+        if not enable_editor and not getattr(assignment_obj, 'allow_file_upload', True):
+            raise BadRequestError("At least one submission method (file upload or code editor) must be enabled")
+
     if ai_settings_data:
         try:
             update_assignment_ai_settings(assignment_obj, ai_settings_data)
@@ -115,6 +128,13 @@ def create_assignment():
         assignment_data["id"] = assignment_id
         # not creating a container yet
         assignment_data["container_id"] = None
+
+        # Validate that at least one submission method is enabled
+        allow_upload = assignment_data.get("allow_file_upload", True)
+        enable_editor = assignment_data.get("enable_code_editor", False)
+        if not allow_upload and not enable_editor:
+            raise BadRequestError("At least one submission method (file upload or code editor) must be enabled")
+
         assignment_data, ai_settings_data = split_ai_settings_payload(assignment_data)
 
         valid_assignment_data = {k: v for k, v in assignment_data.items() if v is not None or isinstance(v, bool)}

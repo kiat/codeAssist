@@ -37,3 +37,7 @@ export async function runCode(params) {
   return service("run_code", params, "post");
 }
 
+export async function rerunSubmissionAutograder(params) {
+  return service("rerun_submission_autograder", params, "post");
+}
+

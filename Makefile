@@ -11,12 +11,12 @@ test: test-backend test-frontend  ## Run all tests
 
 test-backend:                     ## Backend unit / integration tests
 	@echo "Running backend tests..."
-	@cd ./backend && PYTHONPATH=. pytest
+	@cd ./backend && python3 -m pytest
 	@echo "Backend tests passed."
 
 test-frontend:                    ## Front-end Jest tests
 	@echo "Running frontend tests..."
-	@cd ./frontend && npm test --silent
+	@cd ./frontend && npm test -- --watchAll=false --silent
 	@echo "Frontend tests passed."
 
 clean:

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Button, Space, Tag, Tooltip } from "antd";
+import { Button, Input, Space, Tag, Tooltip } from "antd";
 import {
   SaveOutlined,
   PlayCircleOutlined,
@@ -9,6 +9,7 @@ import {
   CheckCircleFilled,
   ClockCircleOutlined,
   CaretRightOutlined,
+  EditOutlined,
 } from "@ant-design/icons";
 
 // CodeMirror 6 imports
@@ -105,6 +106,7 @@ const oneDarkTheme = EditorView.theme({
  *   onOpenHistory   – () => void
  *   autoSaveStatus  – 'idle' | 'saving' | 'saved' | 'error'
  *   fileName        – string
+ *   onFileNameChange – (newFileName) => void
  *   language        – string (e.g. "python")
  *   readOnly        – boolean
  */
@@ -118,6 +120,7 @@ export default function CodeEditor({
   onOpenHistory,
   autoSaveStatus = "idle",
   fileName = "solution.py",
+  onFileNameChange,
   language = "python",
   readOnly = false,
 }) {
@@ -128,6 +131,8 @@ export default function CodeEditor({
   const [cursorLine, setCursorLine] = useState(1);
   const [lineCount, setLineCount] = useState(1);
   const [charCount, setCharCount] = useState(0);
+  const [editingFileName, setEditingFileName] = useState(false);
+  const [fileNameInput, setFileNameInput] = useState(fileName);
 
   // Keep refs up to date
   onChangeRef.current = onChange;
@@ -272,7 +277,42 @@ export default function CodeEditor({
         <div style={styles.toolbarLeft}>
           <Space size="small">
             <CodeOutlined style={{ color: "#1890ff" }} />
-            <span style={styles.fileName}>{fileName}</span>
+            {editingFileName ? (
+              <Input
+                size="small"
+                value={fileNameInput}
+                onChange={(e) => setFileNameInput(e.target.value)}
+                onPressEnter={() => {
+                  const trimmed = fileNameInput.trim();
+                  if (trimmed && onFileNameChange) {
+                    onFileNameChange(trimmed);
+                  }
+                  setEditingFileName(false);
+                }}
+                onBlur={() => {
+                  const trimmed = fileNameInput.trim();
+                  if (trimmed && onFileNameChange) {
+                    onFileNameChange(trimmed);
+                  }
+                  setEditingFileName(false);
+                }}
+                style={{ width: 200, fontFamily: 'monospace', fontSize: 13 }}
+                autoFocus
+              />
+            ) : (
+              <Tooltip title="Click to edit filename (important for autograder)">
+                <span
+                  style={{ ...styles.fileName, cursor: 'pointer' }}
+                  onClick={() => {
+                    setFileNameInput(fileName);
+                    setEditingFileName(true);
+                  }}
+                >
+                  {fileName}
+                  <EditOutlined style={{ marginLeft: 4, fontSize: 11, color: '#636d83' }} />
+                </span>
+              </Tooltip>
+            )}
             <Tag color="blue" style={{ marginLeft: 4 }}>
               {language.toUpperCase()}
             </Tag>

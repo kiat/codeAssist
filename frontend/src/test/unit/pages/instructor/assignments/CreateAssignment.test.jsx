@@ -3,7 +3,7 @@ import { Form } from "antd";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CreateAssignment from "../../../../../pages/instructor/assignments/CreateAssignment";
-import { getCourseInfo } from "../../../../../services/course";
+import { fetchAiModels, getCourseInfo } from "../../../../../services/course";
 import { createAssignment } from "../../../../../services/assignment";
 
 jest.mock("../../../../../services/course", () => ({
@@ -52,22 +52,6 @@ function CreateAssignmentHarness() {
 }
 
 describe("CreateAssignment AI prompt defaults", () => {
-  beforeAll(() => {
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: jest.fn().mockImplementation((query) => ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: jest.fn(),
-        removeListener: jest.fn(),
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
-        dispatchEvent: jest.fn(),
-      })),
-    });
-  });
-
   beforeEach(() => {
     getCourseInfo.mockResolvedValue({
       data: [
@@ -81,6 +65,7 @@ describe("CreateAssignment AI prompt defaults", () => {
       ],
     });
     createAssignment.mockResolvedValue({ id: "assignment-1" });
+    fetchAiModels.mockResolvedValue({ data: { models: ["gpt-4o-mini"] } });
   });
 
   afterEach(() => {
@@ -94,7 +79,7 @@ describe("CreateAssignment AI prompt defaults", () => {
 
     await waitFor(() => expect(getCourseInfo).toHaveBeenCalled());
 
-    await user.click(screen.getAllByRole("switch")[1]);
+    await user.click(screen.getByRole("switch", { name: /enable ai feedback/i }));
 
     expect(await screen.findByText("Feedback Prompts")).toBeInTheDocument();
 
@@ -121,7 +106,7 @@ describe("CreateAssignment AI prompt defaults", () => {
     await waitFor(() => expect(getCourseInfo).toHaveBeenCalled());
 
     await user.type(screen.getByLabelText(/assignment name/i), "Loops");
-    await user.click(screen.getAllByRole("switch")[1]);
+    await user.click(screen.getByRole("switch", { name: /enable ai feedback/i }));
 
     await user.type(
       await screen.findByLabelText("Maximum feedback requests per student"),
@@ -141,6 +126,36 @@ describe("CreateAssignment AI prompt defaults", () => {
         expect.objectContaining({
           ai_feedback_max_requests: 3,
           ai_feedback_wait_seconds: 60,
+        })
+      );
+    });
+  });
+
+  it("includes custom assignment AI key in the create assignment payload", async () => {
+    const user = userEvent.setup();
+
+    render(<CreateAssignmentHarness />);
+
+    await waitFor(() => expect(getCourseInfo).toHaveBeenCalled());
+
+    await user.type(screen.getByLabelText(/assignment name/i), "Loops");
+    await user.click(screen.getByRole("switch", { name: /enable ai feedback/i }));
+    await user.click(await screen.findByLabelText(/customize for this assignment only/i));
+    expect(
+      await screen.findByText(/switch back to course defaults/i)
+    ).toBeInTheDocument();
+    await user.type(
+      await screen.findByLabelText(/assignment api key/i),
+      "assignment-provider-key"
+    );
+
+    await user.click(screen.getByRole("button", { name: /create assignment/i }));
+
+    await waitFor(() => {
+      expect(createAssignment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          use_course_ai_default: false,
+          ai_feedback_api_key: "assignment-provider-key",
         })
       );
     });
