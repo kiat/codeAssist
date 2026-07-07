@@ -293,6 +293,7 @@ def test_submit_code_past_due_date(client, mocker):
 
 
 def test_submit_code_rejects_when_code_editor_disabled(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
     mock_assignment = mocker.Mock()
     mock_assignment.enable_code_editor = False
 
@@ -311,6 +312,9 @@ def test_submit_code_rejects_when_code_editor_disabled(client, mocker):
 
 def test_submit_code_without_autograder_saves_submission_and_final_draft(client, mocker):
     from datetime import datetime, timezone, timedelta
+
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
 
     mock_assignment = mocker.Mock()
     mock_assignment.enable_code_editor = True
@@ -427,7 +431,7 @@ def test_run_code_editor_not_enabled(client, mocker):
         "content": "print('hi')",
     })
     assert resp.status_code == 400
-    assert "not enabled" in resp.get_json()["message"].lower()
+    assert "not allowed" in resp.get_json()["message"].lower()
 
 
 def test_run_code_not_enrolled(client, mocker):
@@ -469,7 +473,7 @@ def test_submit_code_editor_not_enabled(client, mocker):
         "content": "print('hi')",
     })
     assert resp.status_code == 400
-    assert "not enabled" in resp.get_json()["message"].lower()
+    assert "not allowed" in resp.get_json()["message"].lower()
 
 
 def test_submit_code_not_enrolled(client, mocker):
@@ -612,6 +616,16 @@ def test_ai_chat_no_api_key(client, mocker):
 
 
 def test_ai_chat_uses_custom_openai_provider_with_assignment_key(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
+
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
     mock_assignment.course_id = "course-1"
@@ -669,6 +683,16 @@ def test_ai_chat_uses_custom_openai_provider_with_assignment_key(client, mocker)
 
 
 def test_ai_chat_uses_custom_gemini_provider_without_openai_key(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
+
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
     mock_assignment.course_id = "course-1"
@@ -727,6 +751,16 @@ def test_ai_chat_uses_custom_gemini_provider_without_openai_key(client, mocker):
 
 
 def test_ai_chat_retries_transient_gemini_unavailable(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
+
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
     mock_assignment.course_id = "course-1"
@@ -815,6 +849,16 @@ def test_ai_chat_ollama_validates_base_url_before_request(mocker):
 
 
 def test_ai_chat_course_not_found_reports_course_issue(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
+
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
     mock_assignment.course_id = "missing-course"
@@ -837,6 +881,16 @@ def test_ai_chat_course_not_found_reports_course_issue(client, mocker):
 
 
 def test_ai_chat_uses_custom_claude_provider_without_openai_key(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
+
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
     mock_assignment.course_id = "course-1"
