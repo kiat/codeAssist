@@ -14,15 +14,6 @@ from api import db
 from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course, Enrollment
 from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError, ForbiddenError, TooManyRequestsError
-from ai_feedback.integration import async_get_ai_feedback
-from ai_feedback.settings import (
-    check_feedback_limits,
-    get_enabled_feedback_prompt,
-    record_feedback_request,
-    get_student_feedback_status,
-    get_chat_history,
-    store_chat_message,
-from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
 from util.url_utils import validate_ollama_url
 from ai_feedback.integration import (
     async_get_ai_feedback,
@@ -30,6 +21,14 @@ from ai_feedback.integration import (
     get_provider_credentials,
     get_temperature,
     post_gemini_with_retry,
+)
+from ai_feedback.settings import (
+    check_feedback_limits,
+    get_enabled_feedback_prompt,
+    record_feedback_request,
+    get_student_feedback_status,
+    get_chat_history,
+    store_chat_message,
 )
 import docker
 
