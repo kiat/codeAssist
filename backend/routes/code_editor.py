@@ -7,7 +7,6 @@ import tarfile
 import threading
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, current_app
-from flask_cors import cross_origin
 from api import db
 from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course
 from api.schemas import CodeDraftSchema, SubmissionSchema
@@ -28,7 +27,6 @@ def get_docker_client():
 
 
 @code_editor.route('/save_code_draft', methods=["POST"])
-@cross_origin()
 def save_code_draft():
     """
     Save a code draft (auto-save or manual save).
@@ -74,7 +72,6 @@ def save_code_draft():
 
 
 @code_editor.route('/get_code_drafts', methods=["GET"])
-@cross_origin()
 def get_code_drafts():
     """
     Get code drafts for a student/assignment.
@@ -113,7 +110,6 @@ def get_code_drafts():
 
 
 @code_editor.route('/get_latest_draft', methods=["GET"])
-@cross_origin()
 def get_latest_draft():
     """
     Get the latest code draft for a student/assignment.
@@ -139,7 +135,6 @@ def get_latest_draft():
 
 
 @code_editor.route('/submit_code', methods=["POST"])
-@cross_origin()
 def submit_code():
     """
     Submit code directly from the code editor (no file upload needed).
@@ -529,7 +524,6 @@ def _run_autograder_in_container(image, content, file_name, assignment_id, timeo
 
 
 @code_editor.route('/run_code', methods=["POST"])
-@cross_origin()
 def run_code():
     """
     Run code without creating a submission.
@@ -657,7 +651,6 @@ def run_code():
 
 
 @code_editor.route('/ai_chat', methods=["POST"])
-@cross_origin()
 def ai_chat():
     """
     Chat with AI about the current code.

@@ -3,7 +3,6 @@ import os
 import csv
 import requests
 from flask import Blueprint, request, jsonify, session
-from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 from sqlalchemy.exc import IntegrityError
 from api import db
@@ -125,7 +124,6 @@ def is_supported_claude_model(model_id):
     return model_id.startswith("claude-")
 
 @course.route("/create_course", methods=["POST", "GET"])
-@cross_origin()
 def create_course():
     """
     /create_course creates a course in the database
@@ -169,7 +167,6 @@ def create_course():
 
 
 @course.route("/enroll_course", methods=["POST"])
-@cross_origin()
 def enroll_course():
     """
     /enroll_course enrolls a student in a course using entryCode
@@ -211,7 +208,6 @@ def enroll_course():
         raise InternalProcessingError("Failed to enroll in course")
     
 @course.route("/leave_course", methods=["POST"])
-@cross_origin()
 def leave_course():
     data = request.json
     user_id = data.get("user_id")
@@ -370,7 +366,6 @@ def delete_all_assignments():
         raise InternalProcessingError("Failed to delete assignments")
 
 @course.route("/create_enrollment", methods=["POST"])
-@cross_origin()
 def create_enrollment():
     """
     /create_enrollment enrolls a student in a course
@@ -478,7 +473,6 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @course.route("/create_enrollment_csv", methods=["POST"])
-@cross_origin()
 def create_enrollment_csv():
     if 'file' not in request.files:
         raise BadRequestError("Missing file part")
@@ -602,7 +596,6 @@ def get_user_enrollments():
     return jsonify(courses), 200
 
 @course.route("/get_course_enrollment", methods=["GET"])
-@cross_origin()
 def get_course_enrollment():
     """
     Returns all users enrolled in a course,
@@ -637,7 +630,6 @@ def get_course_enrollment():
 
 
 @course.route("/get_course_assignments", methods=["GET"])
-@cross_origin()
 def get_course_assignments():
     """
     /get_course_assignments gets all assignments for a course
@@ -655,7 +647,6 @@ def get_course_assignments():
 
 
 @course.route("/get_course_info", methods=["GET"])
-@cross_origin()
 def get_course_info():
     course_id = request.args.get("course_id")
 
@@ -683,7 +674,6 @@ def get_course_info():
     return jsonify([course_data]), 200
 
 @course.route("/store_api_key", methods=["PUT"])
-@cross_origin()
 
 def store_api_key():
     """
@@ -785,7 +775,6 @@ def update_ai_settings():
 
 
 @course.route("/fetch_ai_models", methods=["POST"])
-@cross_origin()
 def fetch_ai_models():
     data = request.json
 
@@ -935,7 +924,6 @@ def fetch_ai_models():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 @course.route("/test_ai_api_key", methods=["POST"])
-@cross_origin()
 def test_ai_api_key():
     data = request.json
 
@@ -1020,7 +1008,6 @@ def test_ai_api_key():
     
 
 @course.route("/test_ai_model", methods=["POST"])
-@cross_origin()
 def test_ai_model():
     data = request.json
 
@@ -1203,7 +1190,6 @@ def test_ai_model():
         return jsonify({"error": str(e)}), 500
     
 @course.route("/get_courses_by_instructor", methods=["GET"])
-@cross_origin()
 def get_courses_by_instructor():
     """
     /get_courses_by_instructor gets all courses where the user is an instructor
