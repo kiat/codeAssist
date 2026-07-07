@@ -262,7 +262,6 @@ export default function AISettings() {
 
       await updateAiSettings({
         course_id: courseId,
-        requester_id: userInfo.id,
         provider,
         model_name: values.model_name,
         api_key: apiKey || undefined,

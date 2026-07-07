@@ -200,7 +200,6 @@ def duplicate_assignment():
         raise InternalProcessingError("Failed to duplicate assignment")
 
 @assignment.route('/delete_assignment', methods=["DELETE"])
-@cross_origin()
 def delete_assignment():
     assignment_id = request.args.get("assignment_id")
     requester_id = session.get("user_id")
@@ -241,7 +240,6 @@ def delete_assignment():
         raise InternalProcessingError("Failed to delete assignment")
 
 @assignment.route('/delete_submissions', methods=["DELETE"])
-@cross_origin()
 def delete_submissions():
     assignment_id = request.args.get("assignment_id")
     requester_id = session.get("user_id")

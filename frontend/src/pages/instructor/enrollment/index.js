@@ -99,7 +99,6 @@ export default () => {
           "student_id": studentId,
           "course_id": courseId,
           "new_role": newRole,
-          "requester_id": userInfo.id,
         });
         message.info("User role updated")
         getEnrollment();

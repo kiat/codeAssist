@@ -181,7 +181,7 @@ export default () => {
     }
 
     try {
-      await deleteAssignment(currentAssignmentId, userInfo.id);
+      await deleteAssignment(currentAssignmentId);
       message.success("Assignment deleted successfully");
     } catch (error) {
       console.error("Failed to delete assignment:", error);
@@ -196,7 +196,7 @@ export default () => {
     }
 
     try {
-      await deleteSubmissions(currentAssignmentId, userInfo.id);
+      await deleteSubmissions(currentAssignmentId);
       message.success("All submissions deleted successfully");
     } catch (error) {
       console.error("Failed to delete submissions:", error);

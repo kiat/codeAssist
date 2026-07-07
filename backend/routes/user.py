@@ -2,7 +2,7 @@ import uuid
 import requests
 import random
 import string
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, session
 from flask_cors import cross_origin
 from api import db
 from api.models import User, Course, AdminEmail
@@ -115,6 +115,10 @@ def user_login():
             db_user.password = hash_password(password)
             db.session.commit()
 
+    # Establish server-side session so guarded endpoints can verify identity
+    user_id = db_user.get('id') if isinstance(db_user, dict) else db_user.id
+    session["user_id"] = user_id
+
     # Serialize and return
     result = UserSchema().dump(db_user)
     return jsonify(result), 200
@@ -214,6 +218,7 @@ def google_login():
         )
         db.session.add(user)
         db.session.commit()
+        session["user_id"] = user.id
         user_data = UserSchema().dump(user)
         return jsonify(user_data)
 
@@ -222,6 +227,7 @@ def google_login():
         user.role = "admin"
         db.session.commit()
 
+    session["user_id"] = user.id
     user_data = UserSchema().dump(user)
     return jsonify(user_data)
 

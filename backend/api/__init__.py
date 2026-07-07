@@ -1,3 +1,4 @@
+import os
 from flask import Flask
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import SQLAlchemy
@@ -13,16 +14,17 @@ migrate = Migrate()
 def create_app(config_class='config.Config'):
     # Create the Flask app instance
     app = Flask(__name__)
-    app.secret_key = 'codeassist'
+    app.secret_key = os.getenv('SECRET_KEY', 'codeassist')
 
     # Load environment variables
     load_dotenv()
-    
+
     # Load the configuration
     app.config.from_object(config_class)
-    
+
     # Initialize the extensions with the app
-    CORS(app)
+    frontend_origin = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    CORS(app, supports_credentials=True, origins=[frontend_origin])
     ma.init_app(app)
     db.init_app(app)
     migrate.init_app(app, db)

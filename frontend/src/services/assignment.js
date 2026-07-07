@@ -8,15 +8,13 @@ export async function createExtension(params) {
   return service("create_extension", params, "post");
 }
 
-export async function deleteAssignment(assignmentId, requesterId) {
+export async function deleteAssignment(assignmentId) {
   const params = new URLSearchParams({ assignment_id: assignmentId });
-  if (requesterId) params.append("requester_id", requesterId);
   return service(`delete_assignment?${params}`, {}, "delete");
 }
 
-export async function deleteSubmissions(assignmentId, requesterId) {
+export async function deleteSubmissions(assignmentId) {
   const params = new URLSearchParams({ assignment_id: assignmentId });
-  if (requesterId) params.append("requester_id", requesterId);
   return service(`delete_submissions?${params}`, {}, "delete");
 }
 

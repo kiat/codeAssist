@@ -67,7 +67,7 @@ export default () => {
 
   const handleDeleteAllAssignments = async (courseId) => {
     try {
-      await deleteAllAssignments({ course_id: courseId, requester_id: userInfo.id });
+      await deleteAllAssignments({ course_id: courseId });
       message.success("All assignments deleted successfully");
     }
     catch(error) {
@@ -77,7 +77,7 @@ export default () => {
 
   const handleDeleteCourse = async (courseId) => {
     try {
-      await deleteCourse({ course_id: courseId, requester_id: userInfo.id });
+      await deleteCourse({ course_id: courseId });
       message.success("Course deleted successfully");
       navigateHome();
     }
@@ -97,7 +97,6 @@ export default () => {
   const onFinish = async (values) => {
     const dataToSend = {
       course_id: courseId,
-      requester_id: userInfo.id,
       ...Object.fromEntries(
         Object.entries(values).filter(([_, value]) => value !== undefined)
       ),

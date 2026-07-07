@@ -240,7 +240,6 @@ def leave_course():
         raise InternalProcessingError("Failed to leave course")
 
 @course.route("/update_course", methods=["PUT"])
-@cross_origin()
 def update_course():
     """
     /update_course updates a course in the database
@@ -285,7 +284,6 @@ def update_course():
 
 
 @course.route("/delete_course", methods=["DELETE"])
-@cross_origin()
 def delete_course():
     course_id = request.args.get("course_id")
     requester_id = session.get("user_id")
@@ -325,7 +323,6 @@ def delete_course():
         raise InternalProcessingError("Failed to delete course")
 
 @course.route("/delete_all_assignments", methods=["DELETE"])
-@cross_origin()
 def delete_all_assignments():
     course_id = request.args.get("course_id")
     requester_id = session.get("user_id")
@@ -408,7 +405,6 @@ def create_enrollment():
         raise InternalProcessingError("Failed to create enrollment")
 
 @course.route("/update_role", methods=["POST"])
-@cross_origin()
 def update_role():
     data = request.json
     required_fields = ["student_id", "course_id", "new_role"]
@@ -573,7 +569,6 @@ def create_enrollment_csv():
     return jsonify(response), 200
 
 @course.route("/get_my_enrollment_role", methods=["GET"])
-@cross_origin()
 def get_my_enrollment_role():
     user_id = session.get("user_id")
     if not user_id:
@@ -590,7 +585,6 @@ def get_my_enrollment_role():
 
 
 @course.route("/get_user_enrollments", methods=["GET"])
-@cross_origin()
 def get_user_enrollments():
     user_id = session.get("user_id")
     if not user_id:
@@ -721,7 +715,6 @@ def store_api_key():
         raise InternalProcessingError("Failed to store API key")
 
 @course.route("/update_ai_settings", methods=["PUT"])
-@cross_origin()
 def update_ai_settings():
     data = request.json
 
