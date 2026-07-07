@@ -400,15 +400,41 @@ def test_get_user_enrollments_success(client, mocker):
     mock_schema = mocker.patch("routes.course.CourseSchema")
     mock_schema.return_value.dump.return_value = [{"id": "course-123", "name": "CS101"}]
 
-    response = client.get("/get_user_enrollments", query_string={"user_id": "user-123"})
+    with client.session_transaction() as sess:
+        sess["user_id"] = "user-123"
+
+    response = client.get("/get_user_enrollments")
 
     assert response.status_code == 200
     assert response.json == [{"id": "course-123", "name": "CS101", "enrollment_role": "student"}]
 
-def test_get_user_enrollments_missing_user_id(client):
+def test_get_user_enrollments_unauthenticated(client):
     response = client.get("/get_user_enrollments")
+    assert response.status_code == 403
+    assert "Not authenticated" in response.json["message"]
+
+def test_get_my_enrollment_role_success(client, mocker):
+    mocker.patch("routes.course.get_user_course_role", return_value="ta")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "user-123"
+
+    response = client.get("/get_my_enrollment_role", query_string={"course_id": "course-123"})
+
+    assert response.status_code == 200
+    assert response.json == {"role": "ta"}
+
+def test_get_my_enrollment_role_unauthenticated(client):
+    response = client.get("/get_my_enrollment_role", query_string={"course_id": "course-123"})
+    assert response.status_code == 403
+    assert "Not authenticated" in response.json["message"]
+
+def test_get_my_enrollment_role_missing_course_id(client):
+    with client.session_transaction() as sess:
+        sess["user_id"] = "user-123"
+    response = client.get("/get_my_enrollment_role")
     assert response.status_code == 400
-    assert response.json["message"] == "Missing user_id argument"
+    assert "Missing course_id" in response.json["message"]
 
 from types import SimpleNamespace
 

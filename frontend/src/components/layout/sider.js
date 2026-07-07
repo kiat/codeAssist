@@ -33,8 +33,9 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
   }, [courseInfo, updateCourseInfo]);
 
   useEffect(() => {
-    if (courseInfo.id && userInfo.id) {
-      fetch(`${process.env.REACT_APP_API_URL}/get_my_enrollment_role?user_id=${userInfo.id}&course_id=${courseInfo.id}`)
+    const apiUrl = process.env.REACT_APP_API_URL;
+    if (apiUrl && courseInfo.id && userInfo.id) {
+      fetch(`${apiUrl}/get_my_enrollment_role?course_id=${courseInfo.id}`, { credentials: "include" })
         .then((res) => res.ok ? res.json() : null)
         .then((data) => { if (data?.role) updateCourseRole(data.role); })
         .catch(() => {});

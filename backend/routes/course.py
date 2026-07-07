@@ -575,11 +575,12 @@ def create_enrollment_csv():
 @course.route("/get_my_enrollment_role", methods=["GET"])
 @cross_origin()
 def get_my_enrollment_role():
-    user_id = request.args.get("user_id")
+    user_id = session.get("user_id")
+    if not user_id:
+        raise ForbiddenError("Not authenticated")
     course_id = request.args.get("course_id")
-
-    if not user_id or not course_id:
-        raise BadRequestError("Missing user_id or course_id")
+    if not course_id:
+        raise BadRequestError("Missing course_id")
 
     role = get_user_course_role(user_id, course_id)
     if role is None:
@@ -591,14 +592,9 @@ def get_my_enrollment_role():
 @course.route("/get_user_enrollments", methods=["GET"])
 @cross_origin()
 def get_user_enrollments():
-    """
-    /get_user_enrollments gets all enrollments for a single user
-    Requires from the frontend a JSON containing:
-    @param user_id       the id of the user
-    """
-    user_id = request.args.get("user_id")
-    if not user_id or user_id == "":
-        raise BadRequestError("Missing user_id argument")
+    user_id = session.get("user_id")
+    if not user_id:
+        raise ForbiddenError("Not authenticated")
 
     enrollments = db.session.query(Enrollment).filter_by(student_id=user_id).all()
     enrollment_role_by_course = {e.course_id: e.role for e in enrollments}
