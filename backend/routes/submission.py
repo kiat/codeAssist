@@ -269,7 +269,10 @@ def upload_submission():
 
     try:
         # Clear out any leftovers from a previous submission run
+        t0 = time.time()
         container.exec_run("sh -c 'rm -rf /autograder/submission/* /autograder/results/*'")
+        t1 = time.time()
+        print(f"[METRICS] Cleanup exec time: {t1 - t0:.2f}s", flush=True)
 
         # Copy the submission into /autograder/submission/
         tar_stream = io.BytesIO()
@@ -277,14 +280,26 @@ def upload_submission():
             tar.add(file_path, arcname=filename)
         tar_stream.seek(0)
         container.put_archive("/autograder/submission/", tar_stream)
+        t2 = time.time()
+        print(f"[METRICS] Copy submission time: {t2 - t1:.2f}s", flush=True)
 
-        # Run the autograder inside the container
-        exec_proc = subprocess.run(
-            f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(),
-            capture_output=True,
-            timeout=assignment.autograder_timeout
-        )
+        USE_EXEC_RUN = True
 
+        if USE_EXEC_RUN:
+            exec_result = container.exec_run("/bin/bash /autograder/source/run_autograder")
+            t3 = time.time()
+            print(f"[METRICS] Autograder exec time (exec_run): {t3 - t2:.2f}s", flush=True)
+            exec_proc = type('obj', (object,), {'returncode': exec_result.exit_code, 'output': exec_result.output})()
+        else:
+            # Run the autograder inside the container
+            exec_proc = subprocess.run(
+                f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(),
+                capture_output=True,
+                timeout=assignment.autograder_timeout
+            )
+            t3 = time.time()
+            print(f"[METRICS] Autograder exec time: {t3 - t2:.2f}s", flush=True)
+    
     except subprocess.TimeoutExpired:
         # clean up container
         reset_assignment_container(assignment)
@@ -339,6 +354,8 @@ def upload_submission():
 
     # get results
     cat_result = container.exec_run("cat /autograder/results/results.json")
+    t4 = time.time()
+    print(f"[METRICS] Results retrieval time: {t4 - t3:.2f}s", flush=True)
     if cat_result.exit_code != 0:
         os.chdir(current_dir)
         print(f"Error: Failed to retrieve results.json, details: {cat_result.output.decode()}", flush=True)
