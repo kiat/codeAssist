@@ -49,7 +49,7 @@ export default () => {
   const [assignmentModels, setAssignmentModels] = useState([]);
   const [assignmentModelsLoading, setAssignmentModelsLoading] = useState(false);
 
-  const { userInfo, updateAssignmentInfo, courseRole } = useContext(GlobalContext);
+  const { updateAssignmentInfo, courseRole } = useContext(GlobalContext);
   const isInstructor = courseRole === "instructor";
   const navigate = useNavigate();
 

@@ -125,7 +125,7 @@ def test_assignment_ai_settings_requires_authentication(client, mocker, method):
     else:
         resp = client.put("/assignments/assignment-uuid/ai-settings", json={})
 
-    assert resp.status_code == 403
+    assert resp.status_code == 401
     assert "Not authenticated" in resp.json["message"]
 
 

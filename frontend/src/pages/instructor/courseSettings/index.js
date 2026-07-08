@@ -32,7 +32,7 @@ export default () => {
   // Used to manage form state
   const [form] = Form.useForm();
 
-  const { userInfo, courseInfo, updateCourseInfo, courseRole } = useContext(GlobalContext);
+  const { courseInfo, updateCourseInfo, courseRole } = useContext(GlobalContext);
   const navigate = useNavigate();
 
   useEffect(() => {

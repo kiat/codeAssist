@@ -49,7 +49,7 @@ const FEEDBACK_STYLES = [
 ];
 
 const PROVIDER_DEFAULT_MODELS = {
-  openai: "gpt-4o-mini",
+  openai: "gpt-4o",
   gemini: "gemini-1.5-flash",
   claude: "claude-3-5-sonnet-20241022",
   ollama: "llama3",
@@ -74,7 +74,7 @@ const getKeyStatus = (course, selectedProviderKey) => {
 export default function AISettings() {
   const { courseId } = useParams();
   const navigate = useNavigate();
-  const { userInfo, courseRole } = useContext(GlobalContext);
+  const { courseRole } = useContext(GlobalContext);
   const [form] = Form.useForm();
 
   useEffect(() => {

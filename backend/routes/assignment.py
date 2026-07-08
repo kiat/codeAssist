@@ -1,10 +1,10 @@
 import uuid
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify
 from api import db
 from api.models import Assignment, AssignmentExtension, Submission, RegradeRequest, Course
 from api.schemas import AssignmentSchema, CourseSchema, AssignmentExtensionSchema
-from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError, ForbiddenError
-from util.auth import get_user_course_role
+from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError
+from util.auth import require_authenticated, require_course_role
 from ai_feedback.settings import (
     serialize_assignment_ai_settings,
     split_ai_settings_payload,
@@ -31,6 +31,8 @@ def update_assignment():
     assignment_id = data["assignment_id"]
     assignment_name = data["name"]
     course_id = data["course_id"]
+
+    require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can update assignments")
 
     # Check for name conflict in the same course
     existing_assignment = db.session.query(Assignment).filter(
@@ -119,6 +121,8 @@ def create_assignment():
     if not assignment_name or not course_id:
         raise BadRequestError("Missing assignment name or course ID")
 
+    require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can create assignments")
+
     try:
     # Check if assignment already exists for the course
         existing_assignment = db.session.query(Assignment).filter_by(course_id=course_id, name=assignment_name).one_or_none()
@@ -183,6 +187,8 @@ def duplicate_assignment():
     new_name = data["newAssignmentTitle"]
     current_course_id = data["currentCourseId"]
 
+    require_course_role(current_course_id, {"instructor", "ta"}, "Only instructors or TAs can duplicate assignments")
+
     try:
         old_assignment = db.session.query(Assignment).filter_by(id=old_assignment_id).one_or_none()
         if old_assignment is None:
@@ -218,20 +224,17 @@ def duplicate_assignment():
 @assignment.route('/delete_assignment', methods=["DELETE"])
 def delete_assignment():
     assignment_id = request.args.get("assignment_id")
-    requester_id = session.get("user_id")
 
     if not assignment_id:
         raise BadRequestError("Missing assignment ID")
 
-    if not requester_id:
-        raise ForbiddenError("Not authenticated")
+    require_authenticated()
 
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
         raise NotFoundError("Assignment not found")
 
-    if get_user_course_role(requester_id, assignment.course_id) != "instructor":
-        raise ForbiddenError("Only instructors can delete assignments")
+    require_course_role(assignment.course_id, {"instructor"}, "Only instructors can delete assignments")
 
     try:
         #delete regrade requests and submissions first
@@ -255,20 +258,17 @@ def delete_assignment():
 @assignment.route('/delete_submissions', methods=["DELETE"])
 def delete_submissions():
     assignment_id = request.args.get("assignment_id")
-    requester_id = session.get("user_id")
 
     if not assignment_id:
         raise BadRequestError("Missing assignment ID")
 
-    if not requester_id:
-        raise ForbiddenError("Not authenticated")
+    require_authenticated()
 
     assignment_for_auth = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment_for_auth:
         raise NotFoundError("Assignment not found")
 
-    if get_user_course_role(requester_id, assignment_for_auth.course_id) != "instructor":
-        raise ForbiddenError("Only instructors can delete all submissions")
+    require_course_role(assignment_for_auth.course_id, {"instructor"}, "Only instructors can delete all submissions")
 
     # Fetch all submissions for this assignment
     related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment_id).all()
@@ -298,6 +298,15 @@ def create_extension():
     
     assignment_id = data["assignment_id"]
     student_id = data["student_id"]
+
+    require_authenticated()
+
+    extension_assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not extension_assignment:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(extension_assignment.course_id, {"instructor", "ta"}, "Only instructors or TAs can manage extensions")
+
     # Check if there are any extensions for this assignment and student
     related_extension = db.session.query(AssignmentExtension).filter_by(assignment_id=assignment_id, student_id=student_id).first()
     if related_extension:
@@ -373,18 +382,24 @@ def delete_extension():
     extension_id = request.args.get("extension_id")
     if not extension_id:
         raise BadRequestError("Missing extension_id")
-    
-    try:
-        extension = db.session.query(AssignmentExtension).filter_by(id=extension_id).first()
-        if not extension:
-            raise NotFoundError("Extension not found")
 
+    require_authenticated()
+
+    extension = db.session.query(AssignmentExtension).filter_by(id=extension_id).first()
+    if not extension:
+        raise NotFoundError("Extension not found")
+
+    extension_assignment = db.session.query(Assignment).filter_by(id=extension.assignment_id).first()
+    if not extension_assignment:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(extension_assignment.course_id, {"instructor", "ta"}, "Only instructors or TAs can manage extensions")
+
+    try:
         db.session.delete(extension)
         db.session.commit()
 
         return jsonify({"message": "Extension deleted successfully"}), 200
-    except (BadRequestError, NotFoundError) as e:
-        raise e
     except Exception:
         db.session.rollback()
         raise InternalProcessingError("Failed to delete extension")

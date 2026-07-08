@@ -16,7 +16,15 @@ depends_on = None
 
 
 def upgrade():
-    op.execute("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS enable_code_editor BOOLEAN DEFAULT 'false' NOT NULL")
+    # Idempotent: some databases already have this column from before the
+    # migration-head split was reconciled, so only add it when missing.
+    bind = op.get_bind()
+    columns = [c["name"] for c in sa.inspect(bind).get_columns("assignments")]
+    if "enable_code_editor" not in columns:
+        op.add_column(
+            "assignments",
+            sa.Column("enable_code_editor", sa.Boolean(), server_default="false", nullable=False),
+        )
 
 
 def downgrade():

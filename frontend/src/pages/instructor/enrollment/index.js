@@ -5,7 +5,6 @@ import {
   Dropdown,
   Input,
   PageHeader,
-  Select,
   Space,
   Table,
   Typography,
@@ -44,7 +43,7 @@ const columns = [
 ];
 
 export default () => {
-  const { userInfo, courseRole } = useContext(GlobalContext);
+  const { courseRole } = useContext(GlobalContext);
   const isTA = courseRole === "ta";
 
   const [filterRoles, setFilterRoles] = useState([]);
@@ -160,7 +159,7 @@ export default () => {
     }
     if (filterName.trim()) {
       filtered = filtered.filter((e) =>
-        e.name.toLowerCase().includes(filterName.toLowerCase())
+        (e.name || "").toLowerCase().includes(filterName.toLowerCase())
       );
     }
     setEnrollment(filtered);

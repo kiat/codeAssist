@@ -16,7 +16,7 @@ from api import db
 from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
-from util.auth import get_user_course_role
+from util.auth import get_user_course_role, require_authenticated, require_course_role
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -323,6 +323,14 @@ def upload_assignment_autograder():
     if not assignment_id or not file.filename:
         raise BadRequestError("Missing required fields")
 
+    require_authenticated()
+
+    assignment_for_auth = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment_for_auth:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(assignment_for_auth.course_id, {"instructor", "ta"}, "Only instructors or TAs can upload an autograder")
+
     # Set up paths
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
@@ -454,10 +462,18 @@ def delete_submission():
     if not submission_id:
         raise BadRequestError("Missing submission_id")
 
+    require_authenticated()
+
     submission_to_delete = db.session.get(Submission, submission_id)
 
     if not submission_to_delete:
         raise NotFoundError("No submission found to delete")
+
+    submission_assignment = db.session.get(Assignment, submission_to_delete.assignment_id)
+    if not submission_assignment:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(submission_assignment.course_id, {"instructor"}, "Only instructors can delete submissions")
 
     try:
         db.session.delete(submission_to_delete)
@@ -505,9 +521,7 @@ def rerun_submission_autograder():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
-    requester_id = session.get("user_id")
-    if not requester_id:
-        raise ForbiddenError("Not authenticated")
+    requester_id = require_authenticated()
 
     is_owner = str(submission_to_rerun.student_id) == str(requester_id)
     is_staff = get_user_course_role(requester_id, assignment.course_id) in {"instructor", "ta"}

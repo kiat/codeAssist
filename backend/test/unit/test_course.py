@@ -182,7 +182,7 @@ def test_enroll_course_invalid_code(client, mocker):
 def test_update_course_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_query_instance = mocker.Mock()
     mock_query.return_value.filter_by.return_value = mock_query_instance
@@ -212,7 +212,7 @@ def test_update_course_success(client, mocker):
 
 def test_update_course_duplicate_entry_code(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.first.return_value = mocker.Mock(id="different-course-id")  # Duplicate entryCode
 
     with client.session_transaction() as sess:
@@ -237,7 +237,7 @@ def test_delete_course_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_delete = mocker.patch("routes.course.db.session.delete")
     mock_commit = mocker.patch("routes.course.db.session.commit")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         mocker.Mock(),  # Course exists
@@ -257,7 +257,7 @@ def test_delete_course_success(client, mocker):
 
 def test_delete_course_with_assignments(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         mocker.Mock(),  # Course exists
         mocker.Mock()   # Assignments exist
@@ -274,7 +274,7 @@ def test_delete_course_with_assignments(client, mocker):
 def test_delete_all_assignments_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(id="assignment-1")]
 
@@ -290,7 +290,7 @@ def test_delete_all_assignments_success(client, mocker):
 
 def test_delete_all_assignments_not_found(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.all.return_value = []
 
     with client.session_transaction() as sess:
@@ -305,7 +305,7 @@ def test_create_enrollment_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_add = mocker.patch("routes.course.db.session.add")
     mock_commit = mocker.patch("routes.course.db.session.commit")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_query.return_value.filter_by.return_value.first.return_value = None  # No existing enrollment
 
@@ -326,7 +326,7 @@ def test_create_enrollment_success(client, mocker):
 
 def test_create_enrollment_already_enrolled(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.first.return_value = mocker.Mock()  # Already enrolled
 
     with client.session_transaction() as sess:
@@ -347,11 +347,11 @@ def test_create_enrollment_unauthenticated(client):
         "student_id": "student-123",
         "course_id": "course-123",
     })
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Not authenticated" in response.json["message"]
 
 def test_create_enrollment_student_forbidden(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value="student")
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
     with client.session_transaction() as sess:
         sess["user_id"] = "student-uuid"
     response = client.post("/create_enrollment", json={
@@ -362,7 +362,7 @@ def test_create_enrollment_student_forbidden(client, mocker):
     assert "Only instructors" in response.json["message"]
 
 def test_create_enrollment_invalid_role(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     with client.session_transaction() as sess:
         sess["user_id"] = "instructor-uuid"
     response = client.post("/create_enrollment", json={
@@ -377,7 +377,7 @@ def test_create_enrollment_ta_can_add_student(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mocker.patch("routes.course.db.session.add")
     mocker.patch("routes.course.db.session.commit")
-    mocker.patch("routes.course.get_user_course_role", return_value="ta")
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
     mock_query.return_value.filter_by.return_value.first.return_value = None
 
     with client.session_transaction() as sess:
@@ -392,7 +392,7 @@ def test_create_enrollment_ta_can_add_student(client, mocker):
     assert response.status_code == 201
 
 def test_create_enrollment_ta_cannot_add_ta_or_instructor(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value="ta")
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
     with client.session_transaction() as sess:
         sess["user_id"] = "ta-uuid"
 
@@ -408,7 +408,7 @@ def test_create_enrollment_ta_cannot_add_ta_or_instructor(client, mocker):
 def test_update_role_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     enrollment = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = enrollment
@@ -431,7 +431,7 @@ def test_update_role_success(client, mocker):
 
 def test_update_role_cannot_demote_other_instructor(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     enrollment = mocker.Mock()
     enrollment.role = "instructor"
@@ -454,7 +454,7 @@ def test_update_role_cannot_demote_other_instructor(client, mocker):
 def test_update_role_promote_to_instructor_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     enrollment = mocker.Mock()
     enrollment.role = "student"
@@ -477,7 +477,7 @@ def test_update_role_promote_to_instructor_success(client, mocker):
 
 def test_update_role_not_found(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.first.return_value = None  # Enrollment not found
 
     with client.session_transaction() as sess:
@@ -507,7 +507,7 @@ def test_create_enrollment_csv_success(client, mocker):
 
     mock_query = mocker.patch("routes.course.User.query")
     mock_query.filter_by.return_value.first.side_effect = [mock_user_1, mock_user_2]
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mocker.patch("routes.course.allowed_file", return_value=True)
     mocker.patch("routes.course.os.path.exists", return_value=False)
@@ -551,14 +551,14 @@ def test_create_enrollment_csv_unauthenticated(client, mocker):
         data={"file": mock_file, "course_id": "course-123"},
         content_type="multipart/form-data",
     )
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Not authenticated" in response.json["message"]
 
 def test_create_enrollment_csv_student_forbidden(client, mocker):
     file_content = "Email\nstudent1@test.com"
     mock_file = (io.BytesIO(file_content.encode()), "students.csv")
     mocker.patch("routes.course.allowed_file", return_value=True)
-    mocker.patch("routes.course.get_user_course_role", return_value="student")
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
 
     with client.session_transaction() as sess:
         sess["user_id"] = "student-uuid"
@@ -582,7 +582,7 @@ def test_create_enrollment_csv_ta_per_row_cap(client, mocker):
 
     mock_query = mocker.patch("routes.course.User.query")
     mock_query.filter_by.return_value.first.side_effect = [mock_user_1, mock_user_2]
-    mocker.patch("routes.course.get_user_course_role", return_value="ta")
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
 
     mocker.patch("routes.course.allowed_file", return_value=True)
     mocker.patch("routes.course.os.path.exists", return_value=False)
@@ -619,7 +619,7 @@ def test_create_enrollment_csv_per_row_roles(client, mocker):
 
     mock_query = mocker.patch("routes.course.User.query")
     mock_query.filter_by.return_value.first.side_effect = [mock_user_1, mock_user_2]
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mocker.patch("routes.course.allowed_file", return_value=True)
     mocker.patch("routes.course.os.path.exists", return_value=False)
@@ -661,11 +661,11 @@ def test_get_user_enrollments_success(client, mocker):
 
 def test_get_user_enrollments_unauthenticated(client):
     response = client.get("/get_user_enrollments")
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Not authenticated" in response.json["message"]
 
 def test_get_my_enrollment_role_success(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value="ta")
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
 
     with client.session_transaction() as sess:
         sess["user_id"] = "user-123"
@@ -677,7 +677,7 @@ def test_get_my_enrollment_role_success(client, mocker):
 
 def test_get_my_enrollment_role_unauthenticated(client):
     response = client.get("/get_my_enrollment_role", query_string={"course_id": "course-123"})
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Not authenticated" in response.json["message"]
 
 def test_get_my_enrollment_role_missing_course_id(client):
@@ -688,7 +688,7 @@ def test_get_my_enrollment_role_missing_course_id(client):
     assert "Missing course_id" in response.json["message"]
 
 def test_get_my_enrollment_role_not_enrolled(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value=None)
+    mocker.patch("util.auth.get_user_course_role", return_value=None)
 
     with client.session_transaction() as sess:
         sess["user_id"] = "user-123"
@@ -701,6 +701,10 @@ def test_get_my_enrollment_role_not_enrolled(client, mocker):
 from types import SimpleNamespace
 
 def test_get_course_enrollment_success(client, mocker):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
     # Mock the query chain used in the new route (query -> join -> filter)
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_query_instance = mock_query.return_value
@@ -726,6 +730,19 @@ def test_get_course_enrollment_missing_course_id(client):
     response = client.get("/get_course_enrollment")
     assert response.status_code == 400
     assert response.json["message"] == "Missing course_id argument"
+
+def test_get_course_enrollment_unauthenticated(client):
+    response = client.get("/get_course_enrollment", query_string={"course_id": "course-123"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+def test_get_course_enrollment_student_forbidden(client, mocker):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    with client.session_transaction() as sess:
+        sess["user_id"] = "student-uuid"
+    response = client.get("/get_course_enrollment", query_string={"course_id": "course-123"})
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.json["message"]
 
 def test_get_course_assignments_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
@@ -873,7 +890,7 @@ def test_update_course_db_error(client, mocker):
     mocker.patch("routes.course.db.session.query")
     mocker.patch("routes.course.db.session.commit", side_effect=Exception("fail"))
     mocker.patch("routes.course.db.session.rollback")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     with client.session_transaction() as sess:
         sess["user_id"] = "instructor-uuid"
@@ -896,7 +913,7 @@ def test_delete_course_db_error(client, mocker):
     mocker.patch("routes.course.db.session.query")
     mocker.patch("routes.course.db.session.commit", side_effect=Exception("fail"))
     mocker.patch("routes.course.db.session.rollback")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     with client.session_transaction() as sess:
         sess["user_id"] = "instructor-uuid"
@@ -1726,7 +1743,7 @@ def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker):
         return_value="encrypted-openai-key",
     )
     mock_commit = mocker.patch("routes.course.db.session.commit")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1761,7 +1778,7 @@ def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker):
 
 def test_update_ai_settings_invalid_temperature_returns_400(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1784,7 +1801,7 @@ def test_update_ai_settings_invalid_temperature_returns_400(client, mocker):
 
 def test_update_ai_settings_temperature_out_of_range_returns_400(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1808,7 +1825,7 @@ def test_update_ai_settings_temperature_out_of_range_returns_400(client, mocker)
 def test_update_ai_settings_unsupported_provider_without_api_key_returns_400(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1832,7 +1849,7 @@ def test_update_ai_settings_unsupported_provider_without_api_key_returns_400(cli
 
 def test_update_ai_settings_unsupported_provider_for_api_key_returns_400(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -1859,12 +1876,12 @@ def test_update_ai_settings_unsupported_provider_for_api_key_returns_400(client,
 
 def test_delete_course_unauthenticated(client):
     response = client.delete("/delete_course", query_string={"course_id": "course-123"})
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Not authenticated" in response.json["message"]
 
 
 def test_delete_course_student_forbidden(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value="student")
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
     with client.session_transaction() as sess:
         sess["user_id"] = "student-uuid"
     response = client.delete("/delete_course", query_string={"course_id": "course-123"})
@@ -1878,12 +1895,12 @@ def test_update_role_unauthenticated(client):
         "course_id": "course-123",
         "new_role": "ta",
     })
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Not authenticated" in response.json["message"]
 
 
 def test_update_role_ta_forbidden(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value="ta")
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
     with client.session_transaction() as sess:
         sess["user_id"] = "ta-uuid"
     response = client.post("/update_role", json={
@@ -1896,7 +1913,7 @@ def test_update_role_ta_forbidden(client, mocker):
 
 
 def test_update_role_invalid_role(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     with client.session_transaction() as sess:
         sess["user_id"] = "instructor-uuid"
     response = client.post("/update_role", json={
@@ -1909,7 +1926,7 @@ def test_update_role_invalid_role(client, mocker):
 
 
 def test_update_role_self_demotion_forbidden(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     with client.session_transaction() as sess:
         sess["user_id"] = "instructor-uuid"
     response = client.post("/update_role", json={
@@ -1923,12 +1940,12 @@ def test_update_role_self_demotion_forbidden(client, mocker):
 
 def test_update_ai_settings_unauthenticated(client):
     response = client.put("/update_ai_settings", json={"course_id": "course-123"})
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Not authenticated" in response.json["message"]
 
 
 def test_update_ai_settings_ta_forbidden(client, mocker):
-    mocker.patch("routes.course.get_user_course_role", return_value="ta")
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
     with client.session_transaction() as sess:
         sess["user_id"] = "ta-uuid"
     response = client.put("/update_ai_settings", json={
@@ -1941,7 +1958,7 @@ def test_update_ai_settings_ta_forbidden(client, mocker):
 
 def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course

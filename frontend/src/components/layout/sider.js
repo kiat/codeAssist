@@ -37,8 +37,10 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
     if (apiUrl && courseInfo.id && userInfo.id) {
       fetch(`${apiUrl}/get_my_enrollment_role?course_id=${courseInfo.id}`, { credentials: "include" })
         .then((res) => res.ok ? res.json() : null)
-        .then((data) => { if (data?.role) updateCourseRole(data.role); })
-        .catch(() => {});
+        // Reset on failure so a role persisted from another course can't leak
+        // into this one; consumers fall back to the account-level role.
+        .then((data) => updateCourseRole(data?.role || ""))
+        .catch(() => updateCourseRole(""));
     }
   }, [courseInfo.id, userInfo.id, updateCourseRole]);
 

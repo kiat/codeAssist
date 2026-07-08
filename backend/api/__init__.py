@@ -70,8 +70,13 @@ def create_app(config_class='config.Config'):
     app.config.from_object(config_class)
 
     # Initialize the extensions with the app
-    frontend_origin = os.getenv('FRONTEND_URL', 'http://localhost:3000')
-    CORS(app, supports_credentials=True, origins=[frontend_origin])
+    # FRONTEND_URL may list multiple comma-separated origins
+    frontend_origins = [
+        origin.strip()
+        for origin in os.getenv('FRONTEND_URL', 'http://localhost:3000').split(',')
+        if origin.strip()
+    ]
+    CORS(app, supports_credentials=True, origins=frontend_origins)
     ma.init_app(app)
     db.init_app(app)
     migrate.init_app(app, db)

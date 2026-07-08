@@ -11,6 +11,7 @@ from util.errors import (
     ForbiddenError,
     InternalProcessingError,
     NotFoundError,
+    UnauthorizedError,
 )
 
 
@@ -21,7 +22,7 @@ def _get_requester_id():
     requester_id = session.get("user_id")
 
     if not requester_id:
-        raise ForbiddenError("Not authenticated")
+        raise UnauthorizedError("Not authenticated")
 
     return requester_id
 

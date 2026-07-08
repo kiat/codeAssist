@@ -151,7 +151,7 @@ describe('<Dashboard />', () => {
       })
     );
 
-    expect(getUserEnrollments).toHaveBeenCalledTimes(3); 
+    expect(getUserEnrollments).toHaveBeenCalledTimes(2);
   });
 });
 
