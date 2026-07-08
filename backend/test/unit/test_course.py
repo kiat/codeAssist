@@ -373,6 +373,38 @@ def test_create_enrollment_invalid_role(client, mocker):
     assert response.status_code == 400
     assert "Invalid role" in response.json["message"]
 
+def test_create_enrollment_ta_can_add_student(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.db.session.add")
+    mocker.patch("routes.course.db.session.commit")
+    mocker.patch("routes.course.get_user_course_role", return_value="ta")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "ta-uuid"
+
+    response = client.post("/create_enrollment", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "role": "student",
+    })
+
+    assert response.status_code == 201
+
+def test_create_enrollment_ta_cannot_add_ta_or_instructor(client, mocker):
+    mocker.patch("routes.course.get_user_course_role", return_value="ta")
+    with client.session_transaction() as sess:
+        sess["user_id"] = "ta-uuid"
+
+    response = client.post("/create_enrollment", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "role": "ta",
+    })
+
+    assert response.status_code == 403
+    assert "Only instructors can assign a role other than student" in response.json["message"]
+
 def test_update_role_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
@@ -522,11 +554,42 @@ def test_create_enrollment_csv_unauthenticated(client, mocker):
     assert response.status_code == 403
     assert "Not authenticated" in response.json["message"]
 
-def test_create_enrollment_csv_non_instructor_forbidden(client, mocker):
+def test_create_enrollment_csv_student_forbidden(client, mocker):
     file_content = "Email\nstudent1@test.com"
     mock_file = (io.BytesIO(file_content.encode()), "students.csv")
     mocker.patch("routes.course.allowed_file", return_value=True)
+    mocker.patch("routes.course.get_user_course_role", return_value="student")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "student-uuid"
+
+    response = client.post(
+        "/create_enrollment_csv",
+        data={"file": mock_file, "course_id": "course-123"},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.json["message"]
+
+def test_create_enrollment_csv_ta_per_row_cap(client, mocker):
+    file_content = "Email,Role\nstudent1@test.com,student\nstudent2@test.com,ta"
+    mock_file = (io.BytesIO(file_content.encode()), "students.csv")
+
+    mock_user_1 = mocker.Mock()
+    mock_user_1.id = "uuid-1"
+    mock_user_2 = mocker.Mock()
+    mock_user_2.id = "uuid-2"
+
+    mock_query = mocker.patch("routes.course.User.query")
+    mock_query.filter_by.return_value.first.side_effect = [mock_user_1, mock_user_2]
     mocker.patch("routes.course.get_user_course_role", return_value="ta")
+
+    mocker.patch("routes.course.allowed_file", return_value=True)
+    mocker.patch("routes.course.os.path.exists", return_value=False)
+    mocker.patch("routes.course.os.makedirs")
+    mocker.patch("routes.course.os.remove")
+    mocker.patch("builtins.open", mocker.mock_open(read_data=file_content))
+    mock_create_bulk = mocker.patch("routes.course.create_enrollment_bulk", return_value={"failed_enrollments": []})
 
     with client.session_transaction() as sess:
         sess["user_id"] = "ta-uuid"
@@ -536,8 +599,14 @@ def test_create_enrollment_csv_non_instructor_forbidden(client, mocker):
         data={"file": mock_file, "course_id": "course-123"},
         content_type="multipart/form-data",
     )
-    assert response.status_code == 403
-    assert "Only instructors" in response.json["message"]
+
+    assert response.status_code == 200
+    mock_create_bulk.assert_called_once_with({
+        "course_id": "course-123",
+        "student_ids": ["uuid-1"],
+        "roles": {"uuid-1": "student"},
+    })
+    assert {"email": "student2@test.com", "reason": "Only instructors can assign a role other than student"} in response.json["failed_enrollments"]
 
 def test_create_enrollment_csv_per_row_roles(client, mocker):
     file_content = "Email,Role\nstudent1@test.com,ta\nstudent2@test.com,student"
@@ -763,6 +832,16 @@ def test_create_enrollment_bulk_with_failures(mocker):
     result = create_enrollment_bulk(data)
     failed_ids = {f["id"] for f in result["failed_enrollments"]}
     assert failed_ids == {"a", "b"}
+
+def test_create_enrollment_bulk_rejects_invalid_role(mocker):
+    data = {
+        "course_id": "course-1",
+        "student_ids": ["a"],
+        "role": "superadmin",
+    }
+
+    with pytest.raises(BadRequestError):
+        create_enrollment_bulk(data)
 
 def test_create_course_get_not_allowed(client):
     response = client.get("/create_course")

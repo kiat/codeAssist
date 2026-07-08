@@ -24,6 +24,11 @@ def _get_or_create_fallback_secret_key():
     co-located worker processes (e.g. gunicorn --workers N), since each
     process would sign cookies with a different key. Persisting it to a
     local file lets processes on the same host share one.
+
+    This only covers processes sharing one filesystem. It does not help
+    across multiple hosts, replicas, or containers with separate
+    filesystems and no shared volume; those deployments still need
+    SECRET_KEY set explicitly in the environment.
     """
     try:
         with open(_FALLBACK_SECRET_KEY_PATH, 'r') as f:
@@ -35,7 +40,7 @@ def _get_or_create_fallback_secret_key():
 
     new_key = secrets.token_hex(32)
     try:
-        fd = os.open(_FALLBACK_SECRET_KEY_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        fd = os.open(_FALLBACK_SECRET_KEY_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY, mode=0o600)
         with os.fdopen(fd, 'w') as f:
             f.write(new_key)
         return new_key

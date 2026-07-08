@@ -427,12 +427,16 @@ def create_enrollment():
     if not requester_id:
         raise ForbiddenError("Not authenticated")
 
-    if get_user_course_role(requester_id, data["course_id"]) != "instructor":
-        raise ForbiddenError("Only instructors can add users to a course")
+    caller_role = get_user_course_role(requester_id, data["course_id"])
+    if caller_role not in {"instructor", "ta"}:
+        raise ForbiddenError("Only instructors or TAs can add users to a course")
 
     role = data.get("role", "student").lower()
     if role not in {"student", "ta", "instructor"}:
         raise BadRequestError("Invalid role")
+
+    if caller_role != "instructor" and role != "student":
+        raise ForbiddenError("Only instructors can assign a role other than student")
 
     if db.session.query(Enrollment).filter_by(student_id=data["student_id"], course_id=data["course_id"]).first():
         raise ConflictError("User is already enrolled in this course")
@@ -514,11 +518,14 @@ def create_enrollment_bulk(data):
     failed_enrollments = []
 
     for student_id in students:
+        role = roles.get(student_id) or default_role
+        if role not in {"student", "ta", "instructor"}:
+            raise BadRequestError("Invalid role")
         try:
             enrollment = Enrollment(
                 student_id=student_id,
                 course_id=course_id,
-                role=roles.get(student_id) or default_role
+                role=role
             )
             db.session.add(enrollment)
             db.session.commit()
@@ -558,8 +565,9 @@ def create_enrollment_csv():
     if not requester_id:
         raise ForbiddenError("Not authenticated")
 
-    if get_user_course_role(requester_id, course_id) != "instructor":
-        raise ForbiddenError("Only instructors can add users to a course")
+    caller_role = get_user_course_role(requester_id, course_id)
+    if caller_role not in {"instructor", "ta"}:
+        raise ForbiddenError("Only instructors or TAs can add users to a course")
 
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
@@ -618,6 +626,9 @@ def create_enrollment_csv():
             row_role = row[role_col].strip().lower() or "student"
         if row_role not in valid_roles:
             pre_failed.append({"email": email, "reason": "Invalid role"})
+            continue
+        if caller_role != "instructor" and row_role != "student":
+            pre_failed.append({"email": email, "reason": "Only instructors can assign a role other than student"})
             continue
 
         uid = str(user.id)

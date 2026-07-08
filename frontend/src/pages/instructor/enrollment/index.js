@@ -284,6 +284,7 @@ export default () => {
         open={addModalOpen}
         toggleAddModalOpen={toggleAddModalOpen}
         onFinish={finishForm}
+        isTA={isTA}
       />
       <AddCSVModal 
         open={addCSVModalOpen} 
