@@ -12,17 +12,50 @@ ma = Marshmallow()
 db = SQLAlchemy()
 migrate = Migrate()
 
+_FALLBACK_SECRET_KEY_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.flask_secret_key'
+)
+
+
+def _get_or_create_fallback_secret_key():
+    """Reads a persisted fallback key, or creates one on first use.
+
+    A pure per-process random key breaks session validation across
+    co-located worker processes (e.g. gunicorn --workers N), since each
+    process would sign cookies with a different key. Persisting it to a
+    local file lets processes on the same host share one.
+    """
+    try:
+        with open(_FALLBACK_SECRET_KEY_PATH, 'r') as f:
+            key = f.read().strip()
+            if key:
+                return key
+    except FileNotFoundError:
+        pass
+
+    new_key = secrets.token_hex(32)
+    try:
+        fd = os.open(_FALLBACK_SECRET_KEY_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        with os.fdopen(fd, 'w') as f:
+            f.write(new_key)
+        return new_key
+    except FileExistsError:
+        # Another process won the race to create the file; use its value.
+        with open(_FALLBACK_SECRET_KEY_PATH, 'r') as f:
+            return f.read().strip()
+
+
 def create_app(config_class='config.Config'):
     # Create the Flask app instance
     app = Flask(__name__)
     app.secret_key = os.getenv('SECRET_KEY')
     if not app.secret_key:
-        app.secret_key = secrets.token_hex(32)
+        app.secret_key = _get_or_create_fallback_secret_key()
         app.logger.warning(
-            "SECRET_KEY environment variable not set; using a randomly "
-            "generated key for this process. Sessions will not persist "
-            "across restarts. Set SECRET_KEY in the environment for "
-            "production deployments."
+            "SECRET_KEY environment variable not set; using a fallback key "
+            "persisted to %s. Set SECRET_KEY in the environment for "
+            "production deployments.",
+            _FALLBACK_SECRET_KEY_PATH,
         )
 
     # Load environment variables

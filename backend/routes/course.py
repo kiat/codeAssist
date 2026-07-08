@@ -423,10 +423,19 @@ def create_enrollment():
     if not all(field in data for field in required_fields):
         raise BadRequestError("Missing required fields")
 
+    requester_id = session.get("user_id")
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    if get_user_course_role(requester_id, data["course_id"]) != "instructor":
+        raise ForbiddenError("Only instructors can add users to a course")
+
+    role = data.get("role", "student").lower()
+    if role not in {"student", "ta", "instructor"}:
+        raise BadRequestError("Invalid role")
+
     if db.session.query(Enrollment).filter_by(student_id=data["student_id"], course_id=data["course_id"]).first():
         raise ConflictError("User is already enrolled in this course")
-
-    role = data.get("role", "student")
 
     enrollment = Enrollment(
         student_id=data["student_id"],
@@ -470,6 +479,9 @@ def update_role():
     if not enrollment:
         raise NotFoundError("Enrollment not found")
 
+    if enrollment.role.lower() == "instructor" and new_role != "instructor":
+        raise ForbiddenError("Instructors cannot demote another instructor")
+
     try:
         enrollment.role = new_role
         db.session.commit()
@@ -490,7 +502,8 @@ def create_enrollment_bulk(data):
     course_id = data["course_id"]
     students = data["student_ids"]
     # default role to student if not present
-    role = data.get("role", "student")
+    default_role = data.get("role", "student")
+    roles = data.get("roles", {})
 
     if not course_id or not students:
         raise BadRequestError("Missing required fields")
@@ -505,7 +518,7 @@ def create_enrollment_bulk(data):
             enrollment = Enrollment(
                 student_id=student_id,
                 course_id=course_id,
-                role=role
+                role=roles.get(student_id) or default_role
             )
             db.session.add(enrollment)
             db.session.commit()
@@ -527,7 +540,7 @@ def allowed_file(filename):
 def create_enrollment_csv():
     if 'file' not in request.files:
         raise BadRequestError("Missing file part")
-    
+
     file = request.files['file']
 
     if file.filename == '':
@@ -536,23 +549,31 @@ def create_enrollment_csv():
     if not allowed_file(file.filename):
         raise BadRequestError("Invalid file type")
 
+    course_id = request.form.get("course_id")
+
+    if not course_id:
+        raise BadRequestError("Missing course_id")
+
+    requester_id = session.get("user_id")
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    if get_user_course_role(requester_id, course_id) != "instructor":
+        raise ForbiddenError("Only instructors can add users to a course")
+
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
 
     filename = secure_filename(file.filename)
     file_path = os.path.join(UPLOAD_FOLDER, filename)
-    
+
     try:
         file.save(file_path)
     except Exception:
         raise InternalProcessingError("Failed to save file")
 
     student_ids = []
-    course_id = request.form.get("course_id")
 
-    if not course_id:
-        raise BadRequestError("Missing course_id")
-    
     pre_failed = []
 
     try:
@@ -576,8 +597,10 @@ def create_enrollment_csv():
 
     email_col = header.index(matched[0])
     role_col = header.index("role") if "role" in header else None
+    valid_roles = {"student", "ta", "instructor"}
 
     id_to_email = {}
+    id_to_role = {}
 
     for row in rows[1:]:
         if not row or len(row) <= email_col:
@@ -589,13 +612,18 @@ def create_enrollment_csv():
         if not user:
             pre_failed.append({"email": email, "reason": "User not found"})
             continue
+
+        row_role = "student"
+        if role_col is not None and len(row) > role_col:
+            row_role = row[role_col].strip().lower() or "student"
+        if row_role not in valid_roles:
+            pre_failed.append({"email": email, "reason": "Invalid role"})
+            continue
+
         uid = str(user.id)
         id_to_email[uid] = email
+        id_to_role[uid] = row_role
         student_ids.append(uid)
-
-    role = "student"
-    if role_col and len(rows) > 1 and len(rows[1]) > role_col:
-        role = rows[1][role_col].strip().lower() or "student"
 
     if not student_ids:
         return jsonify({"failed_enrollments": pre_failed}), 200
@@ -603,7 +631,7 @@ def create_enrollment_csv():
     response = create_enrollment_bulk({
         "course_id": course_id,
         "student_ids": student_ids,
-        "role": role
+        "roles": id_to_role,
     })
 
     response["failed_enrollments"] = [
@@ -626,7 +654,7 @@ def get_my_enrollment_role():
     if role is None:
         raise ForbiddenError("Not authorized")
 
-    return jsonify({"role": role.lower()}), 200
+    return jsonify({"role": role}), 200
 
 
 @course.route("/get_user_enrollments", methods=["GET"])
