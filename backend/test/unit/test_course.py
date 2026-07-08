@@ -463,6 +463,17 @@ def test_get_my_enrollment_role_missing_course_id(client):
     assert response.status_code == 400
     assert "Missing course_id" in response.json["message"]
 
+def test_get_my_enrollment_role_not_enrolled(client, mocker):
+    mocker.patch("routes.course.get_user_course_role", return_value=None)
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "user-123"
+
+    response = client.get("/get_my_enrollment_role", query_string={"course_id": "course-123"})
+
+    assert response.status_code == 403
+    assert "Not authorized" in response.json["message"]
+
 from types import SimpleNamespace
 
 def test_get_course_enrollment_success(client, mocker):
@@ -1648,6 +1659,32 @@ def test_update_role_ta_forbidden(client, mocker):
     })
     assert response.status_code == 403
     assert "Only instructors" in response.json["message"]
+
+
+def test_update_role_invalid_role(client, mocker):
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+    response = client.post("/update_role", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "new_role": "superadmin",
+    })
+    assert response.status_code == 400
+    assert "Invalid role" in response.json["message"]
+
+
+def test_update_role_self_demotion_forbidden(client, mocker):
+    mocker.patch("routes.course.get_user_course_role", return_value="instructor")
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+    response = client.post("/update_role", json={
+        "student_id": "instructor-uuid",
+        "course_id": "course-123",
+        "new_role": "ta",
+    })
+    assert response.status_code == 403
+    assert "cannot change their own role" in response.json["message"]
 
 
 def test_update_ai_settings_unauthenticated(client):

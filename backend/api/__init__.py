@@ -1,4 +1,5 @@
 import os
+import secrets
 from flask import Flask
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import SQLAlchemy
@@ -14,7 +15,15 @@ migrate = Migrate()
 def create_app(config_class='config.Config'):
     # Create the Flask app instance
     app = Flask(__name__)
-    app.secret_key = os.getenv('SECRET_KEY', 'codeassist')
+    app.secret_key = os.getenv('SECRET_KEY')
+    if not app.secret_key:
+        app.secret_key = secrets.token_hex(32)
+        app.logger.warning(
+            "SECRET_KEY environment variable not set; using a randomly "
+            "generated key for this process. Sessions will not persist "
+            "across restarts. Set SECRET_KEY in the environment for "
+            "production deployments."
+        )
 
     # Load environment variables
     load_dotenv()

@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 
 from ai_feedback.settings import (
     serialize_assignment_ai_settings,
@@ -18,13 +18,10 @@ ai_feedback = Blueprint("ai_feedback", __name__)
 
 
 def _get_requester_id():
-    requester_id = request.args.get("requester_id")
-
-    if not requester_id and request.is_json:
-        requester_id = (request.json or {}).get("requester_id")
+    requester_id = session.get("user_id")
 
     if not requester_id:
-        raise ForbiddenError("Missing requester_id for AI settings authorization")
+        raise ForbiddenError("Not authenticated")
 
     return requester_id
 

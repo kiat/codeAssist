@@ -211,14 +211,16 @@ def test_rerun_submission_autograder_missing_id(client):
     assert response.get_json()["message"] == "Missing submission_id"
 
 
-def test_rerun_submission_autograder_requires_configured_autograder(client, mocker):
+def _mock_rerun_submission_and_assignment(mocker, student_id="student-uuid", autograder_image_name=""):
     existing_submission = mocker.Mock()
     existing_submission.id = "sub1"
     existing_submission.assignment_id = "assgn1"
+    existing_submission.student_id = student_id
 
     assignment = mocker.Mock()
     assignment.id = "assgn1"
-    assignment.autograder_image_name = ""
+    assignment.course_id = "course-uuid"
+    assignment.autograder_image_name = autograder_image_name
 
     def fake_get(model, item_id):
         if model.__name__ == "Submission":
@@ -228,6 +230,14 @@ def test_rerun_submission_autograder_requires_configured_autograder(client, mock
         return None
 
     mocker.patch("routes.submission.db.session.get", side_effect=fake_get)
+    return existing_submission, assignment
+
+
+def test_rerun_submission_autograder_requires_configured_autograder(client, mocker):
+    _mock_rerun_submission_and_assignment(mocker, student_id="student-uuid")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "student-uuid"
 
     response = client.post(
         "/rerun_submission_autograder",
@@ -236,6 +246,33 @@ def test_rerun_submission_autograder_requires_configured_autograder(client, mock
 
     assert response.status_code == 400
     assert "No autograder configured" in response.get_json()["message"]
+
+
+def test_rerun_submission_autograder_unauthenticated(client, mocker):
+    _mock_rerun_submission_and_assignment(mocker)
+
+    response = client.post(
+        "/rerun_submission_autograder",
+        json={"submission_id": "sub1"},
+    )
+
+    assert response.status_code == 403
+    assert "Not authenticated" in response.get_json()["message"]
+
+
+def test_rerun_submission_autograder_forbidden_other_student(client, mocker):
+    _mock_rerun_submission_and_assignment(mocker, student_id="owner-uuid")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "other-student-uuid"
+
+    response = client.post(
+        "/rerun_submission_autograder",
+        json={"submission_id": "sub1"},
+    )
+
+    assert response.status_code == 403
+    assert "Not authorized" in response.get_json()["message"]
 
 
 #  Tests for getting active submission

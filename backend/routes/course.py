@@ -18,6 +18,7 @@ from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSc
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
 from util.url_utils import validate_ollama_url
+from util.auth import get_user_course_role
 from ai_feedback.integration import (
     CORRECTNESS_SYSTEM_PROMPT,
     get_gemini_generation_config,
@@ -28,12 +29,6 @@ from openai import OpenAI
 course = Blueprint("course", __name__)
 
 ALLOWED_EXTENSIONS = {'csv'}
-
-def get_user_course_role(user_id, course_id):
-    enrollment = db.session.query(Enrollment).filter_by(
-        student_id=user_id, course_id=course_id
-    ).first()
-    return enrollment.role if enrollment else None
 UPLOAD_FOLDER = 'uploads'
 SUPPORTED_AI_PROVIDERS = {"openai", "gemini", "claude", "ollama"}
 
@@ -463,13 +458,20 @@ def update_role():
     if get_user_course_role(requester_id, data["course_id"]) != "instructor":
         raise ForbiddenError("Only instructors can change enrollment roles")
 
+    new_role = data["new_role"].lower()
+    if new_role not in {"student", "ta", "instructor"}:
+        raise BadRequestError("Invalid role")
+
+    if data["student_id"] == requester_id:
+        raise ForbiddenError("Instructors cannot change their own role")
+
     # Update the role in the database
     enrollment = db.session.query(Enrollment).filter_by(student_id=data["student_id"], course_id=data["course_id"]).first()
     if not enrollment:
         raise NotFoundError("Enrollment not found")
-    
+
     try:
-        enrollment.role = data["new_role"].lower()
+        enrollment.role = new_role
         db.session.commit()
         newEnrollment = EnrollmentSchema().dump(enrollment, many=False)
         return jsonify(newEnrollment), 200

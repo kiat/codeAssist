@@ -144,10 +144,10 @@ def test_get_assignment_ai_settings_returns_normalized_defaults(client, mocker):
     )
     mock_ai_feedback_route_queries(mocker, mock_assignment)
 
-    resp = client.get(
-        "/assignments/assignment-uuid/ai-settings",
-        query_string={"requester_id": "instructor-uuid"},
-    )
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
+    resp = client.get("/assignments/assignment-uuid/ai-settings")
 
     assert resp.status_code == 200
     assert resp.json["ai_feedback_enabled"] is True
@@ -170,10 +170,12 @@ def test_update_assignment_ai_settings_saves_prompts_and_allowed_inputs(client, 
     mock_ai_feedback_route_queries(mocker, mock_assignment)
     mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
         json={
-            "requester_id": "instructor-uuid",
             "feedback_prompts": [
                 {
                     "id": "debug_failed_tests",
@@ -213,10 +215,12 @@ def test_update_assignment_ai_settings_rejects_invalid_prompt(client, mocker):
     mock_ai_feedback_route_queries(mocker, mock_assignment)
     mock_rollback = mocker.patch("routes.ai_feedback.db.session.rollback")
 
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
         json={
-            "requester_id": "instructor-uuid",
             "feedback_prompts": [
                 {
                     "id": "invalid",
@@ -559,3 +563,20 @@ def test_delete_submissions_ta_forbidden(client, mocker):
     resp = client.delete("/delete_submissions?assignment_id=assign-id")
     assert resp.status_code == 403
     assert "Only instructors" in resp.json["message"]
+
+
+def test_delete_submissions_assignment_not_found(client, mocker):
+    """Regression test: previously the auth check was skipped entirely when
+    the assignment didn't exist, allowing submissions to be deleted with no
+    authorization check at all."""
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_delete = mocker.patch("routes.assignment.db.session.delete")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "student-uuid"
+
+    resp = client.delete("/delete_submissions?assignment_id=notfound-id")
+    assert resp.status_code == 404
+    assert "Assignment not found" in resp.json["message"]
+    mock_delete.assert_not_called()

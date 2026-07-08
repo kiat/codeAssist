@@ -10,12 +10,13 @@ import shutil
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from functools import reduce
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, session
 from flask_cors import CORS
 from api import db
 from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
-from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ServerTimeoutError, SubmissionTimeoutError
+from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
+from util.auth import get_user_course_role
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -504,6 +505,15 @@ def rerun_submission_autograder():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
+    requester_id = session.get("user_id")
+    if not requester_id:
+        raise ForbiddenError("Not authenticated")
+
+    is_owner = str(submission_to_rerun.student_id) == str(requester_id)
+    is_staff = get_user_course_role(requester_id, assignment.course_id) in {"instructor", "ta"}
+    if not (is_owner or is_staff):
+        raise ForbiddenError("Not authorized to rerun this submission")
+
     if (
         not assignment.autograder_image_name
         or not assignment.autograder_image_name.strip()
@@ -598,6 +608,14 @@ def rerun_submission_autograder():
             "Submitted program took too long to run",
             submission_to_rerun.id,
         )
+    except Exception:
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass
+        raise InternalProcessingError("Failed to rerun autograder")
 
     if exec_proc.returncode != 0:
         stderr = getattr(exec_proc, "stderr", b"") or getattr(exec_proc, "output", b"")

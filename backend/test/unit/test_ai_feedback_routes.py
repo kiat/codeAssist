@@ -31,6 +31,11 @@ def client(app):
     return app.test_client()
 
 
+def _login_as(client, user_id):
+    with client.session_transaction() as sess:
+        sess["user_id"] = user_id
+
+
 def _mock_ai_settings_queries(
     mocker,
     assignment=None,
@@ -80,11 +85,9 @@ def test_get_assignment_ai_settings_returns_usage_limits(client, mocker):
         ai_feedback_wait_seconds=300,
     )
     _mock_ai_settings_queries(mocker, assignment=mock_assignment)
+    _login_as(client, "instructor-uuid")
 
-    resp = client.get(
-        "/assignments/assignment-uuid/ai-settings",
-        query_string={"requester_id": "instructor-uuid"},
-    )
+    resp = client.get("/assignments/assignment-uuid/ai-settings")
 
     assert resp.status_code == 200
     assert set(resp.json.keys()) == EXPECTED_AI_SETTINGS_KEYS
@@ -105,18 +108,16 @@ def test_ta_can_get_assignment_ai_settings(client, mocker):
             role="ta",
         ),
     )
+    _login_as(client, "ta-uuid")
 
-    resp = client.get(
-        "/assignments/assignment-uuid/ai-settings",
-        query_string={"requester_id": "ta-uuid"},
-    )
+    resp = client.get("/assignments/assignment-uuid/ai-settings")
 
     assert resp.status_code == 200
     assert set(resp.json.keys()) == EXPECTED_AI_SETTINGS_KEYS
 
 
 @pytest.mark.parametrize("method", ["get", "put"])
-def test_assignment_ai_settings_requires_requester_id(client, mocker, method):
+def test_assignment_ai_settings_requires_authentication(client, mocker, method):
     _mock_ai_settings_queries(mocker)
 
     if method == "get":
@@ -125,7 +126,7 @@ def test_assignment_ai_settings_requires_requester_id(client, mocker, method):
         resp = client.put("/assignments/assignment-uuid/ai-settings", json={})
 
     assert resp.status_code == 403
-    assert "Missing requester_id" in resp.json["message"]
+    assert "Not authenticated" in resp.json["message"]
 
 
 @pytest.mark.parametrize(
@@ -149,10 +150,29 @@ def test_non_instructor_or_ta_cannot_get_assignment_ai_settings(
     enrollment,
 ):
     _mock_ai_settings_queries(mocker, enrollment=enrollment)
+    _login_as(client, requester_id)
+
+    resp = client.get("/assignments/assignment-uuid/ai-settings")
+
+    assert resp.status_code == 403
+    assert "Only instructors or TAs" in resp.json["message"]
+
+
+def test_spoofed_requester_id_is_ignored(client, mocker):
+    """A student cannot impersonate the instructor by passing requester_id."""
+    _mock_ai_settings_queries(
+        mocker,
+        enrollment=Enrollment(
+            student_id="student-uuid",
+            course_id="course-uuid",
+            role="student",
+        ),
+    )
+    _login_as(client, "student-uuid")
 
     resp = client.get(
         "/assignments/assignment-uuid/ai-settings",
-        query_string={"requester_id": requester_id},
+        query_string={"requester_id": "instructor-uuid"},
     )
 
     assert resp.status_code == 403
@@ -184,13 +204,11 @@ def test_non_instructor_or_ta_cannot_update_assignment_ai_settings(
         enrollment=enrollment,
     )
     mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
+    _login_as(client, requester_id)
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
-        json={
-            "requester_id": requester_id,
-            "ai_feedback_wait_seconds": 60,
-        },
+        json={"ai_feedback_wait_seconds": 60},
     )
 
     assert resp.status_code == 403
@@ -201,11 +219,11 @@ def test_non_instructor_or_ta_cannot_update_assignment_ai_settings(
 def test_update_assignment_ai_settings_saves_usage_limits(client, mocker):
     mock_assignment = _mock_ai_settings_queries(mocker)
     mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
+    _login_as(client, "instructor-uuid")
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
         json={
-            "requester_id": "instructor-uuid",
             "ai_feedback_max_requests": 0,
             "ai_feedback_wait_seconds": 60,
         },
@@ -224,11 +242,11 @@ def test_update_assignment_ai_settings_saves_assignment_api_key(client, mocker):
         return_value="encrypted-assignment-key",
     )
     mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
+    _login_as(client, "instructor-uuid")
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
         json={
-            "requester_id": "instructor-uuid",
             "use_course_ai_default": False,
             "ai_feedback_provider": "gemini",
             "ai_feedback_model": "gemini-1.5-flash",
@@ -283,7 +301,7 @@ def test_update_assignment_ai_settings_rejects_invalid_usage_limits(
 ):
     _mock_ai_settings_queries(mocker)
     mock_rollback = mocker.patch("routes.ai_feedback.db.session.rollback")
-    payload = {"requester_id": "instructor-uuid", **payload}
+    _login_as(client, "instructor-uuid")
 
     resp = client.put("/assignments/assignment-uuid/ai-settings", json=payload)
 

@@ -1,9 +1,10 @@
 import uuid
 from flask import Blueprint, request, jsonify, session
 from api import db
-from api.models import Assignment, AssignmentExtension, Enrollment, Submission, RegradeRequest, Course
+from api.models import Assignment, AssignmentExtension, Submission, RegradeRequest, Course
 from api.schemas import AssignmentSchema, CourseSchema, AssignmentExtensionSchema
 from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError, ForbiddenError
+from util.auth import get_user_course_role
 from ai_feedback.settings import (
     serialize_assignment_ai_settings,
     split_ai_settings_payload,
@@ -229,12 +230,9 @@ def delete_assignment():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
-    enrollment = db.session.query(Enrollment).filter_by(
-        student_id=requester_id, course_id=assignment.course_id
-    ).first()
-    if not enrollment or enrollment.role != "instructor":
+    if get_user_course_role(requester_id, assignment.course_id) != "instructor":
         raise ForbiddenError("Only instructors can delete assignments")
-   
+
     try:
         #delete regrade requests and submissions first
         submissions = db.session.query(Submission).filter(Submission.assignment_id == assignment_id).all()
@@ -266,12 +264,11 @@ def delete_submissions():
         raise ForbiddenError("Not authenticated")
 
     assignment_for_auth = db.session.query(Assignment).filter_by(id=assignment_id).first()
-    if assignment_for_auth:
-        enrollment = db.session.query(Enrollment).filter_by(
-            student_id=requester_id, course_id=assignment_for_auth.course_id
-        ).first()
-        if not enrollment or enrollment.role != "instructor":
-            raise ForbiddenError("Only instructors can delete all submissions")
+    if not assignment_for_auth:
+        raise NotFoundError("Assignment not found")
+
+    if get_user_course_role(requester_id, assignment_for_auth.course_id) != "instructor":
+        raise ForbiddenError("Only instructors can delete all submissions")
 
     # Fetch all submissions for this assignment
     related_submissions = db.session.query(Submission).filter_by(assignment_id=assignment_id).all()

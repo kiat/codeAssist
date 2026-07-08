@@ -49,7 +49,7 @@ const FEEDBACK_STYLES = [
 ];
 
 const PROVIDER_DEFAULT_MODELS = {
-  openai: "gpt-4o",
+  openai: "gpt-4o-mini",
   gemini: "gemini-1.5-flash",
   claude: "claude-3-5-sonnet-20241022",
   ollama: "llama3",
