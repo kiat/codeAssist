@@ -10,12 +10,11 @@ import shutil
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from functools import reduce
-from flask import Blueprint, request, jsonify, current_app
-from flask_cors import cross_origin
+from flask import Blueprint, request, jsonify, current_app, session
 from api import db
 from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
-from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ServerTimeoutError, SubmissionTimeoutError
+from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -37,6 +36,23 @@ def allowed_file(filename):
     return "." in filename and \
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
+def _verify_student_owner(student_id):
+    """Verify the authenticated session matches the requested student_id.
+    Checks session first (cheap, no DB), then verifies the user exists.
+    This avoids leaking which UUIDs exist via different error messages."""
+    if not student_id:
+        raise BadRequestError("Missing student_id")
+    session_user_id = session.get("user_id")
+    if not session_user_id:
+        raise ForbiddenError("Not authenticated. Please log in.")
+    if session_user_id != student_id:
+        raise ForbiddenError("You can only access your own data")
+    user = db.session.query(User).filter_by(id=student_id).first()
+    if not user:
+        raise NotFoundError("User not found")
+    return user
+
 @submission.route('/get_submissions', methods=["GET"])
 def get_submissions():
     '''
@@ -50,6 +66,9 @@ def get_submissions():
 
     if not student_id or not assignment_id:
         raise BadRequestError("Missing student_id or assignment_id")
+
+    _verify_student_owner(student_id)
+
     submissions = db.session.query(Submission).filter_by(
         student_id=student_id, 
         assignment_id=assignment_id
@@ -73,6 +92,8 @@ def upload_submission():
     student_id = request.form.get("student_id")
     if not assignment_id or not student_id or not file.filename:
         raise BadRequestError("Missing required fields")
+
+    _verify_student_owner(student_id)
 
     from api.models import AssignmentExtension
     from datetime import datetime, timezone
@@ -408,6 +429,9 @@ def get_latest_submission():
 
     if not student_id or not assignment_id:
         raise BadRequestError("Missing student_id or assignment_id")
+
+    _verify_student_owner(student_id)
+
     # Query for the latest submission based on the submitted time
     latest_submission = Submission.query.filter_by(
         student_id=student_id,
@@ -489,8 +513,12 @@ def get_submission_details():
 
 
 @submission.route('/rerun_submission_autograder', methods=["POST"])
-@cross_origin()
 def rerun_submission_autograder():
+    # Verify the requester is authenticated
+    session_user_id = session.get("user_id")
+    if not session_user_id:
+        raise ForbiddenError("Not authenticated. Please log in.")
+
     data = request.json or {}
     submission_id = data.get("submission_id")
 
@@ -678,7 +706,9 @@ def get_active_submission():
 
     if not assignment or not student:
       raise BadRequestError("not sufficient details")
-    
+
+    _verify_student_owner(student)
+
     submission = db.session.query(Submission).filter_by(assignment_id=assignment, student_id=student, active=True).first()
 
     if not submission:
@@ -705,6 +735,8 @@ def activate_submission():
 
     if not submission_id or not student_id or not assignment_id:
         raise BadRequestError("Missing submission_id, student_id, or assignment_id")
+
+    _verify_student_owner(student_id)
 
     try:
         # Deactivate the current active submission for the same assignment and student

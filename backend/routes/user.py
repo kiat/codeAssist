@@ -3,6 +3,7 @@ import requests
 import random
 import string
 from flask import Blueprint, request, jsonify, current_app, session
+from sqlalchemy.exc import IntegrityError
 from api import db
 from api.models import User, Course, AdminEmail
 from api.schemas import UserSchema, CourseSchema
@@ -298,6 +299,9 @@ def delete_user():
     try:
         db.session.delete(user)
         db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ConflictError("Cannot delete user: they have active courses or other linked records that prevent deletion")
     except Exception as e:
         db.session.rollback()
         raise InternalProcessingError("Error deleting user")
