@@ -91,13 +91,29 @@ def get_or_create_assignment_container(assignment):
 
     if container is None:
         print(f"[DEBUG] creating new container", flush=True)
-        container = get_docker_client().containers.run(
-            image=assignment.autograder_image_name,
-            name=container_name,
-            detach=True,
-            tty=True,
-            command="tail -f /dev/null"
-        )
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                container = get_docker_client().containers.run(
+                    image=assignment.autograder_image_name,
+                    name=container_name,
+                    detach=True,
+                    tty=True,
+                    command="tail -f /dev/null"
+                )
+                break
+            except docker.errors.APIError as e:
+                if e.status_code == 409:
+                    try:
+                        container = get_docker_client().containers.get(container_name)
+                        break
+                    except docker.errors.NotFound:
+                        print(f"[DEBUG] container vanished mid-race, retrying (attempt {attempt + 1})", flush=True)
+                        continue
+                else:
+                    raise
+        else:
+            raise InternalProcessingError("Failed to create or locate assignment container after retries")
     elif container.status != "running":
         print(f"[DEBUG] restarting stopped container", flush=True)
         container.start()
