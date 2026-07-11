@@ -35,6 +35,12 @@ import {
   normalizeAiFeedbackPrompts,
 } from "../../constants/aiFeedbackSettings";
 
+const dateTimePickerProps = {
+  format: "YYYY-MM-DD HH:mm",
+  showTime: { format: "HH:mm" },
+  style: { width: "100%" },
+};
+
 export default () => {
   const { assignmentId } = useParams();
   const [form] = Form.useForm();
@@ -370,7 +376,7 @@ export default () => {
                     { required: true, message: "Please select a release date" },
                   ]}
                 >
-                  <DatePicker showTime style={{ width: "100%" }} />
+                  <DatePicker {...dateTimePickerProps} />
                 </Form.Item>
                 <Form.Item name="allowLateSubmissions" valuePropName="checked">
                   <Checkbox onChange={(e) => setAllowLateSubmissions(e.target.checked)}>
@@ -385,11 +391,13 @@ export default () => {
                   name="dueDate"
                   rules={[{ required: true, message: "Please select a due date" }]}
                 >
-                  <DatePicker showTime style={{ width: "100%" }} />
+                  <DatePicker {...dateTimePickerProps} />
                 </Form.Item>
-                <Form.Item label='LATE DUE DATE (CST)' name='lateDueDate'>
-                  <DatePicker showTime style={{ width: "100%" }} disabled={!allowLateSubmissions} />
-                </Form.Item>
+                {allowLateSubmissions && (
+                  <Form.Item label='LATE DUE DATE (CST)' name='lateDueDate'>
+                    <DatePicker {...dateTimePickerProps} />
+                  </Form.Item>
+                )}
               </Col>
             </Row>
           </Form.Item>

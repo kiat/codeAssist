@@ -11,7 +11,7 @@ test: test-backend test-frontend  ## Run all tests
 
 test-backend:                     ## Backend unit / integration tests
 	@echo "Running backend tests..."
-	@cd ./backend && python3 -m pytest
+	@cd ./backend && python -m pytest
 	@echo "Backend tests passed."
 
 test-frontend:                    ## Front-end Jest tests

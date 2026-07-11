@@ -43,6 +43,11 @@ import {
   normalizeAiFeedbackPrompts,
 } from "../../../constants/aiFeedbackSettings";
 const { Sider, Content } = Layout;
+const dateTimePickerProps = {
+  format: "YYYY-MM-DD HH:mm",
+  showTime: { format: "HH:mm" },
+  style: { width: "100%" },
+};
 
 export default ({
   currentStep,
@@ -56,6 +61,7 @@ export default ({
   const useCourseAiDefault = Form.useWatch("use_course_ai_default", form);
   const allowFileUpload = Form.useWatch("allow_file_upload", form);
   const enableCodeEditor = Form.useWatch("enable_code_editor", form);
+  const allowLateSubmissions = Form.useWatch("allowLateSubmissions", form);
 
   const [configureAutograderNow, setConfigureAutograderNow] = useState(false);
   const [autograderFile, setAutograderFile] = useState(null);
@@ -187,7 +193,7 @@ export default ({
         published_date: toIso(values.releaseDate),
         published: releaseDate ? releaseDate <= now : false,
         due_date: toIso(values.dueDate),
-        late_due_date: toIso(values.lateDueDate),
+        late_due_date: values.allowLateSubmissions ? toIso(values.lateDueDate) : null,
         late_submission: !!values.allowLateSubmissions,
         enable_group: !!values.groupSubmission,
         group_size: values.limitGroupSize ? Number(values.limitGroupSize) : null,
@@ -430,7 +436,7 @@ export default ({
                               },
                             ]}
                           >
-                            <DatePicker showTime style={{ width: "100%" }} />
+                            <DatePicker {...dateTimePickerProps} />
                           </Form.Item>
                         </Col>
 
@@ -445,7 +451,7 @@ export default ({
                               },
                             ]}
                           >
-                            <DatePicker showTime style={{ width: "100%" }} />
+                            <DatePicker {...dateTimePickerProps} />
                           </Form.Item>
                         </Col>
 
@@ -458,28 +464,30 @@ export default ({
                           </Form.Item>
                         </Col>
 
-                        <Col span={24} md={12}>
-                          <Form.Item
-                            label="LATE DUE DATE (CDT)"
-                            dependencies={["dueDate"]}
-                            name="lateDueDate"
-                            rules={[
-                              ({ getFieldValue }) => ({
-                                validator(_, value) {
-                                  if (!value || getFieldValue("dueDate") < value) {
-                                    return Promise.resolve();
-                                  }
+                        {allowLateSubmissions && (
+                          <Col span={24} md={12}>
+                            <Form.Item
+                              label="LATE DUE DATE (CDT)"
+                              dependencies={["dueDate"]}
+                              name="lateDueDate"
+                              rules={[
+                                ({ getFieldValue }) => ({
+                                  validator(_, value) {
+                                    if (!value || getFieldValue("dueDate") < value) {
+                                      return Promise.resolve();
+                                    }
 
-                                  return Promise.reject(
-                                    new Error("Late due date must be after due date")
-                                  );
-                                },
-                              }),
-                            ]}
-                          >
-                            <DatePicker showTime style={{ width: "100%" }} />
-                          </Form.Item>
-                        </Col>
+                                    return Promise.reject(
+                                      new Error("Late due date must be after due date")
+                                    );
+                                  },
+                                }),
+                              ]}
+                            >
+                              <DatePicker {...dateTimePickerProps} />
+                            </Form.Item>
+                          </Col>
+                        )}
                       </Row>
                     </Form.Item>
 
