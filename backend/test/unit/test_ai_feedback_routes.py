@@ -31,11 +31,6 @@ def client(app):
     return app.test_client()
 
 
-def _login_as(client, user_id):
-    with client.session_transaction() as sess:
-        sess["user_id"] = user_id
-
-
 def _mock_ai_settings_queries(
     mocker,
     assignment=None,
@@ -76,7 +71,7 @@ def _mock_ai_settings_queries(
     return assignment
 
 
-def test_get_assignment_ai_settings_returns_usage_limits(client, mocker):
+def test_get_assignment_ai_settings_returns_usage_limits(client, mocker, login_as):
     mock_assignment = Assignment(
         id="assignment-uuid",
         name="AI Assignment",
@@ -85,7 +80,7 @@ def test_get_assignment_ai_settings_returns_usage_limits(client, mocker):
         ai_feedback_wait_seconds=300,
     )
     _mock_ai_settings_queries(mocker, assignment=mock_assignment)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.get("/assignments/assignment-uuid/ai-settings")
 
@@ -99,7 +94,7 @@ def test_get_assignment_ai_settings_returns_usage_limits(client, mocker):
     assert resp.json["ai_feedback_wait_seconds"] == 300
 
 
-def test_ta_can_get_assignment_ai_settings(client, mocker):
+def test_ta_can_get_assignment_ai_settings(client, mocker, login_as):
     _mock_ai_settings_queries(
         mocker,
         enrollment=Enrollment(
@@ -108,7 +103,7 @@ def test_ta_can_get_assignment_ai_settings(client, mocker):
             role="ta",
         ),
     )
-    _login_as(client, "ta-uuid")
+    login_as("ta-uuid")
 
     resp = client.get("/assignments/assignment-uuid/ai-settings")
 
@@ -148,9 +143,10 @@ def test_non_instructor_or_ta_cannot_get_assignment_ai_settings(
     mocker,
     requester_id,
     enrollment,
+    login_as,
 ):
     _mock_ai_settings_queries(mocker, enrollment=enrollment)
-    _login_as(client, requester_id)
+    login_as(requester_id)
 
     resp = client.get("/assignments/assignment-uuid/ai-settings")
 
@@ -158,7 +154,7 @@ def test_non_instructor_or_ta_cannot_get_assignment_ai_settings(
     assert "Only instructors or TAs" in resp.json["message"]
 
 
-def test_spoofed_requester_id_is_ignored(client, mocker):
+def test_spoofed_requester_id_is_ignored(client, mocker, login_as):
     """A student cannot impersonate the instructor by passing requester_id."""
     _mock_ai_settings_queries(
         mocker,
@@ -168,7 +164,7 @@ def test_spoofed_requester_id_is_ignored(client, mocker):
             role="student",
         ),
     )
-    _login_as(client, "student-uuid")
+    login_as("student-uuid")
 
     resp = client.get(
         "/assignments/assignment-uuid/ai-settings",
@@ -198,13 +194,14 @@ def test_non_instructor_or_ta_cannot_update_assignment_ai_settings(
     mocker,
     requester_id,
     enrollment,
+    login_as,
 ):
     _mock_ai_settings_queries(
         mocker,
         enrollment=enrollment,
     )
     mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
-    _login_as(client, requester_id)
+    login_as(requester_id)
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
@@ -216,10 +213,10 @@ def test_non_instructor_or_ta_cannot_update_assignment_ai_settings(
     mock_commit.assert_not_called()
 
 
-def test_update_assignment_ai_settings_saves_usage_limits(client, mocker):
+def test_update_assignment_ai_settings_saves_usage_limits(client, mocker, login_as):
     mock_assignment = _mock_ai_settings_queries(mocker)
     mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
@@ -235,14 +232,14 @@ def test_update_assignment_ai_settings_saves_usage_limits(client, mocker):
     mock_commit.assert_called_once()
 
 
-def test_update_assignment_ai_settings_saves_assignment_api_key(client, mocker):
+def test_update_assignment_ai_settings_saves_assignment_api_key(client, mocker, login_as):
     mock_assignment = _mock_ai_settings_queries(mocker)
     mock_encrypt = mocker.patch(
         "ai_feedback.settings.encrypt_api_key",
         return_value="encrypted-assignment-key",
     )
     mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.put(
         "/assignments/assignment-uuid/ai-settings",
@@ -298,10 +295,11 @@ def test_update_assignment_ai_settings_rejects_invalid_usage_limits(
     mocker,
     payload,
     message,
+    login_as,
 ):
     _mock_ai_settings_queries(mocker)
     mock_rollback = mocker.patch("routes.ai_feedback.db.session.rollback")
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.put("/assignments/assignment-uuid/ai-settings", json=payload)
 

@@ -1,15 +1,22 @@
-from flask import session
+from flask import g, session
 
 from api import db
-from api.models import Enrollment
-from util.errors import ForbiddenError, UnauthorizedError
+from api.models import Course, Enrollment
+from util.errors import ForbiddenError, NotFoundError, UnauthorizedError
 
 
 def get_user_course_role(user_id, course_id):
+    cache = g.setdefault("_course_role_cache", {})
+    cache_key = (user_id, course_id)
+    if cache_key in cache:
+        return cache[cache_key]
+
     enrollment = db.session.query(Enrollment).filter_by(
         student_id=user_id, course_id=course_id
     ).first()
-    return enrollment.role.lower() if enrollment else None
+    role = enrollment.role.lower() if enrollment else None
+    cache[cache_key] = role
+    return role
 
 
 def require_authenticated():

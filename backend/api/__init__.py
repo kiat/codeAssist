@@ -69,8 +69,21 @@ def create_app(config_class='config.Config'):
     # Load the configuration
     app.config.from_object(config_class)
 
+    if not app.config.get('SESSION_COOKIE_SECURE'):
+        app.logger.warning(
+            "SESSION_COOKIE_SECURE is not set to true; session cookies will be "
+            "sent over plain HTTP. Set SESSION_COOKIE_SECURE=true in the "
+            "environment for production and cross-domain deployments."
+        )
+
     # Initialize the extensions with the app
     # FRONTEND_URL may list multiple comma-separated origins
+    if not os.getenv('FRONTEND_URL'):
+        app.logger.warning(
+            "FRONTEND_URL environment variable not set; CORS is defaulting to "
+            "http://localhost:3000. Set FRONTEND_URL in the environment for "
+            "production deployments."
+        )
     frontend_origins = [
         origin.strip()
         for origin in os.getenv('FRONTEND_URL', 'http://localhost:3000').split(',')

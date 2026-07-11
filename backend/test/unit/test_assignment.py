@@ -17,11 +17,6 @@ def client(app):
     return app.test_client()
 
 
-def _login_as(client, user_id):
-    with client.session_transaction() as sess:
-        sess["user_id"] = user_id
-
-
 def _mock_course_role(mocker, role="instructor"):
     return mocker.patch("util.auth.get_user_course_role", return_value=role)
 
@@ -53,13 +48,13 @@ def mock_ai_feedback_route_queries(mocker, assignment):
 
 
 
-def test_update_assignment_success(client, mocker):
+def test_update_assignment_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter.return_value.first.return_value = None
     mock_query.return_value.filter_by.return_value.update.return_value = 1
     mock_commit = mocker.patch("routes.assignment.db.session.commit")
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.put("/update_assignment", json={
         "assignment_id": "some-uuid",
@@ -72,11 +67,11 @@ def test_update_assignment_success(client, mocker):
     mock_commit.assert_called_once()
 
 
-def test_update_assignment_duplicate_name(client, mocker):
+def test_update_assignment_duplicate_name(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter.return_value.first.return_value = mocker.Mock()
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.put("/update_assignment", json={
         "assignment_id": "some-uuid",
@@ -88,12 +83,12 @@ def test_update_assignment_duplicate_name(client, mocker):
     assert "already exists" in resp.json["message"]
 
 
-def test_update_assignment_not_found(client, mocker):
+def test_update_assignment_not_found(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter.return_value.first.return_value = None
     mock_query.return_value.filter_by.return_value.first.return_value = None
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.put("/update_assignment", json={
         "assignment_id": "notfound-uuid",
@@ -256,7 +251,7 @@ def test_update_assignment_ai_settings_rejects_invalid_prompt(client, mocker):
 # create_assignment
 # ---------------------------------------------------------------------------
 
-def test_create_assignment_success(client, mocker):
+def test_create_assignment_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.one_or_none.return_value = None
     mock_add = mocker.patch("routes.assignment.db.session.add")
@@ -265,7 +260,7 @@ def test_create_assignment_success(client, mocker):
     new_assignment = Assignment(id="123", name="New Assignment", course_id="course-uuid")
     mock_query.return_value.filter_by.return_value.first.return_value = new_assignment
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.post("/create_assignment", json={
         "name": "New Assignment",
@@ -283,11 +278,11 @@ def test_create_assignment_success(client, mocker):
 
 
 
-def test_create_assignment_duplicate(client, mocker):
+def test_create_assignment_duplicate(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.one_or_none.return_value = mocker.Mock()
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.post("/create_assignment", json={
         "name": "Duplicate",
@@ -299,7 +294,7 @@ def test_create_assignment_duplicate(client, mocker):
 
 
 
-def test_duplicate_assignment_success(client, mocker):
+def test_duplicate_assignment_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     old_assignment = Assignment(id="old-id", name="Old")
     mock_query.return_value.filter_by.return_value.one_or_none.side_effect = [
@@ -309,7 +304,7 @@ def test_duplicate_assignment_success(client, mocker):
     mock_add = mocker.patch("routes.assignment.db.session.add")
     mock_commit = mocker.patch("routes.assignment.db.session.commit")
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.post("/duplicate_assignment", json={
         "oldAssignmentId": "old-id",
@@ -323,11 +318,11 @@ def test_duplicate_assignment_success(client, mocker):
     mock_commit.assert_called_once()
 
 
-def test_duplicate_assignment_old_not_found(client, mocker):
+def test_duplicate_assignment_old_not_found(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.one_or_none.side_effect = [None, None]
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.post("/duplicate_assignment", json={
         "oldAssignmentId": "notfound-id",
@@ -339,7 +334,7 @@ def test_duplicate_assignment_old_not_found(client, mocker):
     assert "Old assignment not found" in resp.json["message"]
 
 
-def test_duplicate_assignment_name_conflict(client, mocker):
+def test_duplicate_assignment_name_conflict(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     old_assignment = Assignment(id="old-id", name="Old")
     mock_query.return_value.filter_by.return_value.one_or_none.side_effect = [
@@ -347,7 +342,7 @@ def test_duplicate_assignment_name_conflict(client, mocker):
         mocker.Mock()      # new name already in use
     ]
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.post("/duplicate_assignment", json={
         "oldAssignmentId": "old-id",
@@ -430,7 +425,7 @@ def test_delete_submissions(client, mocker):
 # assignment extensions
 # ---------------------------------------------------------------------------
 
-def test_create_extension_success(client, mocker):
+def test_create_extension_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         Assignment(id="assign-id", course_id="course-uuid"),  # auth lookup
@@ -440,7 +435,7 @@ def test_create_extension_success(client, mocker):
     mock_add = mocker.patch("routes.assignment.db.session.add")
     mock_commit = mocker.patch("routes.assignment.db.session.commit")
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.post("/create_extension", json={
         "assignment_id": "assign-id",
@@ -455,7 +450,7 @@ def test_create_extension_success(client, mocker):
     mock_commit.assert_called()
 
 
-def test_create_extension_existing(client, mocker):
+def test_create_extension_existing(client, mocker, login_as):
     with client.application.app_context():
         mock_query = mocker.patch("routes.assignment.db.session.query")
         mock_query.return_value.filter_by.return_value.first.side_effect = [
@@ -467,7 +462,7 @@ def test_create_extension_existing(client, mocker):
         mock_delete = mocker.patch("routes.assignment.db.session.delete")
         mock_commit = mocker.patch("routes.assignment.db.session.commit")
         _mock_course_role(mocker)
-        _login_as(client, "instructor-uuid")
+        login_as("instructor-uuid")
 
         resp = client.post("/create_extension", json={
             "assignment_id": "assign-id",
@@ -504,7 +499,7 @@ def test_get_assignment_extensions(client, mocker):
     assert len(resp.json) == 2
 
 
-def test_delete_extension_found(client, mocker):
+def test_delete_extension_found(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_ext = AssignmentExtension(id="ext-id", assignment_id="assign-id")
     mock_query.return_value.filter_by.return_value.first.side_effect = [
@@ -515,7 +510,7 @@ def test_delete_extension_found(client, mocker):
     mock_delete = mocker.patch("routes.assignment.db.session.delete")
     mock_commit = mocker.patch("routes.assignment.db.session.commit")
     _mock_course_role(mocker)
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.delete("/delete_extension?extension_id=ext-id")
     assert resp.status_code == 200
@@ -524,11 +519,11 @@ def test_delete_extension_found(client, mocker):
     mock_commit.assert_called()
 
 
-def test_delete_extension_not_found(client, mocker):
+def test_delete_extension_not_found(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None
     mock_query.return_value.filter_by.return_value.all.return_value = []
-    _login_as(client, "instructor-uuid")
+    login_as("instructor-uuid")
 
     resp = client.delete("/delete_extension?extension_id=notfound-id")
     assert resp.status_code == 404
@@ -634,9 +629,9 @@ def test_create_assignment_unauthenticated(client):
     assert "Not authenticated" in resp.json["message"]
 
 
-def test_create_assignment_student_forbidden(client, mocker):
+def test_create_assignment_student_forbidden(client, mocker, login_as):
     _mock_course_role(mocker, role="student")
-    _login_as(client, "student-uuid")
+    login_as("student-uuid")
 
     resp = client.post("/create_assignment", json={
         "name": "New Assignment",
@@ -647,7 +642,7 @@ def test_create_assignment_student_forbidden(client, mocker):
     assert "Only instructors or TAs" in resp.json["message"]
 
 
-def test_create_assignment_ta_allowed(client, mocker):
+def test_create_assignment_ta_allowed(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.one_or_none.return_value = None
     mocker.patch("routes.assignment.db.session.add")
@@ -656,7 +651,7 @@ def test_create_assignment_ta_allowed(client, mocker):
     new_assignment = Assignment(id="123", name="New Assignment", course_id="course-uuid")
     mock_query.return_value.filter_by.return_value.first.return_value = new_assignment
     _mock_course_role(mocker, role="ta")
-    _login_as(client, "ta-uuid")
+    login_as("ta-uuid")
 
     resp = client.post("/create_assignment", json={
         "name": "New Assignment",
@@ -677,9 +672,9 @@ def test_update_assignment_unauthenticated(client):
     assert "Not authenticated" in resp.json["message"]
 
 
-def test_update_assignment_student_forbidden(client, mocker):
+def test_update_assignment_student_forbidden(client, mocker, login_as):
     _mock_course_role(mocker, role="student")
-    _login_as(client, "student-uuid")
+    login_as("student-uuid")
 
     resp = client.put("/update_assignment", json={
         "assignment_id": "some-uuid",
@@ -691,9 +686,9 @@ def test_update_assignment_student_forbidden(client, mocker):
     assert "Only instructors or TAs" in resp.json["message"]
 
 
-def test_duplicate_assignment_student_forbidden(client, mocker):
+def test_duplicate_assignment_student_forbidden(client, mocker, login_as):
     _mock_course_role(mocker, role="student")
-    _login_as(client, "student-uuid")
+    login_as("student-uuid")
 
     resp = client.post("/duplicate_assignment", json={
         "oldAssignmentId": "old-id",
@@ -714,13 +709,13 @@ def test_create_extension_unauthenticated(client):
     assert "Not authenticated" in resp.json["message"]
 
 
-def test_create_extension_student_forbidden(client, mocker):
+def test_create_extension_student_forbidden(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = Assignment(
         id="assign-id", course_id="course-uuid"
     )
     _mock_course_role(mocker, role="student")
-    _login_as(client, "student-uuid")
+    login_as("student-uuid")
 
     resp = client.post("/create_extension", json={
         "assignment_id": "assign-id",
@@ -737,14 +732,14 @@ def test_delete_extension_unauthenticated(client):
     assert "Not authenticated" in resp.json["message"]
 
 
-def test_delete_extension_student_forbidden(client, mocker):
+def test_delete_extension_student_forbidden(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         AssignmentExtension(id="ext-id", assignment_id="assign-id"),
         Assignment(id="assign-id", course_id="course-uuid"),
     ]
     _mock_course_role(mocker, role="student")
-    _login_as(client, "student-uuid")
+    login_as("student-uuid")
 
     resp = client.delete("/delete_extension?extension_id=ext-id")
 
