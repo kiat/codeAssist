@@ -378,6 +378,7 @@ def upload_submission():
     db.session.add(new_submission)
     db.session.commit()
 
+    # Leave container running for future reuse
     os.chdir(current_dir)
 
     # Capture the app object and launch a background thread to get AI feedback asynchronously.
