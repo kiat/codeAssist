@@ -172,6 +172,10 @@ def upload_submission():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
+    # Enforce submission method restriction
+    if not assignment.allow_file_upload:
+        raise BadRequestError("File uploads are not allowed for this assignment.")
+
     # Retreive any extension for this student
     extension = db.session.query(AssignmentExtension).filter_by(
         assignment_id=assignment_id,
@@ -594,6 +598,187 @@ def get_submission_details():
     
     submission = SubmissionSchema().dump(submission_to_get)
     return jsonify(submission), 200
+
+
+@submission.route('/rerun_submission_autograder', methods=["POST"])
+@cross_origin()
+def rerun_submission_autograder():
+    data = request.json or {}
+    submission_id = data.get("submission_id")
+
+    if not submission_id:
+        raise BadRequestError("Missing submission_id")
+
+    submission_to_rerun = db.session.get(Submission, submission_id)
+    if not submission_to_rerun:
+        raise NotFoundError("No submission found")
+
+    assignment = db.session.get(Assignment, submission_to_rerun.assignment_id)
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    if (
+        not assignment.autograder_image_name
+        or not assignment.autograder_image_name.strip()
+    ):
+        raise BadRequestError("No autograder configured for this assignment")
+
+    student_code = submission_to_rerun.student_code_file
+    if isinstance(student_code, memoryview):
+        student_code = student_code.tobytes()
+    elif isinstance(student_code, str):
+        student_code = student_code.encode()
+
+    if not student_code:
+        raise BadRequestError("Submission file is not available for rerun")
+
+    filename = secure_filename(submission_to_rerun.file_name or "submission.py")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    assignment_dir = os.path.join(
+        current_dir,
+        'upload_autograder',
+        'runs',
+        str(assignment.id),
+    )
+    rerun_uuid = uuid.uuid4().hex[:8]
+    submissions_dir = os.path.join(assignment_dir, "submission", f"rerun_{rerun_uuid}")
+    results_dir = os.path.join(
+        assignment_dir,
+        str(submission_to_rerun.student_id),
+        'results',
+    )
+
+    os.makedirs(submissions_dir, exist_ok=True)
+    os.makedirs(results_dir, exist_ok=True)
+
+    file_path = os.path.join(submissions_dir, filename)
+    with open(file_path, "wb") as file:
+        file.write(student_code)
+
+    container = None
+    timeout = assignment.autograder_timeout or 300
+    temp_container_name = f"rerun_submission_{uuid.uuid4().hex[:8]}"
+
+    try:
+        container = get_docker_client().containers.run(
+            image=assignment.autograder_image_name,
+            name=temp_container_name,
+            detach=True,
+            tty=True,
+            command="tail -f /dev/null",
+        )
+
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            tar.add(file_path, arcname=filename)
+        tar_stream.seek(0)
+        container.put_archive("/autograder/submission/", tar_stream)
+
+        exec_proc = subprocess.run(
+            f"docker exec {temp_container_name} /bin/bash /autograder/source/run_autograder".split(),
+            capture_output=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        timeout_result = {
+            "tests": [
+                {
+                    "name": "Submission Timeout",
+                    "score": 0,
+                    "max_score": 0,
+                    "status": "failed",
+                    "output": "The submission did not complete within the time limit.",
+                }
+            ],
+            "leaderboard": [],
+            "visibility": "visible",
+            "execution_time": f"{timeout:.2f}",
+            "score": 0,
+        }
+        submission_to_rerun.results = json.dumps(timeout_result).encode()
+        submission_to_rerun.score = 0
+        submission_to_rerun.execution_time = float(timeout)
+        submission_to_rerun.completed = False
+        submission_to_rerun.ai_feedback = None
+        db.session.commit()
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass
+        raise SubmissionTimeoutError(
+            "Submitted program took too long to run",
+            submission_to_rerun.id,
+        )
+
+    if exec_proc.returncode != 0:
+        stderr = getattr(exec_proc, "stderr", b"") or getattr(exec_proc, "output", b"")
+        print(f"Error: Autograder rerun failed, details: {stderr.decode(errors='ignore')}")
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass
+        raise InternalProcessingError("Failed to rerun autograder")
+
+    cat_result = container.exec_run("cat /autograder/results/results.json")
+    if cat_result.exit_code != 0:
+        print(
+            "Error: Failed to retrieve rerun results.json, details: "
+            f"{cat_result.output.decode(errors='ignore')}"
+        )
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass
+        raise InternalProcessingError("Failed to retrieve autograder results")
+
+    results_json_content = cat_result.output.decode()
+    if container:
+        try:
+            container.stop()
+            container.remove()
+        except Exception:
+            pass
+
+    try:
+        parsed_results = json.loads(results_json_content)
+    except json.JSONDecodeError:
+        raise InternalProcessingError("Autograder returned invalid results JSON")
+
+    host_results_json_path = os.path.join(results_dir, f'results_{rerun_uuid}.json')
+    with open(host_results_json_path, 'w') as file:
+        file.write(results_json_content)
+
+    submission_to_rerun.results = results_json_content.encode()
+    submission_to_rerun.score = parsed_results.get("score")
+    try:
+        submission_to_rerun.execution_time = float(
+            parsed_results.get("execution_time", 0) or 0
+        )
+    except (TypeError, ValueError):
+        submission_to_rerun.execution_time = 0
+    submission_to_rerun.completed = True
+    submission_to_rerun.ai_feedback = None
+    db.session.commit()
+
+    if getattr(assignment, "ai_feedback_enabled", False):
+        app_obj = current_app._get_current_object()
+        threading.Thread(
+            target=async_get_ai_feedback,
+            args=(app_obj, submission_to_rerun.id, file_path, results_json_content),
+        ).start()
+
+    return jsonify({
+        "message": "Autograder rerun completed",
+        "results_path": host_results_json_path,
+        "submission": SubmissionSchema().dump(submission_to_rerun),
+    }), 200
+
 
 @submission.route('/get_active_submission', methods=["GET"])
 @cross_origin()

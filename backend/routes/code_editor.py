@@ -5,6 +5,7 @@ import subprocess
 import io
 import tarfile
 import threading
+import requests
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
@@ -12,9 +13,14 @@ from api import db
 from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course
 from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
-from openai import OpenAI
-from util.encryption_utils import decrypt_api_key
-from ai_feedback.integration import async_get_ai_feedback
+from util.url_utils import validate_ollama_url
+from ai_feedback.integration import (
+    async_get_ai_feedback,
+    get_provider_and_model,
+    get_provider_credentials,
+    get_temperature,
+    post_gemini_with_retry,
+)
 import docker
 
 code_editor = Blueprint('code_editor', __name__)
@@ -162,6 +168,10 @@ def submit_code():
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
         raise NotFoundError("Assignment not found")
+
+    # Enforce submission method restriction
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor submissions are not allowed for this assignment.")
 
     if not assignment.published:
         raise BadRequestError("Assignment is not published yet.")
@@ -410,6 +420,13 @@ def _save_final_draft(student_id, assignment_id, content, file_name):
 # Default Python image used when no autograder is configured
 _DEFAULT_PYTHON_IMAGE = "python:3.11-slim"
 
+AI_CHAT_SYSTEM_PROMPT = (
+    "You are an AI coding assistant for a programming course. "
+    "Help students understand their code, debug issues, and improve their solutions. "
+    "Do NOT provide the complete solution. Give hints, guiding questions, and explanations. "
+    "Keep responses concise and encouraging."
+)
+
 
 def _run_code_in_container(image, content, file_name, timeout):
     """
@@ -528,6 +545,112 @@ def _run_autograder_in_container(image, content, file_name, assignment_id, timeo
                 pass
 
 
+def _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperature):
+    if provider == "openai":
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": AI_CHAT_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            model=model,
+            max_tokens=500,
+            temperature=float(temperature),
+            timeout=30,
+        )
+        return response.choices[0].message.content.strip()
+
+    if provider == "gemini":
+        response = post_gemini_with_retry(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            params={"key": api_key},
+            payload={
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": f"{AI_CHAT_SYSTEM_PROMPT}\n\n{user_prompt}",
+                            }
+                        ],
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": float(temperature),
+                    "maxOutputTokens": 700,
+                },
+            },
+            timeout=30,
+        )
+
+        if response.status_code >= 400:
+            raise ValueError(f"Gemini API error: {response.text}")
+
+        data = response.json()
+        candidate = data.get("candidates", [{}])[0]
+        return "".join(
+            part.get("text", "")
+            for part in candidate.get("content", {}).get("parts", [])
+            if not part.get("thought")
+        ).strip()
+
+    if provider == "claude":
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": model,
+                "max_tokens": 500,
+                "temperature": float(temperature),
+                "system": AI_CHAT_SYSTEM_PROMPT,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    }
+                ],
+            },
+            timeout=30,
+        )
+
+        if response.status_code >= 400:
+            raise ValueError(f"Claude API error: {response.text}")
+
+        data = response.json()
+        content = data.get("content", [])
+        if content and content[0].get("type") == "text":
+            return content[0].get("text", "").strip()
+        return ""
+
+    if provider == "ollama":
+        validate_ollama_url(api_key)
+        response = requests.post(
+            f"{api_key}/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": AI_CHAT_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "options": {
+                    "temperature": float(temperature),
+                },
+                "stream": False,
+            },
+            timeout=60,
+        )
+
+        if response.status_code >= 400:
+            raise ValueError(f"Ollama API error: {response.text}")
+
+        return response.json().get("message", {}).get("content", "").strip()
+
+    raise ValueError(f"Unsupported AI provider: {provider}")
+
+
 @code_editor.route('/run_code', methods=["POST"])
 @cross_origin()
 def run_code():
@@ -556,6 +679,10 @@ def run_code():
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
         raise NotFoundError("Assignment not found")
+
+    # Enforce submission method restriction
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor submissions are not allowed for this assignment.")
 
     if not assignment.published:
         raise BadRequestError("Assignment is not published yet.")
@@ -676,7 +803,7 @@ def ai_chat():
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
 
-    # Fetch assignment and course for API key
+    # Fetch assignment and course for provider settings and credentials.
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
         raise NotFoundError("Assignment not found")
@@ -684,42 +811,25 @@ def ai_chat():
         raise BadRequestError("AI chat is not enabled for this assignment.")
 
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
-    if not course or not course.openai_api_key:
-        raise BadRequestError("AI is not configured for this course. Please ask your instructor to set up an API key.")
+    if not course:
+        raise BadRequestError("Course not found for this assignment.")
+
+    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
+    provider, model = get_provider_and_model(assignment, course)
+    temperature = get_temperature(assignment, course)
 
     try:
-        decrypted_api_key = decrypt_api_key(course.openai_api_key)
-        client = OpenAI(api_key=decrypted_api_key)
+        api_key, client = get_provider_credentials(provider, course, assignment)
+    except ValueError as e:
+        error_message = str(e)
+        if error_message.startswith("Missing "):
+            raise BadRequestError("AI is not configured for this course or assignment. Please ask your instructor to set up an API key.")
+        raise BadRequestError(error_message)
     except Exception:
         raise InternalProcessingError("Failed to initialize AI client")
 
-    VALID_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"}
-    model = assignment.ai_feedback_model if assignment and assignment.ai_feedback_model else "gpt-4-turbo"
-    if model not in VALID_MODELS:
-        model = "gpt-4-turbo"
-    temperature = assignment.ai_feedback_temperature if assignment and assignment.ai_feedback_temperature else 0.5
-
-    system_prompt = (
-        "You are an AI coding assistant for a programming course. "
-        "Help students understand their code, debug issues, and improve their solutions. "
-        "Do NOT provide the complete solution. Give hints, guiding questions, and explanations. "
-        "Keep responses concise and encouraging."
-    )
-
-    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
-
     try:
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            model=model,
-            max_tokens=500,
-            temperature=float(temperature),
-            timeout=30,
-        )
-        reply = response.choices[0].message.content.strip()
+        reply = _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperature)
     except Exception as e:
         error_msg = str(e)
         print(f"AI_CHAT error: {e}", flush=True)
@@ -729,6 +839,11 @@ def ai_chat():
             raise BadRequestError("Invalid API key. Please contact your instructor.")
         elif "does not exist" in error_msg or "model_not_found" in error_msg:
             raise BadRequestError(f"AI model '{model}' is not available. Please contact your instructor.")
+        raise BadRequestError(str(e))
+    except BadRequestError:
+        raise
+    except Exception as e:
+        print(f"AI_CHAT error: {e}", flush=True)
         raise InternalProcessingError(f"Failed to get AI response: {type(e).__name__}")
 
     return jsonify({"reply": reply}), 200

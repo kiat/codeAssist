@@ -120,11 +120,12 @@ export default function CodeEditorPage() {
 
       setAutoSaveStatus("saving");
       try {
+        const currentFileName = fileNameRef.current;
         const res = await saveCodeDraft({
           student_id: userInfo.id,
           assignment_id: assignmentId,
           content: code,
-          file_name: fileName,
+          file_name: currentFileName,
           auto_saved: isAuto,
         });
 
@@ -139,7 +140,7 @@ export default function CodeEditorPage() {
         setAutoSaveStatus("error");
       }
     },
-    [code, userInfo?.id, assignmentId, fileName]
+    [code, userInfo?.id, assignmentId]
   );
 
   // Ref to hold latest saveDraft for use in intervals/handlers
@@ -149,6 +150,8 @@ export default function CodeEditorPage() {
   // Auto-save: save every 30 seconds if code has changed
   const codeRef = useRef(code);
   codeRef.current = code;
+  const fileNameRef = useRef(fileName);
+  fileNameRef.current = fileName;
   const autoSaveStatusRef = useRef(autoSaveStatus);
   autoSaveStatusRef.current = autoSaveStatus;
 
@@ -319,6 +322,10 @@ export default function CodeEditorPage() {
             onOpenHistory={() => setHistoryOpen(true)}
             autoSaveStatus={autoSaveStatus}
             fileName={fileName}
+            onFileNameChange={(name) => {
+              setFileName(name);
+              saveDraftRef.current(false);
+            }}
             language="python"
             readOnly={submitting}
           />

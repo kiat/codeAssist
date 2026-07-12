@@ -1,8 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
-import Dashboard from '../../../../pages/dashboard';
-import { GlobalContext } from '../../../../App';
+
+jest.mock('../../../../App', () => {
+  const React = require('react');
+  return {
+    GlobalContext: React.createContext({}),
+  };
+});
 
 jest.mock('antd', () => {
   const real  = jest.requireActual('antd');
@@ -13,16 +18,21 @@ jest.mock('antd', () => {
 });
 
 jest.mock(
-  '../../../../pages/dashboard/semesterCourses',
+  '../../../../pages/dashboard/semesterCourses/index',
   () => {
     const React = require('react');
-    const mockSemesterCourses = jest.fn(({ courses, toggleModal }) => (
-      <div data-testid="semester-courses">
-        <button onClick={toggleModal}>Add course</button>
-        <pre data-testid="courses-prop">{JSON.stringify(courses)}</pre>
-      </div>
-    ));
-    return { __esModule: true, default: mockSemesterCourses };
+    const MockSemesterCourses = ({ courses, toggleModal }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'semester-courses' },
+        React.createElement('button', { onClick: toggleModal }, 'Add course'),
+        React.createElement(
+          'pre',
+          { 'data-testid': 'courses-prop' },
+          JSON.stringify(courses)
+        )
+      );
+    return { __esModule: true, default: MockSemesterCourses };
   }
 );
 
@@ -30,10 +40,11 @@ jest.mock(
   '../../../../pages/dashboard/courseModal',
   () => {
     const React = require('react');
-    const mockCourseModal = jest.fn(({ open, children }) =>
-      open ? <div data-testid="course-modal">{children}</div> : null
-    );
-    return { __esModule: true, default: mockCourseModal };
+    const MockCourseModal = ({ open, children }) =>
+      open
+        ? React.createElement('div', { 'data-testid': 'course-modal' }, children)
+        : null;
+    return { __esModule: true, default: MockCourseModal };
   }
 );
 
@@ -41,23 +52,25 @@ jest.mock(
   '../../../../pages/dashboard/addForm',
   () => {
     const React = require('react');
-    const mockAddForm = jest.fn(({ onFinish }) => (
-      <div data-testid="add-form">
-        <button
-          onClick={() =>
-            onFinish({
-              courseName: 'CS102',
-              year: '2025',
-              semester: 'Fall',
-              entryCode: 'NEWCODE',
-            })
-          }
-        >
-          Submit AddForm
-        </button>
-      </div>
-    ));
-    return { __esModule: true, default: mockAddForm };
+    const MockAddForm = ({ onFinish }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'add-form' },
+        React.createElement(
+          'button',
+          {
+            onClick: () =>
+              onFinish({
+                courseName: 'CS102',
+                year: '2025',
+                semester: 'Fall',
+                entryCode: 'NEWCODE',
+              }),
+          },
+          'Submit AddForm'
+        )
+      );
+    return { __esModule: true, default: MockAddForm };
   }
 );
 
@@ -81,8 +94,8 @@ const {
   createCourse,
 } = require('../../../../services/course');
 
-const { default: mockSemesterCourses }   =
-  require('../../../../pages/dashboard/semesterCourses');
+const Dashboard = require('../../../../pages/dashboard').default;
+const { GlobalContext } = require('../../../../App');
 
 beforeEach(() => {
   jest.clearAllMocks();
