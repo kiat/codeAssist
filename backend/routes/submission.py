@@ -43,56 +43,45 @@ def get_or_create_assignment_container(assignment):
     Returns a running container dedicated to this assignment, reusing
     assignment.container_id when possible instead of creating a new
     container per submission. Recreates the container if it was removed
-    or if the autograder image has since changed.
+    or if the autograder image has changed.
     '''
-    # Force a DB read to bypass any stale SQLAlchemy identity-map entry from
-    # earlier in the same request (e.g. the first query on line 148 vs 207).
     db.session.refresh(assignment)
-    print(f"[DEBUG] assignment.id={assignment.id} container_id={assignment.container_id}", flush=True)
 
     container_name = f"assignment_container_{assignment.id}"
     container = None
-
-    print(f"[DEBUG] container_id in DB: {assignment.container_id}", flush=True)
 
     if assignment.container_id:
         try:
             container = get_docker_client().containers.get(assignment.container_id)
         except docker.errors.NotFound:
-            # Stored ID is stale — fall back to lookup by name in case the
-            # container is still alive (e.g. was recreated and we missed the commit).
             try:
                 container = get_docker_client().containers.get(container_name)
-                print(f"[DEBUG] found container by name after ID miss", flush=True)
             except docker.errors.NotFound:
                 container = None
         except Exception as e:
             print(f"[DEBUG] unexpected error getting container: {e}", flush=True)
             container = None
 
+    # Check if image has changed since container creation. 
+    # Discard container if autograder image does not match anymore
     if container is not None:
         container.reload()
-        # Docker deduplicates identical image content: when two assignments share
-        # the same autograder zip, their images hash to the same object and Docker
-        # gives it multiple tags. tags[0] may return any of those tags, so checking
-        # only [0] produces false mismatches. Check whether the expected tag appears
-        # anywhere in the list instead.
-        def _canonical(name):
+        def _normalize_tag(name):
             if name and ':' not in name:
                 return name + ':latest'
             return name
-        expected = _canonical(assignment.autograder_image_name)
-        container_tags = {_canonical(t) for t in container.image.tags}
+        expected = _normalize_tag(assignment.autograder_image_name)
+        container_tags = {_normalize_tag(t) for t in container.image.tags}
         if expected not in container_tags:
-            print(f"[DEBUG] image changed (tags={container_tags!r} → expected {expected!r}), recreating container", flush=True)
             container.stop()
             container.remove(force=True)
             container = None
 
     if container is None:
-        print(f"[DEBUG] creating new container", flush=True)
+        # If multiple requests race to create this assignment's container,
+        # a loser hits a name conflict and fetches whichever one won.
         max_retries = 3
-        for attempt in range(max_retries):
+        for _ in range(max_retries):
             try:
                 container = get_docker_client().containers.run(
                     image=assignment.autograder_image_name,
@@ -108,17 +97,13 @@ def get_or_create_assignment_container(assignment):
                         container = get_docker_client().containers.get(container_name)
                         break
                     except docker.errors.NotFound:
-                        print(f"[DEBUG] container vanished mid-race, retrying (attempt {attempt + 1})", flush=True)
                         continue
                 else:
                     raise
         else:
             raise InternalProcessingError("Failed to create or locate assignment container after retries")
     elif container.status != "running":
-        print(f"[DEBUG] restarting stopped container", flush=True)
         container.start()
-    else:
-        print(f"[DEBUG] reusing existing running container", flush=True)
 
     if assignment.container_id != container.id:
         assignment.container_id = container.id
