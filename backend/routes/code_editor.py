@@ -890,7 +890,7 @@ def ai_chat():
     code = data.get("code", "")
     prompt_id = data.get("prompt_id")
 
-    _verify_student(student_id)
+    student = _verify_student(student_id)
 
     if not user_message:
         raise BadRequestError("Missing message")
@@ -898,7 +898,7 @@ def ai_chat():
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
 
-    # Fetch assignment and course for provider settings and credentials.
+    # Fetch assignment, course, and student for provider settings and credentials.
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
         raise NotFoundError("Assignment not found")
@@ -926,10 +926,40 @@ def ai_chat():
     if not course:
         raise BadRequestError("Course not found for this assignment.")
 
+    # student is already fetched by _verify_student above — reuse for coding_insights
+
+    # Load recent chat history so the LLM has memory of prior conversation.
+    chat_history = get_chat_history(student_id, assignment_id, limit=20)
+
+    # --- Build context sections ---
+    context_parts = []
+
+    # Assignment description gives the model grounding about what the task is.
+    assignment_desc = str(getattr(assignment, "description", "") or "").strip()
+    if assignment_desc:
+        context_parts.append(f"Assignment description:\n{assignment_desc}")
+
+    # Student's coding_insights summarises their historical patterns.
+    coding_insights = str(getattr(student, "coding_insights", "") or "").strip()
+    if coding_insights and coding_insights != "No history.":
+        context_parts.append(f"Student coding history:\n{coding_insights}")
+
+    # Prior conversation turns give the model memory across messages.
+    if chat_history:
+        history_lines = []
+        for msg in chat_history:
+            role = "Student" if msg["role"] == "user" else "Assistant"
+            history_lines.append(f"{role}: {msg['content']}")
+        context_parts.append("Previous conversation:\n" + "\n".join(history_lines))
+
+    context_block = "\n\n".join(context_parts)
+    if context_block:
+        context_block += "\n\n"
+
     # Build user prompt, incorporating the instructor's selected prompt as
     # additional context when one was chosen via prompt_id.
     prompt_context = f"\n\nInstructor guidance: {instructor_prompt_text}" if instructor_prompt_text else ""
-    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}{prompt_context}"
+    user_prompt = f"{context_block}Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}{prompt_context}"
     provider, model = get_provider_and_model(assignment, course)
     temperature = get_temperature(assignment, course)
 
