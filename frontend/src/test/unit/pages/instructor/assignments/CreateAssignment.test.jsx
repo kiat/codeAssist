@@ -37,13 +37,14 @@ jest.mock("react-router-dom", () => ({
   useParams: () => ({ courseId: "course-1" }),
 }));
 
-function CreateAssignmentHarness() {
+function CreateAssignmentHarness({ initialStep = 1 } = {}) {
   const [form] = Form.useForm();
+  const [step, setStep] = React.useState(initialStep);
 
   return (
     <CreateAssignment
-      currentStep={1}
-      updateCurrentStep={jest.fn()}
+      currentStep={step}
+      updateCurrentStep={setStep}
       toggleIsCreate={jest.fn()}
       nameValidationStatus=""
       form={form}
@@ -159,5 +160,25 @@ describe("CreateAssignment AI prompt defaults", () => {
         })
       );
     });
+  });
+
+  it("shows late due date only when late submissions are enabled", async () => {
+    const user = userEvent.setup();
+
+    render(<CreateAssignmentHarness initialStep={0} />);
+
+    await user.click(
+      await screen.findByText(/programming assignment/i)
+    );
+
+    expect(
+      screen.queryByLabelText(/late due date/i)
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/allow late submissions/i));
+
+    expect(
+      await screen.findByLabelText(/late due date/i)
+    ).toBeInTheDocument();
   });
 });
