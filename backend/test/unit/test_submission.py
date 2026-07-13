@@ -26,6 +26,7 @@ def client(app):
 def mock_verify_student_owner(mocker):
     """Auto-mock session-based auth in submission routes for unit tests."""
     mocker.patch("routes.submission._verify_student_owner")
+    mocker.patch("routes.submission._verify_course_staff")
 
 
 @pytest.fixture
@@ -196,17 +197,22 @@ def test_get_submission_details_missing_id(client):
 
 def test_get_submission_details_success(client, mocker):
     """Test /get_submission_details returns submission details when found."""
-    fake_submission = {"id": "sub1", "score": 100}
+    # Mock submission with student_id and assignment_id for _verify_student_owner
+    fake_submission = mocker.Mock()
+    fake_submission.id = "sub1"
+    fake_submission.student_id = "stu1"
+    fake_submission.assignment_id = "assgn1"
+    fake_submission.score = 100
+    fake_submission_dumped = {"id": "sub1", "score": 100}
     dummy_query = mocker.patch("routes.submission.db.session.query")
-    # Simulate the query returning an object that will be dumped as a list with one item.
     dummy_query.return_value.filter_by.return_value.first.return_value = fake_submission
 
     fake_schema = mocker.patch("routes.submission.SubmissionSchema")
-    fake_schema.return_value.dump.return_value = fake_submission
+    fake_schema.return_value.dump.return_value = fake_submission_dumped
 
     response = client.get("/get_submission_details?submission_id=sub1")
     assert response.status_code == 200
-    assert response.get_json() == fake_submission
+    assert response.get_json() == fake_submission_dumped
 
 
 def test_rerun_submission_autograder_missing_id(client):
@@ -318,7 +324,8 @@ def test_upload_assignment_autograder_missing_file(client):
 
 def test_delete_submission_success(client, mocker):
     """Test /delete_submission successfully deletes a submission."""
-    fake_submission = object()  # a dummy submission object
+    fake_submission = mocker.Mock()
+    fake_submission.assignment_id = "assgn1"
 
     # Patch the get method on the api.db.session instead of routes.submission.db.session.get
     fake_get = mocker.patch("api.db.session.get", return_value=fake_submission)
