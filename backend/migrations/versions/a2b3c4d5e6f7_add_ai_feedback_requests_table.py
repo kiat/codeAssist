@@ -1,7 +1,7 @@
 """Add ai_feedback_requests table for per-student usage tracking.
 
 Revision ID: a2b3c4d5e6f7
-Revises: 45b5cf6cc787
+Revises: 1bdb41066778
 Create Date: 2026-06-29 00:00:00.000000
 
 """

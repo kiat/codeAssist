@@ -6,7 +6,7 @@ are now automatically removed by the database, preventing orphaned
 rows.
 
 Revision ID: c4d5e6f7a8b9
-Revises: b2c3d4e5f6a7
+Revises: b3c4d5e6f7a8
 Create Date: 2026-06-18 00:00:00.000000
 
 """
