@@ -79,3 +79,43 @@ def test_require_course_role_returns_user_and_role_when_allowed(app, mocker):
 
     assert user_id == "user-123"
     assert role == "ta"
+
+
+def test_get_user_course_role_caches_within_a_request(app, mocker):
+    mock_query = mocker.patch("util.auth.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = Enrollment(
+        student_id="user-123", course_id="course-123", role="ta",
+    )
+
+    with app.test_request_context("/"):
+        first = get_user_course_role("user-123", "course-123")
+        second = get_user_course_role("user-123", "course-123")
+
+    assert first == second == "ta"
+    mock_query.assert_called_once()
+
+
+def test_get_user_course_role_cache_does_not_leak_across_requests(app, mocker):
+    # Uses app.app_context() rather than test_request_context(): the
+    # latter reuses whatever app context is already on the stack (here,
+    # the one the `app` fixture leaves pushed for the whole test), so it
+    # wouldn't actually give each block a fresh `g` the way two separate
+    # real HTTP requests would.
+    mock_query = mocker.patch("util.auth.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = Enrollment(
+        student_id="user-123", course_id="course-123", role="student",
+    )
+
+    with app.app_context():
+        first = get_user_course_role("user-123", "course-123")
+
+    mock_query.return_value.filter_by.return_value.first.return_value = Enrollment(
+        student_id="user-123", course_id="course-123", role="instructor",
+    )
+
+    with app.app_context():
+        second = get_user_course_role("user-123", "course-123")
+
+    assert first == "student"
+    assert second == "instructor"
+    assert mock_query.call_count == 2

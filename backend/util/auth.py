@@ -6,6 +6,7 @@ from util.errors import ForbiddenError, NotFoundError, UnauthorizedError
 
 
 def get_user_course_role(user_id, course_id):
+    """Returns the caller's role in course_id, or None for both "course doesn't exist" and "not enrolled" (kept indistinguishable so callers can't enumerate valid course IDs via the error)."""
     cache = g.setdefault("_course_role_cache", {})
     cache_key = (user_id, course_id)
     if cache_key in cache:
