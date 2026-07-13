@@ -926,7 +926,10 @@ def ai_chat():
     if not course:
         raise BadRequestError("Course not found for this assignment.")
 
-    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
+    # Build user prompt, incorporating the instructor's selected prompt as
+    # additional context when one was chosen via prompt_id.
+    prompt_context = f"\n\nInstructor guidance: {instructor_prompt_text}" if instructor_prompt_text else ""
+    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}{prompt_context}"
     provider, model = get_provider_and_model(assignment, course)
     temperature = get_temperature(assignment, course)
 
