@@ -15,7 +15,7 @@ def get_user_course_role(user_id, course_id):
     enrollment = db.session.query(Enrollment).filter_by(
         student_id=user_id, course_id=course_id
     ).first()
-    role = enrollment.role.lower() if enrollment else None
+    role = enrollment.role.lower() if enrollment and enrollment.role else None
     cache[cache_key] = role
     return role
 

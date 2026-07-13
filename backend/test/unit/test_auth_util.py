@@ -34,6 +34,17 @@ def test_get_user_course_role_returns_none_when_not_enrolled(app, mocker):
     assert role is None
 
 
+def test_get_user_course_role_returns_none_when_enrollment_role_is_none(app, mocker):
+    mock_query = mocker.patch("util.auth.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = Enrollment(
+        student_id="user-123", course_id="course-123", role=None,
+    )
+
+    role = get_user_course_role("user-123", "course-123")
+
+    assert role is None
+
+
 def test_require_authenticated_raises_401_without_session(app):
     with app.test_request_context("/"):
         with pytest.raises(UnauthorizedError):

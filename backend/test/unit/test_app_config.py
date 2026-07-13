@@ -12,20 +12,23 @@ def test_get_or_create_fallback_secret_key_creates_key_with_owner_only_permissio
     key_path = tmp_path / ".flask_secret_key"
     monkeypatch.setattr(api_module, "_FALLBACK_SECRET_KEY_PATH", str(key_path))
 
-    key = api_module._get_or_create_fallback_secret_key()
+    key, created_new = api_module._get_or_create_fallback_secret_key()
 
     assert key_path.read_text().strip() == key
     assert stat.S_IMODE(key_path.stat().st_mode) == 0o600
+    assert created_new is True
 
 
 def test_get_or_create_fallback_secret_key_reuses_persisted_key(tmp_path, monkeypatch):
     key_path = tmp_path / ".flask_secret_key"
     monkeypatch.setattr(api_module, "_FALLBACK_SECRET_KEY_PATH", str(key_path))
 
-    first = api_module._get_or_create_fallback_secret_key()
-    second = api_module._get_or_create_fallback_secret_key()
+    first, first_created_new = api_module._get_or_create_fallback_secret_key()
+    second, second_created_new = api_module._get_or_create_fallback_secret_key()
 
     assert first == second
+    assert first_created_new is True
+    assert second_created_new is False
 
 
 def test_get_or_create_fallback_secret_key_handles_concurrent_creation_race(tmp_path, monkeypatch):
@@ -45,9 +48,35 @@ def test_get_or_create_fallback_secret_key_handles_concurrent_creation_race(tmp_
 
     monkeypatch.setattr(os, "open", _open_wins_race)
 
-    key = api_module._get_or_create_fallback_secret_key()
+    key, created_new = api_module._get_or_create_fallback_secret_key()
 
     assert key == "winner-key"
+    assert created_new is False
+
+
+def test_create_app_logs_critical_when_fallback_key_is_freshly_generated(tmp_path, monkeypatch, caplog):
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    monkeypatch.setattr(api_module, "_FALLBACK_SECRET_KEY_PATH", str(tmp_path / ".flask_secret_key"))
+
+    with caplog.at_level("WARNING"):
+        api_module.create_app(config_class="config.TestConfig")
+
+    critical_records = [r for r in caplog.records if r.levelname == "CRITICAL"]
+    assert len(critical_records) == 1
+    assert "generated a new one" in critical_records[0].message
+
+
+def test_create_app_logs_warning_when_fallback_key_is_reused(tmp_path, monkeypatch, caplog):
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    monkeypatch.setattr(api_module, "_FALLBACK_SECRET_KEY_PATH", str(tmp_path / ".flask_secret_key"))
+    # First call creates the key on disk; the run under test should reuse it.
+    api_module._get_or_create_fallback_secret_key()
+
+    with caplog.at_level("WARNING"):
+        api_module.create_app(config_class="config.TestConfig")
+
+    assert not [r for r in caplog.records if r.levelname == "CRITICAL"]
+    assert any("reusing the fallback" in r.message for r in caplog.records if r.levelname == "WARNING")
 
 
 @pytest.fixture
