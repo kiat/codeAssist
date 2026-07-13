@@ -30,6 +30,27 @@ def client(app):
     return app.test_client()
 
 
+@pytest.fixture
+def admin_session(client, app):
+    """Create an admin user and log them in for admin-only endpoints."""
+    admin_id = str(uuid.uuid4())
+    with app.app_context():
+        admin = User(
+            id=admin_id,
+            name="Admin",
+            email_address="admin@test.com",
+            password="hashedpw",
+            sis_user_id="ADMIN-EID",
+            role="admin",
+            coding_insights="No history.",
+        )
+        db.session.add(admin)
+        db.session.commit()
+    with client.session_transaction() as sess:
+        sess["user_id"] = admin_id
+    return admin_id
+
+
 def _create_user(client, name, email, eid, role="student"):
     """Helper to create a user via the API and return the user_id."""
     resp = client.post("/create_user", json={
@@ -103,7 +124,7 @@ def _create_submission_via_api(client, assignment_id, student_id):
 # Tests
 # ----------------------------------------------------------------
 
-def test_delete_student_cascades_enrollment_and_submissions(client):
+def test_delete_student_cascades_enrollment_and_submissions(client, admin_session):
     """Deleting a student should cascade-delete their enrollments and submissions."""
     student_id = _create_user(client, "Alice", "alice@example.com", "EID-ALICE")
     instructor_id = _create_user(client, "Prof", "prof@example.com", "EID-PROF", "instructor")
@@ -135,7 +156,7 @@ def test_delete_student_cascades_enrollment_and_submissions(client):
     assert db.session.query(User).filter_by(id=instructor_id).first() is not None
 
 
-def test_delete_instructor_with_active_courses_is_rejected(client):
+def test_delete_instructor_with_active_courses_is_rejected(client, admin_session):
     """Deleting an instructor who owns courses must be blocked by RESTRICT."""
     instructor_id = _create_user(client, "Prof", "prof@example.com", "EID-PROF", "instructor")
     course_id = _create_course(client, instructor_id)
@@ -156,7 +177,7 @@ def test_delete_instructor_with_active_courses_is_rejected(client):
     assert db.session.query(Course).filter_by(id=course_id).first() is not None
 
 
-def test_delete_student_does_not_affect_other_students(client):
+def test_delete_student_does_not_affect_other_students(client, admin_session):
     """Deleting one student should not affect other students' data."""
     student_a = _create_user(client, "Alice", "alice@example.com", "EID-A")
     student_b = _create_user(client, "Bob", "bob@example.com", "EID-B")
