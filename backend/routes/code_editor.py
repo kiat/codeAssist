@@ -38,6 +38,9 @@ code_editor = Blueprint('code_editor', __name__)
 _docker_client = None
 
 # --- Rate limiting for run_code (per-user) ---
+# NOTE: This is an in-process rate limiter. If the app runs behind multiple
+# workers (e.g. gunicorn with >1 worker), each worker has its own counter.
+# For production multi-worker deployments, consider Redis-backed rate limiting.
 _run_code_timestamps = {}  # {student_id: [timestamps]}
 _run_code_rate_lock = threading.Lock()
 _RUN_CODE_RATE_LIMIT = 10  # max requests per user

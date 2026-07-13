@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 
 from ai_feedback.settings import (
     get_enabled_feedback_prompt,
@@ -7,7 +7,7 @@ from ai_feedback.settings import (
     update_assignment_ai_settings,
 )
 from api import db
-from api.models import Assignment, Course, Enrollment
+from api.models import Assignment, Course, Enrollment, User
 from util.errors import (
     BadRequestError,
     ForbiddenError,
@@ -79,6 +79,13 @@ def get_assignment_prompts(assignment_id):
     student_id = request.args.get("student_id")
     if not student_id:
         raise BadRequestError("Missing student_id")
+
+    # Security: Verify session user matches the requested student_id
+    session_user_id = session.get("user_id")
+    if not session_user_id:
+        raise ForbiddenError("Not authenticated. Please log in.")
+    if session_user_id != student_id:
+        raise ForbiddenError("You can only access your own data")
 
     # Verify student is enrolled
     enrollment = (
