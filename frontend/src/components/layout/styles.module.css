@@ -1,0 +1,32 @@
+.iconText {
+  margin-left: 10px;
+}
+
+.linkText {
+  color: #262626;
+}
+
+.backIconText {
+  color: #262626;
+  font-weight: normal;
+}
+
+/* Transition for text */
+.leaveCourse {
+  transition: color 0.2s ease;
+}
+
+/* Transition for icon */
+.leaveCourseIcon {
+  transition: color 0.2s ease;
+}
+
+/* Hover: text + icon both red */
+.leaveCourseContainer:hover .leaveCourse,
+.leaveCourseContainer:hover .leaveCourseIcon {
+  color: red;
+}
+
+.leaveCourseContainer {
+  transition: color 0.2s ease;
+}
