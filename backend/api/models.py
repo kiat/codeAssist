@@ -12,8 +12,11 @@ class User(db.Model):
     sis_user_id = db.Column(db.String, nullable=False, unique=True)
     role = db.Column(db.String, nullable = False)
 
-    # -- AI Integration -- 
+    # -- AI Integration --
     coding_insights = db.Column(db.String, default="No history.")
+
+    reset_token = db.Column(db.String, nullable=True)
+    reset_token_expiry = db.Column(TIMESTAMP(timezone=True), nullable=True)
 
 class Course(db.Model):
     __tablename__ = "courses"
@@ -26,6 +29,7 @@ class Course(db.Model):
     entryCode = db.Column(db.String, nullable=False, unique=True)
     allowEntryCode = db.Column(db.Boolean, default=False)
     description = db.Column(db.String, default="")
+    active = db.Column(db.Boolean, default=True, nullable=False)
 
     # -- AI Integration Settings -- 
     default_ai_provider = db.Column(db.String, default="openai")

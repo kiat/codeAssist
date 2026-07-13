@@ -1,7 +1,13 @@
 import uuid
+import os
+import secrets
+import smtplib
 import requests
 import random
 import string
+from datetime import datetime, timedelta, timezone
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
 from api import db
@@ -9,6 +15,34 @@ from api.models import User, Course, AdminEmail
 from api.schemas import UserSchema, CourseSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError
 from util.encryption_utils import hash_password, verify_password, needs_rehash, is_hashed
+
+
+def _send_reset_email(to_email, reset_link):
+    email_address = os.getenv('EMAIL_ADDRESS', '')
+    email_password = os.getenv('EMAIL_PASSWORD', '')
+
+    if not email_address or not email_password:
+        print(f"[DEV] Password reset link for {to_email}: {reset_link}", flush=True)
+        return
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = 'Password Reset Request'
+    msg['From'] = email_address
+    msg['To'] = to_email
+
+    text = f"Click the link below to reset your password (expires in 1 hour):\n\n{reset_link}"
+    html = f"""
+    <p>You requested a password reset for your codeAssist account.</p>
+    <p><a href="{reset_link}">Reset your password</a></p>
+    <p>This link expires in 1 hour. If you did not request a reset, ignore this email.</p>
+    """
+    msg.attach(MIMEText(text, 'plain'))
+    msg.attach(MIMEText(html, 'html'))
+
+    with smtplib.SMTP('smtp.gmail.com', 587) as server:
+        server.starttls()
+        server.login(email_address, email_password)
+        server.sendmail(email_address, to_email, msg.as_string())
 
 
 user = Blueprint('user', __name__)
@@ -437,7 +471,7 @@ def get_user_by_eid():
     eid = request.args.get("eid")
     if not eid:
         raise BadRequestError("Missing EID")
-    
+
     print(f"Received EID: '{eid}'")
 
     # Log all EIDs in the database for comparison
@@ -449,3 +483,72 @@ def get_user_by_eid():
         raise NotFoundError("User with this EID not found")
 
     return jsonify(UserSchema().dump(user)), 200
+
+
+@user.route('/forgot_password', methods=["POST"])
+@cross_origin()
+def forgot_password():
+    email = request.json.get('email')
+    if not email:
+        raise BadRequestError("Missing email")
+
+    db_user = db.session.query(User).filter_by(email_address=email).first()
+    # Always return the same message to prevent email enumeration
+    if not db_user:
+        return jsonify({"message": "If an account with that email exists, a reset link has been sent"}), 200
+
+    token = secrets.token_urlsafe(32)
+    expiry = datetime.now(timezone.utc) + timedelta(hours=1)
+    db_user.reset_token = token
+    db_user.reset_token_expiry = expiry
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise InternalProcessingError("Error generating reset token")
+
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    reset_link = f"{frontend_url}/reset-password?token={token}"
+
+    try:
+        _send_reset_email(email, reset_link)
+    except Exception as e:
+        current_app.logger.error("Failed to send reset email: %s", e)
+
+    return jsonify({"message": "If an account with that email exists, a reset link has been sent"}), 200
+
+
+@user.route('/reset_password', methods=["POST"])
+@cross_origin()
+def reset_password():
+    token = request.json.get('token')
+    new_password = request.json.get('password')
+
+    if not token or not new_password:
+        raise BadRequestError("Missing token or password")
+
+    if len(new_password) < 6:
+        raise BadRequestError("Password must be at least 6 characters")
+
+    db_user = db.session.query(User).filter_by(reset_token=token).first()
+    if not db_user:
+        raise BadRequestError("Invalid or expired reset token")
+
+    if db_user.reset_token_expiry < datetime.now(timezone.utc):
+        db_user.reset_token = None
+        db_user.reset_token_expiry = None
+        db.session.commit()
+        raise BadRequestError("Reset token has expired")
+
+    db_user.password = hash_password(new_password)
+    db_user.reset_token = None
+    db_user.reset_token_expiry = None
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise InternalProcessingError("Error resetting password")
+
+    return jsonify({"message": "Password reset successfully"}), 200

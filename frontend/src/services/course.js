@@ -52,6 +52,9 @@ export async function updateRole(params) {
   return service("update_role", params, "post");
 }
 
+export async function setCourseActive(params) {
+  return service("set_course_active", params, "put");
+}
 export async function storeApiKey(params) {
   return service("store_api_key", params, "put");
 }
