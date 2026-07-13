@@ -38,16 +38,12 @@ import { createAssignment, updateAssignment } from "../../../services/assignment
 import { getCourseInfo, fetchAiModels } from "../../../services/course";
 import { DEFAULT_AI_FEEDBACK_PROMPT } from "../../../constants/aiFeedback";
 import AIFeedbackSettingsSection from "../../../components/AIFeedbackSettingsSection";
+import { ASSIGNMENT_DATE_TIME_PICKER_PROPS } from "../../../constants/dateTimePicker";
 import {
   normalizeAiAllowedInputs,
   normalizeAiFeedbackPrompts,
 } from "../../../constants/aiFeedbackSettings";
 const { Sider, Content } = Layout;
-const dateTimePickerProps = {
-  format: "YYYY-MM-DD HH:mm",
-  showTime: { format: "HH:mm" },
-  style: { width: "100%" },
-};
 
 export default ({
   currentStep,
@@ -436,7 +432,7 @@ export default ({
                               },
                             ]}
                           >
-                            <DatePicker {...dateTimePickerProps} />
+                            <DatePicker {...ASSIGNMENT_DATE_TIME_PICKER_PROPS} />
                           </Form.Item>
                         </Col>
 
@@ -451,7 +447,7 @@ export default ({
                               },
                             ]}
                           >
-                            <DatePicker {...dateTimePickerProps} />
+                            <DatePicker {...ASSIGNMENT_DATE_TIME_PICKER_PROPS} />
                           </Form.Item>
                         </Col>
 
@@ -484,7 +480,7 @@ export default ({
                                 }),
                               ]}
                             >
-                              <DatePicker {...dateTimePickerProps} />
+                              <DatePicker {...ASSIGNMENT_DATE_TIME_PICKER_PROPS} />
                             </Form.Item>
                           </Col>
                         )}

@@ -30,16 +30,11 @@ import {
 import { getCourseInfo, fetchAiModels } from "../../services/course";
 import moment from "moment";
 import AIFeedbackSettingsSection from "../../components/AIFeedbackSettingsSection";
+import { ASSIGNMENT_DATE_TIME_PICKER_PROPS } from "../../constants/dateTimePicker";
 import {
   normalizeAiAllowedInputs,
   normalizeAiFeedbackPrompts,
 } from "../../constants/aiFeedbackSettings";
-
-const dateTimePickerProps = {
-  format: "YYYY-MM-DD HH:mm",
-  showTime: { format: "HH:mm" },
-  style: { width: "100%" },
-};
 
 export default () => {
   const { assignmentId } = useParams();
@@ -376,7 +371,7 @@ export default () => {
                     { required: true, message: "Please select a release date" },
                   ]}
                 >
-                  <DatePicker {...dateTimePickerProps} />
+                  <DatePicker {...ASSIGNMENT_DATE_TIME_PICKER_PROPS} />
                 </Form.Item>
                 <Form.Item name="allowLateSubmissions" valuePropName="checked">
                   <Checkbox onChange={(e) => setAllowLateSubmissions(e.target.checked)}>
@@ -391,11 +386,11 @@ export default () => {
                   name="dueDate"
                   rules={[{ required: true, message: "Please select a due date" }]}
                 >
-                  <DatePicker {...dateTimePickerProps} />
+                  <DatePicker {...ASSIGNMENT_DATE_TIME_PICKER_PROPS} />
                 </Form.Item>
                 {allowLateSubmissions && (
                   <Form.Item label='LATE DUE DATE (CST)' name='lateDueDate'>
-                    <DatePicker {...dateTimePickerProps} />
+                    <DatePicker {...ASSIGNMENT_DATE_TIME_PICKER_PROPS} />
                   </Form.Item>
                 )}
               </Col>
