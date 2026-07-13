@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 from functools import reduce
 from flask import Blueprint, request, jsonify, current_app, session
 from api import db
-from api.models import Assignment, Submission, User, Enrollment, TestCaseResult, TestCase
+from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from datetime import datetime, timezone
@@ -37,21 +37,61 @@ def allowed_file(filename):
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _verify_student_owner(student_id):
-    """Verify the authenticated session matches the requested student_id.
-    Checks session first (cheap, no DB), then verifies the user exists.
-    This avoids leaking which UUIDs exist via different error messages."""
+def _verify_student_owner(student_id, assignment_id=None):
+    """Verify the authenticated session matches the requested student_id,
+    OR the requester is course staff (instructor/TA) for the assignment's course.
+    
+    This allows:
+    - Students to access their own submissions
+    - Instructors and TAs to access student submissions for grading/regrade requests
+    
+    If assignment_id is provided, checks course staff permissions.
+    Otherwise, only allows the student themselves.
+    """
     if not student_id:
         raise BadRequestError("Missing student_id")
     session_user_id = session.get("user_id")
     if not session_user_id:
         raise ForbiddenError("Not authenticated. Please log in.")
-    if session_user_id != student_id:
-        raise ForbiddenError("You can only access your own data")
-    user = db.session.query(User).filter_by(id=student_id).first()
-    if not user:
-        raise NotFoundError("User not found")
-    return user
+    
+    # If the user is the student themselves, allow access
+    if session_user_id == student_id:
+        user = db.session.query(User).filter_by(id=student_id).first()
+        if not user:
+            raise NotFoundError("User not found")
+        return user
+    
+    # If assignment_id is provided, check if the requester is course staff
+    if assignment_id:
+        assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+        if not assignment:
+            raise NotFoundError("Assignment not found")
+        
+        course = db.session.query(Course).filter_by(id=assignment.course_id).first()
+        if not course:
+            raise NotFoundError("Course not found")
+        
+        # Check if requester is the course instructor
+        if str(course.instructor_id) == str(session_user_id):
+            user = db.session.query(User).filter_by(id=student_id).first()
+            if not user:
+                raise NotFoundError("User not found")
+            return user
+        
+        # Check if requester is enrolled as instructor or TA in the course
+        enrollment = db.session.query(Enrollment).filter_by(
+            course_id=assignment.course_id,
+            student_id=session_user_id
+        ).first()
+        
+        if enrollment and str(enrollment.role).lower() in {"instructor", "ta"}:
+            user = db.session.query(User).filter_by(id=student_id).first()
+            if not user:
+                raise NotFoundError("User not found")
+            return user
+    
+    # If we get here, the requester is not authorized
+    raise ForbiddenError("You can only access your own data")
 
 @submission.route('/get_submissions', methods=["GET"])
 def get_submissions():
@@ -67,7 +107,7 @@ def get_submissions():
     if not student_id or not assignment_id:
         raise BadRequestError("Missing student_id or assignment_id")
 
-    _verify_student_owner(student_id)
+    _verify_student_owner(student_id, assignment_id)
 
     submissions = db.session.query(Submission).filter_by(
         student_id=student_id, 
@@ -93,6 +133,8 @@ def upload_submission():
     if not assignment_id or not student_id or not file.filename:
         raise BadRequestError("Missing required fields")
 
+    # Note: We intentionally do NOT pass assignment_id here.
+    # Instructors/TAs should not upload submissions on behalf of students.
     _verify_student_owner(student_id)
 
     from api.models import AssignmentExtension
@@ -430,7 +472,7 @@ def get_latest_submission():
     if not student_id or not assignment_id:
         raise BadRequestError("Missing student_id or assignment_id")
 
-    _verify_student_owner(student_id)
+    _verify_student_owner(student_id, assignment_id)
 
     # Query for the latest submission based on the submitted time
     latest_submission = Submission.query.filter_by(
@@ -707,7 +749,7 @@ def get_active_submission():
     if not assignment or not student:
       raise BadRequestError("not sufficient details")
 
-    _verify_student_owner(student)
+    _verify_student_owner(student, assignment)
 
     submission = db.session.query(Submission).filter_by(assignment_id=assignment, student_id=student, active=True).first()
 
@@ -736,7 +778,7 @@ def activate_submission():
     if not submission_id or not student_id or not assignment_id:
         raise BadRequestError("Missing submission_id, student_id, or assignment_id")
 
-    _verify_student_owner(student_id)
+    _verify_student_owner(student_id, assignment_id)
 
     try:
         # Deactivate the current active submission for the same assignment and student
