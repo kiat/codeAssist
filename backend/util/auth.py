@@ -21,6 +21,16 @@ def get_user_course_role(user_id, course_id):
 
 
 def require_authenticated():
+    """Returns the session user_id without checking the user still exists.
+
+    Trusts the session rather than paying a DB round trip on every call.
+    A session for a deleted user is nearly always caught downstream
+    anyway: cascade-delete removes the user's enrollments with them, so
+    any require_course_role() call for that user_id finds no enrollment
+    and 403s. A route that only calls require_authenticated() with no
+    follow-up role check would not get that safety net; none currently
+    do.
+    """
     user_id = session.get("user_id")
     if not user_id:
         raise UnauthorizedError("Not authenticated")
