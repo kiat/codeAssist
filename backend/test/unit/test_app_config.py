@@ -9,6 +9,13 @@ import config as config_module
 
 def test_create_app_raises_when_secret_key_is_not_set(monkeypatch):
     monkeypatch.delenv("SECRET_KEY", raising=False)
+    # create_app() calls load_dotenv() internally, which re-populates any
+    # env var that's currently unset (its override defaults to False) from
+    # a local .env file. Without this, a developer with SECRET_KEY set in
+    # their own backend/.env would have it silently restored right after
+    # the delenv above, and this test would fail to raise on their machine
+    # while passing in CI (which has no .env file at all).
+    monkeypatch.setattr(api_module, "load_dotenv", lambda *a, **kw: None)
 
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         api_module.create_app(config_class="config.Config")
