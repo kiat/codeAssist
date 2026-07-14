@@ -5,13 +5,15 @@ import subprocess
 import io
 import tarfile
 import threading
+import time
+import logging
 import requests
 from datetime import datetime, timezone
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, session
 from api import db
-from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course
+from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtension, Course, Enrollment
 from api.schemas import CodeDraftSchema, SubmissionSchema
-from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError
+from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError, ForbiddenError, TooManyRequestsError
 from util.url_utils import validate_ollama_url
 from ai_feedback.integration import (
     async_get_ai_feedback,
@@ -22,8 +24,64 @@ from ai_feedback.integration import (
 )
 import docker
 
+logger = logging.getLogger(__name__)
+
 code_editor = Blueprint('code_editor', __name__)
 _docker_client = None
+
+# --- Rate limiting for run_code (per-user) ---
+_run_code_timestamps = {}  # {student_id: [timestamps]}
+_run_code_rate_lock = threading.Lock()
+_RUN_CODE_RATE_LIMIT = 10  # max requests per user
+_RUN_CODE_RATE_WINDOW = 60  # per 60 seconds
+
+
+def _check_run_code_rate_limit(student_id):
+    """Per-user sliding-window rate limiter for run_code (thread-safe)."""
+    now = time.time()
+    with _run_code_rate_lock:
+        timestamps = _run_code_timestamps.get(student_id, [])
+        # Prune timestamps outside the window
+        while timestamps and timestamps[0] < now - _RUN_CODE_RATE_WINDOW:
+            timestamps.pop(0)
+        # Evict idle keys to prevent memory leak
+        if not timestamps:
+            _run_code_timestamps.pop(student_id, None)
+            # Record this request as the first in the window
+            _run_code_timestamps[student_id] = [now]
+            return
+        if len(timestamps) >= _RUN_CODE_RATE_LIMIT:
+            raise TooManyRequestsError("Too many run requests. Please wait a moment and try again.")
+        timestamps.append(now)
+
+
+def _verify_student(student_id):
+    """Verify that the authenticated session user matches the requested student_id.
+    Checks session first (cheap, no DB), then queries the DB only if authenticated.
+    This avoids leaking which UUIDs exist via different error messages."""
+    if not student_id:
+        raise BadRequestError("Missing student_id")
+    # Check session FIRST — avoids leaking valid UUIDs to unauthenticated callers
+    session_user_id = session.get("user_id")
+    if not session_user_id:
+        raise ForbiddenError("Not authenticated. Please log in.")
+    if session_user_id != student_id:
+        raise ForbiddenError("You can only access your own data")
+    # Session matches — now verify the user actually exists in the database
+    user = db.session.query(User).filter_by(id=student_id).first()
+    if not user:
+        raise NotFoundError("User not found")
+    return user
+
+
+def _verify_enrollment(student_id, course_id):
+    """Verify that a student is enrolled in the given course. Raises 403 if not."""
+    enrollment = db.session.query(Enrollment).filter_by(
+        student_id=student_id, course_id=course_id
+    ).first()
+    if not enrollment:
+        raise ForbiddenError("You are not enrolled in this course")
+    return enrollment
 
 def get_docker_client():
     global _docker_client
@@ -45,8 +103,10 @@ def save_code_draft():
     file_name = data.get("file_name", "solution.py")
     auto_saved = data.get("auto_saved", False)
 
-    if not student_id or not assignment_id or content is None:
-        raise BadRequestError("Missing required fields: student_id, assignment_id, content")
+    _verify_student(student_id)
+
+    if not assignment_id or content is None:
+        raise BadRequestError("Missing required fields: assignment_id, content")
 
     if len(content) > 100000:
         raise BadRequestError("Code content exceeds maximum length of 100KB")
@@ -89,8 +149,10 @@ def get_code_drafts():
     assignment_id = request.args.get("assignment_id")
     condensed = request.args.get("condensed", "false").lower() == "true"
 
-    if not student_id or not assignment_id:
-        raise BadRequestError("Missing student_id or assignment_id")
+    _verify_student(student_id)
+
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
 
     drafts = (
         db.session.query(CodeDraft)
@@ -124,8 +186,10 @@ def get_latest_draft():
     student_id = request.args.get("student_id")
     assignment_id = request.args.get("assignment_id")
 
-    if not student_id or not assignment_id:
-        raise BadRequestError("Missing student_id or assignment_id")
+    _verify_student(student_id)
+
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
 
     draft = (
         db.session.query(CodeDraft)
@@ -153,8 +217,10 @@ def submit_code():
     content = data.get("content")
     file_name = data.get("file_name", "solution.py")
 
-    if not student_id or not assignment_id or content is None:
-        raise BadRequestError("Missing required fields: student_id, assignment_id, content")
+    _verify_student(student_id)
+
+    if not assignment_id or content is None:
+        raise BadRequestError("Missing required fields: assignment_id, content")
 
     if len(content) > 100000:
         raise BadRequestError("Code content exceeds maximum length of 100KB")
@@ -170,6 +236,13 @@ def submit_code():
 
     if not assignment.published:
         raise BadRequestError("Assignment is not published yet.")
+
+    # Enforce enable_code_editor server-side
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
+
+    # Verify student is enrolled in the course
+    _verify_enrollment(student_id, assignment.course_id)
 
     # Check due dates (same logic as upload_submission)
     extension = db.session.query(AssignmentExtension).filter_by(
@@ -267,6 +340,13 @@ def submit_code():
             timeout=assignment.autograder_timeout,
         )
     except subprocess.TimeoutExpired:
+        # Ensure container cleanup on timeout
+        try:
+            container.stop()
+            container.remove()
+        except Exception:
+            pass
+
         timeout_result = {
             "tests": [{
                 "name": "Submission Timeout",
@@ -663,8 +743,11 @@ def run_code():
     content = data.get("content")
     file_name = data.get("file_name", "solution.py")
 
-    if not student_id or not assignment_id or content is None:
-        raise BadRequestError("Missing required fields: student_id, assignment_id, content")
+    _verify_student(student_id)
+    _check_run_code_rate_limit(student_id)
+
+    if not assignment_id or content is None:
+        raise BadRequestError("Missing required fields: assignment_id, content")
 
     if len(content) > 100000:
         raise BadRequestError("Code content exceeds maximum length of 100KB")
@@ -680,6 +763,13 @@ def run_code():
 
     if not assignment.published:
         raise BadRequestError("Assignment is not published yet.")
+
+    # Enforce enable_code_editor server-side
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
+
+    # Verify student is enrolled in the course
+    _verify_enrollment(student_id, assignment.course_id)
 
     # Check due dates (same logic as submit_code)
     extension = db.session.query(AssignmentExtension).filter_by(
@@ -720,9 +810,10 @@ def run_code():
             run_image, content, file_name, timeout,
         )
     except Exception as e:
-        print(f"RUN_CODE _run_code_in_container error: {e}", flush=True)
+        # Log details server-side but return sanitized error to client
+        logger.error(f"RUN_CODE error: {e}", exc_info=True)
         return jsonify({
-            "output": f"Error: {type(e).__name__}: {str(e)}",
+            "output": "An error occurred while running your code. Please try again.",
             "programOutput": "",
             "passed": False,
             "score": 0,
@@ -790,8 +881,10 @@ def ai_chat():
     user_message = data.get("message")
     code = data.get("code", "")
 
-    if not student_id or not user_message:
-        raise BadRequestError("Missing student_id or message")
+    _verify_student(student_id)
+
+    if not user_message:
+        raise BadRequestError("Missing message")
 
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
@@ -802,6 +895,9 @@ def ai_chat():
         raise NotFoundError("Assignment not found")
     if not assignment.ai_feedback_enabled:
         raise BadRequestError("AI chat is not enabled for this assignment.")
+
+    # Verify student is enrolled in the course to prevent quota abuse
+    _verify_enrollment(student_id, assignment.course_id)
 
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
     if not course:
@@ -825,7 +921,7 @@ def ai_chat():
         reply = _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperature)
     except Exception as e:
         error_msg = str(e)
-        print(f"AI_CHAT error: {e}", flush=True)
+        logger.error(f"AI_CHAT error: {e}", exc_info=True)
         if "insufficient_quota" in error_msg or "429" in error_msg:
             raise BadRequestError("AI service quota exceeded. Please contact your instructor to update the API key.")
         elif "invalid_api_key" in error_msg or "401" in error_msg:

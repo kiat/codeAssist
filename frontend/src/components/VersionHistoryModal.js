@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Modal, List, Tag, Button, Spin, Empty, message } from "antd";
 import { HistoryOutlined, FileOutlined, ClockCircleOutlined } from "@ant-design/icons";
 import moment from "moment";
+import service from "../services";
 
 /**
  * VersionHistoryModal — shows a list of auto-saved and manual draft versions.
@@ -27,10 +28,12 @@ export default function VersionHistoryModal({
     if (!studentId || !assignmentId) return;
     setLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_code_drafts?student_id=${studentId}&assignment_id=${assignmentId}&condensed=true`
-      );
-      const data = await response.json();
+      const response = await service("get_code_drafts", {
+        student_id: studentId,
+        assignment_id: assignmentId,
+        condensed: "true",
+      });
+      const data = response.data;
       setDrafts(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch drafts:", error);

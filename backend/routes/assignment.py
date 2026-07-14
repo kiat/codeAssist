@@ -1,6 +1,5 @@
 import uuid
 from flask import Blueprint, request, jsonify
-from flask_cors import cross_origin
 from api import db
 from api.models import Assignment, AssignmentExtension, Submission, RegradeRequest, Course
 from api.schemas import AssignmentSchema, CourseSchema, AssignmentExtensionSchema
@@ -14,7 +13,6 @@ from ai_feedback.settings import (
 assignment = Blueprint('assignment', __name__)
 
 @assignment.route('/update_assignment', methods=["PUT"])
-@cross_origin()
 def update_assignment():
     '''
     /update_assignment updates the assignment in the database
@@ -83,7 +81,6 @@ def update_assignment():
         raise InternalProcessingError("Failed to update assignment")
         
 @assignment.route('/get_assignment', methods=["GET"])
-@cross_origin()
 def get_assignment():
     '''
     /get_assignment gets the assignment from the database
@@ -105,7 +102,6 @@ def get_assignment():
 
 
 @assignment.route('/create_assignment', methods=["POST"])
-@cross_origin()
 def create_assignment():
     '''
     /create_assignment creates an assignment and generates an assignment
@@ -167,7 +163,6 @@ def create_assignment():
         raise InternalProcessingError("Failed to create assignment")
 
 @assignment.route('/duplicate_assignment', methods=["POST", "GET"])
-@cross_origin()
 def duplicate_assignment():
     '''
     /duplicate_assignment duplicates an existing assignment with a new name
@@ -220,7 +215,6 @@ def duplicate_assignment():
         raise InternalProcessingError("Failed to duplicate assignment")
 
 @assignment.route('/delete_assignment', methods=["DELETE"])
-@cross_origin()
 def delete_assignment():
     assignment_id = request.args.get("assignment_id")
     if not assignment_id:
@@ -250,7 +244,6 @@ def delete_assignment():
         raise InternalProcessingError("Failed to delete assignment")
 
 @assignment.route('/delete_submissions', methods=["DELETE"])
-@cross_origin()
 def delete_submissions():
     assignment_id = request.args.get("assignment_id")
     if not assignment_id:
@@ -275,7 +268,6 @@ def delete_submissions():
 
 
 @assignment.route('/create_extension', methods=["POST", "GET"])
-@cross_origin()
 def create_extension():
     data = request.json
     required_fields = ["assignment_id", "student_id"]
@@ -315,7 +307,6 @@ def create_extension():
     return jsonify(newExtension)
 
 @assignment.route('/get_extension', methods=["GET"])
-@cross_origin()
 def get_extension():
     assignment_id = request.args.get("assignment_id")
     student_id = request.args.get("student_id")
@@ -348,7 +339,6 @@ def get_extension():
         raise InternalProcessingError("Failed to fetch extension")
 
 @assignment.route('/get_assignment_extensions', methods=["GET"])
-@cross_origin()
 def get_assignment_extensions():
     assignment_id = request.args.get("assignment_id")
     # Fetch extension for this assignment and student
@@ -358,7 +348,6 @@ def get_assignment_extensions():
     return jsonify(extensions)
     
 @assignment.route('/delete_extension', methods=["DELETE"])
-@cross_origin()
 def delete_extension():
     extension_id = request.args.get("extension_id")
     if not extension_id:
@@ -380,7 +369,6 @@ def delete_extension():
         raise InternalProcessingError("Failed to delete extension")
 
 @assignment.route('/courses', methods=["GET"])
-@cross_origin()
 def get_courses():
     instructor_id = request.args.get("instructor_id")
     if instructor_id:

@@ -1,7 +1,14 @@
+ifeq ($(OS),Windows_NT)
+PYTHON ?= python
+else
+PYTHON ?= python3
+endif
+PIP ?= $(PYTHON) -m pip
+
 .PHONY: install test clean
 install:
 	@echo "Installing backend dependencies..."
-	@pip install -r ./backend/requirements.txt
+	@$(PIP) install -r ./backend/requirements.txt
 	@echo "Backend dependencies installed."
 	@echo "Installing frontend dependencies..."
 	@cd ./frontend && npm install
@@ -11,7 +18,7 @@ test: test-backend test-frontend  ## Run all tests
 
 test-backend:                     ## Backend unit / integration tests
 	@echo "Running backend tests..."
-	@cd ./backend && python3 -m pytest
+	@cd ./backend && $(PYTHON) -m pytest
 	@echo "Backend tests passed."
 
 test-frontend:                    ## Front-end Jest tests

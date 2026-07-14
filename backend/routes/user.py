@@ -3,10 +3,11 @@ import requests
 import random
 import string
 from flask import Blueprint, request, jsonify, current_app, session
+from sqlalchemy.exc import IntegrityError
 from api import db
 from api.models import User, Course, AdminEmail
 from api.schemas import UserSchema, CourseSchema
-from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError
+from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError, ForbiddenError
 from util.encryption_utils import hash_password, verify_password, needs_rehash, is_hashed
 
 
@@ -45,6 +46,15 @@ def create_user():
     valid_roles = ["admin", "instructor", "student"]
     if role not in valid_roles:
         raise BadRequestError("Invalid role. Must be one of: admin, instructor, student")
+
+    # Security: Only admins can create admin or instructor accounts
+    if role in ["admin", "instructor"]:
+        session_user_id = session.get("user_id")
+        if not session_user_id:
+            raise ForbiddenError("Not authenticated. Please log in.")
+        session_user = db.session.query(User).filter_by(id=session_user_id).first()
+        if not session_user or session_user.role != "admin":
+            raise ForbiddenError("Only administrators can create admin or instructor accounts")
 
     eid_check = db.session.query(User).filter_by(sis_user_id=sis_user_id).first()
     if eid_check:
@@ -112,9 +122,8 @@ def user_login():
             db_user.password = hash_password(password)
             db.session.commit()
 
-    # Establish server-side session so guarded endpoints can verify identity
-    user_id = db_user.get('id') if isinstance(db_user, dict) else db_user.id
-    session["user_id"] = user_id
+    # Store user in session for auth on protected endpoints
+    session["user_id"] = str(db_user.id)
 
     # Serialize and return
     result = UserSchema().dump(db_user)
@@ -213,7 +222,7 @@ def google_login():
         )
         db.session.add(user)
         db.session.commit()
-        session["user_id"] = user.id
+        session["user_id"] = str(user.id)
         user_data = UserSchema().dump(user)
         return jsonify(user_data)
 
@@ -222,7 +231,9 @@ def google_login():
         user.role = "admin"
         db.session.commit()
 
-    session["user_id"] = user.id
+    # Store user in session for auth on protected endpoints
+    session["user_id"] = str(user.id)
+
     user_data = UserSchema().dump(user)
     return jsonify(user_data)
 
@@ -280,6 +291,7 @@ def get_user_by_id():
 def delete_user():
     assert current_app
 
+    # Validate input first
     user_id = request.args.get("id") 
     if not user_id: 
         raise BadRequestError("Missing User id")
@@ -289,7 +301,14 @@ def delete_user():
     except(ValueError, TypeError):
         raise BadRequestError("Invalid user id") 
 
-    
+    # Security: Only admins can delete users
+    session_user_id = session.get("user_id")
+    if not session_user_id:
+        raise ForbiddenError("Not authenticated. Please log in.")
+    session_user = db.session.query(User).filter_by(id=session_user_id).first()
+    if not session_user or session_user.role != "admin":
+        raise ForbiddenError("Only administrators can delete users")
+
     user = db.session.query(User).filter_by(id=user_id).first()
     if not user:
         raise NotFoundError("User Not Found")
@@ -297,6 +316,9 @@ def delete_user():
     try:
         db.session.delete(user)
         db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ConflictError("Cannot delete user: they have active courses or other linked records that prevent deletion")
     except Exception as e:
         db.session.rollback()
         raise InternalProcessingError("Error deleting user")
