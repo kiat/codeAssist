@@ -17,7 +17,10 @@ def test_create_app_raises_when_secret_key_is_not_set(monkeypatch):
 def test_create_app_accepts_secret_key_from_environment(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "env-provided-secret")
 
-    app = api_module.create_app(config_class="config.Config")
+    # TestConfig, not Config: Config's SQLALCHEMY_DATABASE_URI depends on
+    # DB_CONNECTION_STRING, which isn't set in CI, and would fail during
+    # db.init_app() for a reason unrelated to what this test checks.
+    app = api_module.create_app(config_class="config.TestConfig")
 
     assert app.secret_key == "env-provided-secret"
 
