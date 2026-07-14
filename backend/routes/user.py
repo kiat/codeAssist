@@ -316,7 +316,7 @@ def delete_user():
     # Guard: prevent deleting an instructor who still has courses.
     # The courses.instructor_id FK uses RESTRICT, so a plain delete would
     # raise an IntegrityError.  Check here to return a clear 409 instead.
-    if user_obj.role == "instructor":
+    if user.role == "instructor":
         course_count = db.session.query(Course).filter_by(instructor_id=user_id).count()
         if course_count > 0:
             raise ConflictError(
@@ -325,7 +325,7 @@ def delete_user():
             )
 
     try:
-        db.session.delete(user_obj)
+        db.session.delete(user)
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
