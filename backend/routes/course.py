@@ -3,7 +3,6 @@ import os
 import csv
 import requests
 from flask import Blueprint, request, jsonify, current_app
-from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 from sqlalchemy.exc import IntegrityError
 from api import db

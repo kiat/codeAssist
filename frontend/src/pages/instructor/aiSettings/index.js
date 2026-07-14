@@ -419,30 +419,6 @@ export default function AISettings() {
                   <Button type="primary" onClick={handleSave}>
                     Save API Key / Settings
                   </Button>
-
-                  <Button onClick={testConnection} disabled={isTesting}>
-                    Test Selected Model
-                  </Button>
-
-                  {isTesting && (
-                    <Spin
-                      indicator={
-                        <LoadingOutlined style={{ fontSize: 16 }} spin />
-                      }
-                    />
-                  )}
-
-                  {apiTestStatus === "success" && (
-                    <Typography.Text type="success">
-                      <CheckCircleOutlined /> Selected model tested successfully
-                    </Typography.Text>
-                  )}
-
-                  {apiTestStatus === "error" && (
-                    <Typography.Text type="danger">
-                      <CloseCircleOutlined /> Selected model test failed
-                    </Typography.Text>
-                  )}
                 </Space>
               </Space>
             </Card>
@@ -508,8 +484,38 @@ export default function AISettings() {
                         })),
                     ]}
                   />
+
+                  <Button
+                    onClick={testConnection}
+                    disabled={isTesting}
+                    style={{ width: 190 }}
+                  >
+                    Test Selected Model
+                  </Button>
                 </Space.Compact>
               </Form.Item>
+
+              <Space wrap>
+                {isTesting && (
+                  <Spin
+                    indicator={
+                      <LoadingOutlined style={{ fontSize: 16 }} spin />
+                    }
+                  />
+                )}
+
+                {apiTestStatus === "success" && (
+                  <Typography.Text type="success">
+                    <CheckCircleOutlined /> Selected model tested successfully
+                  </Typography.Text>
+                )}
+
+                {apiTestStatus === "error" && (
+                  <Typography.Text type="danger">
+                    <CloseCircleOutlined /> Selected model test failed
+                  </Typography.Text>
+                )}
+              </Space>
             </Card>
 
             <Card title="Feedback Defaults">

@@ -35,9 +35,11 @@ def create_app(config_class='config.Config'):
     # FRONTEND_ORIGIN must be set in production; defaults to localhost only for dev.
     frontend_origin = os.environ.get('FRONTEND_ORIGIN')
     if not frontend_origin:
-        logging.getLogger(__name__).warning(
-            "FRONTEND_ORIGIN not set — defaulting to http://localhost:3000. "
-            "Set this environment variable in production."
+        _logger = logging.getLogger(__name__)
+        _logger.warning(
+            "FRONTEND_ORIGIN environment variable is not set. "
+            "Defaulting to http://localhost:3000 for development only. "
+            "Set FRONTEND_ORIGIN to your actual frontend URL in production."
         )
         frontend_origin = 'http://localhost:3000'
     CORS(app, supports_credentials=True, origins=[frontend_origin])

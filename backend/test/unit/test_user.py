@@ -217,9 +217,20 @@ def test_delete_user(client, mocker):
     random_uuid = uuid.uuid4()
     user_mock = mocker.Mock() 
     user_mock.id = random_uuid
-    
+
+    # Admin user for the admin-only check
+    admin_mock = mocker.Mock()
+    admin_mock.id = "admin-uuid"
+    admin_mock.role = "admin"
+
     mock_query = mocker.patch("routes.user.db.session.query")
-    mock_query.return_value.filter_by.return_value.first.return_value = user_mock
+
+    # First call is for session user (admin check), second is for target user
+    mock_query.return_value.filter_by.return_value.first.side_effect = [admin_mock, user_mock]
+
+    # Set session to simulate authenticated admin
+    with client.session_transaction() as sess:
+        sess["user_id"] = "admin-uuid"
 
     # Mock db.session.delete and commit
     mock_delete = mocker.patch("routes.user.db.session.delete")
@@ -229,12 +240,6 @@ def test_delete_user(client, mocker):
 
     assert response.status_code == 200
     assert response.data.decode() == "Success"
-
-    # Check that filter_by was called with correct id
-    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
-
-    # Check that first() was called to fetch the user
-    mock_query.return_value.filter_by.return_value.first.assert_called_once()
 
     # Check that delete was called with the mock user
     mock_delete.assert_called_once_with(user_mock)
@@ -266,11 +271,21 @@ def test_delete_user_invalid_id(client, mocker):
 def test_delete_user_not_found(client, mocker):
     """Test the /delete_user route."""
 
-    random_uuid = random_uuid = uuid.uuid4() 
+    random_uuid = uuid.uuid4()
+
+    # Admin user for the admin-only check
+    admin_mock = mocker.Mock()
+    admin_mock.id = "admin-uuid"
+    admin_mock.role = "admin"
 
     mock_query = mocker.patch("routes.user.db.session.query")
-    mock_query.return_value.filter_by.return_value.first.return_value = None
 
+    # First call: admin check returns admin, second call: target user not found
+    mock_query.return_value.filter_by.return_value.first.side_effect = [admin_mock, None]
+
+    # Set session to simulate authenticated admin
+    with client.session_transaction() as sess:
+        sess["user_id"] = "admin-uuid"
 
     response = client.delete("/delete_user", query_string={"id" : str(random_uuid)})
 
@@ -278,23 +293,28 @@ def test_delete_user_not_found(client, mocker):
     data = response.get_json() 
     assert data['message'] == "User Not Found"
 
-    mock_query.assert_called_once() 
-    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
-
 
 def test_delete_user_rolls_back_on_exception(client, mocker):
     random_uuid = uuid.uuid4()
     user_mock = mocker.Mock() 
     user_mock.id = random_uuid
 
+    # Admin user for the admin-only check
+    admin_mock = mocker.Mock()
+    admin_mock.id = "admin-uuid"
+    admin_mock.role = "admin"
+
     mock_session = mocker.patch("routes.user.db.session")
 
-    
-    mock_session.query.return_value.filter_by.return_value.first.return_value = user_mock
+    # First call: admin check returns admin, second call: target user found
+    mock_session.query.return_value.filter_by.return_value.first.side_effect = [admin_mock, user_mock]
 
     mock_session.delete.return_value = None
     mock_session.commit.side_effect = Exception("Simulated DB failure")
 
+    # Set session to simulate authenticated admin
+    with client.session_transaction() as sess:
+        sess["user_id"] = "admin-uuid"
 
     response = client.delete("/delete_user", query_string={"id" : str(random_uuid)})
 

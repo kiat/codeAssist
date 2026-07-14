@@ -170,12 +170,11 @@ export default function Assignments() {
 
     if (isSubmitted) {
       navigate(`/assignmentresult/${assignment.submissionId}`);
-    } else if (canSubmitOnTime || canSubmitLate) {
-      setSelectedAssignment(assignment);
+    } else if (!dueDateHasPassed || inLateWindow) {
       setModalOpen(true);
       setAssignmentTitle(assignment.name);
       setAssignmentID(assignment.id);
-
+      setSelectedAssignment(assignment);
     } else {
       message.error("Due Date Has Passed");
     }

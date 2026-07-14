@@ -80,4 +80,3 @@ def register_error_handlers(app):
     @app.errorhandler(TooManyRequestsError)
     def handle_too_many_requests(error):
         return jsonify({"message": str(error)}), error.status_code
-
