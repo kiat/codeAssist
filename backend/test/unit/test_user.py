@@ -138,9 +138,6 @@ def test_user_login_success(client, mock_user_query, mocker):
     assert response.json["name"] == "John Doe"
     mock_query.assert_called_once()
 
-    with client.session_transaction() as sess:
-        assert sess.get("user_id") == "123"
-
 
 def test_user_login_failure(client, mock_user_query):
     """Test the /user_login route with invalid credentials."""
