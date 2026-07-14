@@ -14,6 +14,15 @@ instance.interceptors.response.use(
   err => {
     let errorMessage = 'Operation failed';
 
+    if (err.response?.status === 401) {
+      // Session expired or missing — force a clean re-login.
+      localStorage.removeItem("userInfo");
+      localStorage.removeItem("courseInfo");
+      localStorage.removeItem("courseRole");
+      window.location.assign("/");
+      return Promise.reject(err);
+    }
+
     if (err.response) {
       // Server responded with a status other than 200 range
       if (err.response.status) {
