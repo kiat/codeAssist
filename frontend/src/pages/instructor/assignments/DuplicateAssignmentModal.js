@@ -9,7 +9,7 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
   const [courses, setCourses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [selectedCourseId, setSelectedCourseId] = useState(null);
-  const { courseInfo } = useContext(GlobalContext);
+  const { courseInfo, userInfo } = useContext(GlobalContext);
   
   const getCourses = useCallback(async () => {
     try {
@@ -27,16 +27,16 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
   }, [courseInfo.instructor_id]);
 
   const getAssignments = useCallback(async () => {
-    if (!selectedCourseId) return;
+    if (!selectedCourseId || !userInfo.id) return;
 
     try {
-      const response = await getCourseAssignments({ course_id: selectedCourseId });
+      const response = await getCourseAssignments({ course_id: selectedCourseId, user_id: userInfo.id });
       setAssignments(response.data);
     } catch (err) {
       console.error("Error fetching assignments: ", err);
       message.error("Error fetching assignments");
     }
-  }, [selectedCourseId]);
+  }, [selectedCourseId, userInfo.id]);
 
   useEffect(() => {
     if (open) {

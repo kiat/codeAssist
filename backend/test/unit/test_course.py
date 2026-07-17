@@ -438,17 +438,21 @@ def test_get_course_enrollment_missing_course_id(client):
 
 def test_get_course_assignments_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(id="assignment-1", name="Assignment 1")]
+    mock_enrollment = mocker.Mock(role="instructor")
+    mock_assignments = [ mocker.Mock(id="assignment-1", name="Assignment 1")]
+    enrollment_query = mocker.Mock()
+    enrollment_query.filter_by.return_value.first.return_value = mock_enrollment
+    assignment_query = mocker.Mock()
+    assignment_query.filter_by.return_value.all.return_value = mock_assignments
+    mock_query.side_effect = [enrollment_query, assignment_query,]
     mock_schema = mocker.patch("routes.course.AssignmentSchema")
     mock_schema.return_value.dump.return_value = [{"id": "assignment-1", "name": "Assignment 1"}]
-
-    response = client.get("/get_course_assignments", query_string={"course_id": "course-123"})
-
+    response = client.get("/get_course_assignments", query_string={"course_id": "course-123", "user_id": "instructor-123",},)
     assert response.status_code == 200
     assert response.json == [{"id": "assignment-1", "name": "Assignment 1"}]
 
 def test_get_course_assignments_missing_course_id(client):
-    response = client.get("/get_course_assignments")
+    response = client.get("/get_course_assignments", query_string={"user_id": "user-123"},)
     assert response.status_code == 400
     assert response.json["message"] == "Missing course_id argument"
 

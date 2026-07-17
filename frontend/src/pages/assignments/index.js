@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../App";
 import moment from "moment";
 import AssignmentModal from "./assignment_modal";
-
+import { isAssignmentVisible } from "../../common/assignmentVisibility";
 export default function Assignments() {
   const [courseAssignment, setCourseAssignment] = useState([]);
   const urlParams = useParams();
@@ -90,12 +90,12 @@ export default function Assignments() {
       try {
         const assignmentsResponse = await fetch(
           `${process.env.REACT_APP_API_URL}/get_course_assignments?` +
-          new URLSearchParams({ course_id: urlParams.courseId })
+          new URLSearchParams({ course_id: urlParams.courseId, user_id: userInfo.id, })
         );
         const assignmentsData = await assignmentsResponse.json();
-
+        const visibleAssignments = assignmentsData.filter(isAssignmentVisible);
         const updatedAssignments = await Promise.all(
-          assignmentsData.map(async (assignment) => {
+          visibleAssignments.map(async (assignment) => {
             try {
               const extension = await fetchAssignmentExtensions(assignment.id);
               const activeSubmissions = await fetch(

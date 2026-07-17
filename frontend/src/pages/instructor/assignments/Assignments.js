@@ -1,12 +1,14 @@
-import { Button, Card, Progress, Table, PageHeader } from "antd";
+import { Button, Card, Progress, Table, PageHeader, Tag } from "antd";
 import moment from "moment";
 import { useCallback } from "react";
+import { useContext } from "react";
 import { useEffect } from "react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getCourseAssignments } from "../../../services/course";
+import { getPublishStatus, publishStatusOrder,} from "../../../common/assignmentVisibility";
 // import { tableData } from "./constant";
-
+import { GlobalContext } from "../../../App";
 const columns = [
   {
     title: "NAME",
@@ -49,11 +51,20 @@ const columns = [
   {
     title: "PUBLISHED",
     dataIndex: "published",
-    render: text => (
-      <Button type={text ? "primary" : "default"} shape='circle' size='small'>
-        {" "}
-      </Button>
-    ),
+    sorter: (a, b) => publishStatusOrder[getPublishStatus(a)] - publishStatusOrder[getPublishStatus(b)],
+    render: (_, record) => {
+      const status = getPublishStatus(record);
+      const statusColor = {
+        published: "green",
+        scheduled: "blue",
+        unpublished: "default",
+      };
+      return (
+        <Tag color={statusColor[status]}>
+          {status.toUpperCase()}
+        </Tag>
+      );
+    },
   },
   { title: "REGRADES", dataIndex: "regrades" },
 ];
@@ -62,12 +73,13 @@ const columns = [
 export default ({ isCreate }) => {
   const [assignments, setAssignments] = useState([]);
   const { courseId } = useParams();
+  const { userInfo } = useContext(GlobalContext);
 
   const getAssignments = useCallback(() => {
-    getCourseAssignments({ course_id: courseId }).then(res => {
+    getCourseAssignments({ course_id: courseId, user_id: userInfo.id }).then(res => {
       setAssignments(res.data);
     });
-  }, [courseId]);
+  }, [courseId, userInfo.id]);
 
   useEffect(() => {
     if (!isCreate) {
