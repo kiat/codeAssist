@@ -17,9 +17,9 @@ depends_on = None
 
 
 def upgrade():
-    op.execute("ALTER TABLE courses ADD COLUMN IF NOT EXISTS ollama_base_url VARCHAR DEFAULT ''")
+    op.add_column('courses', sa.Column('ollama_base_url', sa.String(), server_default=''))
     op.execute("UPDATE courses SET ollama_base_url = '' WHERE ollama_base_url = 'http://host.docker.internal:11434'")
 
 
 def downgrade():
-    op.execute("ALTER TABLE courses DROP COLUMN IF EXISTS ollama_base_url")
+    op.drop_column('courses', 'ollama_base_url')

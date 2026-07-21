@@ -1,7 +1,9 @@
 import pytest
+import requests
 from api import create_app
 from util.errors import BadRequestError, ConflictError, NotFoundError, InternalProcessingError
 from routes.course import allowed_file, create_enrollment_bulk
+from util.url_utils import DEFAULT_OLLAMA_BASE_URL
 
 @pytest.fixture
 def app():
@@ -490,7 +492,7 @@ def test_get_course_info_success(client, mocker):
             "has_openai_api_key": True,
             "has_gemini_api_key": False,
             "has_claude_api_key": False,
-            "has_ollama_api_key": False,
+            "has_ollama_configured": False,
         }
     ]
 
@@ -798,7 +800,93 @@ def test_test_ai_model_ollama_missing_saved_url_fallback(client, mocker):
     assert response.json["model"] == "llama3"
     
     mock_post.assert_called_once()
-    assert mock_post.call_args[0][0] == "http://host.docker.internal:11434/api/chat"
+    assert mock_post.call_args[0][0] == f"{DEFAULT_OLLAMA_BASE_URL}/api/chat"
+
+
+def test_test_ai_model_ollama_connection_refused(client, mocker):
+    mocker.patch("routes.course.requests.post", side_effect=requests.exceptions.ConnectionError("Connection refused"))
+    
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_course = mocker.Mock(id="course-123", ollama_base_url="")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "model": "llama3",
+        },
+    )
+    assert response.status_code == 500
+    assert response.json["error"] == "Ollama connection error"
+
+
+def test_test_ai_model_ollama_timeout(client, mocker):
+    mocker.patch("routes.course.requests.post", side_effect=requests.exceptions.Timeout("Timeout occurred"))
+    
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_course = mocker.Mock(id="course-123", ollama_base_url="")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "model": "llama3",
+        },
+    )
+    assert response.status_code == 500
+    assert response.json["error"] == "Ollama connection error"
+
+
+def test_test_ai_model_ollama_non_200_response(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.status_code = 404
+    mock_response.text = "Model not found"
+    mocker.patch("routes.course.requests.post", return_value=mock_response)
+    
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_course = mocker.Mock(id="course-123", ollama_base_url="")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "model": "llama3",
+        },
+    )
+    assert response.status_code == 404
+    assert response.json["error"] == "Selected Ollama model cannot be used"
+
+
+def test_test_ai_model_ollama_invalid_json_response(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "message": {
+            "content": "This is not valid JSON feedback"
+        }
+    }
+    mocker.patch("routes.course.requests.post", return_value=mock_response)
+    
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_course = mocker.Mock(id="course-123", ollama_base_url="")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "ollama",
+            "model": "llama3",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json["error"] == "Selected Ollama model did not return valid JSON feedback"
 
 
 def test_test_ai_model_openai_success(client, mocker):
@@ -1083,6 +1171,34 @@ def test_fetch_ai_models_claude_filters_unavailable_models(client, mocker):
     assert "claude-fable-5" not in response.json["models"]
     assert "claude-mythos-5" not in response.json["models"]
     assert response.json["models"][0] == "claude-3-5-sonnet-20241022"
+
+
+def test_fetch_ai_models_ollama_success(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "models": [
+            {"name": "llama3:latest"},
+            {"name": "mistral:7b"},
+            {"name": "codegemma"}
+        ]
+    }
+
+    mock_get = mocker.patch("routes.course.requests.get", return_value=mock_response)
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={
+            "provider": "ollama",
+            "api_key": DEFAULT_OLLAMA_BASE_URL,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["models"] == ["codegemma", "llama3:latest", "mistral:7b"]
+    mock_get.assert_called_once()
+    assert mock_get.call_args[0][0] == f"{DEFAULT_OLLAMA_BASE_URL}/api/tags"
+
 
 def test_test_ai_api_key_missing_provider_returns_400(client):
     response = client.post(

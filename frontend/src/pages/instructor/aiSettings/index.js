@@ -65,7 +65,7 @@ const getKeyStatus = (course, selectedProviderKey) => {
     return !!course.has_claude_api_key;
   }
   if (selectedProviderKey === "ollama") {
-    return !!course.has_ollama_api_key;
+    return !!course.has_ollama_configured;
   }
   return false;
 };

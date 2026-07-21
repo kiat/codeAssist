@@ -1,5 +1,7 @@
 import os
 import urllib.parse
+DEFAULT_OLLAMA_BASE_URL = "http://host.docker.internal:11434"
+
 from util.errors import BadRequestError
 
 def validate_ollama_url(url):
@@ -10,9 +12,8 @@ def validate_ollama_url(url):
     if not url:
         return
         
-    try:
-        parsed = urllib.parse.urlparse(url)
-    except Exception:
+    parsed = urllib.parse.urlparse(url)
+    if not parsed.scheme:
         raise BadRequestError("Invalid URL format")
         
     # Strictly require http or https scheme
@@ -30,3 +31,12 @@ def validate_ollama_url(url):
     
     if hostname.lower() not in allowed_hosts:
         raise BadRequestError("Ollama host is not permitted by system administrator")
+
+    # Prevent DNS rebinding SSRF targeting cloud metadata / link-local addresses
+    import socket
+    try:
+        ip = socket.gethostbyname(hostname)
+        if ip.startswith("169.254."):
+            raise BadRequestError("Ollama host resolves to a restricted IP address")
+    except socket.gaierror:
+        pass

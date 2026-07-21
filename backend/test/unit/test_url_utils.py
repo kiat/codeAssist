@@ -1,11 +1,11 @@
 import pytest
-from util.url_utils import validate_ollama_url
+from util.url_utils import validate_ollama_url, DEFAULT_OLLAMA_BASE_URL
 from util.errors import BadRequestError
 
 def test_validate_ollama_url_success():
     # Valid default hosts should pass
     validate_ollama_url("http://localhost:11434")
-    validate_ollama_url("http://host.docker.internal:11434")
+    validate_ollama_url(DEFAULT_OLLAMA_BASE_URL)
     validate_ollama_url("https://127.0.0.1:11434/api")
     validate_ollama_url("") # None or empty should pass (noop)
     validate_ollama_url(None)

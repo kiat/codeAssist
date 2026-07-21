@@ -526,7 +526,9 @@ def test_rate_limit_evicts_idle_keys(client, mocker):
 # ---------------------------------------------------------------------------
 
 def test_ai_chat_missing_fields(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     resp = client.post("/ai_chat", json={
         "student_id": "stu-1",
         # missing message
@@ -536,7 +538,9 @@ def test_ai_chat_missing_fields(client, mocker):
 
 
 def test_ai_chat_missing_assignment(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     resp = client.post("/ai_chat", json={
         "student_id": "stu-1",
         "message": "help me",
@@ -547,7 +551,9 @@ def test_ai_chat_missing_assignment(client, mocker):
 
 
 def test_ai_chat_assignment_not_found(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None
 
@@ -562,7 +568,9 @@ def test_ai_chat_assignment_not_found(client, mocker):
 
 
 def test_ai_chat_not_enabled(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = False
 
@@ -580,8 +588,15 @@ def test_ai_chat_not_enabled(client, mocker):
 
 
 def test_ai_chat_no_api_key(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch("routes.code_editor.get_chat_history", return_value=[])
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
 
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
@@ -612,8 +627,18 @@ def test_ai_chat_no_api_key(client, mocker):
 
 
 def test_ai_chat_uses_custom_openai_provider_with_assignment_key(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch("routes.code_editor.get_chat_history", return_value=[])
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
 
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
@@ -672,8 +697,18 @@ def test_ai_chat_uses_custom_openai_provider_with_assignment_key(client, mocker)
 
 
 def test_ai_chat_uses_custom_gemini_provider_without_openai_key(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch("routes.code_editor.get_chat_history", return_value=[])
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
 
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
@@ -733,8 +768,18 @@ def test_ai_chat_uses_custom_gemini_provider_without_openai_key(client, mocker):
 
 
 def test_ai_chat_retries_transient_gemini_unavailable(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch("routes.code_editor.get_chat_history", return_value=[])
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
 
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
@@ -824,8 +869,18 @@ def test_ai_chat_ollama_validates_base_url_before_request(mocker):
 
 
 def test_ai_chat_course_not_found_reports_course_issue(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch("routes.code_editor.get_chat_history", return_value=[])
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
 
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
@@ -849,8 +904,18 @@ def test_ai_chat_course_not_found_reports_course_issue(client, mocker):
 
 
 def test_ai_chat_uses_custom_claude_provider_without_openai_key(client, mocker):
-    mocker.patch("routes.code_editor._verify_student")
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
     mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch("routes.code_editor.get_chat_history", return_value=[])
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+    mocker.patch("routes.code_editor.store_chat_message")
+    mocker.patch("routes.code_editor.record_feedback_request")
 
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True

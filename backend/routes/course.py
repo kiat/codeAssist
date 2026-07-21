@@ -17,7 +17,7 @@ from api.models import (
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
-from util.url_utils import validate_ollama_url
+from util.url_utils import validate_ollama_url, DEFAULT_OLLAMA_BASE_URL
 from ai_feedback.integration import (
     CORRECTNESS_SYSTEM_PROMPT,
     get_gemini_generation_config,
@@ -126,12 +126,7 @@ def _request_ollama(api_key, endpoint, method="GET", json_data=None, timeout=10,
     Returns (response, None) on success.
     Returns (jsonify_response, status_code) on failure.
     """
-    base_url = (api_key or "http://host.docker.internal:11434").strip()
-    try:
-        validate_ollama_url(base_url)
-    except BadRequestError as e:
-        return jsonify({"error": str(e)}), 400
-
+    base_url = (api_key or DEFAULT_OLLAMA_BASE_URL).strip()
     url = f"{base_url}{endpoint}"
     
     if error_msg_400 is None:
@@ -146,17 +141,11 @@ def _request_ollama(api_key, endpoint, method="GET", json_data=None, timeout=10,
         else:
             response = requests.get(url, timeout=timeout)
     except Exception as e:
-        log_prefix = "Failed to connect to Ollama" if "Failed" in error_msg_500 else "Ollama connection error"
-        current_app.logger.error(f"{log_prefix} at {base_url}: {str(e)}")
+        current_app.logger.error(f"Ollama connection error at {base_url}: {str(e)}")
         return jsonify({"error": error_msg_500}), 500
 
     if response.status_code >= 400:
-        if "test failed" in error_msg_400:
-            current_app.logger.error(f"Ollama connection test failed: {response.text}")
-        elif "cannot be used" in error_msg_400:
-            current_app.logger.error(f"Selected Ollama model cannot be used: {response.text}")
-        else:
-            current_app.logger.error(f"Ollama returned error: {response.text}")
+        current_app.logger.error(f"Ollama API error ({response.status_code}) at {url}: {response.text}")
         return jsonify({"error": error_msg_400}), response.status_code
 
     return response, None
@@ -670,7 +659,7 @@ def get_course_info():
         "has_openai_api_key": bool(course_obj.openai_api_key),
         "has_gemini_api_key": bool(course_obj.gemini_api_key),
         "has_claude_api_key": bool(course_obj.claude_api_key),
-        "has_ollama_api_key": bool(course_obj.ollama_base_url),
+        "has_ollama_configured": bool(course_obj.ollama_base_url),
     })
 
     return jsonify([course_data]), 200
@@ -806,6 +795,9 @@ def fetch_ai_models():
                 api_key = course_obj.ollama_base_url
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
+
+        if provider == "ollama":
+            validate_ollama_url((api_key or DEFAULT_OLLAMA_BASE_URL).strip())
 
         if provider == "ollama":
             response, err_response = _request_ollama(
@@ -974,6 +966,9 @@ def test_ai_api_key():
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
 
+        if provider == "ollama":
+            validate_ollama_url((api_key or DEFAULT_OLLAMA_BASE_URL).strip())
+
         if provider == "openai":
             client = OpenAI(api_key=api_key)
             client.models.list()
@@ -1080,6 +1075,9 @@ def test_ai_model():
                 api_key = course_obj.ollama_base_url
             else:
                 raise BadRequestError(f"No saved API key for {provider}")
+
+        if provider == "ollama":
+            validate_ollama_url((api_key or DEFAULT_OLLAMA_BASE_URL).strip())
 
         test_prompt = (
             "Return only this JSON object: "
@@ -1238,7 +1236,7 @@ def test_ai_model():
                     "stream": False,
                     "format": "json"
                 },
-                timeout=15,
+                timeout=30,
                 error_msg_500="Ollama connection error",
                 error_msg_400="Selected Ollama model cannot be used"
             )

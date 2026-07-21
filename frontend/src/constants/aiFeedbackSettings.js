@@ -51,6 +51,27 @@ export const DEFAULT_AI_FEEDBACK_PROMPTS = [
       "Suggest high-level algorithmic improvements or complexity concerns without rewriting the student's solution.",
     enabled: true,
   },
+  {
+    id: "check_code_syntax",
+    title: "Check code syntax",
+    prompt:
+      "Review the student's code for syntax errors, Python best practices, and language-specific issues. Point out problematic patterns and suggest what to fix without rewriting the code.",
+    enabled: true,
+  },
+  {
+    id: "compare_to_optimal_solution",
+    title: "Compare to optimal solution",
+    prompt:
+      "You are comparing the student's code against an optimal reference solution. First, analyze the assignment description to understand what the problem requires. Then generate an optimal approach internally and compare it to the student's code. Identify algorithmic differences, time/space complexity gaps, and structural improvements. Give feedback on how the student's approach differs from the optimal one without revealing the full reference solution. Focus on algorithmic thinking and design patterns.",
+    enabled: true,
+  },
+  {
+    id: "personalized_feedback",
+    title: "Personalized feedback",
+    prompt:
+      "Based on this student's history and current submission, provide personalized feedback. Reference patterns from their previous work where relevant. Focus on areas where this specific student tends to struggle and give targeted guidance. Encourage growth and acknowledge improvements from past submissions.",
+    enabled: true,
+  },
 ];
 
 export function normalizeAiAllowedInputs(value = {}) {
