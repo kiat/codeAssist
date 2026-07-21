@@ -18,7 +18,7 @@ def create_app(config_class='config.Config'):
 
     # Load environment variables first so SECRET_KEY etc. are available
     load_dotenv()
-    
+
     # Load the configuration (provides defaults like SECRET_KEY for test config)
     app.config.from_object(config_class)
 
@@ -29,7 +29,14 @@ def create_app(config_class='config.Config'):
             "SECRET_KEY environment variable is required. "
             "Set it to a random secret string (e.g. python -c 'import secrets; print(secrets.token_hex(32))')."
         )
-    
+
+    if not app.config.get('SESSION_COOKIE_SECURE'):
+        app.logger.warning(
+            "SESSION_COOKIE_SECURE is not set to true; session cookies will be "
+            "sent over plain HTTP. Set SESSION_COOKIE_SECURE=true in the "
+            "environment for production and cross-domain deployments."
+        )
+
     # Initialize the extensions with the app
     # Lock CORS to the actual frontend origin to prevent CSRF on credentialed requests.
     # FRONTEND_ORIGIN must be set in production; defaults to localhost only for dev.

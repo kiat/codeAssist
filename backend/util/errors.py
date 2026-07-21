@@ -36,6 +36,11 @@ class ForbiddenError(Exception):
     def __init__(self, message="Forbidden error"):
         super().__init__(message)
 
+class UnauthorizedError(Exception):
+    status_code = 401
+    def __init__(self, message="Not authenticated"):
+        super().__init__(message)
+
 class TooManyRequestsError(Exception):
     status_code = 429
     def __init__(self, message="Too many requests"):
@@ -75,6 +80,10 @@ def register_error_handlers(app):
         
     @app.errorhandler(ForbiddenError)
     def handle_forbidden_error(error):
+        return jsonify({"message": str(error)}), error.status_code
+
+    @app.errorhandler(UnauthorizedError)
+    def handle_unauthorized_error(error):
         return jsonify({"message": str(error)}), error.status_code
 
     @app.errorhandler(TooManyRequestsError)
