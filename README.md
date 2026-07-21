@@ -51,15 +51,6 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     ```
 Note: PASSWORD_SALT is used for password hashing so the same password produces consistent hashed values across local environments. The backend can still run without this value, but it may fall back to less secure password handling depending on the local configuration. For normal development and testing, developers should use the shared project salt in their .env file when available.
 
-    Optional backend environment variables (session auth / CORS):
-
-    ```bash
-    SECRET_KEY="random secret used to sign session cookies; required in production, auto-generated fallback otherwise"
-    FRONTEND_URL="http://localhost:3000"          # comma-separated list of allowed CORS origins
-    SESSION_COOKIE_SAMESITE="Lax"                 # set to "None" if the frontend is on a different domain
-    SESSION_COOKIE_SECURE="false"                 # must be "true" (HTTPS) whenever SameSite is "None"
-    ```
-
 5. run `docker compose up`
 
 6. Visit the pgadmin website via the url in the container. login with the default login:  

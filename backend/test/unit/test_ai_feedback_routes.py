@@ -290,3 +290,152 @@ def test_update_assignment_ai_settings_rejects_invalid_usage_limits(
     assert resp.status_code == 400
     assert message in resp.json["message"]
     mock_rollback.assert_called_once()
+
+
+# --- Tests for GET /assignments/<id>/prompts ---
+
+
+def test_get_prompts_returns_enabled_prompts(client, mocker):
+    mock_assignment = Assignment(
+        id="assignment-uuid",
+        name="AI Assignment",
+        course_id="course-uuid",
+        ai_feedback_enabled=True,
+        ai_feedback_prompts=[
+            {"id": "p1", "title": "Debug", "prompt": "Help debug", "enabled": True},
+            {"id": "p2", "title": "Explain", "prompt": "Explain code", "enabled": False},
+        ],
+    )
+    _mock_ai_settings_queries(
+        mocker,
+        assignment=mock_assignment,
+        enrollment=Enrollment(student_id="stu-uuid", course_id="course-uuid", role="student"),
+    )
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-uuid"
+
+    resp = client.get(
+        "/assignments/assignment-uuid/prompts",
+        query_string={"student_id": "stu-uuid"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json["ai_feedback_enabled"] is True
+    assert len(resp.json["ai_feedback_prompts"]) == 1
+    assert resp.json["ai_feedback_prompts"][0]["id"] == "p1"
+
+
+def test_get_prompts_rejects_unauthenticated(client, mocker):
+    _mock_ai_settings_queries(mocker)
+
+    resp = client.get(
+        "/assignments/assignment-uuid/prompts",
+        query_string={"student_id": "stu-uuid"},
+    )
+
+    assert resp.status_code == 403
+    assert "Not authenticated" in resp.json["message"]
+
+
+def test_get_prompts_rejects_session_mismatch(client, mocker):
+    _mock_ai_settings_queries(mocker)
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "other-stu-uuid"
+
+    resp = client.get(
+        "/assignments/assignment-uuid/prompts",
+        query_string={"student_id": "stu-uuid"},
+    )
+
+    assert resp.status_code == 403
+    assert "You can only access your own data" in resp.json["message"]
+
+
+def test_get_prompts_rejects_unenrolled_student(client, mocker):
+    _mock_ai_settings_queries(mocker, enrollment=None)
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-uuid"
+
+    resp = client.get(
+        "/assignments/assignment-uuid/prompts",
+        query_string={"student_id": "stu-uuid"},
+    )
+
+    assert resp.status_code == 403
+    assert "not enrolled" in resp.json["message"]
+
+
+# --- Tests for GET /ai_feedback_status ---
+
+
+def test_get_ai_feedback_status_returns_status(client, mocker):
+    mock_assignment = Assignment(
+        id="assignment-uuid",
+        name="AI Assignment",
+        course_id="course-uuid",
+        ai_feedback_enabled=True,
+        ai_feedback_max_requests=10,
+    )
+    _mock_ai_settings_queries(
+        mocker,
+        assignment=mock_assignment,
+        enrollment=Enrollment(student_id="stu-uuid", course_id="course-uuid", role="student"),
+    )
+    # Mock _verify_student to avoid DB query for User model
+    mock_user = mocker.Mock()
+    mock_user.id = "stu-uuid"
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_user)
+    mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch("routes.code_editor.get_student_feedback_status", return_value={"remaining": 5, "wait_seconds": 0})
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-uuid"
+
+    resp = client.get(
+        "/ai_feedback_status",
+        query_string={"student_id": "stu-uuid", "assignment_id": "assignment-uuid"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json["ai_feedback_enabled"] is True
+    assert "remaining" in resp.json
+
+
+def test_get_ai_feedback_status_when_disabled(client, mocker):
+    mock_assignment = Assignment(
+        id="assignment-uuid",
+        course_id="course-uuid",
+        ai_feedback_enabled=False,
+    )
+    _mock_ai_settings_queries(mocker, assignment=mock_assignment)
+    # Mock _verify_student to avoid DB query for User model
+    mock_user = mocker.Mock()
+    mock_user.id = "stu-uuid"
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_user)
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-uuid"
+
+    resp = client.get(
+        "/ai_feedback_status",
+        query_string={"student_id": "stu-uuid", "assignment_id": "assignment-uuid"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json["ai_feedback_enabled"] is False
+    assert resp.json["remaining"] == 0
+
+
+def test_get_ai_feedback_status_rejects_unauthenticated(client, mocker):
+    _mock_ai_settings_queries(mocker)
+
+    resp = client.get(
+        "/ai_feedback_status",
+        query_string={"student_id": "stu-uuid", "assignment_id": "assignment-uuid"},
+    )
+
+    assert resp.status_code == 403
+    assert "Not authenticated" in resp.json["message"]

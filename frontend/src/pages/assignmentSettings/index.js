@@ -415,7 +415,7 @@ export default () => {
                     courseAiInfo.has_openai_api_key ||
                     courseAiInfo.has_gemini_api_key ||
                     courseAiInfo.has_claude_api_key ||
-                    courseAiInfo.has_ollama_api_key
+                    courseAiInfo.has_ollama_configured
                       ? "success"
                       : "warning"
                   }

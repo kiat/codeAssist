@@ -72,6 +72,40 @@ DEFAULT_AI_FEEDBACK_PROMPTS = [
         ),
         "enabled": True,
     },
+    {
+        "id": "check_code_syntax",
+        "title": "Check code syntax",
+        "prompt": (
+            "Review the student's code for syntax errors, Python best practices, "
+            "and language-specific issues. Point out problematic patterns and suggest "
+            "what to fix without rewriting the code."
+        ),
+        "enabled": True,
+    },
+    {
+        "id": "compare_to_optimal_solution",
+        "title": "Compare to optimal solution",
+        "prompt": (
+            "You are comparing the student's code against an optimal reference solution. "
+            "First, analyze the assignment description to understand what the problem requires. "
+            "Then generate an optimal approach internally and compare it to the student's code. "
+            "Identify algorithmic differences, time/space complexity gaps, and structural improvements. "
+            "Give feedback on how the student's approach differs from the optimal one without "
+            "revealing the full reference solution. Focus on algorithmic thinking and design patterns."
+        ),
+        "enabled": True,
+    },
+    {
+        "id": "personalized_feedback",
+        "title": "Personalized feedback",
+        "prompt": (
+            "Based on this student's history and current submission, provide personalized feedback. "
+            "Reference patterns from their previous work where relevant. "
+            "Focus on areas where this specific student tends to struggle and give targeted guidance. "
+            "Encourage growth and acknowledge improvements from past submissions."
+        ),
+        "enabled": True,
+    },
 ]
 
 AI_FEEDBACK_SETTING_KEYS = {
@@ -536,3 +570,174 @@ def render_feedback_context(context):
         rendered_sections.append(f"{title}:\n{value}")
 
     return "\n\n".join(rendered_sections)
+
+
+def check_feedback_limits(assignment, student_id):
+    """Check whether a student can request AI feedback for this assignment.
+
+    Returns a dict with:
+      allowed: bool
+      remaining: int or None (None = unlimited)
+      wait_seconds: int (seconds remaining before next request, 0 = ready)
+      message: str (human-readable reason when not allowed)
+    """
+    max_requests = getattr(assignment, "ai_feedback_max_requests", None)
+    wait_seconds = getattr(assignment, "ai_feedback_wait_seconds", 0) or 0
+
+    from api.models import AIFeedbackRequest
+    from api import db
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+
+    # Count existing requests
+    request_count = (
+        db.session.query(AIFeedbackRequest)
+        .filter_by(student_id=student_id, assignment_id=assignment.id)
+        .count()
+    )
+
+    # Check max requests
+    if max_requests is not None and max_requests == 0:
+        return {
+            "allowed": False,
+            "remaining": 0,
+            "wait_seconds": 0,
+            "message": "AI feedback is disabled for this assignment.",
+        }
+
+    remaining = None
+    if max_requests is not None:
+        remaining = max(0, max_requests - request_count)
+        if remaining <= 0:
+            return {
+                "allowed": False,
+                "remaining": 0,
+                "wait_seconds": 0,
+                "message": "You have used all your AI feedback requests for this assignment.",
+            }
+
+    # Check wait time
+    if wait_seconds > 0 and request_count > 0:
+        last_request = (
+            db.session.query(AIFeedbackRequest)
+            .filter_by(student_id=student_id, assignment_id=assignment.id)
+            .order_by(AIFeedbackRequest.created_at.desc())
+            .first()
+        )
+        if last_request:
+            elapsed = (now - last_request.created_at).total_seconds()
+            if elapsed < wait_seconds:
+                remaining_wait = int(wait_seconds - elapsed)
+                return {
+                    "allowed": False,
+                    "remaining": remaining,
+                    "wait_seconds": remaining_wait,
+                    "message": f"Please wait {remaining_wait} seconds before requesting AI feedback again.",
+                }
+
+    return {
+        "allowed": True,
+        "remaining": remaining,
+        "wait_seconds": 0,
+        "message": "",
+    }
+
+
+def record_feedback_request(student_id, assignment_id, prompt_id=None):
+    """Record an AI feedback request in the database."""
+    import uuid
+    from datetime import datetime, timezone
+    from api.models import AIFeedbackRequest
+    from api import db
+
+    request_record = AIFeedbackRequest(
+        id=str(uuid.uuid4()),
+        student_id=student_id,
+        assignment_id=assignment_id,
+        prompt_id=prompt_id,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.session.add(request_record)
+    db.session.commit()
+
+
+def get_student_feedback_status(assignment, student_id):
+    """Get the student's current feedback request status for this assignment."""
+    max_requests = getattr(assignment, "ai_feedback_max_requests", None)
+    wait_seconds = getattr(assignment, "ai_feedback_wait_seconds", 0) or 0
+
+    from api.models import AIFeedbackRequest
+    from api import db
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+
+    request_count = (
+        db.session.query(AIFeedbackRequest)
+        .filter_by(student_id=student_id, assignment_id=assignment.id)
+        .count()
+    )
+
+    remaining = None
+    if max_requests is not None:
+        remaining = max(0, max_requests - request_count)
+
+    wait_remaining = 0
+    if wait_seconds > 0 and request_count > 0:
+        last_request = (
+            db.session.query(AIFeedbackRequest)
+            .filter_by(student_id=student_id, assignment_id=assignment.id)
+            .order_by(AIFeedbackRequest.created_at.desc())
+            .first()
+        )
+        if last_request:
+            elapsed = (now - last_request.created_at).total_seconds()
+            if elapsed < wait_seconds:
+                wait_remaining = int(wait_seconds - elapsed)
+
+    return {
+        "remaining": remaining,
+        "wait_seconds": wait_remaining,
+        "max_requests": max_requests,
+        "total_requests": request_count,
+    }
+
+
+def get_chat_history(student_id, assignment_id, limit=20):
+    """Retrieve recent chat messages for a student's assignment."""
+    from api.models import AIChatMessage
+    from api import db
+
+    messages = (
+        db.session.query(AIChatMessage)
+        .filter_by(student_id=student_id, assignment_id=assignment_id)
+        .order_by(AIChatMessage.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    # Reverse to get chronological order
+    messages.reverse()
+
+    return [{"role": msg.role, "content": msg.content} for msg in messages]
+
+
+def store_chat_message(student_id, assignment_id, role, content, prompt_id=None):
+    """Store a chat message in the database for AI memory."""
+    import uuid
+    from datetime import datetime, timezone
+    from api.models import AIChatMessage
+    from api import db
+
+    message = AIChatMessage(
+        id=str(uuid.uuid4()),
+        student_id=student_id,
+        assignment_id=assignment_id,
+        role=role,
+        content=content,
+        prompt_id=prompt_id,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.session.add(message)
+    db.session.commit()

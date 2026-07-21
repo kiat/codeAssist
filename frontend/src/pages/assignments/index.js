@@ -165,6 +165,9 @@ export default function Assignments() {
     // Check if we're in the late submission window
     const inLateWindow = hasLateSubmission && dueDateHasPassed && lateDueDateTime && now.isBefore(lateDueDateTime);
 
+    const canSubmitOnTime = !dueDateHasPassed;
+    const canSubmitLate = inLateWindow;
+
     if (isSubmitted) {
       navigate(`/assignmentresult/${assignment.submissionId}`);
     } else if (!dueDateHasPassed || inLateWindow) {
