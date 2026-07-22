@@ -47,14 +47,15 @@ def create_user():
     if role not in valid_roles:
         raise BadRequestError("Invalid role. Must be one of: admin, instructor, student")
 
-    # Security: Only admins can create admin or instructor accounts
-    if role in ["admin", "instructor"]:
+    # Security: Only admins can create admin accounts. Public signup allows
+    # students and instructors because this app currently has no admin bootstrap UI.
+    if role == "admin":
         session_user_id = session.get("user_id")
         if not session_user_id:
             raise ForbiddenError("Not authenticated. Please log in.")
         session_user = db.session.query(User).filter_by(id=session_user_id).first()
         if not session_user or session_user.role != "admin":
-            raise ForbiddenError("Only administrators can create admin or instructor accounts")
+            raise ForbiddenError("Only administrators can create admin accounts")
 
     eid_check = db.session.query(User).filter_by(sis_user_id=sis_user_id).first()
     if eid_check:
@@ -81,6 +82,9 @@ def create_user():
     except Exception as e:
         db.session.rollback()
         raise InternalProcessingError("Error creating user")
+
+    if not session.get("user_id"):
+        session["user_id"] = user_id
     
     res = UserSchema().dump(user)
 
@@ -165,7 +169,12 @@ def create_google_user():
     name = request.json['name']
     email_address = data['email']
     sis_user_id = request.json['eid']
-    role = request.json['role']
+    role = request.json.get('role', 'student')
+    if not isinstance(role, str):
+        role = str(role)
+    role = role.lower()
+    if role not in ["student", "instructor"]:
+        raise BadRequestError("Invalid role. Must be one of: instructor, student")
 
     user_data = {
         "id": user_id,
@@ -178,6 +187,8 @@ def create_google_user():
 
     db.session.add(User(**user_data))
     db.session.commit()
+    if not session.get("user_id"):
+        session["user_id"] = user_id
 
     res = db.session.query(User).filter_by(id=user_id)
     res = UserSchema().dump(res, many=True)[0]

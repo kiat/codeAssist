@@ -1064,6 +1064,7 @@ def test_fetch_ai_models_claude_filters_unavailable_models(client, mocker):
         "data": [
             {"id": "claude-fable-5"},
             {"id": "claude-mythos-5"},
+            {"id": "claude-sonnet-5"},
             {"id": "claude-3-5-sonnet-20241022"},
             {"id": "claude-3-5-haiku-20241022"},
         ]
@@ -1082,7 +1083,7 @@ def test_fetch_ai_models_claude_filters_unavailable_models(client, mocker):
     assert response.status_code == 200
     assert "claude-fable-5" not in response.json["models"]
     assert "claude-mythos-5" not in response.json["models"]
-    assert response.json["models"][0] == "claude-3-5-sonnet-20241022"
+    assert response.json["models"][0] == "claude-sonnet-5"
 
 def test_test_ai_api_key_missing_provider_returns_400(client):
     response = client.post(

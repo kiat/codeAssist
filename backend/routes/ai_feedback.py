@@ -76,16 +76,10 @@ def get_assignment_prompts(assignment_id):
     if not assignment_obj:
         raise NotFoundError("Assignment not found")
 
-    student_id = request.args.get("student_id")
-    if not student_id:
-        raise BadRequestError("Missing student_id")
-
-    # Security: Verify session user matches the requested student_id
     session_user_id = session.get("user_id")
     if not session_user_id:
         raise ForbiddenError("Not authenticated. Please log in.")
-    if session_user_id != student_id:
-        raise ForbiddenError("You can only access your own data")
+    student_id = session_user_id
 
     # Verify student is enrolled
     enrollment = (

@@ -796,7 +796,7 @@ def get_active_submission():
     submission = db.session.query(Submission).filter_by(assignment_id=assignment, student_id=student, active=True).first()
 
     if not submission:
-        raise NotFoundError("No such submission found")
+        return jsonify({"message": "No active submission found", "data": None}), 200
     
     details = SubmissionSchema().dump(submission)
 

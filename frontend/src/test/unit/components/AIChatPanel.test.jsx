@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import AIChatPanel from "../../../components/AIChatPanel";
 
@@ -141,6 +141,32 @@ describe("AIChatPanel", () => {
         "Check correctness",
         "print('hello')",
         "check_correctness"
+      );
+    });
+  });
+
+  it("does not send a fake prompt_id for imperative feedback requests", async () => {
+    const onSendMessage = jest.fn().mockResolvedValue({
+      reply: "AI response",
+      feedback_status: { remaining: 4, wait_seconds: 0 },
+    });
+    const panelRef = React.createRef();
+
+    render(<AIChatPanel {...defaultProps} ref={panelRef} onSendMessage={onSendMessage} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Check correctness")).toBeInTheDocument();
+    });
+
+    act(() => {
+      panelRef.current.sendMessage("Please review my code.");
+    });
+
+    await waitFor(() => {
+      expect(onSendMessage).toHaveBeenCalledWith(
+        "Please review my code.",
+        "print('hello')",
+        undefined
       );
     });
   });

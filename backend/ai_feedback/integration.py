@@ -210,6 +210,24 @@ SECRET_KEY = os.getenv("API_SECRET_KEY")
 cipher = Fernet(SECRET_KEY) if SECRET_KEY else None
 
 
+def build_claude_messages_payload(model, max_tokens, system_prompt, user_prompt):
+    """Build a Claude Messages API payload.
+
+    Temperature is intentionally omitted because newer Claude models reject it.
+    """
+    return {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system_prompt,
+        "messages": [
+            {
+                "role": "user",
+                "content": user_prompt,
+            }
+        ],
+    }
+
+
 def fetch_submission_data(submission_id):
     """Fetch related submission, assignment, course, and student records from DB."""
     assignment_alias = aliased(Assignment)
@@ -492,18 +510,12 @@ def get_structured_feedback_from_claude(api_key, prompt, model, temperature, pas
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         },
-        json={
-            "model": model,
-            "max_tokens": 700,
-            "temperature": temperature,
-            "system": CORRECTNESS_SYSTEM_PROMPT,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
-        },
+        json=build_claude_messages_payload(
+            model,
+            700,
+            CORRECTNESS_SYSTEM_PROMPT,
+            prompt,
+        ),
         timeout=30,
     )
 

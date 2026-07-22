@@ -18,8 +18,8 @@ def upgrade():
     op.execute(
         """CREATE TABLE IF NOT EXISTS ai_feedback_requests (
             id VARCHAR PRIMARY KEY,
-            student_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            assignment_id VARCHAR NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+            student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            assignment_id UUID NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
             prompt_id VARCHAR,
             created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
         )"""

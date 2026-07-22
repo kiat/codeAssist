@@ -166,8 +166,8 @@ class CodeDraft(db.Model):
 class AIFeedbackRequest(db.Model):
     __tablename__ = "ai_feedback_requests"
     id = db.Column(db.String, primary_key=True, nullable=False)
-    student_id = db.Column(db.String, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    assignment_id = db.Column(db.String, db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
     prompt_id = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False)
 
@@ -178,8 +178,8 @@ class AIFeedbackRequest(db.Model):
 class AIChatMessage(db.Model):
     __tablename__ = "ai_chat_messages"
     id = db.Column(db.String, primary_key=True, nullable=False)
-    student_id = db.Column(db.String, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    assignment_id = db.Column(db.String, db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
     role = db.Column(db.String, nullable=False)
     content = db.Column(db.Text, nullable=False)
     prompt_id = db.Column(db.String, nullable=True)

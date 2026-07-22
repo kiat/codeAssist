@@ -317,7 +317,6 @@ def test_get_prompts_returns_enabled_prompts(client, mocker):
 
     resp = client.get(
         "/assignments/assignment-uuid/prompts",
-        query_string={"student_id": "stu-uuid"},
     )
 
     assert resp.status_code == 200
@@ -329,28 +328,10 @@ def test_get_prompts_returns_enabled_prompts(client, mocker):
 def test_get_prompts_rejects_unauthenticated(client, mocker):
     _mock_ai_settings_queries(mocker)
 
-    resp = client.get(
-        "/assignments/assignment-uuid/prompts",
-        query_string={"student_id": "stu-uuid"},
-    )
+    resp = client.get("/assignments/assignment-uuid/prompts")
 
     assert resp.status_code == 403
     assert "Not authenticated" in resp.json["message"]
-
-
-def test_get_prompts_rejects_session_mismatch(client, mocker):
-    _mock_ai_settings_queries(mocker)
-
-    with client.session_transaction() as sess:
-        sess["user_id"] = "other-stu-uuid"
-
-    resp = client.get(
-        "/assignments/assignment-uuid/prompts",
-        query_string={"student_id": "stu-uuid"},
-    )
-
-    assert resp.status_code == 403
-    assert "You can only access your own data" in resp.json["message"]
 
 
 def test_get_prompts_rejects_unenrolled_student(client, mocker):
@@ -361,7 +342,6 @@ def test_get_prompts_rejects_unenrolled_student(client, mocker):
 
     resp = client.get(
         "/assignments/assignment-uuid/prompts",
-        query_string={"student_id": "stu-uuid"},
     )
 
     assert resp.status_code == 403

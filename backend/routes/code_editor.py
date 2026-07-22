@@ -17,6 +17,7 @@ from util.errors import BadRequestError, NotFoundError, InternalProcessingError,
 from util.url_utils import validate_ollama_url
 from ai_feedback.integration import (
     async_get_ai_feedback,
+    build_claude_messages_payload,
     get_provider_and_model,
     get_provider_credentials,
     get_temperature,
@@ -687,18 +688,12 @@ def _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperatur
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
-            json={
-                "model": model,
-                "max_tokens": 500,
-                "temperature": float(temperature),
-                "system": AI_CHAT_SYSTEM_PROMPT,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": user_prompt,
-                    }
-                ],
-            },
+            json=build_claude_messages_payload(
+                model,
+                500,
+                AI_CHAT_SYSTEM_PROMPT,
+                user_prompt,
+            ),
             timeout=30,
         )
 
@@ -985,7 +980,11 @@ def ai_chat():
             raise BadRequestError("AI service quota exceeded. Please contact your instructor to update the API key.")
         elif "invalid_api_key" in error_msg or "401" in error_msg:
             raise BadRequestError("Invalid API key. Please contact your instructor.")
-        elif "does not exist" in error_msg or "model_not_found" in error_msg:
+        elif (
+            "does not exist" in error_msg
+            or "model_not_found" in error_msg
+            or "not_found_error" in error_msg
+        ):
             raise BadRequestError(f"AI model '{model}' is not available. Please contact your instructor.")
         raise BadRequestError(str(e))
     except BadRequestError:

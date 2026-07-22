@@ -49,13 +49,17 @@ export default function CodeEditorPage() {
   const handleAiChat = useCallback(
     async (message, currentCode, promptId) => {
       try {
-        const res = await aiChat({
+        const payload = {
           student_id: userInfo.id,
           assignment_id: assignmentId,
           message,
           code: currentCode,
-          prompt_id: promptId,
-        });
+        };
+        if (promptId) {
+          payload.prompt_id = promptId;
+        }
+
+        const res = await aiChat(payload);
         return res.data;
       } catch (err) {
         // Return the error as a normal reply so the chat panel shows it

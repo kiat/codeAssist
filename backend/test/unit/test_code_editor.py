@@ -626,6 +626,51 @@ def test_ai_chat_no_api_key(client, mocker):
     assert "not configured" in resp.get_json()["message"].lower()
 
 
+def test_ai_chat_claude_not_found_returns_clean_model_error(client, mocker):
+    mock_student = mocker.Mock()
+    mock_student.coding_insights = "No history."
+    mocker.patch("routes.code_editor._verify_student", return_value=mock_student)
+    mocker.patch("routes.code_editor._verify_enrollment")
+    mocker.patch("routes.code_editor.get_chat_history", return_value=[])
+    mocker.patch(
+        "routes.code_editor.check_feedback_limits",
+        return_value={"allowed": True, "remaining": None, "wait_seconds": 0, "message": ""},
+    )
+    mocker.patch("routes.code_editor.get_provider_credentials", return_value=("claude-key", None))
+    mocker.patch("routes.code_editor.get_provider_and_model", return_value=("claude", "claude-3-5-sonnet-20241022"))
+    mocker.patch("routes.code_editor.get_temperature", return_value=0.4)
+    mocker.patch(
+        "routes.code_editor._get_ai_chat_reply",
+        side_effect=ValueError(
+            'Claude API error: {"type":"error","error":{"type":"not_found_error",'
+            '"message":"model: claude-3-5-sonnet-20241022"}}'
+        ),
+    )
+
+    mock_assignment = mocker.Mock()
+    mock_assignment.ai_feedback_enabled = True
+    mock_assignment.course_id = "course-1"
+    mock_course = mocker.Mock()
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        mock_assignment,
+        mock_course,
+    ]
+
+    resp = client.post("/ai_chat", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "message": "help me",
+        "code": "print('hi')",
+    })
+
+    assert resp.status_code == 400
+    assert resp.get_json()["message"] == (
+        "AI model 'claude-3-5-sonnet-20241022' is not available. "
+        "Please contact your instructor."
+    )
+
+
 def test_ai_chat_uses_custom_openai_provider_with_assignment_key(client, mocker):
     mock_student = mocker.Mock()
     mock_student.coding_insights = "No history."
@@ -922,7 +967,7 @@ def test_ai_chat_uses_custom_claude_provider_without_openai_key(client, mocker):
     mock_assignment.course_id = "course-1"
     mock_assignment.use_course_ai_default = False
     mock_assignment.ai_feedback_provider = "claude"
-    mock_assignment.ai_feedback_model = "claude-3-5-sonnet-20241022"
+    mock_assignment.ai_feedback_model = "claude-sonnet-5"
     mock_assignment.ai_feedback_temperature = 0.4
     mock_assignment.ai_feedback_api_key = ""
 
@@ -969,5 +1014,6 @@ def test_ai_chat_uses_custom_claude_provider_without_openai_key(client, mocker):
     assert mock_post.call_args.kwargs["headers"]["x-api-key"] == "decrypted-claude-key"
     assert (
         mock_post.call_args.kwargs["json"]["model"]
-        == "claude-3-5-sonnet-20241022"
+        == "claude-sonnet-5"
     )
+    assert "temperature" not in mock_post.call_args.kwargs["json"]

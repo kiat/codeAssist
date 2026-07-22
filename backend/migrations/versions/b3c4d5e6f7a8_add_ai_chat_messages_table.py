@@ -18,8 +18,8 @@ def upgrade():
     op.execute(
         """CREATE TABLE IF NOT EXISTS ai_chat_messages (
             id VARCHAR PRIMARY KEY,
-            student_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            assignment_id VARCHAR NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+            student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            assignment_id UUID NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
             role VARCHAR NOT NULL,
             content TEXT NOT NULL,
             prompt_id VARCHAR,

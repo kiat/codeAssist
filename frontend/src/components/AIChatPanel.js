@@ -214,14 +214,15 @@ const AIChatPanel = forwardRef(function AIChatPanel(
   useImperativeHandle(ref, () => ({
     sendMessage: (text, promptId) => {
       if (disabledRef.current) return;
-      const matchedPrompt = prompts.find((p) => p.id === promptId) || {
-        id: "custom",
-        title: text,
-        prompt: text,
-      };
-      setMessages((prev) => [...prev, { role: "user", content: matchedPrompt.title }]);
+      const matchedPrompt = promptId
+        ? prompts.find((p) => p.id === promptId)
+        : null;
+      const messageText = matchedPrompt?.title || text;
+      const selectedPromptId = matchedPrompt?.id;
+
+      setMessages((prev) => [...prev, { role: "user", content: messageText }]);
       setLoading(true);
-      onSendMessageRef.current(matchedPrompt.prompt, codeRef.current, matchedPrompt.id)
+      onSendMessageRef.current(messageText, codeRef.current, selectedPromptId)
         .then((result) => {
           const reply =
             typeof result === "string" ? result : result?.reply || "No response received.";

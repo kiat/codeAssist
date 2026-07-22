@@ -103,7 +103,8 @@ export default function Assignments() {
                   new URLSearchParams({
                     student_id: userInfo.id,
                     assignment_id: assignment.id,
-                  })
+                  }),
+                { credentials: "include" }
               );
               const activeData = await activeSubmissions.json();
               const submitted = activeData.completed;

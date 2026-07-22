@@ -277,9 +277,10 @@ def test_get_active_submission_not_found(client, mocker):
     dummy_query.return_value.filter_by.return_value.first.return_value = None
 
     response = client.get("/get_active_submission?student_id=stu1&assignment_id=assgn1")
-    assert response.status_code == 404
+    assert response.status_code == 200
     data = response.get_json()
-    assert data["message"] == "No such submission found"
+    assert data["message"] == "No active submission found"
+    assert data["data"] is None
 
 
 # Edge cases to add in route implementations

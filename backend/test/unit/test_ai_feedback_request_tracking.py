@@ -3,7 +3,9 @@ from datetime import datetime, timezone, timedelta
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy.dialects.postgresql import UUID
 
+from api.models import AIFeedbackRequest, AIChatMessage
 from ai_feedback.settings import (
     check_feedback_limits,
     get_student_feedback_status,
@@ -23,6 +25,13 @@ def _make_assignment(**kwargs):
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
+
+
+def test_ai_feedback_foreign_keys_use_uuid_columns():
+    """AI feedback FK columns must match users.id and assignments.id UUID columns."""
+    for model in (AIFeedbackRequest, AIChatMessage):
+        assert isinstance(model.__table__.c.student_id.type, UUID)
+        assert isinstance(model.__table__.c.assignment_id.type, UUID)
 
 
 # ---------------------------------------------------------------------------
