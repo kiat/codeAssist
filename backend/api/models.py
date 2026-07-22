@@ -163,6 +163,32 @@ class CodeDraft(db.Model):
     saved_at = db.Column(TIMESTAMP(timezone=True), nullable=False)
     auto_saved = db.Column(db.Boolean, nullable=False, default=False)
 
+class AIFeedbackRequest(db.Model):
+    __tablename__ = "ai_feedback_requests"
+    id = db.Column(db.String, primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    prompt_id = db.Column(db.String, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    student = db.relationship("User", backref=db.backref("ai_feedback_requests", lazy="dynamic"))
+    assignment = db.relationship("Assignment", backref=db.backref("ai_feedback_requests", lazy="dynamic"))
+
+
+class AIChatMessage(db.Model):
+    __tablename__ = "ai_chat_messages"
+    id = db.Column(db.String, primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = db.Column(db.String, nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    prompt_id = db.Column(db.String, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    student = db.relationship("User", backref=db.backref("ai_chat_messages", lazy="dynamic"))
+    assignment = db.relationship("Assignment", backref=db.backref("ai_chat_messages", lazy="dynamic"))
+
+
 class AdminEmail(db.Model):
     __tablename__ = 'admin_emails'
     id = db.Column(db.Integer, primary_key=True)

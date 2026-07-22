@@ -16,12 +16,15 @@ function RegradeRequests() {
           ? `${process.env.REACT_APP_API_URL}/get_student_regrade_requests?student_id=${userInfo.id}&course_id=${courseInfo.id}`
           : `${process.env.REACT_APP_API_URL}/get_instructor_regrade_requests?course_id=${courseInfo.id}`;
 
-        const response = await fetch(endpoint);
+        const response = await fetch(endpoint, { credentials: "include" });
         const data = await response.json();
         
         // Fetch the latest submission for each regrade request
         const requestsWithSubmissions = await Promise.all(data.map(async (request) => {
-          const submissionResponse = await fetch(`${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${request.studentId}&assignment_id=${request.assignmentId}`);
+          const submissionResponse = await fetch(
+            `${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${request.studentId}&assignment_id=${request.assignmentId}`,
+            { credentials: "include" }
+          );
           // const submissionResponse = await fetch(
           //   `${process.env.REACT_APP_API_URL}/get_latest_submission?student_id=${request.studentId}&assignment_id=${request.assignmentId}`
           // );

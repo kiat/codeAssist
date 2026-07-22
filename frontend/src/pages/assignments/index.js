@@ -103,7 +103,8 @@ export default function Assignments() {
                   new URLSearchParams({
                     student_id: userInfo.id,
                     assignment_id: assignment.id,
-                  })
+                  }),
+                { credentials: "include" }
               );
               const activeData = await activeSubmissions.json();
               const submitted = activeData.completed;
@@ -164,6 +165,9 @@ export default function Assignments() {
 
     // Check if we're in the late submission window
     const inLateWindow = hasLateSubmission && dueDateHasPassed && lateDueDateTime && now.isBefore(lateDueDateTime);
+
+    const canSubmitOnTime = !dueDateHasPassed;
+    const canSubmitLate = inLateWindow;
 
     if (isSubmitted) {
       navigate(`/assignmentresult/${assignment.submissionId}`);

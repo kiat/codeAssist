@@ -26,6 +26,9 @@ def test_normalize_feedback_prompts_returns_default_prompt_set():
         "explain_runtime_errors",
         "review_code_style",
         "suggest_algorithmic_improvements",
+        "check_code_syntax",
+        "compare_to_optimal_solution",
+        "personalized_feedback",
     ]
     assert all(prompt["enabled"] is True for prompt in prompts)
     assert all(prompt["title"] for prompt in prompts)

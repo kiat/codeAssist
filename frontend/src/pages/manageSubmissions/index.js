@@ -136,7 +136,10 @@ const SubmissionsManager = () => {
     const fetchSubmissions = async (students) => {
       const submissions = await Promise.all(
         students.map(async (student) => {
-          const response = await fetch(`${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${student.id}&assignment_id=${assignmentInfo.id}`);
+          const response = await fetch(
+            `${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${student.id}&assignment_id=${assignmentInfo.id}`,
+            { credentials: "include" }
+          );
           const data = await response.json();
 
           // Ensure that each submission has a non-null score, a name, and a submission time

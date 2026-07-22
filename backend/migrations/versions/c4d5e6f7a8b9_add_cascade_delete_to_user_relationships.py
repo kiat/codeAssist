@@ -6,7 +6,7 @@ are now automatically removed by the database, preventing orphaned
 rows.
 
 Revision ID: c4d5e6f7a8b9
-Revises: b2c3d4e5f6a7
+Revises: b3c4d5e6f7a8
 Create Date: 2026-06-18 00:00:00.000000
 
 """
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'c4d5e6f7a8b9'
-down_revision = '1bdb41066778'
+down_revision = 'b3c4d5e6f7a8'
 branch_labels = None
 depends_on = None
 
