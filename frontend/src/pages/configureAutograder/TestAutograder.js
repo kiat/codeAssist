@@ -1,0 +1,114 @@
+import { useState } from "react";
+import { Button, Form, Modal, Radio, Select, Typography, Upload, message } from "antd";
+import { useNavigate } from "react-router-dom";
+
+export default ({ open, onCancel, autograderFile, onSuccess }) => {
+  const [uploadedSubmission, setUploadedSubmission] = useState(null);
+  const [uploadedAutograder, setUploadedAutograder] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const navigate = useNavigate();
+
+  const handleTestAutograder = async () => {
+    if (!uploadedSubmission || !autograderFile) {
+      message.error("Please upload a submission file.");
+      return;
+    }
+
+    console.log("Uploaded file is:", uploadedSubmission.name);
+    console.log("uploaded autograder is:", autograderFile);
+    message.success(`Hang tight! Processing your submission`);
+
+    const formData = new FormData();
+    formData.append("submission_file", uploadedSubmission);
+    formData.append("autograder_zip", autograderFile);
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/test_autograder_submission`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        if (onSuccess) {
+          onSuccess(data);
+        } else {
+          message.error(data?.error || "uh oh");
+        }
+        localStorage.setItem("testAutograderResults", JSON.stringify(data.results));
+      } else {
+        message.error(data?.error || "Autograder test failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      message.error("hihi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal open={open} title="Submit Programming Assignment" onCancel={onCancel} onOk={handleTestAutograder} confirmLoading={loading}>
+      <Form layout="vertical">
+        <Form.Item label="SUBMISSION METHOD" name="submissionMethod">
+          <Radio.Group
+            defaultValue={0}
+            options={[
+              { label: "Upload", value: 0 },
+              { label: "GitHUb", value: 1 },
+              { label: "Bitbucket", value: 2 },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item noStyle shouldUpdate={(pv, cv) => pv.submissionMethod !== cv.submissionMethod}>
+          {({ getFieldValue }) => {
+            switch (getFieldValue("submissionMethod")) {
+              case 2:
+                return (
+                  <>
+                    <Form.Item label="CONNECT YOUR ACCOUNT">
+                      <Button>Connect to Bitbucket</Button>
+                    </Form.Item>
+                    <Form.Item label="REPOSITORY" name="repository">
+                      <Select placeholder="Select a repository" />
+                    </Form.Item>
+                    <Form.Item label="BRANCH" name="branch">
+                      <Select placeholder="Select a branch" />
+                    </Form.Item>
+                  </>
+                );
+              case 1:
+                return (
+                  <>
+                    <Form.Item label="REPOSITORY" name="repository">
+                      <Select placeholder="Select a repository" />
+                    </Form.Item>
+                    <Form.Item label="BRANCH" name="branch">
+                      <Select placeholder="Select a branch" />
+                    </Form.Item>
+                  </>
+                );
+              default:
+                return (
+                  <Upload.Dragger
+                    maxCount={1}
+                    beforeUpload={(file) => {
+                      setUploadedSubmission(file);
+                      return false; //prevent autoupload
+                    }}
+                  >
+                    <div>
+                      <Typography.Title level={4}>Drag & Drop</Typography.Title>
+                      <Typography.Paragraph>Any file(s) including .zip. Click to browse.</Typography.Paragraph>
+                    </div>
+                  </Upload.Dragger>
+                );
+            }
+          }}
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+};
