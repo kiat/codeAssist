@@ -37,6 +37,9 @@ def create_user():
     role = request.json.get('role')
     if not name or name == "" or not password or password == "" or not email_address or email_address == "" or not sis_user_id or sis_user_id == "" or not role or role == "":
         raise BadRequestError("Missing required fields")
+
+    if len(password) < 6:
+        raise BadRequestError("Password must be at least 6 characters")
     
     if not isinstance(role, str):
         role = str(role)
@@ -370,6 +373,8 @@ def update_account():
     new_name = request.json.get('name')
     new_password = request.json.get('password')
 
+    if new_password is not None and len(new_password) < 6:
+        raise BadRequestError("Password must be at least 6 characters")
 
     # Find the user in the database
     user = db.session.query(User).filter_by(id=user_id).first()

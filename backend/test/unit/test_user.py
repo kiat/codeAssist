@@ -147,6 +147,22 @@ def test_create_user_missing_fields(client):
     assert response.status_code == 400
     assert response.json["message"] == "Missing required fields"
 
+
+def test_create_user_short_password(client):
+    payload = {
+        "name": "John Doe",
+        "password": "123",
+        "email_address": "john@example.com",
+        "eid": "EID123",
+        "role": "student",
+    }
+
+    response = client.post("/create_user", json=payload)
+
+    assert response.status_code == 400
+    assert response.json["message"] == "Password must be at least 6 characters"
+
+
 def test_create_user_duplicate_eid(client, mock_user_query):
     """Test creating a user with a duplicate EID."""
     mock_query, _ = mock_user_query
