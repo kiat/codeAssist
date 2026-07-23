@@ -1,7 +1,11 @@
 import pytest
+import uuid
+from datetime import datetime
 from api import create_app
+from api.models import Assignment, Course, Enrollment, RegradeRequest, Submission, User
 from util.errors import BadRequestError, ConflictError, NotFoundError, InternalProcessingError
 from routes.course import allowed_file, create_enrollment_bulk
+from routes.course import db
 
 @pytest.fixture
 def app():
@@ -436,16 +440,111 @@ def test_get_course_enrollment_missing_course_id(client):
     assert response.status_code == 400
     assert response.json["message"] == "Missing course_id argument"
 
-def test_get_course_assignments_success(client, mocker):
-    mock_query = mocker.patch("routes.course.db.session.query")
-    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(id="assignment-1", name="Assignment 1")]
-    mock_schema = mocker.patch("routes.course.AssignmentSchema")
-    mock_schema.return_value.dump.return_value = [{"id": "assignment-1", "name": "Assignment 1"}]
+def test_get_course_assignments_success(client):
+    instructor_id = str(uuid.uuid4())
+    student_1_id = str(uuid.uuid4())
+    student_2_id = str(uuid.uuid4())
+    course_id = str(uuid.uuid4())
+    assignment_id = str(uuid.uuid4())
+    submission_1_id = str(uuid.uuid4())
 
-    response = client.get("/get_course_assignments", query_string={"course_id": "course-123"})
+    db.session.add_all([
+        User(
+            id=instructor_id,
+            name="Instructor",
+            password="secret123",
+            email_address="instructor@example.com",
+            sis_user_id="inst-1",
+            role="instructor",
+        ),
+        User(
+            id=student_1_id,
+            name="Student One",
+            password="secret123",
+            email_address="student1@example.com",
+            sis_user_id="student-1",
+            role="student",
+        ),
+        User(
+            id=student_2_id,
+            name="Student Two",
+            password="secret123",
+            email_address="student2@example.com",
+            sis_user_id="student-2",
+            role="student",
+        ),
+        Course(
+            id=course_id,
+            name="CS101",
+            instructor_id=instructor_id,
+            semester="Fall",
+            year="2025",
+            entryCode="COURSE123",
+        ),
+        Assignment(
+            id=assignment_id,
+            name="Assignment 1",
+            course_id=course_id,
+        ),
+        Enrollment(
+            student_id=instructor_id,
+            course_id=course_id,
+            role="instructor",
+        ),
+        Enrollment(
+            student_id=student_1_id,
+            course_id=course_id,
+            role="student",
+        ),
+        Enrollment(
+            student_id=student_2_id,
+            course_id=course_id,
+            role="student",
+        ),
+        Submission(
+            id=submission_1_id,
+            file_name="student1.py",
+            submission_number=1,
+            submitted_at=datetime.now(),
+            student_id=student_1_id,
+            assignment_id=assignment_id,
+            student_code_file=b"print('hello')",
+            score=95,
+            execution_time=1.0,
+            active=True,
+            completed=True,
+        ),
+        Submission(
+            id=str(uuid.uuid4()),
+            file_name="student2.py",
+            submission_number=1,
+            submitted_at=datetime.now(),
+            student_id=student_2_id,
+            assignment_id=assignment_id,
+            student_code_file=b"print('hello')",
+            score=None,
+            execution_time=1.0,
+            active=False,
+            completed=False,
+        ),
+        RegradeRequest(
+            id=str(uuid.uuid4()),
+            submission_id=submission_1_id,
+            justification="Please review",
+        ),
+    ])
+    db.session.commit()
+
+    response = client.get("/get_course_assignments", query_string={"course_id": course_id})
 
     assert response.status_code == 200
-    assert response.json == [{"id": "assignment-1", "name": "Assignment 1"}]
+    assert response.json[0]["id"] == assignment_id
+    assert response.json[0]["name"] == "Assignment 1"
+    assert response.json[0]["submissions"] == 2
+    assert response.json[0]["graded_count"] == 1
+    assert response.json[0]["total_students"] == 2
+    assert response.json[0]["graded"] == 50
+    assert response.json[0]["regrades"] == 1
 
 def test_get_course_assignments_missing_course_id(client):
     response = client.get("/get_course_assignments")

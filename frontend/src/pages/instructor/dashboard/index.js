@@ -16,26 +16,29 @@ import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
+import { normalizeAssignmentForTable } from "../../../utils/assignmentData";
+import { getCourseAssignments, getCourseInfo } from "../../../services/course";
+
 //for now change this to a course_id you have in the database
 const columns = [
   {
     title: "ACTIVE ASSIGNMENTS",
     dataIndex: "name",
-    sorter: (a, b) => a.assignmentName > b.assignmentName,
+    sorter: (a, b) => a.name.localeCompare(b.name),
     render: (text, record) => (
       <Link to={`/assignment/reviewGrades/${record.id}`}>{text}</Link>
     ),
   },
   {
     title: "RELEASED",
-    dataIndex: "published_date",
-    sorter: (a, b) => a.released - b.released,
+    dataIndex: "released",
+    sorter: (a, b) => new Date(a.released || 0) - new Date(b.released || 0),
     render: (text) => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
   },
   {
     title: "DUE(CDT)",
-    dataIndex: "due_date",
-    sorter: (a, b) => a.due - b.due,
+    dataIndex: "due",
+    sorter: (a, b) => new Date(a.due || 0) - new Date(b.due || 0),
     render: (text) => moment(text).format("MMM DD [AT] h:mmA").toUpperCase(),
   },
   {
@@ -71,23 +74,14 @@ export default function InstructorDashboard() {
   const [data, setData] = useState([]);
   const { courseInfo, updateCourseInfo, userInfo } = useContext(GlobalContext);
 
-  const fetchData = async (endpoint, params) => {
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}?${new URLSearchParams(params)}`);
-      if (!response.ok) throw new Error('Network response was not ok.');
-      return await response.json();
-    } catch (error) {
-      console.error('There has been a problem with your fetch operation:', error);
-    }
-  };
-  
   useEffect(() => {
     const initFetch = async () => {
-      const assignmentsData = await fetchData("/get_course_assignments", { course_id: courseId });
-      setData(assignmentsData);
+      const assignmentsResponse = await getCourseAssignments({ course_id: courseId });
+      setData((assignmentsResponse.data || []).map(normalizeAssignmentForTable));
       
       if (!courseInfo.id || !courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode || !courseInfo.description) {
-        const courseDetails = await fetchData("/get_course_info", { course_id: courseId });
+        const courseResponse = await getCourseInfo({ course_id: courseId });
+        const courseDetails = courseResponse.data;
         if (courseDetails && courseDetails.length > 0) {
           const [detail] = courseDetails;
           updateCourseInfo({ ...detail, id: courseId });
