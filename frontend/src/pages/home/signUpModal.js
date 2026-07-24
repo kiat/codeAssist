@@ -1,5 +1,5 @@
 import { Button, Form, Input, Modal, Radio } from "antd";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { GlobalContext } from "../../App";
 import { createUser } from "../../services/user";
 
@@ -10,13 +10,14 @@ import { createUser } from "../../services/user";
  */
 export default function SignUpModal({ open, onCancel }) {
   const { updateUserInfo } = useContext(GlobalContext);
+  const [selectedRole, setSelectedRole] = useState("student");
 
   // action after successfully signup
   const finishSignUp = async (values) => {
-    const { role, ...restValue } = values;
+    const role = selectedRole;
 
     try {
-      const res = await createUser({ ...restValue, role });
+      const res = await createUser({ ...values, role });
 
       if (res) {
         const userInfo = {
@@ -38,7 +39,13 @@ export default function SignUpModal({ open, onCancel }) {
     <Modal title="SIGN UP" open={open} footer={null} onCancel={onCancel}>
       <Form layout="vertical" onFinish={finishSignUp}>
         <Form.Item name="role" initialValue="student">
-          <Radio.Group optionType="button" buttonStyle="solid" style={{ width: "100%" }}>
+          <Radio.Group
+            optionType="button"
+            buttonStyle="solid"
+            value={selectedRole}
+            onChange={(event) => setSelectedRole(event.target.value)}
+            style={{ width: "100%" }}
+          >
             <Radio.Button value="student" style={{ width: "50%", textAlign: "center" }}>
               Student
             </Radio.Button>

@@ -22,6 +22,7 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
     try {
       const response = await axios.get(`${process.env.REACT_APP_API_URL}/get_submissions`, {
         params: { student_id: studentId, assignment_id: assignmentId },
+        withCredentials: true,
       });
       // If you need to show the highest scored submission as active, sort the data here
       // Sort by score descending and submission time ascending to get the latest highest score on top
@@ -39,7 +40,10 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
         return;
       }
 
-      const submissionResponse = await fetch(`${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${studentId}&assignment_id=${assignmentId}`);
+      const submissionResponse = await fetch(
+        `${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${studentId}&assignment_id=${assignmentId}`,
+        { credentials: "include" }
+      );
       if (!submissionResponse.ok) {
         setActiveSubmission(null);
         setHasRequest(false);
@@ -59,6 +63,7 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
         `${process.env.REACT_APP_API_URL}/check_regrade_request`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
@@ -102,6 +107,7 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
           `${process.env.REACT_APP_API_URL}/delete_regrade_request`,
           {
             method: "POST",
+            credentials: "include",
             headers: {
               "Content-Type": "application/json",
             },
@@ -128,6 +134,8 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
         submission_id: submissionId,
         student_id: studentId,
         assignment_id: assignmentId,
+      }, {
+        withCredentials: true,
       });
       message.success("Submission activated successfully");
       await getSubmissions();

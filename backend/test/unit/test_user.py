@@ -33,6 +33,7 @@ def test_create_user_success(client, mocker, mock_user_query):
     mock_query, mock_user_schema = mock_user_query
     mock_commit = mocker.patch("routes.user.db.session.commit")
     mock_add = mocker.patch("routes.user.db.session.add")
+    mocker.patch("routes.user.uuid.uuid4", return_value=uuid.UUID("11111111-1111-1111-1111-111111111111"))
 
     mock_user_schema.return_value.dump.return_value = {"id": "123", "name": "John Doe"}
     mock_query.return_value.filter_by.return_value.first.return_value = None
@@ -55,6 +56,88 @@ def test_create_user_success(client, mocker, mock_user_query):
     mock_add.assert_called_once()
 
     assert mock_query.return_value.filter_by.call_count == 2
+    with client.session_transaction() as sess:
+        assert sess["user_id"] == "11111111-1111-1111-1111-111111111111"
+
+
+def test_create_instructor_success(client, mocker, mock_user_query):
+    mock_query, mock_user_schema = mock_user_query
+    mock_commit = mocker.patch("routes.user.db.session.commit")
+    mock_add = mocker.patch("routes.user.db.session.add")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+    mock_user_schema.return_value.dump.return_value = {
+        "id": "instructor-uuid",
+        "name": "Prof Test",
+        "role": "instructor",
+    }
+
+    payload = {
+        "name": "Prof Test",
+        "password": "password123",
+        "email_address": "prof@example.com",
+        "eid": "PROF123",
+        "role": "instructor",
+    }
+
+    response = client.post("/create_user", json=payload)
+
+    assert response.status_code == 201
+    assert response.json["role"] == "instructor"
+    mock_add.assert_called_once()
+    mock_commit.assert_called_once()
+    assert mock_query.return_value.filter_by.call_count == 2
+
+
+def test_create_admin_requires_admin_session(client):
+    payload = {
+        "name": "Admin Test",
+        "password": "password123",
+        "email_address": "admin@example.com",
+        "eid": "ADMIN123",
+        "role": "admin",
+    }
+
+    response = client.post("/create_user", json=payload)
+
+    assert response.status_code == 403
+    assert response.json["message"] == "Not authenticated. Please log in."
+
+
+def test_admin_can_create_admin(client, mocker, mock_user_query):
+    mock_query, mock_user_schema = mock_user_query
+    mock_commit = mocker.patch("routes.user.db.session.commit")
+    mock_add = mocker.patch("routes.user.db.session.add")
+
+    admin = mocker.Mock()
+    admin.id = "admin-uuid"
+    admin.role = "admin"
+    mock_query.return_value.filter_by.return_value.first.side_effect = [
+        admin,
+        None,
+        None,
+    ]
+    mock_user_schema.return_value.dump.return_value = {
+        "id": "new-admin-uuid",
+        "name": "Admin Test",
+        "role": "admin",
+    }
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "admin-uuid"
+
+    response = client.post("/create_user", json={
+        "name": "Admin Test",
+        "password": "password123",
+        "email_address": "new-admin@example.com",
+        "eid": "NEWADMIN123",
+        "role": "admin",
+    })
+
+    assert response.status_code == 201
+    assert response.json["role"] == "admin"
+    mock_add.assert_called_once()
+    mock_commit.assert_called_once()
+
 
 def test_create_user_missing_fields(client):
     payload = {"name": "John Doe"}  # Missing 'password', 'email', etc.
@@ -138,6 +221,9 @@ def test_user_login_success(client, mock_user_query, mocker):
     assert response.json["name"] == "John Doe"
     mock_query.assert_called_once()
 
+    with client.session_transaction() as sess:
+        assert sess.get("user_id") == "123"
+
 
 def test_user_login_failure(client, mock_user_query):
     """Test the /user_login route with invalid credentials."""
@@ -217,9 +303,20 @@ def test_delete_user(client, mocker):
     random_uuid = uuid.uuid4()
     user_mock = mocker.Mock() 
     user_mock.id = random_uuid
-    
+
+    # Admin user for the admin-only check
+    admin_mock = mocker.Mock()
+    admin_mock.id = "admin-uuid"
+    admin_mock.role = "admin"
+
     mock_query = mocker.patch("routes.user.db.session.query")
-    mock_query.return_value.filter_by.return_value.first.return_value = user_mock
+
+    # First call is for session user (admin check), second is for target user
+    mock_query.return_value.filter_by.return_value.first.side_effect = [admin_mock, user_mock]
+
+    # Set session to simulate authenticated admin
+    with client.session_transaction() as sess:
+        sess["user_id"] = "admin-uuid"
 
     # Mock db.session.delete and commit
     mock_delete = mocker.patch("routes.user.db.session.delete")
@@ -229,12 +326,6 @@ def test_delete_user(client, mocker):
 
     assert response.status_code == 200
     assert response.data.decode() == "Success"
-
-    # Check that filter_by was called with correct id
-    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
-
-    # Check that first() was called to fetch the user
-    mock_query.return_value.filter_by.return_value.first.assert_called_once()
 
     # Check that delete was called with the mock user
     mock_delete.assert_called_once_with(user_mock)
@@ -266,11 +357,21 @@ def test_delete_user_invalid_id(client, mocker):
 def test_delete_user_not_found(client, mocker):
     """Test the /delete_user route."""
 
-    random_uuid = random_uuid = uuid.uuid4() 
+    random_uuid = uuid.uuid4()
+
+    # Admin user for the admin-only check
+    admin_mock = mocker.Mock()
+    admin_mock.id = "admin-uuid"
+    admin_mock.role = "admin"
 
     mock_query = mocker.patch("routes.user.db.session.query")
-    mock_query.return_value.filter_by.return_value.first.return_value = None
 
+    # First call: admin check returns admin, second call: target user not found
+    mock_query.return_value.filter_by.return_value.first.side_effect = [admin_mock, None]
+
+    # Set session to simulate authenticated admin
+    with client.session_transaction() as sess:
+        sess["user_id"] = "admin-uuid"
 
     response = client.delete("/delete_user", query_string={"id" : str(random_uuid)})
 
@@ -278,23 +379,28 @@ def test_delete_user_not_found(client, mocker):
     data = response.get_json() 
     assert data['message'] == "User Not Found"
 
-    mock_query.assert_called_once() 
-    mock_query.return_value.filter_by.assert_called_once_with(id=str(random_uuid))
-
 
 def test_delete_user_rolls_back_on_exception(client, mocker):
     random_uuid = uuid.uuid4()
     user_mock = mocker.Mock() 
     user_mock.id = random_uuid
 
+    # Admin user for the admin-only check
+    admin_mock = mocker.Mock()
+    admin_mock.id = "admin-uuid"
+    admin_mock.role = "admin"
+
     mock_session = mocker.patch("routes.user.db.session")
 
-    
-    mock_session.query.return_value.filter_by.return_value.first.return_value = user_mock
+    # First call: admin check returns admin, second call: target user found
+    mock_session.query.return_value.filter_by.return_value.first.side_effect = [admin_mock, user_mock]
 
     mock_session.delete.return_value = None
     mock_session.commit.side_effect = Exception("Simulated DB failure")
 
+    # Set session to simulate authenticated admin
+    with client.session_transaction() as sess:
+        sess["user_id"] = "admin-uuid"
 
     response = client.delete("/delete_user", query_string={"id" : str(random_uuid)})
 
@@ -547,6 +653,65 @@ def test_create_google_user_invalid_token(client, mocker):
 
     assert response.status_code == 400
     assert response.get_json()["message"] == "Invalid google token"
+
+
+def test_create_google_user_sets_session(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {"email": "prof@example.com"}
+    mocker.patch("routes.user.requests.get", return_value=mock_response)
+    mocker.patch("routes.user.uuid.uuid4", return_value=uuid.UUID("22222222-2222-2222-2222-222222222222"))
+    mocker.patch("routes.user.db.session.add")
+    mocker.patch("routes.user.db.session.commit")
+
+    mock_query = mocker.patch("routes.user.db.session.query")
+    mock_query.return_value.filter_by.return_value = [
+        {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "name": "Prof Test",
+            "email_address": "prof@example.com",
+            "role": "instructor",
+        }
+    ]
+    mock_user_schema = mocker.patch("routes.user.UserSchema")
+    mock_user_schema.return_value.dump.return_value = [{
+        "id": "22222222-2222-2222-2222-222222222222",
+        "name": "Prof Test",
+        "role": "instructor",
+    }]
+
+    response = client.post(
+        "/create_google_user",
+        json={
+            "credential": "good_token",
+            "eid": "PROF123",
+            "name": "Prof Test",
+            "role": "instructor",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["role"] == "instructor"
+    with client.session_transaction() as sess:
+        assert sess["user_id"] == "22222222-2222-2222-2222-222222222222"
+
+
+def test_create_google_user_rejects_admin_role(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {"email": "admin@example.com"}
+    mocker.patch("routes.user.requests.get", return_value=mock_response)
+
+    response = client.post(
+        "/create_google_user",
+        json={
+            "credential": "good_token",
+            "eid": "ADMIN123",
+            "name": "Admin Test",
+            "role": "admin",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Invalid role. Must be one of: instructor, student"
 
     
 def test_get_instructor_by_eid_missing_eid(client):

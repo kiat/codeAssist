@@ -6,8 +6,10 @@ import requests
 from ai_feedback.integration import (
     DEFAULT_FEEDBACK_PROMPT,
     RETURN_SPEC,
+    build_claude_messages_payload,
     build_feedback_prompt,
     get_provider_credentials,
+    get_structured_feedback_from_claude,
     get_structured_feedback_from_gemini,
     parse_feedback_json,
 )
@@ -287,6 +289,60 @@ def test_gemini_feedback_retries_transient_network_error(monkeypatch):
     assert sleeps == [1]
     assert "error" not in parsed
     assert new_insights == ["Overall Summary: Feedback recovered after timeout."]
+
+
+def test_claude_messages_payload_omits_temperature():
+    payload = build_claude_messages_payload(
+        model="claude-sonnet-5",
+        max_tokens=700,
+        system_prompt="Return JSON.",
+        user_prompt="Review this code.",
+    )
+
+    assert payload["model"] == "claude-sonnet-5"
+    assert payload["max_tokens"] == 700
+    assert "temperature" not in payload
+
+
+def test_claude_feedback_request_omits_deprecated_temperature(monkeypatch):
+    calls = []
+
+    class FakeClaudeResponse:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            '{"insights":["Overall Summary: Claude feedback works."],'
+                            '"annotations":[]}'
+                        ),
+                    }
+                ]
+            }
+
+    def fake_post(url, headers, json, timeout):
+        calls.append({"url": url, "headers": headers, "json": json, "timeout": timeout})
+        return FakeClaudeResponse()
+
+    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
+
+    parsed, new_insights = get_structured_feedback_from_claude(
+        api_key="claude-key",
+        prompt="Return JSON feedback.",
+        model="claude-sonnet-5",
+        temperature=0.5,
+        past_insights=[],
+    )
+
+    assert calls[0]["url"] == "https://api.anthropic.com/v1/messages"
+    assert calls[0]["json"]["model"] == "claude-sonnet-5"
+    assert "temperature" not in calls[0]["json"]
+    assert "error" not in parsed
+    assert new_insights == ["Overall Summary: Claude feedback works."]
 
 
 @pytest.mark.parametrize(

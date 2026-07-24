@@ -103,7 +103,8 @@ export default function Assignments() {
                   new URLSearchParams({
                     student_id: userInfo.id,
                     assignment_id: assignment.id,
-                  })
+                  }),
+                { credentials: "include" }
               );
               const activeData = await activeSubmissions.json();
               const submitted = activeData.completed;
@@ -153,33 +154,28 @@ export default function Assignments() {
 
   const handleAssignmentInteraction = (assignment) => {
     const now = moment();
-    const dueDateTime = moment(assignment.due_date).valueOf();
-
-    const lateDueDateTime = assignment.late_due_date ? moment(assignment.late_due_date) : null;
-    // const extension = await fetchAssignmentExtensions(assignment.id);
-    // if (extension != null) {
-    //   if (extension.due_date_extension) {
-    //     dueDateTime = moment(extension.due_date_extension).valueOf();
-    //   }
-    //   if (extension.late_due_date_extension) {
-    //     dueDateTime = moment(extension.late_due_date_extension).valueOf();
-    //   }
-    // }
-
+    const dueDateTime = assignment.due_date ? moment(assignment.due_date).valueOf() : null;
+    const lateDueDateTime = assignment.late_due_date ? moment(assignment.late_due_date).valueOf() : null;
+    const hasLateSubmission = assignment.late_submission;
 
     const isSubmitted = assignment.submitted;
-    const dueDateHasPassed = now.isAfter(dueDateTime);
-    const lateDueDateHasPassed = lateDueDateTime ? now.isAfter(lateDueDateTime) : true;
+
+    // Check if we're past the due date
+    const dueDateHasPassed = dueDateTime ? now.isAfter(dueDateTime) : false;
+
+    // Check if we're in the late submission window
+    const inLateWindow = hasLateSubmission && dueDateHasPassed && lateDueDateTime && now.isBefore(lateDueDateTime);
+
     const canSubmitOnTime = !dueDateHasPassed;
-    const canSubmitLate = assignment.late_submission && lateDueDateTime && !lateDueDateHasPassed;
+    const canSubmitLate = inLateWindow;
 
     if (isSubmitted) {
       navigate(`/assignmentresult/${assignment.submissionId}`);
-    } else if (canSubmitOnTime || canSubmitLate) {
-      setSelectedAssignment(assignment);
+    } else if (!dueDateHasPassed || inLateWindow) {
       setModalOpen(true);
       setAssignmentTitle(assignment.name);
       setAssignmentID(assignment.id);
+      setSelectedAssignment(assignment);
     } else {
       message.error("Due Date Has Passed");
     }
