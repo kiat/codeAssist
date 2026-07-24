@@ -1,7 +1,7 @@
 """add container_id to assignments
 
 Revision ID: a3f92c1e7b04
-Revises: 1bdb41066778
+Revises: c4d5e6f7a8b9
 Create Date: 2026-07-12 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'a3f92c1e7b04'
-down_revision = '1bdb41066778'
+down_revision = 'c4d5e6f7a8b9'
 branch_labels = None
 depends_on = None
 
