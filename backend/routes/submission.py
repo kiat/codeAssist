@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
 import threading
+import time
 
 
 submission = Blueprint('submission', __name__)
@@ -120,6 +121,94 @@ def _verify_student_owner(student_id, assignment_id=None):
     
     # If we get here, the requester is not authorized
     raise ForbiddenError("You can only access your own data")
+
+def get_or_create_assignment_container(assignment):
+    '''
+    Returns a running container dedicated to this assignment, reusing
+    assignment.container_id when possible instead of creating a new
+    container per submission. Recreates the container if it was removed
+    or if the autograder image has changed.
+    '''
+    db.session.refresh(assignment)
+
+    container_name = f"assignment_container_{assignment.id}"
+    container = None
+
+    if assignment.container_id:
+        try:
+            container = get_docker_client().containers.get(assignment.container_id)
+        except docker.errors.NotFound:
+            try:
+                container = get_docker_client().containers.get(container_name)
+            except docker.errors.NotFound:
+                container = None
+        except Exception as e:
+            print(f"[DEBUG] unexpected error getting container: {e}", flush=True)
+            container = None
+
+    # Check if image has changed since container creation. 
+    # Discard container if autograder image does not match anymore
+    if container is not None:
+        container.reload()
+        def _normalize_tag(name):
+            if name and ':' not in name:
+                return name + ':latest'
+            return name
+        expected = _normalize_tag(assignment.autograder_image_name)
+        container_tags = {_normalize_tag(t) for t in container.image.tags}
+        if expected not in container_tags:
+            container.stop()
+            container.remove(force=True)
+            container = None
+
+    if container is None:
+        # If multiple requests race to create this assignment's container,
+        # a loser hits a name conflict and fetches whichever one won.
+        max_retries = 3
+        for _ in range(max_retries):
+            try:
+                container = get_docker_client().containers.run(
+                    image=assignment.autograder_image_name,
+                    name=container_name,
+                    detach=True,
+                    tty=True,
+                    command="tail -f /dev/null"
+                )
+                break
+            except docker.errors.APIError as e:
+                if e.status_code == 409:
+                    try:
+                        container = get_docker_client().containers.get(container_name)
+                        break
+                    except docker.errors.NotFound:
+                        continue
+                else:
+                    raise
+        else:
+            raise InternalProcessingError("Failed to create or locate assignment container after retries")
+    elif container.status != "running":
+        container.start()
+
+    if assignment.container_id != container.id:
+        assignment.container_id = container.id
+        db.session.commit()
+
+    return container
+
+
+def reset_assignment_container(assignment):
+    '''Discards the persistent container for an assignment, e.g. after a stuck/timed-out run.'''
+    if not assignment.container_id:
+        return
+    try:
+        container = get_docker_client().containers.get(assignment.container_id)
+        container.stop()
+        container.remove(force=True)
+    except docker.errors.NotFound:
+        pass
+    finally:
+        assignment.container_id = None
+        db.session.commit()
 
 @submission.route('/get_submissions', methods=["GET"])
 def get_submissions():
@@ -265,17 +354,14 @@ def upload_submission():
         }), 200
 
 
-    # Create a new temporary container from the assignment image
-    temp_container_name = f"submission_{uuid.uuid4().hex[:8]}"
-    container = get_docker_client().containers.run(
-        image=assignment.autograder_image_name,
-        name=temp_container_name,
-        detach=True,
-        tty=True,
-        command="tail -f /dev/null"  # Keep container alive for copying & exec
-    )
+    # Reuse (or create, on first submission) a persistent container for this assignment
+    container = get_or_create_assignment_container(assignment)
+    container_name = container.name
 
     try:
+        # Clear out any leftovers from a previous submission run
+        container.exec_run("sh -c 'rm -rf /autograder/submission/* /autograder/results/*'")
+
         # Copy the submission into /autograder/submission/
         tar_stream = io.BytesIO()
         with tarfile.open(fileobj=tar_stream, mode="w") as tar:
@@ -285,15 +371,14 @@ def upload_submission():
 
         # Run the autograder inside the container
         exec_proc = subprocess.run(
-            f"docker exec {temp_container_name} /bin/bash /autograder/source/run_autograder".split(),
+            f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(),
             capture_output=True,
             timeout=assignment.autograder_timeout
         )
-
+    
     except subprocess.TimeoutExpired:
         # clean up container
-        container.stop()
-        container.remove()
+        reset_assignment_container(assignment)
         os.chdir(current_dir)
 
         # upload failed submission to db
@@ -340,14 +425,14 @@ def upload_submission():
 
     if exec_proc.returncode != 0:
         os.chdir(current_dir)
-        print(f"Error: Autograder failed, details: {exec_proc.output.decode()}")
+        print(f"Error: Autograder failed, details: {exec_proc.output.decode()}", flush=True)
         raise InternalProcessingError("Failed to grade submission")
 
     # get results
     cat_result = container.exec_run("cat /autograder/results/results.json")
     if cat_result.exit_code != 0:
         os.chdir(current_dir)
-        print(f"Error: Failed to retrieve results.json, details: {cat_result.output.decode()}")
+        print(f"Error: Failed to retrieve results.json, details: {cat_result.output.decode()}", flush=True)
         raise InternalProcessingError("Failed to grade submission")
 
     results_json_content = cat_result.output.decode()
@@ -382,9 +467,7 @@ def upload_submission():
     db.session.add(new_submission)
     db.session.commit()
 
-    # Clean up container
-    container.stop()
-    container.remove()
+    # Leave container running for future reuse
     os.chdir(current_dir)
 
     # Capture the app object and launch a background thread to get AI feedback asynchronously.
