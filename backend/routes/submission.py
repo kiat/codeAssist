@@ -19,11 +19,12 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
 import threading
-import time
+import logging
 
 
 submission = Blueprint('submission', __name__)
 _docker_client = None
+logger = logging.getLogger(__name__)
 
 def get_docker_client():
     global _docker_client
@@ -122,6 +123,11 @@ def _verify_student_owner(student_id, assignment_id=None):
     # If we get here, the requester is not authorized
     raise ForbiddenError("You can only access your own data")
 
+def _normalize_tag(name):
+    if name and ':' not in name:
+        return name + ':latest'
+    return name
+
 def get_or_create_assignment_container(assignment):
     '''
     Returns a running container dedicated to this assignment, reusing
@@ -143,22 +149,32 @@ def get_or_create_assignment_container(assignment):
             except docker.errors.NotFound:
                 container = None
         except Exception as e:
-            print(f"[DEBUG] unexpected error getting container: {e}", flush=True)
+            logger.warning(
+                "Unexpected error getting container %s for assignment %s: %s",
+                assignment.container_id, assignment.id, e
+            )
             container = None
 
     # Check if image has changed since container creation. 
     # Discard container if autograder image does not match anymore
     if container is not None:
-        container.reload()
-        def _normalize_tag(name):
-            if name and ':' not in name:
-                return name + ':latest'
-            return name
-        expected = _normalize_tag(assignment.autograder_image_name)
-        container_tags = {_normalize_tag(t) for t in container.image.tags}
-        if expected not in container_tags:
-            container.stop()
-            container.remove(force=True)
+        try:
+            container.reload()
+            expected = _normalize_tag(assignment.autograder_image_name)
+            container_tags = {_normalize_tag(t) for t in container.image.tags}
+            if expected not in container_tags:
+                try:
+                    container.stop()
+                    container.remove(force=True)
+                except Exception:
+                    logger.warning(
+                        "Failed to stop/remove stale container %s for assignment %s",
+                        container.id, assignment.id, exc_info=True
+                    )
+                container = None
+        except docker.errors.NotFound:
+            container = None
+        except docker.errors.APIError:
             container = None
 
     if container is None:
@@ -360,8 +376,12 @@ def upload_submission():
 
     try:
         # Clear out any leftovers from a previous submission run
-        container.exec_run("sh -c 'rm -rf /autograder/submission/* /autograder/results/*'")
-
+        cleanup_result = container.exec_run("sh -c 'rm -rf /autograder/submission/* /autograder/results/*'")
+        if cleanup_result.exit_code != 0:
+            os.chdir(current_dir)
+            logger.warning("Error: Failed to cleanup container, details: %s", cleanup_result.output.decode())
+            raise InternalProcessingError("Failed to cleanup container")
+        
         # Copy the submission into /autograder/submission/
         tar_stream = io.BytesIO()
         with tarfile.open(fileobj=tar_stream, mode="w") as tar:
@@ -370,8 +390,13 @@ def upload_submission():
         container.put_archive("/autograder/submission/", tar_stream)
 
         # Run the autograder inside the container
+        results_json_name = f"results_{submission_uuid}.json"
         exec_proc = subprocess.run(
-            f"docker exec {container_name} /bin/bash /autograder/source/run_autograder".split(),
+            [
+                "docker", "exec", container_name, "sh", "-c",
+                f"/bin/bash /autograder/source/run_autograder && "
+                f"mv /autograder/results/results.json /autograder/results/{results_json_name}"
+            ],
             capture_output=True,
             timeout=assignment.autograder_timeout
         )
@@ -429,15 +454,14 @@ def upload_submission():
         raise InternalProcessingError("Failed to grade submission")
 
     # get results
-    cat_result = container.exec_run("cat /autograder/results/results.json")
+    cat_result = container.exec_run(f"cat /autograder/results/{results_json_name}")
     if cat_result.exit_code != 0:
         os.chdir(current_dir)
-        print(f"Error: Failed to retrieve results.json, details: {cat_result.output.decode()}", flush=True)
+        print(f"Error: Failed to retrieve {results_json_name}, details: {cat_result.output.decode()}", flush=True)
         raise InternalProcessingError("Failed to grade submission")
 
     results_json_content = cat_result.output.decode()
-    submission_uuid = uuid.uuid4().hex[:8]
-    host_results_json_path = os.path.join(results_dir, f'results_{submission_uuid}.json')
+    host_results_json_path = os.path.join(results_dir, results_json_name)
     with open(host_results_json_path, 'w') as file:
         file.write(results_json_content)
 

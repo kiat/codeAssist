@@ -1,8 +1,12 @@
 from marshmallow import Schema, fields
+from sqlalchemy import event
 from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
 from dataclasses import dataclass
+import docker
+import logging
+
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
@@ -85,6 +89,23 @@ class Assignment(db.Model):
     ai_feedback_style = db.Column(db.String, nullable=True)
     ai_feedback_max_requests = db.Column(db.Integer, nullable=True)
     ai_feedback_wait_seconds = db.Column(db.Integer, nullable=False, default=0)
+
+def cleanup_assignment_container(mapper, connection, target):
+    container_id = target.container_id
+    if not container_id:
+        return
+    try:
+        client = docker.from_env()
+        container = client.containers.get(container_id)
+        container.stop()
+        container.remove(force=True)
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "Failed to clean up container %s for deleted assignment %s",
+            container_id, target.id, exc_info=True
+        )
+
+event.listen(Assignment, "after_delete", cleanup_assignment_container)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
