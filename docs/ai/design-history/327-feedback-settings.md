@@ -1,3 +1,5 @@
+> **Historical design doc** — moved from `docs/AI_Feedback_Settings_327_Design.md`. This documents the design rationale for Issue #327 at the time it was written. For current behavior, see `../architecture.md` and `../settings-guide.md`. Kept here because it's still useful for understanding *why* the settings model looks the way it does (e.g. the `ai_feedback_prompt` legacy-compat handling).
+
 # Issue 327 AI Feedback Settings Design
 
 ## Goal
@@ -26,6 +28,8 @@ Deferred to #328:
 - Sending prompt_id from the student AI assistant.
 - Uploaded .py/.zip feedback request selection.
 - AIChatPanel integration changes.
+
+(Note: #328's items above have since shipped — see `../architecture.md` for current behavior. The `.zip` feedback-request handling mentioned above was deferred, not necessarily solved; see the `README.md` gap list.)
 
 ## Data Model
 
@@ -111,9 +115,11 @@ Existing async submission feedback generation now calls:
 
 The prompt sent to the AI provider is rendered from backend-approved context only. If the instructor disables student code, test cases, student output, or other inputs, those values are excluded even if frontend code has access to them.
 
+**Update since this doc was written:** this enforcement applies to submission feedback only. `/ai_chat` does not currently go through `build_allowed_feedback_context()` — see `../README.md` gap #2.
+
 ## Default Prompts
 
-Default prompts:
+Default prompts (at time of writing):
 
 - Check correctness
 - Debug failed tests
@@ -123,6 +129,8 @@ Default prompts:
 - Suggest algorithmic improvements
 
 Defaults are provided when an assignment has no saved prompt configuration.
+
+(Three more defaults — check code syntax, compare to optimal solution, personalized feedback — were added later. See `../architecture.md` for the current list of nine.)
 
 ## Input Permissions
 
