@@ -1,6 +1,30 @@
 # AI Feedback — Improvement Roadmap
 
-Prioritized plan based on the code review in `README.md`/`architecture.md`. Each item lists the problem, the fix, the files involved, and how to verify it. P0 = correctness/trust gap affecting every submission today; P1 = real inconsistency worth fixing before it compounds; P2 = test-debt and hardening; P3 = longer-term design work (this is where your "Future work 2: student history / AI memory" notes belong).
+Prioritized plan based on the code review in `README.md`/`architecture.md`. Each item lists the problem, the fix, the files involved, and how to verify it. P0 = correctness/trust or security gap affecting every submission/course today; P1 = real inconsistency worth fixing before it compounds; P2 = test-debt and hardening; P3 = longer-term design work (this is where your "Future work 2: student history / AI memory" notes belong).
+
+Scope note (2026-07-25): multi-model side-by-side comparison (ChatALL, see `proposals/chatall-multi-ai.md`) is intentionally out of scope pending instructor/professor approval. Current single-provider-per-course-with-per-assignment-override design (`update_ai_settings`, `Assignment.use_course_ai_default` + overrides) is the right shape to keep — the items below are about hardening and correcting that existing design, not replacing it.
+
+## P0 — Course-level AI settings endpoints have no authorization check
+
+**Problem:** `store_api_key`, `update_ai_settings`, `fetch_ai_models`, `test_ai_api_key`, and `test_ai_model` in `backend/routes/course.py` never check `session.get("user_id")` or verify the requester is the course's instructor/TA. Any caller who knows or guesses a `course_id` UUID can: overwrite the course's configured AI provider/model/API key (`update_ai_settings`, `store_api_key`), or use `test_ai_api_key`/`fetch_ai_models`/`test_ai_model` as a free oracle to check whether an arbitrary OpenAI/Gemini/Claude API key is valid. This isn't unique to AI settings — `update_course`/`delete_course` in the same file have the same gap — but it's most consequential here because it directly controls what AI provider/key every submission in a course uses, and a bad actor could silently swap in a key that drains someone else's quota or breaks AI feedback for an entire course.
+
+Note: the Ollama path is **not** vulnerable to SSRF — `_request_ollama()` already calls `validate_ollama_url()`, which enforces a hostname allowlist (`ALLOWED_OLLAMA_HOSTS`) before making any outbound request. That part is solid as-is.
+
+**Fix:** Add the same authorization pattern already used correctly elsewhere in the codebase — `routes/ai_feedback.py::_require_instructor_or_ta_for_assignment()` and `routes/submission.py::_verify_course_staff()` are both good models to copy: require a `requester_id`/session user, look up the course, and only allow the instructor or an enrolled `instructor`/`ta` to proceed. Apply to all five endpoints listed above (and flag `update_course`/`delete_course` separately since they're the same root cause, even though they're outside the AI settings scope).
+
+**Verify:** Test that an unauthenticated request (no session) and a request from a student (not instructor/TA) enrolled in some other course both get `403 Forbidden` from each of the five endpoints; test that the actual course instructor and a TA still succeed.
+
+## P1 — `store_api_key` is a confusing, OpenAI-only duplicate of `update_ai_settings`
+
+**Problem:** `store_api_key` only ever sets `course.openai_api_key`, doesn't validate `provider`, and overlaps with `update_ai_settings` (which correctly handles all four providers plus model/style/temperature). Having two endpoints that partially do the same thing is a maintenance and correctness risk — a frontend caller using the wrong one silently only ever configures OpenAI.
+
+**Fix:** Confirm whether any frontend code still calls `store_api_key` (`frontend/src/services/course.js`); if not, remove it. If it's still used, either delete it in favor of `update_ai_settings` or make it delegate to the same logic instead of duplicating a partial version of it.
+
+## P2 — Raw exception/provider-response text returned to the client
+
+**Problem:** `fetch_ai_models`, `test_ai_api_key`, and `test_ai_model` all have a bare `except Exception as e: return jsonify({"error": str(e)}), 500` and, on provider HTTP errors, return `response.text` from Gemini/Claude directly to the frontend. This is low-severity but worth cleaning up — raw provider error bodies and Python exception strings aren't guaranteed to be safe to show a browser, and it's inconsistent with how errors are handled elsewhere (`util/errors.py`'s structured error responses).
+
+**Fix:** Wrap these in the same structured-error pattern used by `BadRequestError`/`InternalProcessingError` elsewhere, logging the raw detail server-side and returning a generic message to the client.
 
 ## P0 — Assignment description doesn't reach the AI
 
