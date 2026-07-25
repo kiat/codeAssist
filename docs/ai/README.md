@@ -20,6 +20,7 @@ Last reviewed against code: 2026-07-25.
 | [`design-history/`](./design-history/) | Historical design docs (issue-specific rationale, the original whole-product founding doc, and the original rubric-based draft). Useful for "why is it built this way," not for "how does it work now." |
 | [`known-limitations.md`](./known-limitations.md) | Product-wide known-incomplete areas (Edit Outline, Create Rubric, Grading Dashboard) — kept here because "Create Rubric" is the last trace of the abandoned rubric-grading design. |
 | [`proposals/`](./proposals/) | Unimplemented feature proposals (currently: ChatALL multi-model side-by-side chat). Not part of the shipped product. |
+| [`roadmap.md`](./roadmap.md) | Prioritized plan for fixing the gaps below, plus the longer-term student-history/AI-memory design. |
 
 Note: file-upload submissions get AI feedback the same way code-editor submissions do (same backend pipeline), they just don't have their own doc — there's no separate "AI panel" UI for uploads, feedback shows up on the results page. See `architecture.md` for the shared pipeline both paths go through.
 
