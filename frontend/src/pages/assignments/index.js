@@ -93,6 +93,8 @@ export default function Assignments() {
           new URLSearchParams({ course_id: urlParams.courseId, user_id: userInfo.id, })
         );
         const assignmentsData = await assignmentsResponse.json();
+        // The backend is authoritative, but retain client-side filtering as
+        // defense-in-depth in case stale assignment data reaches the UI.
         const visibleAssignments = assignmentsData.filter(isAssignmentVisible);
         const updatedAssignments = await Promise.all(
           visibleAssignments.map(async (assignment) => {

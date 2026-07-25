@@ -6,6 +6,7 @@ export const publishStatusLabels = {
   published: "Published",
 };
 
+// Sort order: unpublished then scheduled then published.
 export const publishStatusOrder = {
   unpublished: 0,
   scheduled: 1,

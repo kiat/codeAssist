@@ -439,22 +439,71 @@ def test_get_course_enrollment_missing_course_id(client):
 def test_get_course_assignments_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_enrollment = mocker.Mock(role="instructor")
-    mock_assignments = [ mocker.Mock(id="assignment-1", name="Assignment 1")]
+    mock_assignments = [mocker.Mock(id="44444444-4444-4444-4444-444444444444", name="Assignment 1")]
     enrollment_query = mocker.Mock()
     enrollment_query.filter_by.return_value.first.return_value = mock_enrollment
     assignment_query = mocker.Mock()
     assignment_query.filter_by.return_value.all.return_value = mock_assignments
+    # The route performs two db.session.query(...) calls:
+    # first for Enrollment, then for Assignment.
     mock_query.side_effect = [enrollment_query, assignment_query,]
     mock_schema = mocker.patch("routes.course.AssignmentSchema")
-    mock_schema.return_value.dump.return_value = [{"id": "assignment-1", "name": "Assignment 1"}]
-    response = client.get("/get_course_assignments", query_string={"course_id": "course-123", "user_id": "instructor-123",},)
+    mock_schema.return_value.dump.return_value = [{"id": "44444444-4444-4444-4444-444444444444", "name": "Assignment 1"}]
+    response = client.get("/get_course_assignments", query_string={"course_id": "22222222-2222-2222-2222-222222222222", "user_id": "33333333-3333-3333-3333-333333333333",},)
     assert response.status_code == 200
-    assert response.json == [{"id": "assignment-1", "name": "Assignment 1"}]
+    assert response.json == [{"id": "44444444-4444-4444-4444-444444444444", "name": "Assignment 1"}]
+     # Instructors should receive the unfiltered assignment query.
+    assignment_query.filter_by.return_value.filter.assert_not_called()
 
 def test_get_course_assignments_missing_course_id(client):
-    response = client.get("/get_course_assignments", query_string={"user_id": "user-123"},)
+    response = client.get("/get_course_assignments", query_string={"user_id": "11111111-1111-1111-1111-111111111111"},)
     assert response.status_code == 400
     assert response.json["message"] == "Missing course_id argument"
+
+def test_get_course_assignments_student_only_receives_visible_assignments(client, mocker):
+    student_id = "11111111-1111-1111-1111-111111111111"
+    course_id = "22222222-2222-2222-2222-222222222222"
+    mock_query = mocker.patch("routes.course.db.session.query")
+    enrollment_query = mocker.Mock()
+    assignment_query = mocker.Mock()
+    # The route performs two db.session.query(...) calls:
+    # first for Enrollment, then for Assignment.
+    mock_query.side_effect = [enrollment_query, assignment_query,]
+    enrollment_query.filter_by.return_value.first.return_value = mocker.Mock(role="student")
+    visible_assignment = mocker.Mock(id="44444444-4444-4444-4444-444444444444", name="Published Assignment", published=True)
+    # The mocked database filter represents exclusion of unpublished and
+    # future-scheduled assignments.
+    assignment_query.filter_by.return_value.filter.return_value.all.return_value = [visible_assignment]
+    mock_schema = mocker.patch("routes.course.AssignmentSchema")
+    mock_schema.return_value.dump.return_value = [{"id": "44444444-4444-4444-4444-444444444444", "name": "Published Assignment", "published": True}]
+    response = client.get("/get_course_assignments", query_string={"course_id": course_id, "user_id": student_id})
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data == [{"id": "44444444-4444-4444-4444-444444444444", "name": "Published Assignment", "published": True}]
+    returned_names = {assignment["name"] for assignment in data}
+    assert "Published Assignment" in returned_names
+    assert "Unpublished Assignment" not in returned_names
+    assert "Future Scheduled Assignment" not in returned_names
+    assignment_query.filter_by.return_value.filter.assert_called_once()
+
+def test_get_course_assignments_missing_user_id(client):
+    response = client.get("/get_course_assignments", query_string={"course_id": "22222222-2222-2222-2222-222222222222"})
+    assert response.status_code == 400
+    assert response.json["message"] == "Missing user_id argument"
+
+def test_get_course_assignments_invalid_user_id_returns_400(client):
+    response = client.get("/get_course_assignments", query_string={"course_id": "382d235c-1167-4e0f-ac36-adc69db9faec", "user_id": "not-a-valid-uuid"})
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Invalid user_id format"
+
+def test_get_course_assignments_non_enrolled_user_returns_403(client,mocker):
+    user_id = "11111111-1111-1111-1111-111111111111"
+    course_id = "22222222-2222-2222-2222-222222222222"
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+    response = client.get("/get_course_assignments", query_string={"course_id": course_id, "user_id": user_id})
+    assert response.status_code == 403
+    assert response.json["message"] == ( "User is not enrolled in this course")
 
 def test_get_course_info_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")

@@ -38,10 +38,6 @@ export default function Dashboard() {
   const getAssignmentsCount = async (courseId) => {
     try {
       const res = await getCourseAssignments({ course_id: courseId, user_id: userInfo.id });
-      // if student we only wants the number of published assignments
-      if (userInfo?.isStudent) {
-        return res.data.filter(isAssignmentVisible).length;
-      }
       return res.data.length; // instructor see total number of assignments
     } catch (error) {
       console.error(`Error fetching assignments for course ${courseId}:`, error);

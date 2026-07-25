@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getCourseAssignments } from "../../../services/course";
-import { getPublishStatus, publishStatusOrder,} from "../../../common/assignmentVisibility";
+import { getPublishStatus, publishStatusOrder, publishStatusLabels} from "../../../common/assignmentVisibility";
 // import { tableData } from "./constant";
 import { GlobalContext } from "../../../App";
 const columns = [
@@ -54,14 +54,14 @@ const columns = [
     sorter: (a, b) => publishStatusOrder[getPublishStatus(a)] - publishStatusOrder[getPublishStatus(b)],
     render: (_, record) => {
       const status = getPublishStatus(record);
-      const statusColor = {
+      const colors = {
         published: "green",
         scheduled: "blue",
         unpublished: "default",
       };
       return (
-        <Tag color={statusColor[status]}>
-          {status.toUpperCase()}
+        <Tag color={colors[status]}>
+          {publishStatusLabels[status]}
         </Tag>
       );
     },

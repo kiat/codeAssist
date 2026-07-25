@@ -648,6 +648,11 @@ def get_course_assignments():
     if not user_id:
         raise BadRequestError("Missing user_id argument")
     
+    # Validate UUID format
+    try:
+        user_id = str(uuid.UUID(user_id))
+    except (ValueError, TypeError, AttributeError):
+        raise BadRequestError("Invalid user_id format")
     enrollment = (
         db.session.query(Enrollment)
         .filter_by(
