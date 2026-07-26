@@ -52,7 +52,7 @@ function CreateAssignmentHarness({ initialStep = 1 } = {}) {
   );
 }
 
-describe("CreateAssignment AI prompt defaults", () => {
+describe("CreateAssignment setup", () => {
   beforeEach(() => {
     getCourseInfo.mockResolvedValue({
       data: [
@@ -73,7 +73,7 @@ describe("CreateAssignment AI prompt defaults", () => {
     jest.clearAllMocks();
   });
 
-  it("shows the default AI feedback prompts immediately when AI feedback is enabled", async () => {
+  it("shows advanced AI prompt settings in a separate create section", async () => {
     const user = userEvent.setup();
 
     render(<CreateAssignmentHarness />);
@@ -82,24 +82,17 @@ describe("CreateAssignment AI prompt defaults", () => {
 
     await user.click(screen.getByRole("switch", { name: /enable ai feedback/i }));
 
-    expect(await screen.findByText("Feedback Prompts")).toBeInTheDocument();
-
-    expect(screen.getByDisplayValue("Check correctness")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Debug failed tests")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Review edge cases")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Explain runtime errors")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Review code style")).toBeInTheDocument();
+    expect(await screen.findByText("Current Course AI Default")).toBeInTheDocument();
     expect(
-      screen.getByDisplayValue("Suggest algorithmic improvements")
+      screen.getByText("Prompts, input permissions, and usage limits")
     ).toBeInTheDocument();
-
+    expect(await screen.findByText("Feedback Prompts")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Check correctness")).toBeInTheDocument();
     expect(screen.getByText("AI Input Permissions")).toBeInTheDocument();
     expect(screen.getByText("AI Feedback Usage Limits")).toBeInTheDocument();
-    expect(screen.getByLabelText("Assignment description")).toBeChecked();
-    expect(screen.getByLabelText("Student solution code")).toBeChecked();
   });
 
-  it("includes AI usage limits in the create assignment payload", async () => {
+  it("includes edited AI usage limits in the create assignment payload", async () => {
     const user = userEvent.setup();
 
     render(<CreateAssignmentHarness />);
@@ -125,6 +118,7 @@ describe("CreateAssignment AI prompt defaults", () => {
     await waitFor(() => {
       expect(createAssignment).toHaveBeenCalledWith(
         expect.objectContaining({
+          ai_feedback_enabled: true,
           ai_feedback_max_requests: 3,
           ai_feedback_wait_seconds: 60,
         })
@@ -156,7 +150,7 @@ describe("CreateAssignment AI prompt defaults", () => {
     });
   });
 
-  it("includes custom assignment AI key in the create assignment payload", async () => {
+  it("creates AI-enabled assignments with the course default model source", async () => {
     const user = userEvent.setup();
 
     render(<CreateAssignmentHarness />);
@@ -165,22 +159,14 @@ describe("CreateAssignment AI prompt defaults", () => {
 
     await user.type(screen.getByLabelText(/assignment name/i), "Loops");
     await user.click(screen.getByRole("switch", { name: /enable ai feedback/i }));
-    await user.click(await screen.findByLabelText(/customize for this assignment only/i));
-    expect(
-      await screen.findByText(/switch back to course defaults/i)
-    ).toBeInTheDocument();
-    await user.type(
-      await screen.findByLabelText(/assignment api key/i),
-      "assignment-provider-key"
-    );
 
     await user.click(screen.getByRole("button", { name: /create assignment/i }));
 
     await waitFor(() => {
       expect(createAssignment).toHaveBeenCalledWith(
         expect.objectContaining({
-          use_course_ai_default: false,
-          ai_feedback_api_key: "assignment-provider-key",
+          use_course_ai_default: true,
+          ai_feedback_api_key: "",
         })
       );
     });

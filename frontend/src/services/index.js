@@ -12,10 +12,16 @@ instance.interceptors.response.use(
     return res;
   },
   err => {
-    let errorMessage = 'Operation failed';
+    let errorMessage = "Operation failed";
+    const responseMessage = err.response?.data?.message || "";
+    const isAuthMismatch =
+      err.response?.status === 403 &&
+      (
+        responseMessage.includes("Not authenticated") ||
+        responseMessage.includes("You can only access your own data")
+      );
 
-    if (err.response?.status === 401) {
-      // Session expired or missing — force a clean re-login.
+    if (err.response?.status === 401 || isAuthMismatch) {
       localStorage.removeItem("userInfo");
       localStorage.removeItem("courseInfo");
       localStorage.removeItem("courseRole");
@@ -24,18 +30,15 @@ instance.interceptors.response.use(
     }
 
     if (err.response) {
-      // Server responded with a status other than 200 range
       if (err.response.status) {
         errorMessage = err.response.data.message;
       } else {
-        errorMessage = 'An unexpected error occurred. Please try again.';
+        errorMessage = "An unexpected error occurred. Please try again.";
       }
     } else if (err.request) {
-      // Request was made but no response was received
-      errorMessage = 'No response from the server. Please check your network connection.';
+      errorMessage = "No response from the server. Please check your network connection.";
     } else {
-      // Something happened in setting up the request that triggered an error
-      errorMessage = 'Request error. Please try again.';
+      errorMessage = "Request error. Please try again.";
     }
     message.error(errorMessage);
     return Promise.reject(err);
@@ -48,7 +51,7 @@ instance.interceptors.response.use(
  * @param {*} params the params
  * @param {*} method the method
  * @param {*} options the additional options for axios
- * @returns 
+ * @returns
  */
 const service = (url, params, method = "get", options) =>
   instance({

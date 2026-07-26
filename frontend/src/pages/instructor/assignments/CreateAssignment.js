@@ -11,6 +11,7 @@ import {
   Card,
   Checkbox,
   Col,
+  Collapse,
   DatePicker,
   Form,
   Input,
@@ -38,6 +39,7 @@ import { createAssignment, updateAssignment } from "../../../services/assignment
 import { getCourseInfo, fetchAiModels } from "../../../services/course";
 import { DEFAULT_AI_FEEDBACK_PROMPT } from "../../../constants/aiFeedback";
 import AIFeedbackSettingsSection from "../../../components/AIFeedbackSettingsSection";
+import AssignmentDescriptionInput from "../../../components/AssignmentDescriptionInput";
 import { ASSIGNMENT_DATE_TIME_PICKER_PROPS } from "../../../constants/dateTimePicker";
 import {
   normalizeAiAllowedInputs,
@@ -166,6 +168,7 @@ export default ({
   const handleFinish = async (values) => {
     try {
       setSaveLoading(true);
+      values = { ...form.getFieldsValue(true), ...values };
 
       if (!courseId) {
         throw new Error("Missing courseId in route. Unable to create assignment.");
@@ -383,14 +386,7 @@ export default ({
                   <Input placeholder="Name your assignment" />
                 </Form.Item>
 
-                <Form.Item label="ASSIGNMENT DESCRIPTION" name="description">
-                  <Input.TextArea
-                    rows={6}
-                    maxLength={20000}
-                    showCount
-                    placeholder="Enter assignment requirements, input/output format, constraints, and grading expectations."
-                  />
-                </Form.Item>
+                <AssignmentDescriptionInput form={form} />
 
                 {assignmentType !== "2" ? (
                   <Form.Item label="TEMPLATE" name="template" valuePropName="fileList">
@@ -534,7 +530,6 @@ export default ({
                       label="Allow File Upload"
                       name="allow_file_upload"
                       valuePropName="checked"
-                      initialValue={true}
                       tooltip="Allow students to upload a file as their submission"
                     >
                       <Switch />
@@ -544,7 +539,6 @@ export default ({
                       label="Enable Code Editor"
                       name="enable_code_editor"
                       valuePropName="checked"
-                      initialValue={false}
                       tooltip="Allow students to write and submit code directly in the browser"
                     >
                       <Switch />
@@ -567,161 +561,172 @@ export default ({
                       <Switch />
                     </Form.Item>
 
-                      {aiFeedbackEnabled && (
-                        <>
-                          <Alert
-                            type={
-                              courseAiInfo.has_openai_api_key ||
-                              courseAiInfo.has_gemini_api_key ||
-                              courseAiInfo.has_claude_api_key ||
-                              courseAiInfo.has_ollama_api_key
-                                ? "success"
-                                : "warning"
-                            }
-                            showIcon
-                            style={{ marginBottom: 16 }}
-                            message="Current Course AI Default"
-                            description={
-                              courseAiInfo.default_ai_provider &&
-                              courseAiInfo.default_ai_model
-                                ? `Using ${courseAiInfo.default_ai_provider} / ${courseAiInfo.default_ai_model} by default.`
-                                : "Course default AI settings are incomplete. Configure them in Course AI Settings first."
-                            }
-                          />
+                    {aiFeedbackEnabled && (
+                      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                        <Alert
+                          type={
+                            courseAiInfo.has_openai_api_key ||
+                            courseAiInfo.has_gemini_api_key ||
+                            courseAiInfo.has_claude_api_key ||
+                            courseAiInfo.has_ollama_api_key
+                              ? "success"
+                              : "warning"
+                          }
+                          showIcon
+                          message="Current Course AI Default"
+                          description={
+                            courseAiInfo.default_ai_provider &&
+                            courseAiInfo.default_ai_model
+                              ? `Using ${courseAiInfo.default_ai_provider} / ${courseAiInfo.default_ai_model} by default.`
+                              : "Course default AI settings are incomplete. Configure them in Course AI Settings first."
+                          }
+                        />
 
-                          <Form.Item
-                            label="Model Source"
-                            name="use_course_ai_default"
-                          >
-                            <Radio.Group>
-                              <Space direction="vertical">
-                                <Radio value={true}>
-                                  Use course default
-                                  <Typography.Text
-                                    type="secondary"
-                                    style={{ marginLeft: 8 }}
-                                  >
-                                    {courseAiInfo.default_ai_provider || "No provider"} /{" "}
-                                    {courseAiInfo.default_ai_model || "No model"}
-                                  </Typography.Text>
-                                </Radio>
+                        <Collapse defaultActiveKey={["prompts"]}>
+                          <Collapse.Panel header="Model and feedback style" key="model">
+                            <Form.Item
+                              label="Model Source"
+                              name="use_course_ai_default"
+                            >
+                              <Radio.Group>
+                                <Space direction="vertical">
+                                  <Radio value={true}>
+                                    Use course default
+                                    <Typography.Text
+                                      type="secondary"
+                                      style={{ marginLeft: 8 }}
+                                    >
+                                      {courseAiInfo.default_ai_provider || "No provider"} /{" "}
+                                      {courseAiInfo.default_ai_model || "No model"}
+                                    </Typography.Text>
+                                  </Radio>
 
-                                <Radio value={false}>
-                                  Customize for this assignment only
-                                </Radio>
-                              </Space>
-                            </Radio.Group>
+                                  <Radio value={false}>
+                                    Customize for this assignment only
+                                  </Radio>
+                                </Space>
+                              </Radio.Group>
                             </Form.Item>
 
-                          {useCourseAiDefault === false && (
-                            <Card size="small" title="Custom Assignment Model">
-                              <Alert
-                                type="info"
-                                showIcon
-                                style={{ marginBottom: 16 }}
-                                message="Assignment credential behavior"
-                                description="If you later switch back to course defaults, the saved assignment credential will be cleared."
-                              />
+                            {useCourseAiDefault === false && (
+                              <Card size="small" title="Custom Assignment Model">
+                                <Alert
+                                  type="info"
+                                  showIcon
+                                  style={{ marginBottom: 16 }}
+                                  message="Assignment credential behavior"
+                                  description="If you later switch back to course defaults, the saved assignment credential will be cleared."
+                                />
 
-                              <Form.Item
-                                label="Provider"
-                                name="ai_feedback_provider"
-                                rules={[
-                                  {
-                                    required: true,
-                                    message: "Please select an AI provider",
-                                  },
-                                ]}
-                              >
-                                <Select
-                                  options={[
-                                    { label: "ChatGPT", value: "openai" },
-                                    { label: "Gemini", value: "gemini" },
-                                    { label: "Claude", value: "claude" },
-                                    { label: "Ollama (Local LLM)", value: "ollama" },
+                                <Form.Item
+                                  label="Provider"
+                                  name="ai_feedback_provider"
+                                  rules={[
+                                    {
+                                      required: true,
+                                      message: "Please select an AI provider",
+                                    },
                                   ]}
-                                  onChange={() => {
-                                    setAssignmentModels([]);
-                                    form.setFieldsValue({
-                                      ai_feedback_model: undefined,
-                                      ai_feedback_api_key: "",
-                                    });
-                                  }}
-                                />
-                              </Form.Item>
+                                >
+                                  <Select
+                                    options={[
+                                      { label: "ChatGPT", value: "openai" },
+                                      { label: "Gemini", value: "gemini" },
+                                      { label: "Claude", value: "claude" },
+                                      { label: "Ollama (Local LLM)", value: "ollama" },
+                                    ]}
+                                    onChange={() => {
+                                      setAssignmentModels([]);
+                                      form.setFieldsValue({
+                                        ai_feedback_model: undefined,
+                                        ai_feedback_api_key: "",
+                                      });
+                                    }}
+                                  />
+                                </Form.Item>
 
-                              <Form.Item
-                                label="Assignment API Key / Base URL"
-                                name="ai_feedback_api_key"
-                              >
-                                <Input.Password
-                                  autoComplete="new-password"
-                                  placeholder="Use a custom credential for this assignment"
-                                />
-                              </Form.Item>
+                                <Form.Item
+                                  label="Assignment API Key / Base URL"
+                                  name="ai_feedback_api_key"
+                                >
+                                  <Input.Password
+                                    autoComplete="new-password"
+                                    placeholder="Use a custom credential for this assignment"
+                                  />
+                                </Form.Item>
 
-                              <Form.Item
-                                label="Model"
-                                name="ai_feedback_model"
-                                rules={[
+                                <Form.Item
+                                  label="Model"
+                                  name="ai_feedback_model"
+                                  rules={[
+                                    {
+                                      required: true,
+                                      message: "Please refresh and select an AI model",
+                                    },
+                                  ]}
+                                >
+                                  <Space.Compact style={{ width: "100%" }}>
+                                    <Button
+                                      onClick={handleFetchAssignmentModels}
+                                      loading={assignmentModelsLoading}
+                                      style={{ width: 180 }}
+                                    >
+                                      Refresh Models
+                                    </Button>
+
+                                    <Select
+                                      placeholder="Select a model"
+                                      style={{ width: "100%" }}
+                                      disabled={assignmentModels.length === 0}
+                                      options={assignmentModels.map((model) => ({
+                                        label: model,
+                                        value: model,
+                                      }))}
+                                    />
+                                  </Space.Compact>
+                                </Form.Item>
+                              </Card>
+                            )}
+
+                            <Form.Item
+                              label="Feedback Style"
+                              name="ai_feedback_style"
+                            >
+                              <Select
+                                options={[
+                                  { label: "Hint-based", value: "hint-based" },
+                                  { label: "Balanced", value: "balanced" },
                                   {
-                                    required: true,
-                                    message: "Please refresh and select an AI model",
+                                    label: "Detailed debugging",
+                                    value: "detailed-debugging",
                                   },
                                 ]}
-                              >
-                                <Space.Compact style={{ width: "100%" }}>
-                                  <Button
-                                    onClick={handleFetchAssignmentModels}
-                                    loading={assignmentModelsLoading}
-                                    style={{ width: 180 }}
-                                  >
-                                    Refresh Models
-                                  </Button>
+                              />
+                            </Form.Item>
 
-                                  <Select
-                                    placeholder="Select a model"
-                                    style={{ width: "100%" }}
-                                    disabled={assignmentModels.length === 0}
-                                    options={assignmentModels.map((model) => ({
-                                      label: model,
-                                      value: model,
-                                    }))}
-                                  />
-                                </Space.Compact>
-                              </Form.Item>
-                            </Card>
-                          )}
-
-                          <Form.Item
-                            label="Feedback Style"
-                            name="ai_feedback_style"
-                          >
-                            <Select
-                              options={[
-                                { label: "Hint-based", value: "hint-based" },
-                                { label: "Balanced", value: "balanced" },
-                                { label: "Detailed debugging", value: "detailed-debugging" },
+                            <Form.Item
+                              label="Model Temperature"
+                              name="ai_feedback_temperature"
+                              rules={[
+                                {
+                                  pattern: /^0(\.\d+)?|1$/,
+                                  message: "Enter a value between 0 and 1",
+                                },
                               ]}
-                            />
-                          </Form.Item>
+                            >
+                              <Input placeholder="0.5" />
+                            </Form.Item>
+                          </Collapse.Panel>
 
-                          <AIFeedbackSettingsSection />
-
-                          <Form.Item
-                            label="Model Temperature"
-                            name="ai_feedback_temperature"
-                            rules={[
-                              {
-                                pattern: /^0(\.\d+)?|1$/,
-                                message: "Enter a value between 0 and 1",
-                              },
-                            ]}
+                          <Collapse.Panel
+                            header="Prompts, input permissions, and usage limits"
+                            key="prompts"
                           >
-                            <Input placeholder="0.5" />
-                          </Form.Item>
-                        </>
-                      )}
+                            <AIFeedbackSettingsSection />
+                          </Collapse.Panel>
+                        </Collapse>
+                      </Space>
+                    )}
 
                     <Form.Item
                       label="CONFIGURE AUTOGRADER"
