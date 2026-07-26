@@ -23,6 +23,7 @@ from ai_feedback.integration import (
     get_temperature,
     post_gemini_with_retry,
 )
+from ai_feedback.memory import get_recent_submission_history_text
 from ai_feedback.settings import (
     build_allowed_feedback_context,
     check_feedback_limits,
@@ -926,22 +927,24 @@ def ai_chat():
     if not course:
         raise BadRequestError("Course not found for this assignment.")
 
-    # student is already fetched by _verify_student above — reuse for coding_insights
-
     # Load recent chat history so the LLM has memory of prior conversation.
     chat_history = get_chat_history(student_id, assignment_id, limit=20)
+    submission_history = get_recent_submission_history_text(
+        student_id,
+        assignment_id,
+    )
+    if not submission_history:
+        legacy_insights = str(getattr(student, "coding_insights", "") or "").strip()
+        if legacy_insights and legacy_insights != "No history.":
+            submission_history = legacy_insights
 
     # --- Build context sections ---
     feedback_context = build_allowed_feedback_context(
         assignment=assignment,
         code_text=code,
+        submission_history=submission_history,
     )
     context_parts = [render_feedback_context(feedback_context)]
-
-    # Student's coding_insights summarises their historical patterns.
-    coding_insights = str(getattr(student, "coding_insights", "") or "").strip()
-    if coding_insights and coding_insights != "No history.":
-        context_parts.append(f"Student coding history:\n{coding_insights}")
 
     # Prior conversation turns give the model memory across messages.
     if chat_history:

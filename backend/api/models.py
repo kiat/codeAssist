@@ -104,6 +104,21 @@ class Submission(db.Model):
 
     # -- AI Integration Settings -- 
     ai_feedback = db.Column(db.Text, nullable=True)
+
+
+class StudentSubmissionInsight(db.Model):
+    __tablename__ = "student_submission_insights"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    submission_id = db.Column(UUID(as_uuid=False), db.ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    insights = db.Column(db.JSON, nullable=True)
+    summary = db.Column(db.Text, nullable=True)
+    created_at = db.Column(TIMESTAMP(timezone=True), nullable=False, server_default=db.func.now())
+
+    student = db.relationship("User", backref=db.backref("submission_insights", lazy="dynamic"))
+    assignment = db.relationship("Assignment", backref=db.backref("student_submission_insights", lazy="dynamic"))
+    submission = db.relationship("Submission", backref=db.backref("student_submission_insight", uselist=False))
     
 # Handling multiple submitters for a single submission
 class SubmissionSubmitter(db.Model):

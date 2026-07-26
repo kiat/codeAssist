@@ -125,6 +125,7 @@ def test_normalize_allowed_inputs_merges_defaults_and_booleans():
         "test_results": True,
         "test_cases": True,
         "student_output": True,
+        "submission_history": True,
     }
 
 
@@ -186,6 +187,7 @@ def test_build_allowed_feedback_context_excludes_unapproved_code_and_outputs():
             "test_results": True,
             "test_cases": False,
             "student_output": False,
+            "submission_history": False,
         },
     )
 
@@ -207,6 +209,7 @@ def test_build_allowed_feedback_context_excludes_unapproved_code_and_outputs():
             "score": 0,
             "output": "student stdout",
         },
+        submission_history="Previous issue with recursion",
     )
 
     rendered = "\n".join(context.values())
@@ -216,7 +219,23 @@ def test_build_allowed_feedback_context_excludes_unapproved_code_and_outputs():
     assert "print('secret implementation')" not in rendered
     assert "expected_output" not in rendered
     assert "student stdout" not in rendered
+    assert "Previous issue with recursion" not in rendered
     assert '"output"' not in context["test_results"]
+
+
+def test_build_allowed_feedback_context_includes_submission_history_when_allowed():
+    assignment = SimpleNamespace(
+        name="Recursion Lab",
+        description="Practice recursive functions.",
+        ai_allowed_inputs={"submission_history": True},
+    )
+
+    context = build_allowed_feedback_context(
+        assignment=assignment,
+        submission_history="Submission one: missed base case",
+    )
+
+    assert context["submission_history"] == "Submission one: missed base case"
 
 
 def test_build_allowed_feedback_context_redacts_hidden_test_details():

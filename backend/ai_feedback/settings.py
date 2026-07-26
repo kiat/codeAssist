@@ -14,6 +14,7 @@ DEFAULT_AI_ALLOWED_INPUTS = {
     "test_results": True,
     "test_cases": False,
     "student_output": True,
+    "submission_history": True,
 }
 
 DEFAULT_AI_FEEDBACK_PROMPTS = [
@@ -541,6 +542,7 @@ def build_allowed_feedback_context(
     autograder_results=None,
     test_cases=None,
     student_output=None,
+    submission_history=None,
 ):
     allowed_inputs = normalize_allowed_inputs(
         getattr(assignment, "ai_allowed_inputs", None)
@@ -568,6 +570,9 @@ def build_allowed_feedback_context(
     if allowed_inputs["student_output"] and student_output:
         context["student_output"] = _format_context_value(student_output)
 
+    if allowed_inputs["submission_history"] and submission_history:
+        context["submission_history"] = _format_context_value(submission_history)
+
     return context
 
 
@@ -581,6 +586,7 @@ def render_feedback_context(context):
         "test_results": "Autograder results",
         "test_cases": "Test cases",
         "student_output": "Student output",
+        "submission_history": "Previous submission feedback history",
     }
 
     rendered_sections = []

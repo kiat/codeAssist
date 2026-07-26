@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from api import create_app, db
-from api.models import Assignment, Course, Submission, User
+from api.models import Assignment, Course, StudentSubmissionInsight, Submission, User
 from ai_feedback.integration import async_get_ai_feedback
 
 
@@ -117,7 +117,13 @@ def test_async_ai_feedback_extracts_source_from_zip(app, tmp_path, mocker):
 
         updated_submission = db.session.get(Submission, submission_id)
         feedback = json.loads(updated_submission.ai_feedback)
+        insight_record = StudentSubmissionInsight.query.filter_by(
+            submission_id=submission_id
+        ).first()
+        updated_student = db.session.get(User, student_id)
 
         assert "File: main.py" in captured["prompt"]
         assert "print('zip feedback')" in captured["prompt"]
         assert feedback["insights"] == ["Overall Summary: ZIP feedback works."]
+        assert insight_record.summary == "- Overall Summary: ZIP feedback works."
+        assert "ZIP feedback works" in updated_student.coding_insights

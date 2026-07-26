@@ -18,9 +18,14 @@ from util.encryption_utils import decrypt_api_key
 from util.url_utils import validate_ollama_url
 from api.models import Assignment, Submission, User, Course
 from api import db
+from ai_feedback.memory import (
+    get_recent_submission_history_text,
+    record_submission_insight,
+)
 from ai_feedback.settings import (
     build_allowed_feedback_context,
     get_enabled_feedback_prompt,
+    normalize_allowed_inputs,
     render_feedback_context,
 )
 from ai_feedback.source_extraction import (
@@ -583,7 +588,13 @@ def update_submission_feedback(submission_id, ai_feedback_json, new_insights):
         raise ValueError(f"Student ID {submission.student_id} not found")
 
     submission.ai_feedback = json.dumps(ai_feedback_json)
-    student.coding_insights = str(new_insights)
+    record_submission_insight(submission, new_insights)
+    db.session.flush()
+
+    student.coding_insights = (
+        get_recent_submission_history_text(submission.student_id, limit=10)
+        or "No history."
+    )
 
     db.session.commit()
 
@@ -806,7 +817,17 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
 
         print("AI_FEEDBACK: Code file loaded", flush=True)
 
-        past_insights = student.coding_insights or "No prior insights."
+        allowed_inputs = normalize_allowed_inputs(
+            getattr(assignment, "ai_allowed_inputs", None)
+        )
+        submission_history = ""
+        if allowed_inputs["submission_history"]:
+            submission_history = get_recent_submission_history_text(
+                student.id,
+                assignment.id,
+            )
+
+        past_insights = submission_history or "No prior insights."
 
         prompt_config = get_enabled_feedback_prompt(assignment)
         base_prompt = prompt_config.get("prompt") or DEFAULT_FEEDBACK_PROMPT

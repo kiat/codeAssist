@@ -6,6 +6,7 @@ export const DEFAULT_AI_ALLOWED_INPUTS = {
   test_results: true,
   test_cases: false,
   student_output: true,
+  submission_history: true,
 };
 
 export const DEFAULT_AI_FEEDBACK_PROMPTS = [

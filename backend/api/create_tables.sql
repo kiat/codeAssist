@@ -91,6 +91,22 @@ CREATE TABLE submission_submitters (
     FOREIGN KEY (submitter_id) REFERENCES user (id)
 );
 
+CREATE TABLE student_submission_insights (
+    id uuid PRIMARY KEY,
+    student_id uuid NOT NULL,
+    assignment_id uuid NOT NULL,
+    submission_id uuid NOT NULL UNIQUE,
+    insights json,
+    summary text,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    FOREIGN KEY (student_id) REFERENCES user (id),
+    FOREIGN KEY (assignment_id) REFERENCES assignments (id),
+    FOREIGN KEY (submission_id) REFERENCES submissions (id)
+);
+
+CREATE INDEX student_submission_insights_idx
+ON student_submission_insights (student_id, assignment_id, created_at);
+
 /* Create TestCases table */
 CREATE TABLE test_cases (
     id uuid PRIMARY KEY,
