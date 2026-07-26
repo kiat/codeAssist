@@ -24,9 +24,11 @@ from ai_feedback.integration import (
     post_gemini_with_retry,
 )
 from ai_feedback.settings import (
+    build_allowed_feedback_context,
     check_feedback_limits,
     get_enabled_feedback_prompt,
     record_feedback_request,
+    render_feedback_context,
     get_student_feedback_status,
     get_chat_history,
     store_chat_message,
@@ -930,12 +932,11 @@ def ai_chat():
     chat_history = get_chat_history(student_id, assignment_id, limit=20)
 
     # --- Build context sections ---
-    context_parts = []
-
-    # Assignment description gives the model grounding about what the task is.
-    assignment_desc = str(getattr(assignment, "description", "") or "").strip()
-    if assignment_desc:
-        context_parts.append(f"Assignment description:\n{assignment_desc}")
+    feedback_context = build_allowed_feedback_context(
+        assignment=assignment,
+        code_text=code,
+    )
+    context_parts = [render_feedback_context(feedback_context)]
 
     # Student's coding_insights summarises their historical patterns.
     coding_insights = str(getattr(student, "coding_insights", "") or "").strip()
@@ -957,7 +958,7 @@ def ai_chat():
     # Build user prompt, incorporating the instructor's selected prompt as
     # additional context when one was chosen via prompt_id.
     prompt_context = f"\n\nInstructor guidance: {instructor_prompt_text}" if instructor_prompt_text else ""
-    user_prompt = f"{context_block}Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}{prompt_context}"
+    user_prompt = f"{context_block}Student message: {user_message}{prompt_context}"
     provider, model = get_provider_and_model(assignment, course)
     temperature = get_temperature(assignment, course)
 

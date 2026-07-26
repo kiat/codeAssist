@@ -185,6 +185,7 @@ export default ({
         feedbackPrompts.find((prompt) => prompt.enabled) || feedbackPrompts[0];
       const payload = {
         name: values.name,
+        description: (values.description || "").trim() || null,
         course_id: courseId,
         published_date: toIso(values.releaseDate),
         published: releaseDate ? releaseDate <= now : false,
@@ -380,6 +381,15 @@ export default ({
                   rules={[{ required: true, message: "Please enter a name" }]}
                 >
                   <Input placeholder="Name your assignment" />
+                </Form.Item>
+
+                <Form.Item label="ASSIGNMENT DESCRIPTION" name="description">
+                  <Input.TextArea
+                    rows={6}
+                    maxLength={20000}
+                    showCount
+                    placeholder="Enter assignment requirements, input/output format, constraints, and grading expectations."
+                  />
                 </Form.Item>
 
                 {assignmentType !== "2" ? (

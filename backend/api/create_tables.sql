@@ -47,6 +47,7 @@ CREATE TABLE assignment_extensions (
 CREATE TABLE assignments (
     id uuid PRIMARY KEY,
     name varchar(50) NOT NULL,
+    description text,
     course_id uuid NOT NULL,
     due_date timestamp,
     anonymous_grading boolean DEFAULT FALSE,

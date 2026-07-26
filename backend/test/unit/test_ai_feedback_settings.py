@@ -219,6 +219,57 @@ def test_build_allowed_feedback_context_excludes_unapproved_code_and_outputs():
     assert '"output"' not in context["test_results"]
 
 
+def test_build_allowed_feedback_context_redacts_hidden_test_details():
+    assignment = SimpleNamespace(
+        name="Edge Case Lab",
+        description="Handle edge cases.",
+        ai_allowed_inputs={
+            "assignment_description": True,
+            "student_code": True,
+            "test_results": True,
+            "test_cases": True,
+            "student_output": True,
+        },
+    )
+
+    context = build_allowed_feedback_context(
+        assignment=assignment,
+        code_text="print('hello')",
+        autograder_results={
+            "tests": [
+                {
+                    "name": "secret empty input",
+                    "status": "failed",
+                    "score": 0,
+                    "max_score": 1,
+                    "visibility": "hidden",
+                    "input": "",
+                    "expected_output": "0",
+                    "output": "Traceback",
+                },
+                {
+                    "name": "public base case",
+                    "status": "passed",
+                    "score": 1,
+                    "max_score": 1,
+                    "visibility": "visible",
+                    "input": "1",
+                    "expected_output": "1",
+                    "output": "1",
+                },
+            ],
+        },
+    )
+
+    rendered_results = context["test_results"]
+
+    assert "Hidden test" in rendered_results
+    assert "secret empty input" not in rendered_results
+    assert "Traceback" not in rendered_results
+    assert "public base case" in rendered_results
+    assert '"expected_output": "1"' in rendered_results
+
+
 def test_serialize_assignment_ai_settings_combines_existing_model_and_feedback_settings():
     assignment = SimpleNamespace(
         ai_feedback_enabled=True,

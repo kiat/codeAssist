@@ -50,6 +50,7 @@ class Assignment(db.Model):
     __tablename__ = "assignments"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     name = db.Column(db.String, nullable=False)
+    description = db.Column(db.Text, nullable=True)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     due_date = db.Column(TIMESTAMP(timezone=True), nullable=True)
     anonymous_grading = db.Column(db.Boolean, default=False)

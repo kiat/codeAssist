@@ -2,7 +2,6 @@ import os
 import subprocess
 import hashlib
 import docker
-import zipfile
 import shutil
 import time
 import threading
@@ -23,6 +22,10 @@ from ai_feedback.settings import (
     build_allowed_feedback_context,
     get_enabled_feedback_prompt,
     render_feedback_context,
+)
+from ai_feedback.source_extraction import (
+    SourceExtractionError,
+    extract_submission_source,
 )
 
 
@@ -585,6 +588,22 @@ def update_submission_feedback(submission_id, ai_feedback_json, new_insights):
     db.session.commit()
 
 
+def save_ai_feedback_failure(submission_id, message):
+    """Stores a safe, student-facing AI feedback failure message."""
+    submission = Submission.query.get(submission_id)
+
+    if not submission:
+        raise ValueError(f"Submission ID {submission_id} not found")
+
+    submission.ai_feedback = json.dumps({
+        "error": message,
+        "insights": [message],
+        "annotations": [],
+    })
+
+    db.session.commit()
+
+
 def get_provider_and_model(assignment, course):
     """Chooses provider/model from course default or assignment override."""
     if getattr(assignment, "use_course_ai_default", True):
@@ -767,11 +786,6 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
     try:
         print(f"AI_FEEDBACK: Starting for submission {submission_id}", flush=True)
 
-        with open(file_path, "r") as code_file:
-            code_text = code_file.read()
-
-        print("AI_FEEDBACK: Code file loaded", flush=True)
-
         submission, assignment, course, student = fetch_submission_data(submission_id)
 
         print(
@@ -782,6 +796,15 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         if not assignment.ai_feedback_enabled:
             print(f"AI_FEEDBACK: Disabled for submission {submission_id}", flush=True)
             return
+
+        try:
+            code_text = extract_submission_source(file_path)
+        except SourceExtractionError as e:
+            print(f"AI_FEEDBACK: Source extraction failed - {e}", flush=True)
+            save_ai_feedback_failure(submission_id, str(e))
+            return
+
+        print("AI_FEEDBACK: Code file loaded", flush=True)
 
         past_insights = student.coding_insights or "No prior insights."
 

@@ -457,6 +457,15 @@ def _assignment_description(assignment):
     return ""
 
 
+def _is_hidden_test_result(test):
+    visibility = str(test.get("visibility", "") or "").strip().lower()
+    hidden_flag = test.get("hidden", test.get("is_hidden", False))
+    if isinstance(hidden_flag, str):
+        hidden_flag = hidden_flag.strip().lower() in {"true", "1", "yes"}
+
+    return bool(hidden_flag) or visibility in {"hidden", "private", "secret"}
+
+
 def _prepare_results_for_prompt(results, allowed_inputs):
     decoded_results = _decode_json_value(results)
 
@@ -482,6 +491,16 @@ def _prepare_results_for_prompt(results, allowed_inputs):
                 continue
 
             prepared_test = {}
+            is_hidden = _is_hidden_test_result(test)
+
+            if is_hidden:
+                prepared_test["name"] = "Hidden test"
+                for key in ("status", "score", "max_score", "visibility"):
+                    if key in test:
+                        prepared_test[key] = test[key]
+                prepared_tests.append(prepared_test)
+                continue
+
             for key in ("name", "status", "score", "max_score", "visibility"):
                 if key in test:
                     prepared_test[key] = test[key]

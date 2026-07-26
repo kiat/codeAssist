@@ -132,6 +132,30 @@ describe("CreateAssignment AI prompt defaults", () => {
     });
   });
 
+  it("includes assignment description in the create assignment payload", async () => {
+    const user = userEvent.setup();
+
+    render(<CreateAssignmentHarness />);
+
+    await waitFor(() => expect(getCourseInfo).toHaveBeenCalled());
+
+    await user.type(screen.getByLabelText(/assignment name/i), "Loops");
+    await user.type(
+      screen.getByLabelText(/assignment description/i),
+      "Write a loop that prints every value exactly once."
+    );
+
+    await user.click(screen.getByRole("button", { name: /create assignment/i }));
+
+    await waitFor(() => {
+      expect(createAssignment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Write a loop that prints every value exactly once.",
+        })
+      );
+    });
+  });
+
   it("includes custom assignment AI key in the create assignment payload", async () => {
     const user = userEvent.setup();
 

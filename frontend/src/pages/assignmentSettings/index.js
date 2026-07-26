@@ -85,6 +85,7 @@ export default () => {
     getAssignment({ assignment_id: assignmentId }).then((res) => {
       const {
         name,
+        description,
         published,
         due_date,
         autograder_points,
@@ -117,6 +118,7 @@ export default () => {
 
       form.setFieldsValue({
         name,
+        description: description || "",
         published,
         autograderPoints: autograder_points,
         dueDate: due_date ? moment.utc(due_date).local() : null,
@@ -249,6 +251,7 @@ export default () => {
     const newAssignmentData = {
       assignment_id: assignmentId,
       name: values.name,
+      description: (values.description || "").trim() || null,
       course_id: courseId,
       due_date: values.dueDate?._d || values.dueDate,
       autograder_points: values.autograderPoints,
@@ -322,6 +325,15 @@ export default () => {
             rules={[{ required: true, message: "Please enter a title" }]}
           >
             <Input />
+          </Form.Item>
+
+          <Form.Item label="DESCRIPTION" name="description">
+            <Input.TextArea
+              rows={6}
+              maxLength={20000}
+              showCount
+              placeholder="Enter assignment requirements, input/output format, constraints, and grading expectations."
+            />
           </Form.Item>
 
           <Form.Item
