@@ -81,20 +81,26 @@ Each assignment can either:
 Assignment fields:
 
 ```python
+description                 # assignment problem statement/context for AI feedback
 ai_feedback_enabled
 use_course_ai_default
 ai_feedback_provider
 ai_feedback_model
 ai_feedback_prompt          # legacy single-prompt field, kept for backwards compatibility
 ai_feedback_prompts         # current: list of {id, title, prompt, enabled}
-ai_allowed_inputs           # {assignment_description, student_code, test_results, test_cases, student_output}
+ai_allowed_inputs           # {assignment_description, student_code, test_results, test_cases, student_output, previous_submission_feedback}
 ai_feedback_temperature
 ai_feedback_style
 ai_feedback_max_requests
 ai_feedback_wait_seconds
 ```
 
-**Gap to know about:** there is currently no `description`/instructions field on `Assignment` at all (not `ai_feedback_prompt`, an actual assignment-text field). Prompts above are the AI's *instructions*; they are not the assignment's problem statement. See `README.md` gap #1 — right now the AI only ever sees the assignment's *name*, not real assignment text, unless that's fixed.
+Assignment descriptions are supported and can be configured through the assignment creation and settings pages.
+
+The description is separate from AI feedback prompts:
+
+- Assignment description: explains the programming task.
+- AI feedback prompts: instruct the model how to evaluate the submission.
 
 ## AI Feedback Usage Limits
 

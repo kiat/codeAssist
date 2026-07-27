@@ -114,4 +114,7 @@ An assignment can have the code editor enabled with no autograder — students c
 - **AI chat** — ask "Can you explain what this code does?" → AI responds with a hint-style explanation, **not** the complete solution.
 - **AI chat memory** — send a follow-up referencing the previous message, confirm the AI's reply shows it has context (tests this in code: `get_chat_history(limit=20)`).
 - **Version history** — make several manual saves with different code, open History, restore an older version, confirm content matches.
-- **File-upload parity check** (recommended addition — not in the original checklist) — upload a `.py` file via the non-editor upload flow and confirm AI feedback appears the same way; then try a `.zip` upload and confirm what actually happens (see `README.md` gap #3 — this is expected to currently fail silently into a generic error).
+- **File-upload parity check**
+  - Upload a `.py` file and confirm AI feedback appears.
+  - Upload a ZIP file containing source files and confirm AI feedback is generated.
+  - Upload an invalid ZIP and confirm a clear extraction error is shown.
