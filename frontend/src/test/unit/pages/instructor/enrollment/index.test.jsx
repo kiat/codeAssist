@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import Enrollment from "../../../../../pages/instructor/enrollment";
 import { GlobalContext } from "../../../../../App";
 import {
@@ -21,9 +21,12 @@ jest.mock("../../../../../services/user", () => ({
   getUserByEmail: jest.fn(),
 }));
 
+const mockNavigate = jest.fn();
+
 jest.mock("react-router-dom", () => ({
   ...jest.requireActual("react-router-dom"),
   useParams: () => ({ courseId: "course-1" }),
+  useNavigate: () => mockNavigate,
 }));
 
 const ROSTER = [
@@ -68,5 +71,25 @@ describe("Enrollment role-editing access control", () => {
 
     // Student and TA rows are editable (down-arrow affordance present).
     expect(document.querySelectorAll(".anticon-down").length).toBe(2);
+  });
+
+  it("redirects a student away from the roster page", async () => {
+    renderEnrollment("student");
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/instructorDashboard/course-1")
+    );
+  });
+
+  it("does not crash when the enrollment fetch is forbidden (e.g. a demoted TA reloading)", async () => {
+    getCourseEnrollment.mockRejectedValue({
+      response: { status: 403, data: { message: "Only instructors or TAs can view course enrollment" } },
+    });
+
+    expect(() => renderEnrollment("student")).not.toThrow();
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/instructorDashboard/course-1")
+    );
   });
 });

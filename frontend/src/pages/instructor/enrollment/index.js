@@ -22,7 +22,7 @@ import {
 import {
   getUserByEmail,
 } from "../../../services/user";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
 import { GlobalContext } from "../../../App";
@@ -55,11 +55,18 @@ export default () => {
   const [enrollment, setEnrollment] = useState([]);
 
   const { courseId } = useParams();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (courseRole && courseRole !== "instructor" && courseRole !== "ta") {
+      navigate(`/instructorDashboard/${courseId}`);
+    }
+  }, [courseRole, courseId, navigate]);
 
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen((t) => !t);
   }, []);
-  
+
   const toggleAddCSVModalOpen = useCallback(() => {
     setAddCSVModalOpen((t) => !t);
   }, []);
@@ -69,10 +76,14 @@ export default () => {
   }, []);
 
   const getEnrollment = useCallback(() => {
-    getCourseEnrollment({ course_id: courseId }).then((res) => {
-      setEnrollment(res.data);
-      setOriginalEnrollment(res.data); 
-    });
+    getCourseEnrollment({ course_id: courseId })
+      .then((res) => {
+        setEnrollment(res.data);
+        setOriginalEnrollment(res.data);
+      })
+      .catch((error) => {
+        console.error("Error fetching enrollment: ", error);
+      });
   }, [courseId]);
 
 
