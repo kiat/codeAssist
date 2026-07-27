@@ -49,7 +49,7 @@ export default function Dashboard() {
     const formattedCourses = {};
 
     for (const course of coursesArray) {
-      const { semester, year, name, description, id } = course;
+      const { semester, year, name, description, id, enrollment_role } = course;
       const key = `${year}${semester}`;
 
       // Fetch assignments count for each course
@@ -59,7 +59,7 @@ export default function Dashboard() {
         formattedCourses[key] = [];
       }
 
-      formattedCourses[key].push({ name, description, assignments: assignmentsCount, id });
+      formattedCourses[key].push({ name, description, assignments: assignmentsCount, id, enrollment_role });
     }
 
     return formattedCourses;
