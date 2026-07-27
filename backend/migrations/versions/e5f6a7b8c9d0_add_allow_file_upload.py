@@ -6,6 +6,7 @@ Create Date: 2026-07-01 00:00:00.000000
 
 """
 from alembic import op
+import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
@@ -16,14 +17,8 @@ depends_on = None
 
 
 def upgrade():
-    op.execute(
-        "ALTER TABLE assignments ADD COLUMN IF NOT EXISTS allow_file_upload BOOLEAN DEFAULT TRUE"
-    )
-    op.execute(
-        "UPDATE assignments SET allow_file_upload = TRUE WHERE allow_file_upload IS NULL"
-    )
-    op.execute("ALTER TABLE assignments ALTER COLUMN allow_file_upload SET NOT NULL")
+    op.add_column('assignments', sa.Column('allow_file_upload', sa.Boolean(), server_default='true', nullable=False))
 
 
 def downgrade():
-    op.execute("ALTER TABLE assignments DROP COLUMN IF EXISTS allow_file_upload")
+    op.drop_column('assignments', 'allow_file_upload')

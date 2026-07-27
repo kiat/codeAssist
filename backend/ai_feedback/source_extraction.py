@@ -28,6 +28,7 @@ IGNORED_PATH_PARTS = {
 MAX_SOURCE_FILE_SIZE = 200_000
 MAX_TOTAL_SOURCE_SIZE = 1_000_000
 MAX_ARCHIVE_FILE_COUNT = 100
+ZIP_READ_CHUNK_SIZE = 64 * 1024
 
 
 class SourceExtractionError(Exception):
@@ -75,6 +76,38 @@ def _format_zip_source(member_name, content):
     return f"File: {member_name}\n```\n{content}\n```"
 
 
+def _read_zip_member_with_limits(archive, member, total_size):
+    chunks = []
+    member_size = 0
+
+    try:
+        with archive.open(member) as source:
+            while True:
+                chunk = source.read(ZIP_READ_CHUNK_SIZE)
+                if not chunk:
+                    break
+
+                member_size += len(chunk)
+
+                if member_size > MAX_SOURCE_FILE_SIZE:
+                    raise SourceExtractionError(
+                        "AI feedback could not be generated because a source file in the ZIP archive is too large."
+                    )
+
+                if total_size + member_size > MAX_TOTAL_SOURCE_SIZE:
+                    raise SourceExtractionError(
+                        "AI feedback could not be generated because the source files in the ZIP archive are too large."
+                    )
+
+                chunks.append(chunk)
+    except RuntimeError as exc:
+        raise SourceExtractionError(
+            "AI feedback could not be generated because a source file in the ZIP archive could not be read."
+        ) from exc
+
+    return b"".join(chunks), total_size + member_size
+
+
 def extract_source_from_zip(file_path):
     sections = []
     total_size = 0
@@ -96,18 +129,11 @@ def extract_source_from_zip(file_path):
                 if extension not in SUPPORTED_SOURCE_EXTENSIONS:
                     continue
 
-                if member.file_size > MAX_SOURCE_FILE_SIZE:
-                    raise SourceExtractionError(
-                        "AI feedback could not be generated because a source file in the ZIP archive is too large."
-                    )
-
-                total_size += member.file_size
-                if total_size > MAX_TOTAL_SOURCE_SIZE:
-                    raise SourceExtractionError(
-                        "AI feedback could not be generated because the source files in the ZIP archive are too large."
-                    )
-
-                raw_content = archive.read(member)
+                raw_content, total_size = _read_zip_member_with_limits(
+                    archive,
+                    member,
+                    total_size,
+                )
                 try:
                     content = raw_content.decode("utf-8")
                 except UnicodeDecodeError:

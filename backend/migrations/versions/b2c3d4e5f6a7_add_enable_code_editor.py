@@ -6,6 +6,7 @@ Create Date: 2026-06-16 00:00:00.000000
 
 """
 from alembic import op
+import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'b2c3d4e5f6a7'
@@ -15,14 +16,8 @@ depends_on = None
 
 
 def upgrade():
-    op.execute(
-        "ALTER TABLE assignments ADD COLUMN IF NOT EXISTS enable_code_editor BOOLEAN DEFAULT FALSE"
-    )
-    op.execute(
-        "UPDATE assignments SET enable_code_editor = FALSE WHERE enable_code_editor IS NULL"
-    )
-    op.execute("ALTER TABLE assignments ALTER COLUMN enable_code_editor SET NOT NULL")
+    op.add_column('assignments', sa.Column('enable_code_editor', sa.Boolean(), server_default='false', nullable=False))
 
 
 def downgrade():
-    op.execute("ALTER TABLE assignments DROP COLUMN IF EXISTS enable_code_editor")
+    op.drop_column('assignments', 'enable_code_editor')

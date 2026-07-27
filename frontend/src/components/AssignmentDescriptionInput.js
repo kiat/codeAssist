@@ -48,6 +48,7 @@ export default function AssignmentDescriptionInput({
     };
     reader.readAsText(file);
 
+    // This import reads the file into the textarea instead of uploading it.
     return Upload.LIST_IGNORE;
   };
 

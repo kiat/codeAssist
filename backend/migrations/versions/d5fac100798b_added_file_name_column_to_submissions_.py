@@ -6,6 +6,7 @@ Create Date: 2024-04-12 00:41:19.764147
 
 """
 from alembic import op
+import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
@@ -16,10 +17,10 @@ depends_on = None
 
 
 def upgrade():
-    op.execute("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS file_name VARCHAR(255)")
+    op.add_column('submissions', sa.Column('file_name', sa.String(length=255), nullable=True))
 
 
 
 def downgrade():
-    op.execute("ALTER TABLE submissions DROP COLUMN IF EXISTS file_name")
+    op.drop_column('submissions', 'file_name')
 
