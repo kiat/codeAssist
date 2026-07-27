@@ -39,7 +39,7 @@ def allowed_file(filename):
 
 
 def _verify_course_staff(assignment_id):
-    """Verify the requester is course staff (instructor/TA) or admin for the given assignment.
+    """Verify the requester is course staff (instructor/TA) for the given assignment.
     Returns the authenticated user id.
     Raises ForbiddenError if not authorized.
     """
@@ -52,9 +52,6 @@ def _verify_course_staff(assignment_id):
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
     if not course:
         raise NotFoundError("Course not found")
-    session_user = db.session.query(User).filter_by(id=session_user_id).first()
-    if session_user and session_user.role == "admin":
-        return session_user_id
     if str(course.instructor_id) == str(session_user_id):
         return session_user_id
     enrollment = db.session.query(Enrollment).filter_by(
@@ -63,7 +60,7 @@ def _verify_course_staff(assignment_id):
     ).first()
     if enrollment and str(enrollment.role).lower() in {"instructor", "ta"}:
         return session_user_id
-    raise ForbiddenError("Only course staff or administrators can perform this action")
+    raise ForbiddenError("Only course staff can perform this action")
 
 
 def _verify_student_owner(student_id, assignment_id=None):

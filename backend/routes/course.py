@@ -496,14 +496,16 @@ def create_enrollment_bulk(data):
 
     failed_enrollments = []
 
-    # Validate every role up front so a bad row can't leave a partial import
+    # Resolve and validate every role up front so a bad row can't leave a
+    # partial import.
+    resolved_roles = {}
     for student_id in students:
         role = roles.get(student_id) or default_role
         if role not in {"student", "ta", "instructor"}:
             raise BadRequestError("Invalid role")
+        resolved_roles[student_id] = role
 
-    for student_id in students:
-        role = roles.get(student_id) or default_role
+    for student_id, role in resolved_roles.items():
         try:
             enrollment = Enrollment(
                 student_id=student_id,

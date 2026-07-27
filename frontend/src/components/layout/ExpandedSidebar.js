@@ -25,7 +25,7 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed, hand
   const isInstructor = effectiveRole === "instructor";
   const isCourseStaff = isTA || isInstructor;
 
-  const roleLabel = ROLE_LABELS[courseRole] || (userInfo?.role?.toUpperCase() ?? "");
+  const roleLabel = ROLE_LABELS[effectiveRole] || "";
 
   return (
     <>

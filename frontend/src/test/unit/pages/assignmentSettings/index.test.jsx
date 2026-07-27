@@ -29,11 +29,12 @@ jest.mock("../../../../services/course", () => ({
   fetchAiModels: jest.fn(),
 }));
 
-function renderAssignmentSettings() {
+function renderAssignmentSettings(courseRole) {
   return render(
     <GlobalContext.Provider
       value={{
         updateAssignmentInfo: jest.fn(),
+        courseRole,
       }}
     >
       <AssignmentSettings />
@@ -92,5 +93,31 @@ describe("AssignmentSettings late submissions", () => {
         })
       );
     });
+  });
+
+  it("shows Delete Assignment/Delete All Submissions for an instructor", async () => {
+    renderAssignmentSettings("instructor");
+
+    await screen.findByDisplayValue("Homework 1");
+
+    expect(
+      screen.getByRole("button", { name: /delete assignment/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /delete all submissions/i })
+    ).toBeInTheDocument();
+  });
+
+  it("hides Delete Assignment/Delete All Submissions for a TA", async () => {
+    renderAssignmentSettings("ta");
+
+    await screen.findByDisplayValue("Homework 1");
+
+    expect(
+      screen.queryByRole("button", { name: /delete assignment/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /delete all submissions/i })
+    ).not.toBeInTheDocument();
   });
 });

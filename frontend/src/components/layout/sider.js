@@ -3,6 +3,7 @@ import { useState, useContext, useEffect } from "react";
 import { GlobalContext } from "../../App";
 import CollapsedSidebar from "./CollapsedSidebar";
 import ExpandedSidebar from "./ExpandedSidebar";
+import { getMyEnrollmentRole } from "../../services/course";
 
 export default function RootSider({ pathname, courseInfo, userInfo, assignmentInfo, onLeaveCourse }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -33,13 +34,11 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
   }, [courseInfo, updateCourseInfo]);
 
   useEffect(() => {
-    const apiUrl = process.env.REACT_APP_API_URL;
-    if (apiUrl && courseInfo.id && userInfo.id) {
-      fetch(`${apiUrl}/get_my_enrollment_role?course_id=${courseInfo.id}`, { credentials: "include" })
-        .then((res) => res.ok ? res.json() : null)
-        // Reset on failure so a role persisted from another course can't leak
-        // into this one; consumers fall back to the account-level role.
-        .then((data) => updateCourseRole(data?.role || ""))
+    if (courseInfo.id && userInfo.id) {
+      // Reset on failure so a role persisted from another course can't leak
+      // into this one; consumers fall back to the account-level role.
+      getMyEnrollmentRole({ course_id: courseInfo.id })
+        .then((res) => updateCourseRole(res.data?.role || ""))
         .catch(() => updateCourseRole(""));
     }
   }, [courseInfo.id, userInfo.id, updateCourseRole]);

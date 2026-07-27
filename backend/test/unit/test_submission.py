@@ -325,7 +325,6 @@ def test_upload_submission_missing_file(client):
     assert response.status_code == 400
 
 
-# FAILED TEST
 def test_delete_submission_not_found(client, mocker):
     """Test /delete_submission returns 404 when the submission is not found."""
     # Patch the get method to return None.
@@ -343,7 +342,6 @@ def test_delete_submission_not_found(client, mocker):
     assert data["message"] == "No submission found to delete"
 
 
-# FAILED TEST
 def test_upload_assignment_autograder_missing_file(client):
     """Test that /upload_assignment_autograder returns an error message when the file is missing."""
     response = client.post("/upload_assignment_autograder", data={})
