@@ -51,7 +51,8 @@ export default function AssignmentResult() {
       console.log("Fetching IDs based on submission ID:", submissionId);
       try {
         const details = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`,
+          { credentials: "include" }
         );
         const data = await details.json();
         if (data) {
@@ -89,7 +90,8 @@ export default function AssignmentResult() {
     const interval = setInterval(async () => {
       try {
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${toSend.id}`
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${toSend.id}`,
+          { credentials: "include" }
         );
         const updated = await response.json();
         if (updated?.ai_feedback) {
@@ -157,7 +159,8 @@ export default function AssignmentResult() {
     const fetchStudentName = async () => {
       try {
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`,
+          { credentials: "include" }
         );
         const studentData = await response.json();
         if (studentData) {

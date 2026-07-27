@@ -123,6 +123,12 @@ def save_code_draft():
     if len(content) > 100000:
         raise BadRequestError("Code content exceeds maximum length of 100KB")
 
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
+
     # Find the latest version number for this student/assignment
     latest = (
         db.session.query(CodeDraft)
@@ -166,6 +172,12 @@ def get_code_drafts():
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
 
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
+
     drafts = (
         db.session.query(CodeDraft)
         .filter_by(student_id=student_id, assignment_id=assignment_id)
@@ -202,6 +214,12 @@ def get_latest_draft():
 
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
 
     draft = (
         db.session.query(CodeDraft)

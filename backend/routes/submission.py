@@ -840,12 +840,21 @@ def activate_submission():
 
     _verify_student_owner(student_id, assignment_id)
 
+    submission_to_activate = db.session.get(Submission, submission_id)
+    if not submission_to_activate:
+        raise NotFoundError("No submission found")
+    if (
+        str(submission_to_activate.student_id) != str(student_id)
+        or str(submission_to_activate.assignment_id) != str(assignment_id)
+    ):
+        raise ForbiddenError("Submission does not belong to the given student and assignment")
+
     try:
         # Deactivate the current active submission for the same assignment and student
         old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
         if old:
             old.update({'active': False})
-        
+
         # Activate the specified submission
         db.session.query(Submission).filter_by(id=submission_id).update({'active': True})
         db.session.commit()

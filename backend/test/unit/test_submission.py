@@ -1,11 +1,15 @@
 import os
 import pytest
-from flask import json
+from flask import json, session
 from api import create_app, db
 from api.models import Submission
-
+from util.errors import ForbiddenError
 
 from routes.submission import submission
+# Captured at import time, before the autouse mock below patches the name on
+# the routes.submission module — lets us test the real authorization logic
+# directly without fighting that fixture.
+from routes.submission import _verify_student_owner as real_verify_student_owner
 
 @pytest.fixture
 def app():
@@ -139,6 +143,9 @@ def test_activate_submission_missing_params(client):
 def test_activate_submission_success(client, mocker):
     """Test /activate_submission successfully activates a submission."""
     payload = {"submission_id": "sub1", "student_id": "stu1", "assignment_id": "assgn1"}
+
+    fake_submission = mocker.Mock(student_id="stu1", assignment_id="assgn1")
+    mocker.patch("routes.submission.db.session.get", return_value=fake_submission)
 
     # Patch the query call chain used in the route.
     # Here we simulate that the query returns an object that supports update()
@@ -424,7 +431,9 @@ def test_activate_submission_internal_error(client, mocker):
         "assignment_id": "assgn1"
     }
 
+    fake_submission = mocker.Mock(student_id="stu1", assignment_id="assgn1")
     mock_session = mocker.patch("routes.submission.db.session")
+    mock_session.get.return_value = fake_submission
     mock_session.query.side_effect = Exception("database error")
 
     response = client.post("/activate_submission", json=payload)
@@ -580,3 +589,146 @@ def test_upload_assignment_autograder_student_forbidden(client, mocker):
     )
     assert response.status_code == 403
     assert "Only instructors or TAs" in response.get_json()["message"]
+
+
+# ---------------------------------------------------------------------------
+# Direct tests of the real _verify_student_owner logic (bypasses the
+# autouse mock via the reference captured at module import time above).
+# ---------------------------------------------------------------------------
+
+def test_verify_student_owner_allows_self(app, mocker):
+    mock_user = mocker.Mock(id="stu1")
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_user
+
+    with app.test_request_context():
+        session["user_id"] = "stu1"
+        user = real_verify_student_owner("stu1", "assgn1")
+
+    assert user is mock_user
+
+
+def test_verify_student_owner_denies_other_student(app, mocker):
+    mock_assignment = mocker.Mock(course_id="course-1")
+    mock_course = mocker.Mock(instructor_id="instructor-uuid")
+
+    def fake_query(model):
+        dummy = mocker.Mock()
+        if model.__name__ == "Assignment":
+            dummy.filter_by.return_value.first.return_value = mock_assignment
+        elif model.__name__ == "Course":
+            dummy.filter_by.return_value.first.return_value = mock_course
+        elif model.__name__ == "Enrollment":
+            dummy.filter_by.return_value.first.return_value = None
+        return dummy
+
+    mocker.patch("routes.submission.db.session.query", side_effect=fake_query)
+
+    with app.test_request_context():
+        session["user_id"] = "other-student-uuid"
+        with pytest.raises(ForbiddenError):
+            real_verify_student_owner("stu1", "assgn1")
+
+
+def test_verify_student_owner_allows_enrolled_instructor(app, mocker):
+    mock_assignment = mocker.Mock(course_id="course-1")
+    mock_course = mocker.Mock(instructor_id="someone-else")
+    mock_enrollment = mocker.Mock(role="instructor")
+    mock_target_user = mocker.Mock(id="stu1")
+
+    def fake_query(model):
+        dummy = mocker.Mock()
+        if model.__name__ == "Assignment":
+            dummy.filter_by.return_value.first.return_value = mock_assignment
+        elif model.__name__ == "Course":
+            dummy.filter_by.return_value.first.return_value = mock_course
+        elif model.__name__ == "Enrollment":
+            dummy.filter_by.return_value.first.return_value = mock_enrollment
+        elif model.__name__ == "User":
+            dummy.filter_by.return_value.first.return_value = mock_target_user
+        return dummy
+
+    mocker.patch("routes.submission.db.session.query", side_effect=fake_query)
+
+    with app.test_request_context():
+        session["user_id"] = "instructor-uuid"
+        user = real_verify_student_owner("stu1", "assgn1")
+
+    assert user is mock_target_user
+
+
+def test_verify_student_owner_allows_enrolled_ta(app, mocker):
+    mock_assignment = mocker.Mock(course_id="course-1")
+    mock_course = mocker.Mock(instructor_id="someone-else")
+    mock_enrollment = mocker.Mock(role="ta")
+    mock_target_user = mocker.Mock(id="stu1")
+
+    def fake_query(model):
+        dummy = mocker.Mock()
+        if model.__name__ == "Assignment":
+            dummy.filter_by.return_value.first.return_value = mock_assignment
+        elif model.__name__ == "Course":
+            dummy.filter_by.return_value.first.return_value = mock_course
+        elif model.__name__ == "Enrollment":
+            dummy.filter_by.return_value.first.return_value = mock_enrollment
+        elif model.__name__ == "User":
+            dummy.filter_by.return_value.first.return_value = mock_target_user
+        return dummy
+
+    mocker.patch("routes.submission.db.session.query", side_effect=fake_query)
+
+    with app.test_request_context():
+        session["user_id"] = "ta-uuid"
+        user = real_verify_student_owner("stu1", "assgn1")
+
+    assert user is mock_target_user
+
+
+# ---------------------------------------------------------------------------
+# activate_submission: submission must actually belong to the given
+# student_id/assignment_id, not just get a caller-authorization pass.
+# ---------------------------------------------------------------------------
+
+def test_activate_submission_wrong_student_forbidden(client, mocker):
+    fake_submission = mocker.Mock(student_id="owner-uuid", assignment_id="assgn1")
+    mocker.patch("routes.submission.db.session.get", return_value=fake_submission)
+    mock_commit = mocker.patch("routes.submission.db.session.commit")
+
+    response = client.post("/activate_submission", json={
+        "submission_id": "sub1",
+        "student_id": "attacker-uuid",
+        "assignment_id": "assgn1",
+    })
+
+    assert response.status_code == 403
+    assert "does not belong" in response.get_json()["message"]
+    mock_commit.assert_not_called()
+
+
+def test_activate_submission_wrong_assignment_forbidden(client, mocker):
+    fake_submission = mocker.Mock(student_id="stu1", assignment_id="other-assgn")
+    mocker.patch("routes.submission.db.session.get", return_value=fake_submission)
+    mock_commit = mocker.patch("routes.submission.db.session.commit")
+
+    response = client.post("/activate_submission", json={
+        "submission_id": "sub1",
+        "student_id": "stu1",
+        "assignment_id": "assgn1",
+    })
+
+    assert response.status_code == 403
+    assert "does not belong" in response.get_json()["message"]
+    mock_commit.assert_not_called()
+
+
+def test_activate_submission_not_found(client, mocker):
+    mocker.patch("routes.submission.db.session.get", return_value=None)
+
+    response = client.post("/activate_submission", json={
+        "submission_id": "missing-sub",
+        "student_id": "stu1",
+        "assignment_id": "assgn1",
+    })
+
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "No submission found"
