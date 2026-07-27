@@ -88,8 +88,9 @@ def test_get_latest_submission_missing_params(client):
 def test_get_latest_submission_success(client, mocker):
     """Test /get_latest_submission returns the latest submission data."""
     fake_submission = {"id": "sub1", "score": 100}
-    mock_model = mocker.patch.object(Submission, "query", create=True)
-    mock_model.filter_by.return_value.order_by.return_value.first.return_value = fake_submission
+    # Patch the query chain for Submission.
+    fake_query = mocker.patch.object(Submission, "query", create=True)
+    fake_query.filter_by.return_value.order_by.return_value.first.return_value = fake_submission
 
     fake_schema = mocker.patch("routes.submission.SubmissionSchema")
     fake_schema.return_value.dump.return_value = fake_submission
@@ -101,8 +102,8 @@ def test_get_latest_submission_success(client, mocker):
 
 def test_get_latest_submission_not_found(client, mocker):
     """Test /get_latest_submission returns a message when no submission is found."""
-    mock_model = mocker.patch.object(Submission, "query", create=True)
-    mock_model.filter_by.return_value.order_by.return_value.first.return_value = None
+    fake_query = mocker.patch.object(Submission, "query", create=True)
+    fake_query.filter_by.return_value.order_by.return_value.first.return_value = None
 
     fake_schema = mocker.patch("routes.submission.SubmissionSchema")
     fake_schema.return_value.dump.return_value = None
@@ -216,25 +217,22 @@ def test_get_submission_details_success(client, mocker):
 
 
 def test_rerun_submission_autograder_missing_id(client):
-    with client.session_transaction() as sess:
-        sess["user_id"] = "stu1"
     response = client.post("/rerun_submission_autograder", json={})
 
     assert response.status_code == 400
     assert response.get_json()["message"] == "Missing submission_id"
 
 
-def test_rerun_submission_autograder_requires_configured_autograder(client, mocker):
-    with client.session_transaction() as sess:
-        sess["user_id"] = "stu1"
-
+def _mock_rerun_submission_and_assignment(mocker, student_id="student-uuid", autograder_image_name=""):
     existing_submission = mocker.Mock()
     existing_submission.id = "sub1"
     existing_submission.assignment_id = "assgn1"
+    existing_submission.student_id = student_id
 
     assignment = mocker.Mock()
     assignment.id = "assgn1"
-    assignment.autograder_image_name = ""
+    assignment.course_id = "course-uuid"
+    assignment.autograder_image_name = autograder_image_name
 
     def fake_get(model, item_id):
         if model.__name__ == "Submission":
@@ -244,6 +242,14 @@ def test_rerun_submission_autograder_requires_configured_autograder(client, mock
         return None
 
     mocker.patch("routes.submission.db.session.get", side_effect=fake_get)
+    return existing_submission, assignment
+
+
+def test_rerun_submission_autograder_requires_configured_autograder(client, mocker):
+    _mock_rerun_submission_and_assignment(mocker, student_id="student-uuid")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "student-uuid"
 
     response = client.post(
         "/rerun_submission_autograder",
@@ -252,6 +258,33 @@ def test_rerun_submission_autograder_requires_configured_autograder(client, mock
 
     assert response.status_code == 400
     assert "No autograder configured" in response.get_json()["message"]
+
+
+def test_rerun_submission_autograder_unauthenticated(client, mocker):
+    _mock_rerun_submission_and_assignment(mocker)
+
+    response = client.post(
+        "/rerun_submission_autograder",
+        json={"submission_id": "sub1"},
+    )
+
+    assert response.status_code == 401
+    assert "Not authenticated" in response.get_json()["message"]
+
+
+def test_rerun_submission_autograder_forbidden_other_student(client, mocker):
+    _mock_rerun_submission_and_assignment(mocker, student_id="owner-uuid")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "other-student-uuid"
+
+    response = client.post(
+        "/rerun_submission_autograder",
+        json={"submission_id": "sub1"},
+    )
+
+    assert response.status_code == 403
+    assert "Not authorized" in response.get_json()["message"]
 
 
 #  Tests for getting active submission
@@ -278,9 +311,7 @@ def test_get_active_submission_not_found(client, mocker):
 
     response = client.get("/get_active_submission?student_id=stu1&assignment_id=assgn1")
     assert response.status_code == 200
-    data = response.get_json()
-    assert data["message"] == "No active submission found"
-    assert data["data"] is None
+    assert response.get_json() == {"message": "No active submission found", "data": None}
 
 
 # Edge cases to add in route implementations
@@ -294,6 +325,7 @@ def test_upload_submission_missing_file(client):
     assert response.status_code == 400
 
 
+# FAILED TEST
 def test_delete_submission_not_found(client, mocker):
     """Test /delete_submission returns 404 when the submission is not found."""
     # Patch the get method to return None.
@@ -302,6 +334,9 @@ def test_delete_submission_not_found(client, mocker):
     "routes.submission.db.session.get",
     return_value=None
 )
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
     response = client.delete("/delete_submission?submission_id=123")
     assert response.status_code == 404
     data = response.get_json()
@@ -325,20 +360,24 @@ def test_upload_assignment_autograder_missing_file(client):
 
 def test_delete_submission_success(client, mocker):
     """Test /delete_submission successfully deletes a submission."""
-    fake_submission = mocker.Mock()
-    fake_submission.assignment_id = "assgn1"
+    fake_submission = mocker.Mock(assignment_id="assign-1")
+    fake_assignment = mocker.Mock(course_id="course-uuid")
 
     # Patch the get method on the api.db.session instead of routes.submission.db.session.get
-    fake_get = mocker.patch("api.db.session.get", return_value=fake_submission)
+    fake_get = mocker.patch("api.db.session.get", side_effect=[fake_submission, fake_assignment])
     mock_delete = mocker.patch("routes.submission.db.session.delete")
     mock_commit = mocker.patch("routes.submission.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
 
     response = client.delete("/delete_submission?submission_id=123")
     assert response.status_code == 200
     data = response.get_json()
     assert data["message"] == "Submission successfully deleted"
-    
-    fake_get.assert_called_once_with(Submission, "123")
+
+    fake_get.assert_any_call(Submission, "123")
     mock_delete.assert_called_once_with(fake_submission)
     mock_commit.assert_called_once()
 
@@ -350,3 +389,196 @@ def test_get_active_submission_missing_params(client):
     assert data is not None, "Expected a valid JSON response"
     assert data["message"] == "not sufficient details"
 
+
+def test_get_all_assignment_submissions_missing_assignment_id(client):
+    response = client.get("/get_all_assignment_submissions")
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing assignment_id"
+
+def test_get_all_assignment_submissions_not_found(client, mocker):
+    fake_query = mocker.patch.object(Submission, "query", create=True)
+    fake_query.filter_by.return_value.order_by.return_value.all.return_value = []
+
+    response = client.get("/get_all_assignment_submissions?assignment_id=assgn1")
+
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "No submissions found for this assignment"
+
+def test_get_all_assignment_submissions_success(client, mocker):
+    fake_submissions = [{"id": "sub1", "score": 95}]
+
+    fake_query = mocker.patch.object(Submission, "query", create=True)
+    fake_query.filter_by.return_value.order_by.return_value.all.return_value = fake_submissions
+
+    fake_schema = mocker.patch("routes.submission.SubmissionSchema")
+    fake_schema.return_value.dump.return_value = fake_submissions
+
+    response = client.get("/get_all_assignment_submissions?assignment_id=assgn1")
+
+    assert response.status_code == 200
+    assert response.get_json() == fake_submissions
+
+def test_activate_submission_internal_error(client, mocker):
+    payload = {
+        "submission_id": "sub1",
+        "student_id": "stu1",
+        "assignment_id": "assgn1"
+    }
+
+    mock_session = mocker.patch("routes.submission.db.session")
+    mock_session.query.side_effect = Exception("database error")
+
+    response = client.post("/activate_submission", json=payload)
+
+    assert response.status_code == 500
+    assert response.get_json()["message"] == "Failed to activate submission"
+    mock_session.rollback.assert_called_once()
+
+def test_get_submission_details_not_found(client, mocker):
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.get(
+        "/get_submission_details?submission_id=sub1"
+    )
+
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "No submission found"
+
+def test_get_results_user_not_found(client, mocker):
+    mock_query = mocker.patch("routes.submission.db.session.query")
+
+    fake_user_query = mocker.Mock()
+    fake_user_query.filter_by.return_value.first.return_value = None
+    mock_query.return_value = fake_user_query
+
+    response = client.get("/get_results?email=test@test.com&assignment_id=a1")
+
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "User not found"
+
+
+from io import BytesIO
+
+def test_upload_submission_missing_fields(client):
+    response = client.post(
+        "/upload_submission",
+        data={
+            "file": (BytesIO(b"hello"), "test.py")
+        },
+        content_type="multipart/form-data"
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing required fields"
+
+def test_upload_submission_assignment_not_found(client, mocker):
+    mock_query = mocker.patch(
+        "routes.submission.db.session.query"
+    )
+
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.post(
+        "/upload_submission",
+        data={
+            "assignment_id": "a1",
+            "student_id": "s1",
+            "file": (BytesIO(b"hello"), "test.py")
+        },
+        content_type="multipart/form-data"
+    )
+
+    assert response.status_code == 404
+
+def test_delete_submission_commit_error(client, mocker):
+    fake_submission = mocker.Mock(assignment_id="assign-1")
+    fake_assignment = mocker.Mock(course_id="course-uuid")
+
+    mocker.patch(
+        "routes.submission.db.session.get",
+        side_effect=[fake_submission, fake_assignment]
+    )
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
+    mocker.patch(
+        "routes.submission.db.session.delete"
+    )
+
+    mocker.patch(
+        "routes.submission.db.session.commit",
+        side_effect=Exception("db error")
+    )
+
+    rollback = mocker.patch(
+        "routes.submission.db.session.rollback"
+    )
+
+    response = client.delete(
+        "/delete_submission?submission_id=123"
+    )
+
+    assert response.status_code == 500
+
+    data = response.get_json()
+    assert data["message"] == "Failed to delete submission"
+
+    rollback.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Negative-path auth tests (session-based guards)
+# ---------------------------------------------------------------------------
+
+def test_delete_submission_unauthenticated(client):
+    response = client.delete("/delete_submission?submission_id=123")
+    assert response.status_code == 401
+    assert "Not authenticated" in response.get_json()["message"]
+
+
+def test_delete_submission_ta_forbidden(client, mocker):
+    fake_submission = mocker.Mock(assignment_id="assign-1")
+    fake_assignment = mocker.Mock(course_id="course-uuid")
+    mocker.patch("routes.submission.db.session.get", side_effect=[fake_submission, fake_assignment])
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "ta-uuid"
+
+    response = client.delete("/delete_submission?submission_id=123")
+    assert response.status_code == 403
+    assert "Only instructors" in response.get_json()["message"]
+
+
+def test_upload_assignment_autograder_unauthenticated(client):
+    import io
+    response = client.post(
+        "/upload_assignment_autograder",
+        data={"file": (io.BytesIO(b"zip-bytes"), "autograder.zip"), "assignment_id": "assign-1"},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 401
+    assert "Not authenticated" in response.get_json()["message"]
+
+
+def test_upload_assignment_autograder_student_forbidden(client, mocker):
+    import io
+    fake_assignment = mocker.Mock(course_id="course-uuid")
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = fake_assignment
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "student-uuid"
+
+    response = client.post(
+        "/upload_assignment_autograder",
+        data={"file": (io.BytesIO(b"zip-bytes"), "autograder.zip"), "assignment_id": "assign-1"},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.get_json()["message"]

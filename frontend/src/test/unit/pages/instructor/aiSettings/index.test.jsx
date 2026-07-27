@@ -19,6 +19,7 @@ jest.mock("../../../../../services/course", () => ({
 jest.mock("react-router-dom", () => ({
   ...jest.requireActual("react-router-dom"),
   useParams: () => ({ courseId: "course-1" }),
+  useNavigate: () => jest.fn(),
 }));
 
 describe("AISettings model testing", () => {

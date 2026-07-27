@@ -30,8 +30,9 @@ export default function AssignmentResult() {
   // const { assignmentId, studentId } = useParams();
   const navigate = useNavigate();
   // adding global context variable
-  const { userInfo, assignmentInfo, updateAssignmentInfo } =
+  const { userInfo, assignmentInfo, updateAssignmentInfo, courseRole } =
     useContext(GlobalContext);
+  const isStudent = (courseRole || (userInfo?.isStudent ? "student" : "instructor")) === "student";
   const [toSend, setToSend] = useState();
   const [dueDate, setDueDate] = useState();
   const [lateDueDate, setLateDueDate] = useState();
@@ -288,7 +289,7 @@ export default function AssignmentResult() {
           </div>
         </div>
       </PageContent>
-      {userInfo.isStudent ? (
+      {isStudent ? (
         <PageBottom>
           <ActionButtons
             onRerun={handleRerunAutograder}
@@ -306,7 +307,7 @@ export default function AssignmentResult() {
             }}
             onDownload={handleDownload} // Implement or replace with actual function
             onHistoryOpen={() => toggleModal("history")}
-            isStudent={userInfo?.isStudent}
+            isStudent={isStudent}
             allowFileUpload={allowFileUpload}
             enableCodeEditor={enableCodeEditor}
             rerunLoading={rerunLoading}

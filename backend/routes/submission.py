@@ -15,6 +15,7 @@ from api import db
 from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
+from util.auth import get_user_course_role, require_authenticated, require_course_role
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -413,6 +414,14 @@ def upload_assignment_autograder():
     if not assignment_id or not file.filename:
         raise BadRequestError("Missing required fields")
 
+    require_authenticated()
+
+    assignment_for_auth = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment_for_auth:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(assignment_for_auth.course_id, {"instructor", "ta"}, "Only instructors or TAs can upload an autograder")
+
     # Set up paths
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
@@ -552,13 +561,18 @@ def delete_submission():
     if not submission_id:
         raise BadRequestError("Missing submission_id")
 
+    require_authenticated()
+
     submission_to_delete = db.session.get(Submission, submission_id)
 
     if not submission_to_delete:
         raise NotFoundError("No submission found to delete")
 
-    # Security: Verify the requester is course staff or admin
-    _verify_course_staff(submission_to_delete.assignment_id)
+    submission_assignment = db.session.get(Assignment, submission_to_delete.assignment_id)
+    if not submission_assignment:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(submission_assignment.course_id, {"instructor"}, "Only instructors can delete submissions")
 
     try:
         db.session.delete(submission_to_delete)
@@ -595,11 +609,6 @@ def get_submission_details():
 
 @submission.route('/rerun_submission_autograder', methods=["POST"])
 def rerun_submission_autograder():
-    # Verify the requester is authenticated
-    session_user_id = session.get("user_id")
-    if not session_user_id:
-        raise ForbiddenError("Not authenticated. Please log in.")
-
     data = request.json or {}
     submission_id = data.get("submission_id")
 
@@ -614,8 +623,12 @@ def rerun_submission_autograder():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
-    # Security: Only course staff (instructor/TA) or admins can rerun submissions
-    _verify_course_staff(assignment.id)
+    requester_id = require_authenticated()
+
+    is_owner = str(submission_to_rerun.student_id) == str(requester_id)
+    is_staff = get_user_course_role(requester_id, assignment.course_id) in {"instructor", "ta"}
+    if not (is_owner or is_staff):
+        raise ForbiddenError("Not authorized to rerun this submission")
 
     if (
         not assignment.autograder_image_name
@@ -711,6 +724,14 @@ def rerun_submission_autograder():
             "Submitted program took too long to run",
             submission_to_rerun.id,
         )
+    except Exception:
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass
+        raise InternalProcessingError("Failed to rerun autograder")
 
     if exec_proc.returncode != 0:
         stderr = getattr(exec_proc, "stderr", b"") or getattr(exec_proc, "output", b"")

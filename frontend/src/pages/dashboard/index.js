@@ -90,11 +90,6 @@ export default function Dashboard() {
     fetchCourses();
   }, [fetchCourses, userInfo]);
 
-  // Fetch courses on mount and when userInfo changes
-  useEffect(() => {
-    fetchCourses();
-  }, [fetchCourses, userInfo]);
-
   // Function to handle adding a new course
   const handleAddCourse = useCallback(
     (values) => {
