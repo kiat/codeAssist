@@ -31,7 +31,8 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
             `${process.env.REACT_APP_API_URL}/get_regrade_request?` +
               new URLSearchParams({
                 submission_id: submissionId,
-              })
+              }),
+            { credentials: "include" }
           );
           const request = await response.json();
           if (request.justification) {
@@ -86,6 +87,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           submission_id: submissionId,
           justification: TempJustification,
@@ -116,6 +118,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           submission_id: submissionId,
           new_grade: parseFloat(Grade), // Ensure the grade is a float
@@ -129,6 +132,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: "include",
           body: JSON.stringify({
             submission_id: submissionId,
           }),
