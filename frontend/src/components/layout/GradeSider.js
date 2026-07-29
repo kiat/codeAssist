@@ -35,7 +35,8 @@ export default () => {
     fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
     new URLSearchParams({
       course_id: courseInfo.id,
-    })
+    }),
+    { credentials: "include" }
     )
     .then((res) => res.json())
         .then((data) =>
