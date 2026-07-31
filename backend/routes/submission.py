@@ -119,7 +119,7 @@ def _verify_student_owner(student_id, assignment_id=None):
             if not user:
                 raise NotFoundError("User not found")
             return user
-    
+
     # If we get here, the requester is not authorized
     raise ForbiddenError("You can only access your own data")
 
@@ -203,11 +203,34 @@ def get_or_create_assignment_container(assignment):
         else:
             raise InternalProcessingError("Failed to create or locate assignment container after retries")
     elif container.status != "running":
-        container.start()
+        try:
+            container.start()
+        except Exception:
+            logger.warning(
+                "Failed to restart container %s for assignment %s",
+                container.id, assignment.id, exc_info=True
+            )
+            raise InternalProcessingError("Failed to restart container")
 
     if assignment.container_id != container.id:
         assignment.container_id = container.id
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            try:
+                container.stop()
+                container.remove(force=True)
+            except Exception:
+                logger.warning(
+                    "Failed to stop/remove container %s for assignment %s after commit failure",
+                    container.id, assignment.id, exc_info=True
+                )
+            logger.warning(
+                "Failed to commit container %s for assignment %s to database",
+                container.id, assignment.id, exc_info=True
+            )
+            raise InternalProcessingError("Failed to commit container_id to database")
 
     return container
 

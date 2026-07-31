@@ -238,7 +238,7 @@ def delete_assignment():
         db.session.commit()
 
         return jsonify({"message": "Assignment deleted successfully"}), 200
-        
+
     except Exception:
         db.session.rollback()
         raise InternalProcessingError("Failed to delete assignment")
