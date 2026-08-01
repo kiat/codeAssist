@@ -14,6 +14,7 @@ DEFAULT_AI_ALLOWED_INPUTS = {
     "test_results": True,
     "test_cases": False,
     "student_output": True,
+    "submission_history": True,
 }
 
 DEFAULT_AI_FEEDBACK_PROMPTS = [
@@ -457,6 +458,15 @@ def _assignment_description(assignment):
     return ""
 
 
+def _is_hidden_test_result(test):
+    visibility = str(test.get("visibility", "") or "").strip().lower()
+    hidden_flag = test.get("hidden", test.get("is_hidden", False))
+    if isinstance(hidden_flag, str):
+        hidden_flag = hidden_flag.strip().lower() in {"true", "1", "yes"}
+
+    return bool(hidden_flag) or visibility in {"hidden", "private", "secret"}
+
+
 def _prepare_results_for_prompt(results, allowed_inputs):
     decoded_results = _decode_json_value(results)
 
@@ -482,6 +492,16 @@ def _prepare_results_for_prompt(results, allowed_inputs):
                 continue
 
             prepared_test = {}
+            is_hidden = _is_hidden_test_result(test)
+
+            if is_hidden:
+                prepared_test["name"] = "Hidden test"
+                for key in ("status", "score", "max_score", "visibility"):
+                    if key in test:
+                        prepared_test[key] = test[key]
+                prepared_tests.append(prepared_test)
+                continue
+
             for key in ("name", "status", "score", "max_score", "visibility"):
                 if key in test:
                     prepared_test[key] = test[key]
@@ -522,6 +542,7 @@ def build_allowed_feedback_context(
     autograder_results=None,
     test_cases=None,
     student_output=None,
+    submission_history=None,
 ):
     allowed_inputs = normalize_allowed_inputs(
         getattr(assignment, "ai_allowed_inputs", None)
@@ -549,6 +570,9 @@ def build_allowed_feedback_context(
     if allowed_inputs["student_output"] and student_output:
         context["student_output"] = _format_context_value(student_output)
 
+    if allowed_inputs["submission_history"] and submission_history:
+        context["submission_history"] = _format_context_value(submission_history)
+
     return context
 
 
@@ -562,6 +586,7 @@ def render_feedback_context(context):
         "test_results": "Autograder results",
         "test_cases": "Test cases",
         "student_output": "Student output",
+        "submission_history": "Previous submission feedback history",
     }
 
     rendered_sections = []

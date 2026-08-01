@@ -1,5 +1,5 @@
 """Tests that verify the content passed to _get_ai_chat_reply includes
-chat history (memory), assignment description, and coding_insights."""
+chat history, assignment description, and submission feedback memory."""
 import pytest
 from api import create_app, db
 
@@ -18,13 +18,22 @@ def client(app):
     return app.test_client()
 
 
-def _build_ai_chat_mocks(mocker, *, description="Build a calculator", insights="Struggles with loops", chat_history=None):
+def _build_ai_chat_mocks(
+    mocker,
+    *,
+    description="Build a calculator",
+    insights="No history.",
+    submission_history="",
+    chat_history=None,
+    ai_allowed_inputs=None,
+):
     """Helper to wire up the common mocks for a successful ai_chat call."""
     mock_assignment = mocker.Mock()
     mock_assignment.ai_feedback_enabled = True
     mock_assignment.course_id = "course-1"
     mock_assignment.use_course_ai_default = True
     mock_assignment.description = description
+    mock_assignment.ai_allowed_inputs = ai_allowed_inputs
     mock_assignment.ai_feedback_temperature = None
 
     mock_course = mocker.Mock()
@@ -50,6 +59,10 @@ def _build_ai_chat_mocks(mocker, *, description="Build a calculator", insights="
     mocker.patch("routes.code_editor.store_chat_message")
     mocker.patch("routes.code_editor.record_feedback_request")
     mocker.patch("routes.code_editor.get_chat_history", return_value=chat_history or [])
+    mocker.patch(
+        "routes.code_editor.get_recent_submission_history_text",
+        return_value=submission_history,
+    )
     mocker.patch("ai_feedback.integration.decrypt_api_key", return_value="decrypted-key")
 
     mock_query = mocker.patch("routes.code_editor.db.session.query")
@@ -106,9 +119,12 @@ def test_ai_chat_prompt_includes_assignment_description(client, mocker):
     assert "Assignment description:" in prompt_arg
 
 
-def test_ai_chat_prompt_includes_coding_insights(client, mocker):
-    """Student coding_insights (memory) is included in the prompt sent to the LLM."""
-    _build_ai_chat_mocks(mocker, insights="Struggles with off-by-one errors in loops")
+def test_ai_chat_prompt_includes_submission_history(client, mocker):
+    """Previous AI submission feedback is included in the prompt sent to the LLM."""
+    _build_ai_chat_mocks(
+        mocker,
+        submission_history="Submission loops.py: Struggles with off-by-one errors in loops",
+    )
     mock_reply = mocker.patch("routes.code_editor._get_ai_chat_reply", return_value="Watch your range bounds.")
 
     resp = client.post("/ai_chat", json={
@@ -122,11 +138,11 @@ def test_ai_chat_prompt_includes_coding_insights(client, mocker):
     prompt_arg = mock_reply.call_args.kwargs.get("user_prompt") or mock_reply.call_args.args[3]
 
     assert "off-by-one" in prompt_arg
-    assert "Student coding history:" in prompt_arg
+    assert "Previous submission feedback history:" in prompt_arg
 
 
 def test_ai_chat_prompt_excludes_empty_insights(client, mocker):
-    """When coding_insights is 'No history.', it should not clutter the prompt."""
+    """When there is no stored history, it should not clutter the prompt."""
     _build_ai_chat_mocks(mocker, insights="No history.")
     mock_reply = mocker.patch("routes.code_editor._get_ai_chat_reply", return_value="Sure, let's begin.")
 
@@ -141,4 +157,36 @@ def test_ai_chat_prompt_excludes_empty_insights(client, mocker):
     prompt_arg = mock_reply.call_args.kwargs.get("user_prompt") or mock_reply.call_args.args[3]
 
     assert "No history." not in prompt_arg
-    assert "Student coding history:" not in prompt_arg
+    assert "Previous submission feedback history:" not in prompt_arg
+
+
+def test_ai_chat_prompt_respects_allowed_input_settings(client, mocker):
+    _build_ai_chat_mocks(
+        mocker,
+        description="Do not send this assignment text.",
+        ai_allowed_inputs={
+            "assignment_description": False,
+            "student_code": False,
+            "test_results": True,
+            "test_cases": False,
+            "student_output": True,
+            "submission_history": False,
+        },
+        submission_history="Do not send this submission history.",
+    )
+    mock_reply = mocker.patch("routes.code_editor._get_ai_chat_reply", return_value="I can still help.")
+
+    resp = client.post("/ai_chat", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "message": "How should I think about this?",
+        "code": "print('secret solution code')",
+    })
+
+    assert resp.status_code == 200
+    prompt_arg = mock_reply.call_args.kwargs.get("user_prompt") or mock_reply.call_args.args[3]
+
+    assert "Do not send this assignment text." not in prompt_arg
+    assert "secret solution code" not in prompt_arg
+    assert "Do not send this submission history." not in prompt_arg
+    assert "How should I think about this?" in prompt_arg

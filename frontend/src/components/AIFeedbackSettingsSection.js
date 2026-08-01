@@ -34,6 +34,10 @@ const INPUT_PERMISSIONS = [
     key: "student_output",
     label: "Student output",
   },
+  {
+    key: "submission_history",
+    label: "Previous submission feedback",
+  },
 ];
 
 export default function AIFeedbackSettingsSection() {
