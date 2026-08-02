@@ -12,6 +12,23 @@ from ai_feedback.settings import (
 )
 
 assignment = Blueprint('assignment', __name__)
+MAX_ASSIGNMENT_DESCRIPTION_LENGTH = 20000
+
+
+def _normalize_assignment_description(data):
+    if "description" not in data:
+        return
+
+    description = data.get("description")
+    if description is None:
+        data["description"] = None
+        return
+
+    description = str(description).strip()
+    if len(description) > MAX_ASSIGNMENT_DESCRIPTION_LENGTH:
+        raise BadRequestError("Assignment description is too long")
+
+    data["description"] = description or None
 
 @assignment.route('/update_assignment', methods=["PUT"])
 def update_assignment():
@@ -22,11 +39,13 @@ def update_assignment():
     @param name             the name of the assignment
     @param course_id        the id of the course
     '''
-    data = request.json
+    data = request.json or {}
     required_fields = ["assignment_id", "name", "course_id"]
 
     if not all(field in data for field in required_fields):
         raise BadRequestError("Missing required fields")
+
+    _normalize_assignment_description(data)
 
     assignment_id = data["assignment_id"]
     assignment_name = data["name"]
@@ -113,13 +132,15 @@ def create_assignment():
     @param name         the name of the assignment
     @param course_id    id of the course
     '''
-    assignment_data = request.json
+    assignment_data = request.json or {}
 
     assignment_name = assignment_data.get("name")
     course_id = assignment_data.get("course_id")
 
     if not assignment_name or not course_id:
         raise BadRequestError("Missing assignment name or course ID")
+
+    _normalize_assignment_description(assignment_data)
 
     require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can create assignments")
 

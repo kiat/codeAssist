@@ -1,6 +1,9 @@
+import uuid
+
 import pytest
-from api import create_app
+from api import create_app, db
 from api.models import Assignment, Submission, AssignmentExtension, Course, Enrollment
+from api.schemas import AssignmentSchema
 
 
 @pytest.fixture
@@ -67,6 +70,31 @@ def test_update_assignment_success(client, mocker, login_as):
     mock_commit.assert_called_once()
 
 
+def test_update_assignment_saves_description(client, mocker, login_as):
+    mock_assignment = Assignment(
+        id="some-uuid",
+        name="Old",
+        course_id="course-uuid",
+        description="Old description",
+    )
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query.return_value.filter.return_value.first.return_value = None
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+    mocker.patch("routes.assignment.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+
+    resp = client.put("/update_assignment", json={
+        "assignment_id": "some-uuid",
+        "name": "Updated",
+        "course_id": "course-uuid",
+        "description": "  Implement BFS over an unweighted graph.  ",
+    })
+
+    assert resp.status_code == 200
+    assert mock_assignment.description == "Implement BFS over an unweighted graph."
+
+
 def test_update_assignment_duplicate_name(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter.return_value.first.return_value = mocker.Mock()
@@ -115,6 +143,28 @@ def test_get_assignment_success(client, mocker):
     assert resp.json["id"] == "assignment-uuid"
     assert resp.json["name"] == "Test Assignment"
     mock_query.return_value.filter_by.assert_called_once_with(id="assignment-uuid")
+
+
+def test_assignment_description_schema_round_trip(app):
+    with app.app_context():
+        db.create_all()
+        assignment_id = str(uuid.uuid4())
+        course_id = str(uuid.uuid4())
+        assignment = Assignment(
+            id=assignment_id,
+            name="BFS Lab",
+            course_id=course_id,
+            description="Use BFS to find shortest paths in an unweighted graph.",
+        )
+        db.session.add(assignment)
+        db.session.commit()
+
+        loaded = db.session.get(Assignment, assignment_id)
+        serialized = AssignmentSchema().dump(loaded)
+
+        assert loaded.description == "Use BFS to find shortest paths in an unweighted graph."
+        assert serialized["description"] == loaded.description
+        db.drop_all()
 
 
 def test_get_assignment_does_not_return_assignment_api_key(client, mocker):
@@ -275,6 +325,48 @@ def test_create_assignment_success(client, mocker, login_as):
 
     mock_add.assert_called_once()
     mock_commit.assert_called_once()
+
+
+def test_create_assignment_saves_description(client, mocker, login_as):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query.return_value.filter_by.return_value.one_or_none.return_value = None
+    mock_add = mocker.patch("routes.assignment.db.session.add")
+    mocker.patch("routes.assignment.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+
+    created_assignment = Assignment(
+        id="123",
+        name="New Assignment",
+        course_id="course-uuid",
+        description="Explain recursion base cases.",
+    )
+    mock_query.return_value.filter_by.return_value.first.return_value = created_assignment
+
+    resp = client.post("/create_assignment", json={
+        "name": "New Assignment",
+        "course_id": "course-uuid",
+        "description": "  Explain recursion base cases.  ",
+    })
+
+    assert resp.status_code == 200
+    saved_assignment = mock_add.call_args.args[0]
+    assert saved_assignment.description == "Explain recursion base cases."
+    assert resp.json["description"] == "Explain recursion base cases."
+
+
+def test_create_assignment_rejects_too_long_description(client, mocker):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query.return_value.filter_by.return_value.one_or_none.return_value = None
+
+    resp = client.post("/create_assignment", json={
+        "name": "New Assignment",
+        "course_id": "course-uuid",
+        "description": "x" * 20001,
+    })
+
+    assert resp.status_code == 400
+    assert "description is too long" in resp.json["message"]
 
 
 

@@ -1,14 +1,13 @@
 import { Layout, message, Modal } from "antd";
 import axios from "axios";
 import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import "./setupMocks";
 import Home from "./pages/home";
 import Dashboard from "./pages/dashboard";
 import { createContext, useCallback, useEffect, useState } from "react";
 import Assignments from "./pages/assignments";
 import AssignmentResult from "./pages/result";
 import RootSider from "./components/layout/sider";
-  
-import "./mock";
 import InstructorDashboard from "./pages/instructor/dashboard";
 import CourseSettings from "./pages/instructor/courseSettings";
 import AISettings from "./pages/instructor/aiSettings";

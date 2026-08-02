@@ -48,6 +48,7 @@ describe("AssignmentSettings late submissions", () => {
       data: {
         id: "assignment-1",
         name: "Homework 1",
+        description: "Practice loops carefully.",
         course_id: "course-1",
         published: false,
         published_date: "2026-07-01T12:00:00Z",
@@ -90,6 +91,7 @@ describe("AssignmentSettings late submissions", () => {
           assignment_id: "assignment-1",
           late_submission: false,
           late_due_date: null,
+          description: "Practice loops carefully.",
         })
       );
     });
