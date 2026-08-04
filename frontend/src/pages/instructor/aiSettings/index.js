@@ -31,44 +31,21 @@ import {
   fetchAiModels,
   testAiModel,
 } from "../../../services/course";
+import {
+  AI_PROVIDER_DEFAULT_MODELS,
+  AI_PROVIDERS,
+  AI_PROVIDER_KEYS,
+  hasProviderConfiguration,
+  isVertexProvider,
+} from "../../../constants/aiFeedbackSettings";
 
 const { Sider, Content } = Layout;
-
-const PROVIDERS = [
-  { key: "openai", label: "ChatGPT", displayName: "OpenAI / ChatGPT" },
-  { key: "gemini", label: "Gemini", displayName: "Google Gemini" },
-  { key: "claude", label: "Claude", displayName: "Anthropic Claude" },
-  { key: "ollama", label: "Ollama", displayName: "Ollama (Local LLM)" },
-];
 
 const FEEDBACK_STYLES = [
   { label: "Hint-based", value: "hint-based" },
   { label: "Balanced", value: "balanced" },
   { label: "Detailed debugging", value: "detailed-debugging" },
 ];
-
-const PROVIDER_DEFAULT_MODELS = {
-  openai: "gpt-4o",
-  gemini: "gemini-1.5-flash",
-  claude: "claude-sonnet-5",
-  ollama: "llama3",
-};
-
-const getKeyStatus = (course, selectedProviderKey) => {
-  if (selectedProviderKey === "openai") {
-    return !!course.has_openai_api_key;
-  }
-  if (selectedProviderKey === "gemini") {
-    return !!course.has_gemini_api_key;
-  }
-  if (selectedProviderKey === "claude") {
-    return !!course.has_claude_api_key;
-  }
-  if (selectedProviderKey === "ollama") {
-    return !!course.has_ollama_api_key;
-  }
-  return false;
-};
 
 export default function AISettings() {
   const { courseId } = useParams();
@@ -83,9 +60,49 @@ export default function AISettings() {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [apiTestStatus, setApiTestStatus] = useState(null);
 
-  const selectedProvider = PROVIDERS.find((item) => item.key === provider);
-  const isOllama = provider === "ollama";
-  const hasSavedKey = getKeyStatus(courseAiInfo, provider);
+  const selectedProvider = AI_PROVIDERS.find((item) => item.key === provider);
+  const isOllama = provider === AI_PROVIDER_KEYS.OLLAMA;
+  const isVertex = isVertexProvider(provider);
+  const hasSavedKey = hasProviderConfiguration(courseAiInfo, provider);
+  const providerStatusPrefix = isVertex
+    ? "Server config: "
+    : isOllama
+    ? "Ollama URL: "
+    : "API key: ";
+  const providerStatusText = hasSavedKey
+    ? "Connected"
+    : isVertex
+    ? "Not configured"
+    : isOllama
+    ? "Using Default"
+    : "Not saved";
+  const providerConfigTitle = isVertex
+    ? "Vertex AI Server Configuration"
+    : isOllama
+    ? "Ollama Server URL"
+    : "Provider API Key";
+  const providerAlertMessage = hasSavedKey
+    ? isVertex
+      ? "Vertex AI server configuration is available"
+      : isOllama
+      ? "Ollama connection URL is configured"
+      : `${selectedProvider?.label} API key is saved`
+    : isVertex
+    ? "Vertex AI server configuration is incomplete"
+    : isOllama
+    ? "Ollama URL is not configured (defaults to http://host.docker.internal:11434)"
+    : `${selectedProvider?.label} API key is not configured`;
+  const providerAlertDescription = hasSavedKey
+    ? isVertex
+      ? "Gemini over Vertex AI uses the Google Cloud project and credentials configured for the CodeAssist deployment."
+      : isOllama
+      ? "A connection URL is configured. Enter a new URL only if you want to replace it."
+      : "A saved key exists. Paste a new key only if you want to replace it."
+    : isVertex
+    ? "Set GOOGLE_CLOUD_PROJECT and Application Default Credentials on the server before using this provider."
+    : isOllama
+    ? "Provide the URL to your local or remote Ollama server instance."
+    : "Paste an API key below and save it for this provider.";
 
   const fetchModelsForProvider = useCallback(
     async ({
@@ -113,7 +130,7 @@ export default function AISettings() {
           return;
         }
 
-        const providerPreferredModel = PROVIDER_DEFAULT_MODELS[targetProvider];
+        const providerPreferredModel = AI_PROVIDER_DEFAULT_MODELS[targetProvider];
 
         const preferredModel =
           providerPreferredModel && fetchedModels.includes(providerPreferredModel)
@@ -150,7 +167,7 @@ export default function AISettings() {
       const defaultProvider = course.default_ai_provider || "openai";
       const defaultModel =
         course.default_ai_model ||
-        PROVIDER_DEFAULT_MODELS[defaultProvider] ||
+        AI_PROVIDER_DEFAULT_MODELS[defaultProvider] ||
         "";
 
       setProvider(defaultProvider);
@@ -164,7 +181,7 @@ export default function AISettings() {
         temperature: course.default_ai_temperature ?? 0.5,
       });
 
-      if (getKeyStatus(course, defaultProvider)) {
+      if (hasProviderConfiguration(course, defaultProvider)) {
         await fetchModelsForProvider({
           targetProvider: defaultProvider,
           keyOverride: "",
@@ -188,7 +205,7 @@ export default function AISettings() {
     setApiTestStatus(null);
     setApiKey("");
 
-    const fallbackModel = PROVIDER_DEFAULT_MODELS[newProvider] || "";
+    const fallbackModel = AI_PROVIDER_DEFAULT_MODELS[newProvider] || "";
     let nextModel = fallbackModel;
 
     if (newProvider === courseAiInfo.default_ai_provider) {
@@ -203,7 +220,7 @@ export default function AISettings() {
       model_name: nextModel,
     });
 
-    if (getKeyStatus(courseAiInfo, newProvider)) {
+    if (hasProviderConfiguration(courseAiInfo, newProvider)) {
       await fetchModelsForProvider({
         targetProvider: newProvider,
         keyOverride: "",
@@ -296,7 +313,7 @@ export default function AISettings() {
           mode="inline"
           selectedKeys={[provider]}
           onClick={(item) => handleProviderChange(item.key)}
-          items={PROVIDERS.map((item) => ({
+          items={AI_PROVIDERS.map((item) => ({
             key: item.key,
             label: item.label,
           }))}
@@ -318,12 +335,8 @@ export default function AISettings() {
                   hasSavedKey ? <CheckCircleOutlined /> : <CloseCircleOutlined />
                 }
               >
-                {isOllama ? "Ollama URL: " : "API key: "}
-                {hasSavedKey
-                  ? "Connected"
-                  : isOllama
-                  ? "Using Default"
-                  : "Not saved"}
+                {providerStatusPrefix}
+                {providerStatusText}
               </Tag>
 
               <Tag
@@ -355,9 +368,7 @@ export default function AISettings() {
               title={
                 <Space>
                   <KeyOutlined />
-                  <span>
-                    {isOllama ? "Ollama Server URL" : "Provider API Key"}
-                  </span>
+                  <span>{providerConfigTitle}</span>
                 </Space>
               }
             >
@@ -366,7 +377,7 @@ export default function AISettings() {
                   <Select
                     value={provider}
                     onChange={handleProviderChange}
-                    options={PROVIDERS.map((item) => ({
+                    options={AI_PROVIDERS.map((item) => ({
                       label: item.displayName,
                       value: item.key,
                     }))}
@@ -376,48 +387,34 @@ export default function AISettings() {
                 <Alert
                   type={hasSavedKey ? "success" : "info"}
                   showIcon
-                  message={
-                    hasSavedKey
-                      ? isOllama
-                        ? "Ollama connection URL is configured"
-                        : `${selectedProvider?.label} API key is saved`
-                      : isOllama
-                      ? "Ollama URL is not configured (defaults to http://host.docker.internal:11434)"
-                      : `${selectedProvider?.label} API key is not configured`
-                  }
-                  description={
-                    hasSavedKey
-                      ? isOllama
-                        ? "A connection URL is configured. Enter a new URL only if you want to replace it."
-                        : "A saved key exists. Paste a new key only if you want to replace it."
-                      : isOllama
-                      ? "Provide the URL to your local or remote Ollama server instance."
-                      : "Paste an API key below and save it for this provider."
-                  }
+                  message={providerAlertMessage}
+                  description={providerAlertDescription}
                 />
 
-                <Form.Item
-                  label={isOllama ? "Ollama Base URL" : "Add or Replace API Key"}
-                >
-                  {isOllama ? (
-                    <Input
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="e.g. http://host.docker.internal:11434"
-                    />
-                  ) : (
-                    <Input.Password
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="Paste a new API key to add or replace"
-                      visibilityToggle
-                    />
-                  )}
-                </Form.Item>
+                {!isVertex && (
+                  <Form.Item
+                    label={isOllama ? "Ollama Base URL" : "Add or Replace API Key"}
+                  >
+                    {isOllama ? (
+                      <Input
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder="e.g. http://host.docker.internal:11434"
+                      />
+                    ) : (
+                      <Input.Password
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder="Paste a new API key to add or replace"
+                        visibilityToggle
+                      />
+                    )}
+                  </Form.Item>
+                )}
 
                 <Space wrap>
                   <Button type="primary" onClick={handleSave}>
-                    Save API Key / Settings
+                    {isVertex ? "Save Settings" : "Save API Key / Settings"}
                   </Button>
                 </Space>
               </Space>
@@ -440,8 +437,16 @@ export default function AISettings() {
                 type="info"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message="Save API key before refreshing models"
-                description="Enter or save the provider API key first, then use Refresh Models to load the current usable models for this provider."
+                message={
+                  isVertex
+                    ? "Vertex models are managed by CodeAssist"
+                    : "Save API key before refreshing models"
+                }
+                description={
+                  isVertex
+                    ? "Refresh Models loads the CodeAssist-supported Gemini models for Vertex AI."
+                    : "Enter or save the provider API key first, then use Refresh Models to load the current usable models for this provider."
+                }
               />
 
               <Form.Item

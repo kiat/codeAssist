@@ -1,5 +1,6 @@
 import pytest
 from api import create_app
+from ai_feedback.providers.errors import ProviderPermissionError, ProviderTimeoutError
 from util.errors import BadRequestError, ConflictError, NotFoundError, InternalProcessingError
 from routes.course import allowed_file, create_enrollment_bulk
 
@@ -489,6 +490,7 @@ def test_get_course_info_success(client, mocker):
             "default_ai_temperature": 0.5,
             "has_openai_api_key": True,
             "has_gemini_api_key": False,
+            "has_gemini_vertex_config": False,
             "has_claude_api_key": False,
             "has_ollama_api_key": False,
         }
@@ -837,23 +839,10 @@ def test_test_ai_model_openai_success(client, mocker):
 
 
 def test_test_ai_model_gemini_success(client, mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": '{"insights":["Model test passed."],"annotations":[]}'
-                        }
-                    ]
-                }
-            }
-        ]
-    }
-
-    mock_post = mocker.patch("routes.course.requests.post", return_value=mock_response)
+    mock_generate = mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value='{"insights":["Model test passed."],"annotations":[]}',
+    )
 
     response = client.post(
         "/test_ai_model",
@@ -868,29 +857,17 @@ def test_test_ai_model_gemini_success(client, mocker):
     assert response.json["provider"] == "gemini"
     assert response.json["model"] == "gemini-1.5-flash"
 
-    mock_post.assert_called_once()
-    assert "gemini-1.5-flash:generateContent" in mock_post.call_args.args[0]
-    assert mock_post.call_args.kwargs["params"] == {"key": "test-gemini-key"}
+    mock_generate.assert_called_once()
+    assert mock_generate.call_args.args[0] == "gemini"
+    assert mock_generate.call_args.args[1] == "test-gemini-key"
+    assert mock_generate.call_args.args[2] == "gemini-1.5-flash"
 
 
-def test_test_ai_model_gemini_uses_feedback_generation_config(client, mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": '{"insights":["Model test passed."],"annotations":[]}'
-                        }
-                    ]
-                }
-            }
-        ]
-    }
-
-    mock_post = mocker.patch("routes.course.requests.post", return_value=mock_response)
+def test_test_ai_model_gemini_uses_shared_generation_helper(client, mocker):
+    mock_generate = mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value='{"insights":["Model test passed."],"annotations":[]}',
+    )
 
     response = client.post(
         "/test_ai_model",
@@ -903,30 +880,17 @@ def test_test_ai_model_gemini_uses_feedback_generation_config(client, mocker):
 
     assert response.status_code == 200
 
-    generation_config = mock_post.call_args.kwargs["json"]["generationConfig"]
-    assert generation_config["maxOutputTokens"] == 1600
-    assert generation_config["responseMimeType"] == "application/json"
-    assert generation_config["thinkingConfig"] == {"thinkingBudget": 0}
+    assert mock_generate.call_args.args[0] == "gemini"
+    assert mock_generate.call_args.args[1] == "test-gemini-key"
+    assert mock_generate.call_args.args[2] == "gemini-2.5-flash"
+    assert "Return only this JSON object" in mock_generate.call_args.args[3]
 
 
 def test_test_ai_model_gemini_invalid_json_returns_error(client, mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": "This model can chat, but did not return JSON."
-                        }
-                    ]
-                }
-            }
-        ]
-    }
-
-    mocker.patch("routes.course.requests.post", return_value=mock_response)
+    mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value="This model can chat, but did not return JSON.",
+    )
 
     response = client.post(
         "/test_ai_model",
@@ -942,13 +906,12 @@ def test_test_ai_model_gemini_invalid_json_returns_error(client, mocker):
 
 
 def test_test_ai_model_gemini_unavailable_returns_error(client, mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 503
-    mock_response.text = (
-        '{"error":{"message":"This model is currently experiencing high demand."}}'
+    mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        side_effect=ProviderTimeoutError(
+            "This model is currently experiencing high demand."
+        ),
     )
-
-    mocker.patch("routes.course.requests.post", return_value=mock_response)
 
     response = client.post(
         "/test_ai_model",
@@ -959,8 +922,95 @@ def test_test_ai_model_gemini_unavailable_returns_error(client, mocker):
         },
     )
 
-    assert response.status_code == 503
-    assert "Selected Gemini model cannot be used" in response.json["error"]
+    assert response.status_code == 504
+    assert response.json["code"] == "PROVIDER_TIMEOUT_ERROR"
+    assert response.json["error"] == "AI provider request timed out."
+
+
+def test_fetch_ai_models_gemini_vertex_returns_supported_models(client):
+    response = client.post(
+        "/fetch_ai_models",
+        json={
+            "provider": "gemini_vertex",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["models"] == ["gemini-2.5-flash", "gemini-2.5-pro"]
+
+
+def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker):
+    mock_test = mocker.patch(
+        "routes.course._test_vertex_connection",
+        return_value="OK",
+    )
+
+    response = client.post(
+        "/test_ai_api_key",
+        json={
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+            "location": "us-central1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["success"] is True
+    assert response.json["message"] == "Vertex AI connection succeeded."
+    assert response.json["provider"] == "gemini_vertex"
+    mock_test.assert_called_once()
+
+
+def test_test_ai_model_gemini_vertex_success(client, mocker):
+    mock_generate = mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value='{"insights":["Model test passed."],"annotations":[]}',
+    )
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+            "location": "us-central1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["success"] is True
+    assert response.json["provider"] == "gemini_vertex"
+    assert response.json["model"] == "gemini-2.5-flash"
+    assert mock_generate.call_args.args[:3] == (
+        "gemini_vertex",
+        None,
+        "gemini-2.5-flash",
+    )
+    assert mock_generate.call_args.kwargs["location"] == "us-central1"
+
+
+def test_test_ai_model_gemini_vertex_sanitizes_provider_errors(client, mocker):
+    mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        side_effect=ProviderPermissionError(
+            "service-account@example.iam.gserviceaccount.com lacks aiplatform",
+        ),
+    )
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json["success"] is False
+    assert response.json["code"] == "PROVIDER_PERMISSION_ERROR"
+    assert "service-account" not in response.json["error"]
+    assert response.json["error"] == (
+        "CodeAssist does not have permission to use this AI provider."
+    )
 
 
 def test_test_ai_model_claude_success(client, mocker):
@@ -1445,6 +1495,56 @@ def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker):
 
     mock_encrypt.assert_called_once_with("plain-openai-key")
     mock_commit.assert_called_once()
+
+
+def test_update_ai_settings_accepts_gemini_vertex_without_api_key(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_encrypt = mocker.patch("routes.course.encrypt_api_key")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model_name": "gemini-2.5-flash",
+            "feedback_style": "balanced",
+            "temperature": 0.2,
+        },
+    )
+
+    assert response.status_code == 200
+    assert mock_course.default_ai_provider == "gemini_vertex"
+    assert mock_course.default_ai_model == "gemini-2.5-flash"
+    assert mock_course.default_feedback_style == "balanced"
+    assert mock_course.default_ai_temperature == 0.2
+    mock_encrypt.assert_not_called()
+    mock_commit.assert_called_once()
+
+
+def test_update_ai_settings_rejects_gemini_vertex_api_key(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model_name": "gemini-2.5-flash",
+            "api_key": "do-not-store-this",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "managed by server configuration" in response.json["message"]
+    mock_commit.assert_not_called()
 
 
 def test_update_ai_settings_invalid_temperature_returns_400(client, mocker):

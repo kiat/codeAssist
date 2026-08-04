@@ -8,6 +8,7 @@ Supported providers:
 
 * OpenAI / ChatGPT
 * Google Gemini
+* Gemini over Vertex AI
 * Anthropic Claude
 
 AI feedback should focus on **correctness and debugging**, not style, formatting, readability, or refactoring.
@@ -48,6 +49,12 @@ Instructors can configure:
 * Feedback style
 * Temperature
 
+For Gemini over Vertex AI, credentials are configured on the CodeAssist server
+instead of being pasted by instructors. Set `GOOGLE_CLOUD_PROJECT`,
+`GOOGLE_CLOUD_LOCATION` (defaults to `global`), and Application Default
+Credentials in the deployment environment. `VERTEX_AI_API_KEY` is only for
+Vertex AI Express Mode when `VERTEX_AI_AUTH_MODE=api_key`.
+
 Saved course fields:
 
 ```python
@@ -59,6 +66,10 @@ claude_api_key
 default_feedback_style
 default_ai_temperature
 ```
+
+Gemini over Vertex AI does not add a course key column. The course default can
+select `default_ai_provider = "gemini_vertex"` and a Gemini model, while cloud
+credentials remain deployment-managed.
 
 ---
 
@@ -76,12 +87,17 @@ ai_feedback_enabled
 use_course_ai_default
 ai_feedback_provider
 ai_feedback_model
+ai_feedback_vertex_location
 ai_feedback_prompt
 ai_feedback_temperature
 ai_feedback_style
 ai_feedback_max_requests
 ai_feedback_wait_seconds
 ```
+
+`ai_feedback_vertex_location` is optional and only applies when an assignment
+customizes its provider to Gemini over Vertex AI. When it is blank, CodeAssist
+uses `GOOGLE_CLOUD_LOCATION` or `global`.
 
 Recommended default:
 
@@ -238,6 +254,26 @@ Reason:
 
 ```text
 They may not support the standard generateContent feedback request.
+```
+
+### Gemini over Vertex AI
+
+Recommended:
+
+```text
+gemini-2.5-flash
+gemini-2.5-pro
+```
+
+Model listing uses CodeAssist's curated allowlist for the first implementation.
+The selected model is still tested through the real Vertex AI client before use.
+
+Avoid:
+
+```text
+automatic fallback to regular Gemini
+course-level Vertex API key storage
+assignment-level Vertex credentials
 ```
 
 ### Claude
