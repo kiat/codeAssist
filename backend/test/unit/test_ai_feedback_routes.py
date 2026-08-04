@@ -79,7 +79,11 @@ def test_get_assignment_ai_settings_returns_usage_limits(client, mocker, login_a
         ai_feedback_max_requests=10,
         ai_feedback_wait_seconds=300,
     )
-    _mock_ai_settings_queries(mocker, assignment=mock_assignment)
+    _mock_ai_settings_queries(
+        mocker,
+        assignment=mock_assignment,
+        enrollment=Enrollment(student_id="instructor-uuid", course_id="course-uuid", role="instructor"),
+    )
     login_as("instructor-uuid")
 
     resp = client.get("/assignments/assignment-uuid/ai-settings")
@@ -214,7 +218,10 @@ def test_non_instructor_or_ta_cannot_update_assignment_ai_settings(
 
 
 def test_update_assignment_ai_settings_saves_usage_limits(client, mocker, login_as):
-    mock_assignment = _mock_ai_settings_queries(mocker)
+    mock_assignment = _mock_ai_settings_queries(
+        mocker,
+        enrollment=Enrollment(student_id="instructor-uuid", course_id="course-uuid", role="instructor"),
+    )
     mock_commit = mocker.patch("routes.ai_feedback.db.session.commit")
     login_as("instructor-uuid")
 
@@ -233,7 +240,10 @@ def test_update_assignment_ai_settings_saves_usage_limits(client, mocker, login_
 
 
 def test_update_assignment_ai_settings_saves_assignment_api_key(client, mocker, login_as):
-    mock_assignment = _mock_ai_settings_queries(mocker)
+    mock_assignment = _mock_ai_settings_queries(
+        mocker,
+        enrollment=Enrollment(student_id="instructor-uuid", course_id="course-uuid", role="instructor"),
+    )
     mock_encrypt = mocker.patch(
         "ai_feedback.settings.encrypt_api_key",
         return_value="encrypted-assignment-key",
@@ -297,7 +307,10 @@ def test_update_assignment_ai_settings_rejects_invalid_usage_limits(
     message,
     login_as,
 ):
-    _mock_ai_settings_queries(mocker)
+    _mock_ai_settings_queries(
+        mocker,
+        enrollment=Enrollment(student_id="instructor-uuid", course_id="course-uuid", role="instructor"),
+    )
     mock_rollback = mocker.patch("routes.ai_feedback.db.session.rollback")
     login_as("instructor-uuid")
 
@@ -346,7 +359,7 @@ def test_get_prompts_rejects_unauthenticated(client, mocker):
 
     resp = client.get("/assignments/assignment-uuid/prompts")
 
-    assert resp.status_code == 403
+    assert resp.status_code == 401
     assert "Not authenticated" in resp.json["message"]
 
 

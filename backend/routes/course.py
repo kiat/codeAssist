@@ -706,7 +706,9 @@ def get_course_assignments():
     course_id = request.args.get("course_id")
     if not course_id or course_id == "":
         raise BadRequestError("Missing course_id argument")
-    
+
+    require_course_role(course_id, {"student", "ta", "instructor"}, "You are not enrolled in this course")
+
     assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
     assignments = AssignmentSchema().dump(assignments, many=True)
 
@@ -719,6 +721,8 @@ def get_course_info():
 
     if not course_id or course_id == "":
         raise BadRequestError("Missing course_id argument")
+
+    require_course_role(course_id, {"student", "ta", "instructor"}, "You are not enrolled in this course")
 
     course_obj = db.session.query(Course).filter_by(id=course_id).first()
 
@@ -755,6 +759,8 @@ def store_api_key():
 
     if not all(field in data and data[field] for field in required_fields):
         raise BadRequestError("Missing required fields")
+
+    require_course_role(data["course_id"], {"instructor"}, "Only instructors can manage the course API key")
 
     # Fetch the course
     course = db.session.query(Course).filter_by(id=data["course_id"]).first()
@@ -859,6 +865,8 @@ def fetch_ai_models():
             if not course_id:
                 raise BadRequestError("Missing course_id or api_key")
 
+            require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can use a course's saved API key")
+
             course_obj = db.session.query(Course).filter_by(id=course_id).first()
 
             if not course_obj:
@@ -886,7 +894,7 @@ def fetch_ai_models():
             )
             if err_response:
                 return response, err_response
-                
+
             models_data = response.json().get("models", [])
             model_ids = [m.get("name") for m in models_data if m.get("name")]
             return jsonify({"models": sorted(list(set(model_ids)))}), 200
@@ -1010,7 +1018,7 @@ def fetch_ai_models():
 
         raise BadRequestError("Unsupported AI provider")
 
-    except (BadRequestError, NotFoundError):
+    except (BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError):
         raise
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1029,6 +1037,8 @@ def test_ai_api_key():
         if not api_key:
             if not course_id:
                 raise BadRequestError("Missing course_id or api_key")
+
+            require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can use a course's saved API key")
 
             course_obj = db.session.query(Course).filter_by(id=course_id).first()
 
@@ -1111,7 +1121,7 @@ def test_ai_api_key():
 
         raise BadRequestError("Unsupported AI provider")
 
-    except (BadRequestError, NotFoundError):
+    except (BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError):
         raise
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1136,6 +1146,8 @@ def test_ai_model():
         if not api_key:
             if not course_id:
                 raise BadRequestError("Missing course_id or api_key")
+
+            require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can use a course's saved API key")
 
             course_obj = db.session.query(Course).filter_by(id=course_id).first()
 
@@ -1335,7 +1347,7 @@ def test_ai_model():
 
         raise BadRequestError("Unsupported AI provider")
 
-    except (BadRequestError, NotFoundError):
+    except (BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError):
         raise
     except Exception as e:
         return jsonify({"error": str(e)}), 500

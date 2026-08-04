@@ -249,6 +249,9 @@ def delete_assignment():
     if not assignment_id:
         raise BadRequestError("Missing assignment ID")
 
+    # Authenticate before the DB lookup below, so an unauthenticated caller
+    # gets 401 rather than a 404 that leaks whether the ID exists.
+    # require_course_role() re-checks this, but only after that lookup.
     require_authenticated()
 
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
@@ -283,6 +286,9 @@ def delete_submissions():
     if not assignment_id:
         raise BadRequestError("Missing assignment ID")
 
+    # Authenticate before the DB lookup below, so an unauthenticated caller
+    # gets 401 rather than a 404 that leaks whether the ID exists.
+    # require_course_role() re-checks this, but only after that lookup.
     require_authenticated()
 
     assignment_for_auth = db.session.query(Assignment).filter_by(id=assignment_id).first()
@@ -320,6 +326,9 @@ def create_extension():
     assignment_id = data["assignment_id"]
     student_id = data["student_id"]
 
+    # Authenticate before the DB lookup below, so an unauthenticated caller
+    # gets 401 rather than a 404 that leaks whether the ID exists.
+    # require_course_role() re-checks this, but only after that lookup.
     require_authenticated()
 
     extension_assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
@@ -404,6 +413,9 @@ def delete_extension():
     if not extension_id:
         raise BadRequestError("Missing extension_id")
 
+    # Authenticate before the DB lookup below, so an unauthenticated caller
+    # gets 401 rather than a 404 that leaks whether the ID exists.
+    # require_course_role() re-checks this, but only after that lookup.
     require_authenticated()
 
     extension = db.session.query(AssignmentExtension).filter_by(id=extension_id).first()

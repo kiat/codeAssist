@@ -34,7 +34,9 @@ def mock_ai_feedback_route_queries(mocker, assignment):
     course_query.filter_by.return_value.first.return_value = course
 
     enrollment_query = mocker.Mock()
-    enrollment_query.filter_by.return_value.first.return_value = None
+    enrollment_query.filter_by.return_value.first.return_value = Enrollment(
+        student_id="instructor-uuid", course_id=assignment.course_id, role="instructor"
+    )
 
     def query_side_effect(model):
         if model is Assignment:
