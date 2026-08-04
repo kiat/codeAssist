@@ -1,4 +1,4 @@
-> Moved from `docs/CodeAssist_limitations.md`. This is product-wide, not AI-specific, but it's kept here because the rubric-grading gap it mentions ties directly into `design-history/original-rubric-design-draft.md` — the AI feedback system was originally designed around rubrics, and rubrics were never built. See `README.md` for the AI-specific gap list (missing assignment description, `/ai_chat` input-permission bypass, `.zip` upload feedback failure, thin submission history).
+> Moved from `docs/CodeAssist_limitations.md`. This is product-wide, not AI-specific, but it's kept here because the rubric-grading gap it mentions ties directly into `design-history/original-rubric-design-draft.md` — the AI feedback system was originally designed around rubrics, and rubrics were never built. See `README.md` and `roadmap.md` for the current AI feedback implementation status and follow-up work.
 
 ## Current Limitations
 

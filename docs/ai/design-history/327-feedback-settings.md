@@ -29,7 +29,7 @@ Deferred to #328:
 - Uploaded .py/.zip feedback request selection.
 - AIChatPanel integration changes.
 
-(Note: #328's items above have since shipped — see `../architecture.md` for current behavior. The `.zip` feedback-request handling mentioned above was deferred, not necessarily solved; see the `README.md` gap list.)
+(Note: #328's items above have since shipped. ZIP source extraction and the later shared `/ai_chat` input-permission enforcement shipped in PR #352; see `../architecture.md` for current behavior.)
 
 ## Data Model
 
@@ -115,7 +115,7 @@ Existing async submission feedback generation now calls:
 
 The prompt sent to the AI provider is rendered from backend-approved context only. If the instructor disables student code, test cases, student output, or other inputs, those values are excluded even if frontend code has access to them.
 
-**Update since this doc was written:** this enforcement applies to submission feedback only. `/ai_chat` does not currently go through `build_allowed_feedback_context()` — see `../README.md` gap #2.
+**Update since this doc was written:** PR #352 routed `/ai_chat` through the shared allowed-input context path too, so the enforcement described here now applies to both submission feedback and chat. See `../architecture.md` for current behavior.
 
 ## Default Prompts
 

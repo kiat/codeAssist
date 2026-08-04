@@ -1,4 +1,20 @@
+# Summer 2026 
+* Yucheng Zhang <yuchengcecilia@utexas.edu> 
+* Nandanavanam, Sashank <sn29599@my.utexas.edu> 
+* De Silva, Dario <dd36724@my.utexas.edu> 
+* Deepthi A Morusupalli <deepthimor@utexas.edu> 
+* Goel, Shreya <sg63353@my.utexas.edu> 
+* Rayudu, Omkar <or4674@my.utexas.edu> 
+* Jieun Lee <jieunleecollege23@gmail.com> 
+* Shreya Sharanya Varma <shreya.varma@utexas.edu> 
+* Anika K Doddamane <anika.kdodd@utexas.edu> 
+* Gaurav Salandri <gaurav.salandri@utexas.edu>
+* Bhalani, Khushi C <kcb2697@my.utexas.edu> 
+* Sri Harini Kolluru <sriharini.kolluru@utexas.edu> 
+* Ngoc Quach <nbq75@my.utexas.edu>
+* Raymond Shengrui Zhu <rayz@utexas.edu> 
 
+  
 # Fall 2025 
 * Yang Shao <yang.shao@utexas.edu>
 * Azaan Waseem <aw42679@utexas.edu>

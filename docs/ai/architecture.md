@@ -144,7 +144,7 @@ Enforced server-side in `check_feedback_limits()` before every `/ai_chat` call; 
 | `test_results` | on | yes | yes |
 | `test_cases` | off | yes | yes |
 | `student_output` | on | yes | yes |
-| `previous_submission_feedback` | on | yes | yes |
+| `submission_history` | on | yes | yes |
 
 Both submission feedback and `/ai_chat` route context through the shared allowed-input filtering logic, so instructor permissions are applied consistently.
 
@@ -169,6 +169,7 @@ Nine built-in prompts ship in `ai_feedback/settings.py::DEFAULT_AI_FEEDBACK_PROM
 | Migration | Creates |
 |-----------|---------|
 | `45b5cf6cc787` | Input logging columns for AI feedback |
+| `a2b3c4d5e6f7` | `ai_feedback_requests` table |
 | `b3c4d5e6f7a8` | `ai_chat_messages` table |
 | `03dd583914d0` | Submission history / linked-submission tracking |
 | `d6e7f8a9b0c1` | Assignment description field |

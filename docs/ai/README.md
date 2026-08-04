@@ -29,7 +29,7 @@ Note: file-upload submissions get AI feedback the same way code-editor submissio
 **Working and matches its docs:**
 - Code-editor and file-upload submissions both trigger async AI feedback (`ai_feedback/integration.py`) with structured JSON output (`insights` + line `annotations`), three selectable feedback styles, and instructor-defined prompts.
 - `/ai_chat` chat memory: last 20 messages from `ai_chat_messages` are loaded and included in every prompt. Covered by `test_ai_chat_prompt_content.py`.
-- Instructor input-permission toggles (`ai_allowed_inputs`: assignment_description, student_code, test_results, test_cases, student_output, previous_submission_feedback) are enforced through shared context filtering for submission-triggered feedback and `/ai_chat`.
+- Instructor input-permission toggles (`ai_allowed_inputs`: assignment_description, student_code, test_results, test_cases, student_output, submission_history) are enforced through shared context filtering for submission-triggered feedback and `/ai_chat`.
 - Per-student usage limits (`ai_feedback_max_requests`, `ai_feedback_wait_seconds`) are enforced server-side and tested.
 - Multi-provider support (OpenAI, Gemini, Claude, Ollama) with provider-specific retry/error handling.
 

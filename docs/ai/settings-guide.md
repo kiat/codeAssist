@@ -88,7 +88,7 @@ ai_feedback_provider
 ai_feedback_model
 ai_feedback_prompt          # legacy single-prompt field, kept for backwards compatibility
 ai_feedback_prompts         # current: list of {id, title, prompt, enabled}
-ai_allowed_inputs           # {assignment_description, student_code, test_results, test_cases, student_output, previous_submission_feedback}
+ai_allowed_inputs           # {assignment_description, student_code, test_results, test_cases, student_output, submission_history}
 ai_feedback_temperature
 ai_feedback_style
 ai_feedback_max_requests
