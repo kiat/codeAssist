@@ -1,14 +1,14 @@
 # AI Feedback — Docs Index
 
-This folder consolidates every doc related to CodeAssist's AI feedback / AI chat feature. It replaces the scattered `AI_*.md` files that previously lived directly under `docs/` (and one duplicate-named file at the repo root).
+This folder consolidates every doc related to CodeAssist's AI feedback and controlled AI prompt panel. It replaces the scattered `AI_*.md` files that previously lived directly under `docs/` (and one duplicate-named file at the repo root).
 
-Last reviewed against code: 2026-07-25.
+Last reviewed against `origin/main`: 2026-08-04.
 
 ## The feature has two parts
 
-**1. Instructor AI settings** — instructors add provider API keys (OpenAI/Gemini/Claude/Ollama) at the course level, then choose a prompt and model per course or override it per assignment. Covered in [`settings-guide.md`](./settings-guide.md) (how-to/troubleshooting) and the "Instructor-Facing" sections of [`architecture.md`](./architecture.md) (how it's implemented).
+**1. Instructor AI settings** — instructors add provider API keys and default provider/model settings at the course level, then configure prompts, allowed inputs, usage limits, and any per-assignment provider/model overrides at the assignment level. Covered in [`settings-guide.md`](./settings-guide.md) (how-to/troubleshooting) and the "Instructor-Facing" sections of [`architecture.md`](./architecture.md) (how it's implemented).
 
-**2. Student-facing AI feedback** — students see AI feedback on their submissions through *either* submission path: uploading a file (`/upload_submission`) or writing/submitting in the in-browser code editor (`/submit_code`), plus interactive chat in the code editor's AI panel (`/ai_chat`). Both submission paths call the same `async_get_ai_feedback` pipeline. Covered in [`architecture.md`](./architecture.md) (data flow / backend) and [`code-editor-feedback.md`](./code-editor-feedback.md) (the code editor UI, its AI chat panel, and manual QA steps).
+**2. Student-facing AI feedback** — students see AI feedback on their submissions through *either* submission path: uploading a file (`/upload_submission`) or writing/submitting in the in-browser code editor (`/submit_code`), plus a controlled preset-prompt AI panel in the code editor (`/ai_chat`). Both submission paths call the same `async_get_ai_feedback` pipeline. Covered in [`architecture.md`](./architecture.md) (data flow / backend) and [`code-editor-feedback.md`](./code-editor-feedback.md) (the code editor UI, its AI panel, and manual QA steps).
 
 ## Start here
 
@@ -16,11 +16,11 @@ Last reviewed against code: 2026-07-25.
 |---|---|
 | [`architecture.md`](./architecture.md) | How the feature actually works today: data flow, DB tables, modules, endpoints. Read this first. |
 | [`settings-guide.md`](./settings-guide.md) | Instructor side: configuring providers/models/keys per course or assignment, testing them, troubleshooting common provider errors. |
-| [`code-editor-feedback.md`](./code-editor-feedback.md) | Student side: the code editor, its AI chat panel, Run/Submit flow, and how submission feedback surfaces there. Includes manual QA steps. |
+| [`code-editor-feedback.md`](./code-editor-feedback.md) | Student side: the code editor, its controlled AI prompt panel, Run/Submit flow, and how submission feedback surfaces there. Includes manual QA steps. |
 | [`design-history/`](./design-history/) | Historical design docs (issue-specific rationale, the original whole-product founding doc, and the original rubric-based draft). Useful for "why is it built this way," not for "how does it work now." |
 | [`known-limitations.md`](./known-limitations.md) | Product-wide known-incomplete areas (Edit Outline, Create Rubric, Grading Dashboard) — kept here because "Create Rubric" is the last trace of the abandoned rubric-grading design. |
-| [`proposals/`](./proposals/) | Unimplemented feature proposals (currently: ChatALL multi-model side-by-side chat). Not part of the shipped product. |
-| [`roadmap.md`](./roadmap.md) | Longer-term AI feedback roadmap and future memory/privacy design notes. |
+| [`proposals/`](./proposals/) | Unimplemented feature proposals. [`Submission-defense questions`](./proposals/submission-defense-questions.md) are the current exploratory direction. |
+| [`roadmap.md`](./roadmap.md) | Longer-term AI feedback roadmap, new Vertex AI request, and future controlled-feedback design notes. |
 
 Note: file-upload submissions get AI feedback the same way code-editor submissions do (same backend pipeline), they just don't have their own doc — there's no separate "AI panel" UI for uploads, feedback shows up on the results page. See `architecture.md` for the shared pipeline both paths go through.
 
@@ -28,10 +28,14 @@ Note: file-upload submissions get AI feedback the same way code-editor submissio
 
 **Working and matches its docs:**
 - Code-editor and file-upload submissions both trigger async AI feedback (`ai_feedback/integration.py`) with structured JSON output (`insights` + line `annotations`), three selectable feedback styles, and instructor-defined prompts.
-- `/ai_chat` chat memory: last 20 messages from `ai_chat_messages` are loaded and included in every prompt. Covered by `test_ai_chat_prompt_content.py`.
+- `/ai_chat` prompt-panel memory: last 20 student/assistant turns from `ai_chat_messages` are loaded and included in every request. Covered by `test_ai_chat_prompt_content.py`.
 - Instructor input-permission toggles (`ai_allowed_inputs`: assignment_description, student_code, test_results, test_cases, student_output, submission_history) are enforced through shared context filtering for submission-triggered feedback and `/ai_chat`.
 - Per-student usage limits (`ai_feedback_max_requests`, `ai_feedback_wait_seconds`) are enforced server-side and tested.
-- Multi-provider support (OpenAI, Gemini, Claude, Ollama) with provider-specific retry/error handling.
+- Multi-provider support (OpenAI, Gemini Developer API, Claude, Ollama) with provider-specific retry/error handling.
+
+**Requested but not implemented on `main` yet:**
+- Gemini over Google Cloud Vertex AI. Current `main` has the regular Gemini Developer API path only (`provider == "gemini"` with `gemini_api_key`); there is no Vertex AI provider mode, project/location configuration, or `google-genai` Vertex client path yet.
+- AI-generated submission-understanding questions after static tests pass, with student written or recorded explanations. This is a new future feature direction, not current behavior.
 
 ## Current implementation status
 
@@ -86,9 +90,9 @@ Each submission creates its own history record instead of overwriting previous f
 
 Future improvements:
 
-- course-level learning memory
+- assignment-level learning-memory controls
 - student privacy controls
-- instructor memory configuration
+- instructor-controlled feedback/question configuration
 - better long-term learning summaries
 
 ## Full current AI-related endpoint list

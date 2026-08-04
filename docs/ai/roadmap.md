@@ -10,15 +10,40 @@ Last updated: 2026-08-04, after PR
 assignment-description, ZIP-source-extraction, `/ai_chat` permission-filtering,
 and per-submission feedback-history fixes.
 
-Scope note: multi-model side-by-side comparison (ChatALL, see
-`proposals/chatall-multi-ai.md`) is intentionally out of scope pending
-instructor/professor approval. Current single-provider-per-course with
-per-assignment override design (`update_ai_settings`,
-`Assignment.use_course_ai_default` + overrides) is the right shape to keep. The
-items below are about hardening and correcting that existing design, not
-replacing it.
+Scope note: the current direction is controlled, assignment-level AI feedback:
+instructors decide which prompts/questions matter for each assignment, and
+students should not get an open-ended "ask the AI anything" surface.
+Course-level provider/model defaults can remain useful, but prompt/question
+configuration should stay at the assignment level.
 
 ## Currently Open
+
+### P1 - Gemini over Google Cloud Vertex AI support
+
+**Problem:** Current `main` supports the Gemini Developer API only:
+`SUPPORTED_AI_PROVIDERS` includes `gemini`, course settings store
+`gemini_api_key`, and provider calls use the API-key `generateContent` path.
+Kia requested an additional "Gemini over Vertex AI" mode backed by Google Cloud
+Vertex AI, which uses Google Cloud project/location configuration and ADC or
+Vertex-compatible credentials instead of the existing `gemini_api_key` request
+path.
+
+**Fix:** Add a distinct provider mode or Gemini backend option for Vertex AI.
+The implementation should avoid storing test credentials in docs or code. It
+will likely need:
+
+- provider/config naming such as `gemini_vertex` or `gemini` with a
+  `use_vertex_ai` flag
+- project and location settings, e.g. `GOOGLE_CLOUD_PROJECT` and
+  `GOOGLE_CLOUD_LOCATION`
+- a Vertex-compatible client path, separate from the existing Gemini Developer
+  API key path
+- course/assignment UI copy that makes "Gemini Developer API" vs. "Gemini over
+  Vertex AI" clear to instructors
+- tests for provider/model resolution and sanitized error handling
+
+**Verify:** Mock the Vertex client and assert the right project/location/model
+are used. Also verify the existing Gemini Developer API path still works.
 
 ### P0 - Course-level AI settings endpoints need authorization checks
 
@@ -87,6 +112,20 @@ larger, deliberate memory/privacy design:
 Scope this as its own design doc + issue. It touches data model, privacy, and
 instructor UX enough that it deserves a dedicated review rather than being
 bundled into a hardening PR.
+
+### P3 - AI-generated submission-defense questions
+
+**Problem / opportunity:** Kia suggested a more controlled student-AI
+interaction: after a submission passes static tests, the AI asks the student a
+targeted question about their own submitted code, and the student explains the
+implementation in text or recorded audio.
+
+**Why this fits the direction:** It checks understanding without letting
+students ask for direct answers, and it can be configured per assignment around
+the concepts instructors care about.
+
+**Proposal:** See `proposals/submission-defense-questions.md` for example
+questions, a possible table shape, and open design decisions.
 
 ## Shipped In PR #352
 

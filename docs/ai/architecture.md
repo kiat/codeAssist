@@ -7,15 +7,15 @@
 CodeAssist provides AI-powered feedback to students on their programming submissions, in two forms:
 
 1. **Submission feedback** — automatic, structured JSON feedback (`insights` + line `annotations`) generated after a code-editor or file-upload submission is graded.
-2. **AI chat** — interactive, turn-by-turn conversation in the code editor's AI panel, with memory of recent turns.
+2. **Controlled AI prompt panel** — students select instructor-enabled prompts in the code editor's AI panel; the backend route is still `/ai_chat`, and recent turns are remembered.
 
-The system integrates with four LLM providers: OpenAI, Gemini, Claude, and Ollama (self-hosted/local).
+The system integrates with four LLM providers today: OpenAI, Gemini Developer API, Claude, and Ollama (self-hosted/local). Gemini over Google Cloud Vertex AI is requested but is not implemented on `main` yet.
 
 ## Key Features
 
-- **Assignment-level AI configuration** — instructors configure prompts, allowed inputs, provider/model, temperature, feedback style, and usage limits per assignment (or inherit course defaults).
-- **Student prompt selection** — students can pick from instructor-enabled feedback prompts when chatting.
-- **Chat memory** — the last 20 turns of a student's chat for an assignment are replayed into each new request.
+- **Assignment-level AI configuration** — instructors configure prompts, allowed inputs, usage limits, and any provider/model overrides per assignment. Course-level settings only provide provider/model/style/temperature defaults and credentials.
+- **Student prompt selection** — students can pick from instructor-enabled feedback prompts; there is no free-text student chat box in the current React panel.
+- **Prompt-panel memory** — the last 20 turns of a student's AI feedback panel history for an assignment are replayed into each new request.
 - **Reference-solution-style comparison** — one built-in prompt (`compare_to_optimal_solution`) asks the model to derive an optimal approach internally and compare the student's code against it, without a stored reference solution.
 - **Per-student usage limits** — max requests and cooldown seconds enforced server-side.
 - **Input permission control** — instructors choose which data categories (code, test results, test cases, output, description, submission history) may reach the AI for both submission feedback and AI chat.
@@ -47,10 +47,10 @@ Background thread: async_get_ai_feedback(app, submission_id, file_path, results_
        StudentSubmissionInsight history record
 ```
 
-### Data flow — AI chat (`POST /ai_chat`)
+### Data flow — controlled AI prompt panel (`POST /ai_chat`)
 
 ```
-Student Code Editor → AIChatPanel → POST /ai_chat
+Student Code Editor → AIChatPanel preset prompt → POST /ai_chat
     ↓
 1. Verify student + enrollment
 2. Check feedback limits (check_feedback_limits: max_requests, wait_seconds)
@@ -59,7 +59,7 @@ Student Code Editor → AIChatPanel → POST /ai_chat
 5. Build context through shared AI feedback context generation.
    The same permission filtering logic is used by:
    - submission feedback
-   - AI chat
+   - controlled AI prompt panel
    Instructor ai_allowed_inputs settings are respected consistently.
 6. Call provider → get reply
 7. store_chat_message() for both the user turn and the assistant reply
@@ -96,16 +96,16 @@ Student Code Editor → AIChatPanel → POST /ai_chat
 
 | Component | Role |
 |-----------|------|
-| `AIChatPanel.js` | Student chat interface: prompt buttons, remaining-request count, cooldown countdown |
+| `AIChatPanel.js` | Controlled student AI interface: instructor prompt buttons, remaining-request count, cooldown countdown |
 | `AIFeedbackSettingsSection.js` | Instructor prompt/input-permission/limit configuration UI |
 | `codeEditor/index.js` | Code editor page, integrates `AIChatPanel` |
 | `CreateAssignment.js` / `assignmentSettings/index.js` | Assignment description and assignment-level AI configuration UI |
 
-## Chat Memory
+## Prompt-Panel Memory
 
-- Every user/assistant turn is stored in `ai_chat_messages`, tagged with `prompt_id` when one was used.
-- Messages are stored concisely — the raw user message only, not the instructor prompt text or the full code — to keep the table lean.
-- `get_chat_history(student_id, assignment_id, limit=20)` returns the **last 20** messages, chronological order, and they're folded into the `/ai_chat` prompt as "Previous conversation."
+- Every prompt-click or toolbar-triggered feedback request and assistant response is stored in `ai_chat_messages`, tagged with `prompt_id` when one was used.
+- Messages are stored concisely — the prompt title or fixed request text only, not the instructor prompt text or the full code — to keep the table lean.
+- `get_chat_history(student_id, assignment_id, limit=20)` returns the **last 20** messages, chronological order, and they are folded into the `/ai_chat` prompt as "Previous conversation."
 - Storage failures are caught and logged; they don't fail the chat response itself.
 - **Note:** submission feedback history is stored separately from chat history (see below).
 

@@ -10,7 +10,7 @@ The **AI Feedback API** extends the existing CodeAssist system to provide LLM-po
 
 
 ## Frontend
-###  Menu design change (NEED TO BE DONE, refer ChatALL)
+### Historical menu-design note
 
 ## AI Settings (Instructor View)
 

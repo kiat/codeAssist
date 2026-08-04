@@ -9,9 +9,13 @@ AI Settings lets instructors configure AI feedback for programming assignments.
 Supported providers:
 
 * OpenAI / ChatGPT
-* Google Gemini
+* Google Gemini Developer API
 * Anthropic Claude
 * Ollama (self-hosted/local models)
+
+Gemini over Google Cloud Vertex AI was requested on 2026-08-02, but it is not
+implemented on `main` yet. Current Gemini support uses the regular Gemini
+Developer API key stored in `gemini_api_key`.
 
 AI feedback should focus on **correctness and debugging**, not style, formatting, readability, or refactoring.
 
@@ -69,6 +73,11 @@ default_feedback_style
 default_ai_temperature
 ```
 
+Course-level settings do **not** own instructor prompt lists or input-permission
+toggles. Per the latest instructor direction, prompt customization and
+AI-feedback controls should stay at the assignment level so each assignment can
+define its own controlled feedback environment.
+
 ---
 
 ## Assignment-Level AI Settings
@@ -77,6 +86,9 @@ Each assignment can either:
 
 1. Use course default AI settings (`use_course_ai_default = True`, recommended default).
 2. Customize provider/model/prompts/limits for that assignment only.
+
+Prompt configuration is intentionally assignment-level only. Do not add
+course-level prompt management unless the product direction changes again.
 
 Assignment fields:
 
@@ -148,6 +160,10 @@ Some provider APIs return models that appear available but can't actually be use
 ### Gemini
 - Recommended: `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-2.5-flash`, `gemini-2.5-pro`
 - Avoid: `gemini-2.0-flash`, deep-research models, antigravity models, embedding/audio/image/video models (may not support standard `generateContent`)
+- Current implementation uses the Gemini Developer API. Vertex AI will need a
+  separate provider mode or credential path because it uses Google Cloud
+  project/location configuration rather than the existing `gemini_api_key`
+  request path.
 
 ### Claude
 - Recommended: `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`, `claude-3-opus-20240229`
