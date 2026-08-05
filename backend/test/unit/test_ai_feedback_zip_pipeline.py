@@ -98,6 +98,7 @@ def test_async_ai_feedback_extracts_source_from_zip(app, tmp_path, mocker):
             model,
             temperature,
             past_insights,
+            vertex_location=None,
         ):
             captured["prompt"] = prompt
             return (
