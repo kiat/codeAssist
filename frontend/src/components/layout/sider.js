@@ -15,9 +15,10 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
 
   useEffect(() => {
     if (courseInfo.id && (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode)) {
-      fetch(process.env.REACT_APP_API_URL + "/get_course_info?" + new URLSearchParams({ course_id: courseInfo.id }))
+      fetch(process.env.REACT_APP_API_URL + "/get_course_info?" + new URLSearchParams({ course_id: courseInfo.id }), { credentials: "include" })
         .then((res) => res.json())
         .then((data) => {
+          if (!Array.isArray(data)) return;
           data.forEach((element) => {
             if (element.id === courseInfo.id) {
               updateCourseInfo({
