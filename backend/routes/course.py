@@ -862,6 +862,9 @@ def fetch_ai_models():
 
     try:
         if not api_key:
+            # Course auth only applies when falling back to the course's saved
+            # key. A caller supplying their own api_key isn't touching
+            # course-scoped secrets, so no course role check is needed.
             if not course_id:
                 raise BadRequestError("Missing course_id or api_key")
 

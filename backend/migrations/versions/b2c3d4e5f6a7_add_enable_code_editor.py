@@ -30,8 +30,9 @@ def upgrade():
                 "assignments",
                 sa.Column("enable_code_editor", sa.Boolean(), server_default="false", nullable=False),
             )
-        except ProgrammingError:
-            pass
+        except ProgrammingError as e:
+            if "already exists" not in str(e):
+                raise
 
 
 def downgrade():
