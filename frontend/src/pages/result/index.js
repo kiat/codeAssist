@@ -1,0 +1,353 @@
+import React, { useContext, useCallback, useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Card, PageHeader, Radio, message } from "antd";
+
+import { GlobalContext } from "../../App";
+import PageContent from "../../components/layout/pageContent";
+import PageBottom from "../../components/layout/pageBottom";
+import TestResultsDisplay from "./TestResultsDisplay";
+import ActionButtons from "./ActionButtons";
+
+import UploadModal from "../../components/UploadModal";
+import SubmissionHistoryModal from "./submissionHistoryModal";
+import FormattingModal from "./FormattingModal";
+
+import { getAssignment, getExtension } from "../../services/assignment";
+import { rerunSubmissionAutograder } from "../../services/submission";
+import moment from "moment";
+
+export default function AssignmentResult() {
+  const [viewMode, setViewMode] = useState("Results");
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [formattingModalOpen, setFormattingOpen] = useState(false);
+  const [autoGraderPoints, setAutograderPoints] = useState(0);
+  const [assignmentName, setAssignmentName] = useState(""); // Placeholder value
+  // changing the whole file to use the submisison id in the params instead of teh assingment id and submission id passed in
+  const { submissionId } = useParams();
+  const [assignmentId, setAssignmentId] = useState("");
+  const [studentId, setStudentId] = useState("");
+  // const { assignmentId, studentId } = useParams();
+  const navigate = useNavigate();
+  // adding global context variable
+  const { userInfo, assignmentInfo, updateAssignmentInfo } =
+    useContext(GlobalContext);
+  const [toSend, setToSend] = useState();
+  const [dueDate, setDueDate] = useState();
+  const [lateDueDate, setLateDueDate] = useState();
+  const [lateAllowed, setLateAllowed] = useState();
+
+  // used to check if AI Feedback has been enabled on this assignment
+  const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true);
+  // used to check if code editor is enabled for this assignment
+  const [allowFileUpload, setAllowFileUpload] = useState(false);
+  const [enableCodeEditor, setEnableCodeEditor] = useState(false);
+  const [rerunLoading, setRerunLoading] = useState(false);
+  
+  useEffect(() => {
+    // Fetching student and assignment IDs based on this submission ID
+    const fetchIds = async () => {
+      console.log("Fetching IDs based on submission ID:", submissionId);
+      try {
+        const details = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`
+        );
+        const data = await details.json();
+        if (data) {
+          setToSend(data);
+          console.log("Fetched IDs:", data.assignment_id, data.student_id);
+          setAssignmentId(data.assignment_id);
+          setStudentId(data.student_id);
+        } else {
+          console.log("No response data");
+        }
+      } catch (error) {
+        console.error("Failed to fetch IDs:", error);
+      }
+    };
+    fetchIds();
+  }, [submissionId]);
+
+
+
+
+  // useEffect loop that continues to poll server every 5 seconds for updated
+  // AI Feedback until it successfully returns. This is because AI feedback can 
+  // take about 5-10 seconds to process. Loop is skipped if AI feedback is disabled.
+  // Issue #345: Add a timeout (60 seconds) to prevent infinite spinning when
+  // no API key is configured and AI feedback will never be generated.
+  useEffect(() => {
+    // AI Feedback is not enabled, skip
+    if (!aiFeedbackEnabled) {
+      console.log("AI Feedback Disabled.")
+      return;
+    } else {
+      console.log("AI Feedback Enabled.")
+    }
+
+    if (!toSend || !toSend.id || toSend.ai_feedback) return;
+  
+    const startTime = Date.now();
+    const timeoutMs = 60000; // 60 seconds timeout
+    
+    const interval = setInterval(async () => {
+      // Check if we've exceeded the timeout
+      if (Date.now() - startTime > timeoutMs) {
+        console.log("AI Feedback polling timeout reached. Feedback may not be available (check API key configuration).");
+        clearInterval(interval);
+        return;
+      }
+      
+      try {
+        const response = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${toSend.id}`
+        );
+        const updated = await response.json();
+        if (updated?.ai_feedback) {
+          console.log("AI Feedback is now available.");
+          setToSend(updated);
+          clearInterval(interval);
+        }
+      } catch (err) {
+        console.error("Polling for AI feedback failed:", err);
+      }
+    }, 5000);
+  
+    return () => clearInterval(interval);
+  }, [toSend, aiFeedbackEnabled]);
+  
+
+  useEffect(() => {
+    if (!assignmentId || !studentId) {
+      console.log(
+        "Assignment ID or Student ID not yet set:",
+        assignmentId,
+        studentId
+      );
+      return;
+    }
+
+    const fetchAssignmentDetails = async () => {
+      try {
+        const res = await getAssignment({ assignment_id: assignmentId });
+        const extension = await getExtension({
+          assignment_id: assignmentId,
+          student_id: studentId,
+        });
+        if (res?.data) {
+          console.log("Im in");
+          setAutograderPoints(res.data.autograder_points);
+          setAssignmentName(res.data.name); // Assuming the API provides this
+          setDueDate(moment(res.data.due_date).valueOf());
+          setLateAllowed(res.data.late_submission);
+          setLateDueDate(moment(res.data.late_due_date).valueOf());
+          setAiFeedbackEnabled(res.data.ai_feedback_enabled);
+          setAllowFileUpload(res.data.allow_file_upload !== false);
+          setEnableCodeEditor(!!res.data.enable_code_editor);
+          if (extension?.data.due_date_extension) {
+            setDueDate(moment(extension.data.due_date_extension).valueOf());
+          }
+          if (extension?.data.late_due_date_extension) {
+            setDueDate(
+              moment(extension.data.late_due_date_extension).valueOf()
+            );
+            setLateAllowed(true);
+          }
+          updateAssignmentInfo((prevInfo) => ({
+            ...prevInfo,
+            name: res.data.name,
+            id: assignmentId,
+          }));
+        }
+        console.log(assignmentId);
+      } catch (error) {
+        console.error("Failed to fetch assignment details:", error);
+      }
+    };
+
+    const fetchStudentName = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`
+        );
+        const studentData = await response.json();
+        if (studentData) {
+          console.log("im in");
+          updateAssignmentInfo((prevInfo) => ({
+            ...prevInfo,
+            studentName: studentData.name,
+            studentId: studentId,
+          }));
+        }
+        console.log(studentId);
+      } catch (error) {
+        console.error("Failed to fetch student data:", error);
+      }
+    };
+
+    fetchAssignmentDetails();
+    fetchStudentName();
+  }, [submissionId, assignmentId, studentId, updateAssignmentInfo]);
+
+  const toggleModal = useCallback(
+    (type) => {
+      if (type === "upload") {
+        const now = moment();
+        const due = dueDate ? moment(dueDate) : null;
+        const late = lateDueDate ? moment(lateDueDate) : null;
+
+        if (!due && !late) {
+          setUploadModalOpen((prev) => !prev);
+          return;
+        }
+
+        if (due && !now.isAfter(due)) {
+          setUploadModalOpen((prev) => !prev);
+        } else if (late && lateAllowed && !now.isAfter(late)) {
+          setUploadModalOpen((prev) => !prev);
+        } else {
+          message.error("Due Date Has Passed");
+        }
+      } else if (type === "history") setHistoryModalOpen((prev) => !prev);
+      else if (type === "formatting") setFormattingOpen((prev) => !prev);
+    },
+    [dueDate, lateDueDate, lateAllowed]
+  );
+
+  const handleRadioChange = useCallback((e) => {
+    setViewMode(e.target.value);
+  }, []);
+  const Reload = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  const handleDownload = () => {
+    if (toSend && toSend.student_code_file && toSend.file_name) {
+      const blob = new Blob([toSend.student_code_file], { type: "text/plain" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = toSend.file_name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } else {
+      message.error("File not available for download");
+    }
+  };
+
+  const handleRerunAutograder = useCallback(async () => {
+    if (!toSend?.id) {
+      message.error("Submission is still loading");
+      return;
+    }
+
+    setRerunLoading(true);
+    try {
+      const response = await rerunSubmissionAutograder({
+        submission_id: toSend.id,
+      });
+      if (response?.data?.submission) {
+        setToSend(response.data.submission);
+      }
+      message.success(response?.data?.message || "Autograder rerun completed");
+    } catch (error) {
+      console.error("Failed to rerun autograder:", error);
+    } finally {
+      setRerunLoading(false);
+    }
+  }, [toSend]);
+
+  return (
+    <>
+      <PageContent>
+        <div style={{ display: "flex" }}>
+          <div style={{ flex: "1", height: "calc(100vh - 40px)" }}>
+            <PageHeader
+              style={{ borderBottom: "1px solid #f0f0f0" }}
+              title={viewMode}
+              extra={[
+                <Radio.Group
+                  key="viewMode"
+                  buttonStyle="solid"
+                  defaultValue="Results"
+                  onChange={handleRadioChange}
+                >
+                  <Radio.Button value="Results">Results</Radio.Button>
+                  <Radio.Button value="Code">Code</Radio.Button>
+                </Radio.Group>,
+              ]}
+            />
+            <Card bordered={false}>
+              {toSend && (
+                <TestResultsDisplay
+                  viewMode={viewMode}
+                  assignmentName={assignmentName}
+                  studentName={assignmentInfo?.studentName ?? userInfo?.name}
+                  score={assignmentInfo?.score ?? "Unknown"} // Replace with actual score data as needed
+                  totalPoints={autoGraderPoints}
+                  data={toSend}
+                  aiFeedbackEnabled={aiFeedbackEnabled}
+                />
+              )}
+              {/* old calls */}
+              {/* {studentId && assignmentId && <TestResultsDisplay viewMode={viewMode} studentId={studentId} assignmentName={assignmentName}
+              //<TestResultsDisplay viewMode={viewMode} studentId={studentId} assignmentName={assignmentName}
+              studentName={assignmentInfo?.studentName ?? userInfo?.name}
+              score={assignmentInfo?.score ?? "Unknown"} // Replace with actual score data as needed
+              totalPoints={autoGraderPoints}/>} */}
+            </Card>
+          </div>
+        </div>
+      </PageContent>
+      {userInfo.isStudent ? (
+        <PageBottom>
+          <ActionButtons
+            onRerun={handleRerunAutograder}
+            onUpload={() => toggleModal("upload")}
+            onResubmitEditor={() => {
+              const now = moment();
+              const due = dueDate ? moment(dueDate) : null;
+              const late = lateDueDate ? moment(lateDueDate) : null;
+              const canSubmit = (!due || !now.isAfter(due)) || (late && lateAllowed && !now.isAfter(late));
+              if (!canSubmit) {
+                message.error("Due Date Has Passed");
+                return;
+              }
+              navigate(`/codeEditor/${assignmentId}`);
+            }}
+            onDownload={handleDownload} // Implement or replace with actual function
+            onHistoryOpen={() => toggleModal("history")}
+            isStudent={userInfo?.isStudent}
+            allowFileUpload={allowFileUpload}
+            enableCodeEditor={enableCodeEditor}
+            rerunLoading={rerunLoading}
+          />
+        </PageBottom>
+      ) : (
+        <></>
+      )}
+      {/* sending required data to upload modal */}
+      <UploadModal
+        open={uploadModalOpen}
+        onCancel={() => toggleModal("upload")}
+        assignmentID={assignmentId}
+        assignmentTitle={assignmentName}
+        extra={() => Reload()}
+      />
+      <SubmissionHistoryModal
+        open={historyModalOpen}
+        onCancel={() => toggleModal("history")}
+        studentId={userInfo?.id}
+        assignmentId={assignmentId}
+        studentName={userInfo?.name}
+        extra={() => Reload()}
+        currSubData={toSend}
+      />
+      <FormattingModal
+        open={formattingModalOpen}
+        onCancel={() => toggleModal("formatting")}
+      />
+    </>
+  );
+}
