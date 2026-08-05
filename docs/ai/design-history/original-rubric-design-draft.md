@@ -1,3 +1,5 @@
+> **Historical / superseded — does not match what was built.** Moved from `docs/AI_Design_Doc.md`. This was an early design draft proposing a rubric-based grading model (`/assignments`, `/rubrics`, `/results/{result_id}`, `/models`, `rubric_breakdown` JSON). **None of the rubric endpoints or rubric_breakdown structure described below were actually implemented.** The system that shipped uses instructor-defined prompts + `insights`/`annotations` JSON instead — see `../architecture.md` for what's real. Kept only for historical context on the original proposal.
+
 # CodeAssist AI Feature Design Doc
 
 ## Introduction
@@ -8,13 +10,13 @@ The **AI Feedback API** extends the existing CodeAssist system to provide LLM-po
 
 
 ## Frontend
-###  Menu design change (NEED TO BE DONE, refer ChatALL)
+### Historical menu-design note
 
 ## AI Settings (Instructor View)
 
 * API key input fields (OpenAI, Gemini, Claude, Local LLM).
 * Save settings to backend.
-* Option to toggle **“Enable AI Feedback”** on assignments.
+* Option to toggle **"Enable AI Feedback"** on assignments.
 * Dropdown to select **1 model (model_id)** for the assignment.
   * Example: Instructor sets `GPT-4o-mini` as default for Assignment 1.
 
@@ -25,7 +27,7 @@ The **AI Feedback API** extends the existing CodeAssist system to provide LLM-po
 
 ## AI Feedback Panel (Student View)
 
-Since the model is already chosen by the instructor, **students don’t pick multiple models**.
+Since the model is already chosen by the instructor, **students don't pick multiple models**.
 
 ### Students see:
 
@@ -34,7 +36,7 @@ Since the model is already chosen by the instructor, **students don’t pick mul
 * **Rubric breakdown** (table or progress bars) from `rubric_breakdown`. (e.g., table: Correctness, Style, Efficiency).--> store it as JSON in backend → render it as table in frontend.
 
 **Backend Alignment**:
-* `GET /results/{result_id}` returns structured JSON for **one model’s output**.
+* `GET /results/{result_id}` returns structured JSON for **one model's output**.
 
 #### Example rubric breakdown table: 
 
@@ -107,6 +109,7 @@ While already preexisting, an assignment description text will be requested addi
 - `model_id`: chosen LLM (default will be set to gpt-4o-mini)
 - `rubric_id`: the rubric scheme linked to the assignment 
 
+*(This "assignment description text" requirement was never implemented — see `../README.md` gap #1. It's effectively the origin of that still-open gap.)*
 
 ### Create rubric
 **POST** `/rubrics`
