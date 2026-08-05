@@ -104,11 +104,16 @@ def create_gemini_client(config: GeminiClientConfig):
             if not config.api_key:
                 raise ProviderConfigurationError("Vertex AI API key is required.")
 
-            return genai.Client(
-                vertexai=True,
-                api_key=config.api_key,
-                http_options=http_options,
-            )
+            client_kwargs = {
+                "vertexai": True,
+                "api_key": config.api_key,
+                "http_options": http_options,
+            }
+            if config.project:
+                client_kwargs["project"] = config.project
+                client_kwargs["location"] = config.location or DEFAULT_VERTEX_LOCATION
+
+            return genai.Client(**client_kwargs)
 
         if auth_mode != VERTEX_AUTH_ADC:
             raise ProviderConfigurationError(
@@ -188,6 +193,14 @@ def classify_provider_exception(exc):
         return ProviderAuthenticationError(message)
 
     if status_code == 403 or "permission" in normalized or "iam" in normalized:
+        if "aiplatform.endpoints.predict" in normalized:
+            return ProviderPermissionError(
+                message,
+                "Vertex AI permission denied. Grant a role with "
+                "aiplatform.endpoints.predict, such as Vertex AI User or "
+                "Vertex AI Express User, and ensure the Vertex AI API is enabled.",
+            )
+
         return ProviderPermissionError(message)
 
     if status_code in {400, 404} and (

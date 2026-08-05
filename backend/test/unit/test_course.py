@@ -455,6 +455,7 @@ def test_get_course_assignments_missing_course_id(client):
 
 def test_get_course_info_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.has_vertex_configuration", return_value=False)
 
     mock_course = mocker.Mock(
         id="course-123",

@@ -50,10 +50,15 @@ Instructors can configure:
 * Temperature
 
 For Gemini over Vertex AI, credentials are configured on the CodeAssist server
-instead of being pasted by instructors. Set `GOOGLE_CLOUD_PROJECT`,
-`GOOGLE_CLOUD_LOCATION` (defaults to `global`), and Application Default
-Credentials in the deployment environment. `VERTEX_AI_API_KEY` is only for
-Vertex AI Express Mode when `VERTEX_AI_AUTH_MODE=api_key`.
+instead of being pasted by instructors. Standard Vertex AI uses
+`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` (defaults to `global`), and
+Application Default Credentials in the deployment environment. Vertex AI
+Express Mode uses `VERTEX_AI_AUTH_MODE=api_key` and `VERTEX_AI_API_KEY`.
+
+The configured Google Cloud identity or Express key project must be able to call
+Vertex AI prediction APIs. In IAM terms, it needs `aiplatform.endpoints.predict`,
+for example through the Vertex AI User or Vertex AI Express User role, and the
+Vertex AI API must be enabled for the project.
 
 Saved course fields:
 

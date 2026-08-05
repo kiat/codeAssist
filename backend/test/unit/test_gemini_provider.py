@@ -3,6 +3,7 @@ import pytest
 from ai_feedback.providers.errors import (
     ProviderConfigurationError,
     ProviderModelError,
+    ProviderPermissionError,
     UnsupportedProviderError,
 )
 from ai_feedback.providers.gemini import (
@@ -11,6 +12,7 @@ from ai_feedback.providers.gemini import (
     VERTEX_AUTH_API_KEY,
     GeminiClientConfig,
     GeminiProvider,
+    classify_provider_exception,
     create_gemini_client,
     validate_model,
 )
@@ -106,6 +108,30 @@ def test_create_gemini_vertex_api_key_mode_requires_api_key(monkeypatch):
         )
 
 
+def test_create_gemini_vertex_api_key_mode_uses_project_location_when_present(monkeypatch):
+    fake_genai = FakeGenAI()
+    monkeypatch.setattr(
+        "ai_feedback.providers.gemini._load_genai_modules",
+        lambda: (fake_genai, FakeTypes),
+    )
+
+    client = create_gemini_client(
+        GeminiClientConfig(
+            provider=GEMINI_VERTEX_PROVIDER,
+            api_key="vertex-key",
+            project="project-1",
+            location="global",
+            vertex_auth_mode=VERTEX_AUTH_API_KEY,
+        )
+    )
+
+    assert client["client_kwargs"]["vertexai"] is True
+    assert client["client_kwargs"]["api_key"] == "vertex-key"
+    assert client["client_kwargs"]["project"] == "project-1"
+    assert client["client_kwargs"]["location"] == "global"
+    assert client["client_kwargs"]["http_options"].api_version == "v1"
+
+
 def test_create_gemini_client_rejects_unknown_provider(monkeypatch):
     monkeypatch.setattr(
         "ai_feedback.providers.gemini._load_genai_modules",
@@ -114,6 +140,19 @@ def test_create_gemini_client_rejects_unknown_provider(monkeypatch):
 
     with pytest.raises(UnsupportedProviderError):
         create_gemini_client(GeminiClientConfig(provider="llama"))
+
+
+def test_classify_vertex_predict_permission_error_has_actionable_message():
+    class FakePermissionError(Exception):
+        status_code = 403
+
+    error = classify_provider_exception(
+        FakePermissionError("Permission 'aiplatform.endpoints.predict' denied")
+    )
+
+    assert isinstance(error, ProviderPermissionError)
+    assert "aiplatform.endpoints.predict" in error.public_message
+    assert "Vertex AI User" in error.public_message
 
 
 def test_gemini_provider_generate_passes_model_prompt_and_config(monkeypatch):
