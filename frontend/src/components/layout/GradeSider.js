@@ -39,7 +39,8 @@ export default () => {
     { credentials: "include" }
     )
     .then((res) => res.json())
-        .then((data) =>
+        .then((data) => {
+          if (!Array.isArray(data)) return;
           data.forEach((element) => {
             if (element.id === assignmentId) {
               updateAssignmentInfo({
@@ -47,8 +48,8 @@ export default () => {
                 name: element.name,
               });
             }
-          })
-        );
+          });
+        });
     }, [assignmentInfo.id, assignmentInfo.name, updateAssignmentInfo])
   
   return (
