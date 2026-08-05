@@ -228,6 +228,7 @@ export default () => {
       <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
+        assignmentId={assignmentId}
       />
     </>
   );
