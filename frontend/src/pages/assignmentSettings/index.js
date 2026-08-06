@@ -34,6 +34,9 @@ import AIFeedbackSettingsSection from "../../components/AIFeedbackSettingsSectio
 import AssignmentDescriptionInput from "../../components/AssignmentDescriptionInput";
 import { ASSIGNMENT_DATE_TIME_PICKER_PROPS } from "../../constants/dateTimePicker";
 import {
+  AI_PROVIDERS,
+  VERTEX_LOCATION_OPTIONS,
+  isVertexProvider,
   normalizeAiAllowedInputs,
   normalizeAiFeedbackPrompts,
 } from "../../constants/aiFeedbackSettings";
@@ -56,6 +59,8 @@ export default () => {
   const navigate = useNavigate();
 
   const useCourseAiDefault = Form.useWatch("use_course_ai_default", form);
+  const selectedAiProvider = Form.useWatch("ai_feedback_provider", form);
+  const isAssignmentVertex = isVertexProvider(selectedAiProvider);
 
   useEffect(() => {
     if (enableAiFeedback && !form.getFieldValue("ai_feedback_prompts")) {
@@ -104,6 +109,7 @@ export default () => {
         ai_feedback_prompts,
         ai_allowed_inputs,
         ai_feedback_model,
+        ai_feedback_vertex_location,
         ai_feedback_temperature,
         ai_feedback_style,
         ai_feedback_max_requests,
@@ -138,6 +144,7 @@ export default () => {
         ),
         ai_allowed_inputs: normalizeAiAllowedInputs(ai_allowed_inputs),
         ai_feedback_model: ai_feedback_model || undefined,
+        ai_feedback_vertex_location: ai_feedback_vertex_location || "",
         ai_feedback_temperature: ai_feedback_temperature ?? 0.5,
         ai_feedback_style: ai_feedback_style || "balanced",
         ai_feedback_max_requests: ai_feedback_max_requests ?? null,
@@ -155,6 +162,7 @@ export default () => {
 
   const handleFetchAssignmentModels = async () => {
     const provider = form.getFieldValue("ai_feedback_provider") || "openai";
+    const isVertex = isVertexProvider(provider);
     const assignmentApiKey = (
       form.getFieldValue("ai_feedback_api_key") || ""
     ).trim();
@@ -166,7 +174,10 @@ export default () => {
         course_id: courseId,
         provider,
       };
-      if (assignmentApiKey) {
+      if (isVertex) {
+        fetchPayload.location =
+          form.getFieldValue("ai_feedback_vertex_location") || undefined;
+      } else if (assignmentApiKey) {
         fetchPayload.api_key = assignmentApiKey;
       }
 
@@ -275,7 +286,13 @@ export default () => {
         values.use_course_ai_default === false ? values.ai_feedback_provider : null,
       ai_feedback_model:
         values.use_course_ai_default === false ? values.ai_feedback_model : null,
+      ai_feedback_vertex_location:
+        values.use_course_ai_default === false &&
+        isVertexProvider(values.ai_feedback_provider)
+          ? values.ai_feedback_vertex_location || null
+          : null,
       ...(values.use_course_ai_default === false &&
+      !isVertexProvider(values.ai_feedback_provider) &&
       (values.ai_feedback_api_key || "").trim()
         ? { ai_feedback_api_key: values.ai_feedback_api_key.trim() }
         : {}),
@@ -424,6 +441,7 @@ export default () => {
                   type={
                     courseAiInfo.has_openai_api_key ||
                     courseAiInfo.has_gemini_api_key ||
+                    courseAiInfo.has_gemini_vertex_config ||
                     courseAiInfo.has_claude_api_key ||
                     courseAiInfo.has_ollama_api_key
                       ? "success"
@@ -474,17 +492,16 @@ export default () => {
                           ]}
                         >
                           <Select
-                            options={[
-                              { label: "ChatGPT", value: "openai" },
-                              { label: "Gemini", value: "gemini" },
-                              { label: "Claude", value: "claude" },
-                              { label: "Ollama (Local LLM)", value: "ollama" },
-                            ]}
+                            options={AI_PROVIDERS.map((item) => ({
+                              label: item.label,
+                              value: item.key,
+                            }))}
                             onChange={() => {
                               setAssignmentModels([]);
                               form.setFieldsValue({
                                 ai_feedback_model: undefined,
                                 ai_feedback_api_key: "",
+                                ai_feedback_vertex_location: "",
                               });
                             }}
                           />
@@ -493,7 +510,8 @@ export default () => {
                         <Form.Item shouldUpdate noStyle>
                           {({ getFieldValue }) => (
                             <>
-                              {getFieldValue("has_assignment_ai_key") && (
+                              {getFieldValue("has_assignment_ai_key") &&
+                                !isAssignmentVertex && (
                                 <Alert
                                   type="info"
                                   showIcon
@@ -503,15 +521,37 @@ export default () => {
                                 />
                               )}
 
-                              <Form.Item
-                                label="Assignment API Key / Base URL"
-                                name="ai_feedback_api_key"
-                              >
-                                <Input.Password
-                                  autoComplete="new-password"
-                                  placeholder="Use a custom credential for this assignment"
-                                />
-                              </Form.Item>
+                              {isAssignmentVertex ? (
+                                <>
+                                  <Alert
+                                    type="info"
+                                    showIcon
+                                    style={{ marginBottom: 16 }}
+                                    message="Vertex AI authentication"
+                                    description="Gemini over Vertex AI uses the Google Cloud project and credentials configured for the CodeAssist deployment."
+                                  />
+
+                                  <Form.Item
+                                    label="Vertex AI Location"
+                                    name="ai_feedback_vertex_location"
+                                  >
+                                    <Select
+                                      options={VERTEX_LOCATION_OPTIONS}
+                                      placeholder="Use server default"
+                                    />
+                                  </Form.Item>
+                                </>
+                              ) : (
+                                <Form.Item
+                                  label="Assignment API Key / Base URL"
+                                  name="ai_feedback_api_key"
+                                >
+                                  <Input.Password
+                                    autoComplete="new-password"
+                                    placeholder="Use a custom credential for this assignment"
+                                  />
+                                </Form.Item>
+                              )}
                             </>
                           )}
                         </Form.Item>
