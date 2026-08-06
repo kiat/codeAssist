@@ -6,6 +6,7 @@ import shutil
 import time
 import threading
 import json
+import traceback
 import requests
 
 from openai import OpenAI
@@ -62,6 +63,21 @@ PROVIDER_DISPLAY_NAMES = {
     "claude": "Claude",
     "ollama": "Ollama",
 }
+
+
+def log_ai_feedback_exception(submission_id, provider, model, error):
+    """Log internal feedback failures without exposing details to students."""
+    provider_label = provider or "unknown"
+    model_label = model or "unknown"
+    print(
+        "AI_FEEDBACK: Unexpected error for submission "
+        f"{submission_id} provider={provider_label} model={model_label} - "
+        f"{type(error).__name__}: {error}",
+        flush=True,
+    )
+    traceback.print_exc()
+
+
 CORRECTNESS_SYSTEM_PROMPT = (
     "You are an AI feedback assistant for programming assignments. "
     "Give short, student-facing feedback about correctness, test results, "
@@ -850,6 +866,8 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
     """Background task for obtaining and recording AI feedback."""
     ctx = app.app_context()
     ctx.push()
+    provider = None
+    model = None
 
     try:
         print(f"AI_FEEDBACK: Starting for submission {submission_id}", flush=True)
@@ -935,7 +953,7 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         print(f"AI_FEEDBACK: Saved feedback for submission {submission_id}", flush=True)
 
     except Exception as e:
-        print(f"AI_FEEDBACK: Unexpected error - {type(e).__name__}: {e}", flush=True)
+        log_ai_feedback_exception(submission_id, provider, model, e)
 
         try:
             submission = Submission.query.get(submission_id)
