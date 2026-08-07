@@ -1,4 +1,5 @@
 import {
+  BarChartOutlined,
   CheckOutlined,
   DownloadOutlined,
   EyeOutlined,
@@ -13,6 +14,8 @@ import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import PopoverDownload from "../../components/download/PopoverDownload";
 import ExportSubmissions from "./ExportSubmissions";
+import GradeStatistics from "./GradeStatistics";
+import { getGradeStatistics } from "../../services/submission";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -20,7 +23,9 @@ import { useNavigate, useParams } from "react-router-dom";
 export default () => {
   const [assignmentDetail, setAssignmentDetail] = useState();
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [statisticsModalOpen, setStatisticsModalOpen] = useState(false);
   const [submissions, setSubmissions] = useState([]);
+  const [maxPoints, setMaxPoints] = useState(null);
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
@@ -29,6 +34,10 @@ export default () => {
 
   const toggleDownloadModalOpen = useCallback(() => {
     setDownloadModalOpen(t => !t);
+  }, []);
+
+  const toggleStatisticsModalOpen = useCallback(() => {
+    setStatisticsModalOpen(t => !t);
   }, []);
 
   const goAssignmentResult = (submissionId) => {
@@ -59,8 +68,12 @@ export default () => {
       title: "SCORE",
       dataIndex: "score",
       align: "center",
-      render: (score) => 
-        (score != null ? score : "-"),
+      render: (score) => {
+        if (score == null) return "-";
+        if (!maxPoints) return score;
+        const pct = Math.round((score / maxPoints) * 100);
+        return `${score}/${maxPoints} (${pct}%)`;
+      },
       sorter: (a, b) => (a.score ?? -1) - (b.score ?? -1),
     },
     {
@@ -113,7 +126,8 @@ export default () => {
       try {
         // First get all submissions
         const allSubmissions = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_all_assignment_submissions?assignment_id=${assignmentId}`
+          `${process.env.REACT_APP_API_URL}/get_all_assignment_submissions?assignment_id=${assignmentId}`,
+          { credentials: "include" }
         );
         if (!allSubmissions.ok) {
           throw new Error("Failed to load all submissions.");
@@ -122,7 +136,8 @@ export default () => {
 
         // Now fetch all the students
         const students = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`
+          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`,
+          { credentials: "include" }
         );
         if (!students.ok) {
           throw new Error("Failed to load students list.");
@@ -156,6 +171,18 @@ export default () => {
         setSubmissions(rows);
       } catch (err) {
         console.error("Error fetching grades:", err);
+      }
+    })();
+
+    // Separate from the roster load above: max_points is a "nice to have"
+    // for the SCORE column display, not required for the table to render,
+    // so a failure here shouldn't block showing the roster.
+    (async () => {
+      try {
+        const response = await getGradeStatistics({ assignment_id: assignmentId });
+        setMaxPoints(response.data?.max_points ?? null);
+      } catch (err) {
+        console.error("Error fetching max points:", err);
       }
     })();
   }, [
@@ -217,6 +244,9 @@ export default () => {
           <Button icon={<DownloadOutlined />} onClick={toggleDownloadModalOpen}>
             Export Submissions
           </Button>
+          <Button icon={<BarChartOutlined />} onClick={toggleStatisticsModalOpen}>
+            Statistics
+          </Button>
           <Button>
             <span>Publish Grades</span>
             <RightOutlined />
@@ -226,6 +256,11 @@ export default () => {
       <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
+      />
+      <GradeStatistics
+        open={statisticsModalOpen}
+        onCancel={toggleStatisticsModalOpen}
+        assignmentId={assignmentId}
       />
     </>
   );

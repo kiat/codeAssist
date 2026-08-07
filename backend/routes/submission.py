@@ -2,6 +2,7 @@ import uuid
 import json
 import sys
 import io
+import statistics
 import tarfile
 import subprocess
 import os
@@ -544,6 +545,180 @@ def get_all_assignment_submissions():
     submissions_data = submissions_schema.dump(all_submissions)
 
     return jsonify(submissions_data), 200
+
+
+def _percentage_histogram(scores, max_points):
+    """10 fixed-width buckets over [0, max_points]. Scores outside that
+    range (extra credit above max_points, or a negative score, which
+    Submission.score has no DB constraint against) get their own overflow/
+    underflow bucket rather than being silently clamped into 0-10%/90-100%.
+    """
+    bucket_width = max_points / 10
+    buckets = [0] * 10
+    overflow = 0
+    underflow = 0
+    for s in scores:
+        if s < 0:
+            underflow += 1
+            continue
+        if s > max_points:
+            overflow += 1
+            continue
+        # min(..., 9) so a score exactly equal to max_points lands in the
+        # last bucket (90-100%) instead of a nonexistent 11th bucket.
+        idx = min(int(s / bucket_width), 9)
+        buckets[idx] += 1
+
+    histogram = [
+        {
+            "label": f"{i * 10}-{(i + 1) * 10}%",
+            "bucket_start": round(i * bucket_width, 2),
+            "bucket_end": round((i + 1) * bucket_width, 2),
+            "count": buckets[i],
+        }
+        for i in range(10)
+    ]
+    if underflow:
+        histogram.insert(0, {"label": "<0%", "bucket_start": None, "bucket_end": 0, "count": underflow})
+    if overflow:
+        histogram.append({"label": ">100%", "bucket_start": max_points, "bucket_end": None, "count": overflow})
+    return histogram
+
+
+def _raw_histogram(scores, score_min, score_max):
+    """Fallback bucketing when the assignment has no autograder_points (or
+    it's 0) to build percentage buckets against: 10 fixed-width buckets over
+    the observed score range instead.
+    """
+    if score_min == score_max:
+        # A single submission, or every graded score being identical, can't
+        # be split into 10 non-degenerate buckets.
+        return [{
+            "label": f"{score_min:g}",
+            "bucket_start": score_min,
+            "bucket_end": score_min,
+            "count": len(scores),
+        }]
+
+    bucket_width = (score_max - score_min) / 10
+    buckets = [0] * 10
+    for s in scores:
+        idx = min(int((s - score_min) / bucket_width), 9)
+        buckets[idx] += 1
+
+    return [
+        {
+            "label": f"{score_min + i * bucket_width:.1f}-{score_min + (i + 1) * bucket_width:.1f}",
+            "bucket_start": round(score_min + i * bucket_width, 2),
+            "bucket_end": round(score_min + (i + 1) * bucket_width, 2),
+            "count": buckets[i],
+        }
+        for i in range(10)
+    ]
+
+
+def _effective_max_points(active_submissions, assignment_max_points):
+    """Assignment.autograder_points is a manually-entered field on the
+    assignment and can drift from what the autograder actually grades out
+    of (e.g. it's left at a default of 100 while the configured test suite
+    only totals 20 points) -- so prefer the real total computed from a
+    graded submission's own results.json (sum of each test's max_score,
+    the same source of truth /export_evaluations reads from) over the
+    configured field, falling back to it only when no submission has
+    parseable results yet.
+    """
+    computed_max = 0
+    for sub in active_submissions:
+        raw = sub.results
+        if isinstance(raw, memoryview):
+            raw = raw.tobytes()
+        if not raw:
+            continue
+        try:
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8")
+            data = json.loads(raw)
+            total = sum(t.get("max_score", 0) or 0 for t in data.get("tests", []) or [])
+            if total > computed_max:
+                computed_max = total
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return computed_max if computed_max > 0 else assignment_max_points
+
+
+def _compute_grade_statistics(scores, max_points):
+    count = len(scores)
+    if count == 0:
+        return {
+            "count": 0,
+            "mean": None,
+            "median": None,
+            "min": None,
+            "max": None,
+            "stdev": None,
+            "max_points": max_points,
+            "mode": "percentage" if (max_points and max_points > 0) else "raw",
+            "histogram": [],
+        }
+
+    score_min = min(scores)
+    score_max = max(scores)
+
+    if max_points and max_points > 0:
+        histogram = _percentage_histogram(scores, max_points)
+        mode = "percentage"
+    else:
+        histogram = _raw_histogram(scores, score_min, score_max)
+        mode = "raw"
+
+    return {
+        "count": count,
+        "mean": round(statistics.mean(scores), 2),
+        "median": round(statistics.median(scores), 2),
+        "min": score_min,
+        "max": score_max,
+        # Population stdev, not sample stdev: `scores` is the entire set of
+        # graded submissions for this assignment, not a sample drawn from a
+        # larger population. Also defined for n == 1 (returns 0.0), which
+        # avoids a separate low-n guard that statistics.stdev would need.
+        "stdev": round(statistics.pstdev(scores), 2),
+        "max_points": max_points,
+        "mode": mode,
+        "histogram": histogram,
+    }
+
+
+@submission.route('/get_grade_statistics', methods=["GET"])
+def get_grade_statistics():
+    '''
+    /get_grade_statistics computes summary stats (mean, median, min, max,
+    stdev) and a histogram of the score distribution for an assignment's
+    graded submissions.
+    @param assignment_id  the id of the assignment
+    '''
+    assignment_id = request.args.get("assignment_id")
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    # Security: Verify the requester is course staff or admin
+    _verify_course_staff(assignment_id)
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    # Only the active submission counts per student, and only if it's been
+    # graded (an active submission can still have score == None while
+    # autograding/AI feedback is in progress).
+    active_submissions = Submission.query.filter_by(
+        assignment_id=assignment_id, active=True
+    ).all()
+    scores = [s.score for s in active_submissions if s.score is not None]
+    max_points = _effective_max_points(active_submissions, assignment.autograder_points)
+
+    stats = _compute_grade_statistics(scores, max_points)
+    return jsonify(stats), 200
+
 
 @submission.route('/delete_submission', methods=["DELETE"])
 def delete_submission():
