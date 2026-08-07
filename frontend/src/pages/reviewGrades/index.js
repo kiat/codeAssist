@@ -1,4 +1,5 @@
 import {
+  BarChartOutlined,
   CheckOutlined,
   DownloadOutlined,
   EyeOutlined,
@@ -7,12 +8,14 @@ import {
 } from "@ant-design/icons";
 import { Button, PageHeader, Space, Table, Typography, Card, Input } from "antd";
 import { useState, useEffect, useCallback, useContext, } from "react";
-import { formatDayTimeEn } from "../../common/format";
+import { formatDayTimeEn, scorePercent } from "../../common/format";
 import { GRADES } from "./mock";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import PopoverDownload from "../../components/download/PopoverDownload";
 import ExportSubmissions from "./ExportSubmissions";
+import GradeStatistics from "./GradeStatistics";
+import { getGradeStatistics } from "../../services/submission";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -20,7 +23,15 @@ import { useNavigate, useParams } from "react-router-dom";
 export default () => {
   const [assignmentDetail, setAssignmentDetail] = useState();
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [statisticsModalOpen, setStatisticsModalOpen] = useState(false);
   const [submissions, setSubmissions] = useState([]);
+  // Fetched once here (not re-fetched when the Statistics modal opens) and
+  // passed down as a prop, so the SCORE column and the modal always agree
+  // on the same max points, and the expensive backend histogram
+  // computation only runs once per assignment view.
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState(false);
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
@@ -29,6 +40,10 @@ export default () => {
 
   const toggleDownloadModalOpen = useCallback(() => {
     setDownloadModalOpen(t => !t);
+  }, []);
+
+  const toggleStatisticsModalOpen = useCallback(() => {
+    setStatisticsModalOpen(t => !t);
   }, []);
 
   const goAssignmentResult = (submissionId) => {
@@ -59,8 +74,12 @@ export default () => {
       title: "SCORE",
       dataIndex: "score",
       align: "center",
-      render: (score) => 
-        (score != null ? score : "-"),
+      render: (score) => {
+        if (score == null) return "-";
+        const pct = scorePercent(score, stats?.max_points);
+        if (pct == null) return score;
+        return `${score}/${stats.max_points} (${pct}%)`;
+      },
       sorter: (a, b) => (a.score ?? -1) - (b.score ?? -1),
     },
     {
@@ -109,11 +128,19 @@ export default () => {
       return;
     }
 
+    // Reset immediately on navigation to a different assignment, so a
+    // slow/failed refetch below can't leave the previous assignment's
+    // stats (and max points) displayed against this assignment's rows.
+    setStats(null);
+    setStatsError(false);
+    setStatsLoading(true);
+
     (async () => {
       try {
         // First get all submissions
         const allSubmissions = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_all_assignment_submissions?assignment_id=${assignmentId}`
+          `${process.env.REACT_APP_API_URL}/get_all_assignment_submissions?assignment_id=${assignmentId}`,
+          { credentials: "include" }
         );
         if (!allSubmissions.ok) {
           throw new Error("Failed to load all submissions.");
@@ -122,7 +149,8 @@ export default () => {
 
         // Now fetch all the students
         const students = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`
+          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`,
+          { credentials: "include" }
         );
         if (!students.ok) {
           throw new Error("Failed to load students list.");
@@ -156,6 +184,21 @@ export default () => {
         setSubmissions(rows);
       } catch (err) {
         console.error("Error fetching grades:", err);
+      }
+    })();
+
+    // Separate from the roster load above: stats are a "nice to have" for
+    // the SCORE column / Statistics modal, not required for the table to
+    // render, so a failure here shouldn't block showing the roster.
+    (async () => {
+      try {
+        const response = await getGradeStatistics({ assignment_id: assignmentId });
+        setStats(response.data);
+      } catch (err) {
+        console.error("Error fetching statistics:", err);
+        setStatsError(true);
+      } finally {
+        setStatsLoading(false);
       }
     })();
   }, [
@@ -217,6 +260,9 @@ export default () => {
           <Button icon={<DownloadOutlined />} onClick={toggleDownloadModalOpen}>
             Export Submissions
           </Button>
+          <Button icon={<BarChartOutlined />} onClick={toggleStatisticsModalOpen}>
+            Statistics
+          </Button>
           <Button>
             <span>Publish Grades</span>
             <RightOutlined />
@@ -226,6 +272,13 @@ export default () => {
       <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
+      />
+      <GradeStatistics
+        open={statisticsModalOpen}
+        onCancel={toggleStatisticsModalOpen}
+        stats={stats}
+        loading={statsLoading}
+        error={statsError}
       />
     </>
   );

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ReviewGrades from "../../../../pages/reviewGrades/index";
 import { GlobalContext } from "../../../../App";
+import { getGradeStatistics } from "../../../../services/submission";
 
 const mockNavigate = jest.fn();
 jest.mock("react-router-dom", () => {
@@ -14,6 +15,10 @@ jest.mock("react-router-dom", () => {
     MemoryRouter: original.MemoryRouter,
   };
 });
+
+jest.mock("../../../../services/submission", () => ({
+  getGradeStatistics: jest.fn(),
+}));
 
 beforeAll(() => {
   window.matchMedia =
@@ -85,7 +90,8 @@ describe("<ReviewGrades />", () => {
       ok: true,
       json: () => Promise.resolve(fakeStudents),
     });
-    
+    getGradeStatistics.mockResolvedValue({ data: { max_points: 100 } });
+
     renderWithCtx();
 
     expect(
@@ -97,6 +103,45 @@ describe("<ReviewGrades />", () => {
     );
 
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
-    expect(screen.getByText("88")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("88/100 (88%)")).toBeInTheDocument()
+    );
+  });
+
+  it("falls back to a plain score when max_points is unavailable", async () => {
+    const fakeSubmission = [
+      {
+        id: 10,
+        student_id: 1,
+        score: 88,
+        active: true,
+        submitted_at: 1658362327000,
+      },
+    ];
+
+    const fakeStudents = [
+      {
+        id: 1,
+        name: "Alice Example",
+        email_address: "alice@example.com",
+      },
+    ];
+
+    global.fetch = jest.fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(fakeSubmission),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(fakeStudents),
+    });
+    getGradeStatistics.mockRejectedValue(new Error("network error"));
+
+    renderWithCtx();
+
+    await waitFor(() =>
+      expect(screen.getByText("88")).toBeInTheDocument()
+    );
   });
 });

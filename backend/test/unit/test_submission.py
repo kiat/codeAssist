@@ -1,8 +1,9 @@
 import os
+import uuid
 import pytest
 from flask import json
 from api import create_app, db
-from api.models import Submission
+from api.models import Assignment, Submission
 
 
 from routes.submission import submission
@@ -349,4 +350,244 @@ def test_get_active_submission_missing_params(client):
     data = response.get_json(silent=True)
     assert data is not None, "Expected a valid JSON response"
     assert data["message"] == "not sufficient details"
+
+
+# Tests for /get_grade_statistics
+
+
+def _make_assignment(autograder_points=100):
+    assignment = Assignment(
+        id=str(uuid.uuid4()),
+        name="Test Assignment",
+        course_id=str(uuid.uuid4()),
+        autograder_points=autograder_points,
+    )
+    db.session.add(assignment)
+    db.session.commit()
+    return assignment
+
+
+def _make_submission(assignment_id, score, active=True, results=None):
+    sub = Submission(
+        id=str(uuid.uuid4()),
+        file_name="solution.py",
+        submission_number=1,
+        student_id=str(uuid.uuid4()),
+        assignment_id=assignment_id,
+        student_code_file=b"",
+        score=score,
+        active=active,
+        completed=True,
+        results=json.dumps(results).encode("utf-8") if results is not None else None,
+    )
+    db.session.add(sub)
+    db.session.commit()
+    return sub
+
+
+def test_get_grade_statistics_missing_assignment_id(client):
+    response = client.get("/get_grade_statistics")
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing assignment_id"
+
+
+def test_get_grade_statistics_assignment_not_found(client, mocker):
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.get("/get_grade_statistics?assignment_id=missing")
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "Assignment not found"
+
+
+def test_get_grade_statistics_forbidden(client, mocker):
+    from util.errors import ForbiddenError
+    mocker.patch(
+        "routes.submission._verify_course_staff",
+        side_effect=ForbiddenError("Only course staff or administrators can perform this action"),
+    )
+
+    response = client.get("/get_grade_statistics?assignment_id=assgn1")
+    assert response.status_code == 403
+
+
+def test_get_grade_statistics_no_graded_submissions(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["count"] == 0
+        assert data["mean"] is None
+        assert data["median"] is None
+        assert data["min"] is None
+        assert data["max"] is None
+        assert data["stdev"] is None
+        assert data["histogram"] == []
+
+
+def test_get_grade_statistics_ignores_active_but_ungraded(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        _make_submission(assignment_id, score=None, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        assert response.get_json()["count"] == 0
+
+
+def test_get_grade_statistics_ignores_inactive_submissions(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        _make_submission(assignment_id, score=90, active=True)
+        _make_submission(assignment_id, score=10, active=False)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["count"] == 1
+        assert data["mean"] == 90
+        assert data["max"] == 90
+        assert data["min"] == 90
+
+
+def test_get_grade_statistics_success_percentage_mode(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        for score in [50, 60, 70, 85, 95, 100]:
+            _make_submission(assignment_id, score=score, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["count"] == 6
+        assert data["mean"] == pytest.approx(76.67, abs=0.01)
+        assert data["median"] == 77.5
+        assert data["min"] == 50
+        assert data["max"] == 100
+        assert data["mode"] == "percentage"
+
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["50-60%"] == 1
+        assert buckets_by_label["60-70%"] == 1
+        assert buckets_by_label["70-80%"] == 1
+        assert buckets_by_label["80-90%"] == 1
+        assert buckets_by_label["90-100%"] == 2
+        assert buckets_by_label["0-10%"] == 0
+
+
+def test_get_grade_statistics_autograder_points_zero(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=0).id
+        _make_submission(assignment_id, score=5, active=True)
+        _make_submission(assignment_id, score=8, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        assert response.get_json()["mode"] == "raw"
+
+
+def test_get_grade_statistics_raw_mode_no_max_points(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=None).id
+        for score in [10, 20, 30]:
+            _make_submission(assignment_id, score=score, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["mode"] == "raw"
+        assert data["histogram"][0]["bucket_start"] == 10
+        assert data["histogram"][-1]["bucket_end"] == 30
+
+
+def test_get_grade_statistics_single_submission(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=None).id
+        _make_submission(assignment_id, score=42, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["count"] == 1
+        assert data["stdev"] == 0.0
+        assert len(data["histogram"]) == 1
+        assert data["histogram"][0]["count"] == 1
+        assert data["histogram"][0]["bucket_start"] == 42
+        assert data["histogram"][0]["bucket_end"] == 42
+
+
+def test_get_grade_statistics_extra_credit_overflow_bucket(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        _make_submission(assignment_id, score=110, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label[">100%"] == 1
+        assert buckets_by_label["90-100%"] == 0
+
+
+def test_get_grade_statistics_boundary_score_not_misclassified_by_float_error(app, client):
+    """A score exactly on a bucket boundary must land in the bucket it
+    starts, not the one below it. For max_points=11, bucket_width=1.1, and
+    3.3 / 1.1 evaluates to 2.9999999999999996 in floating point -- a naive
+    int() truncation would misfile the boundary score into '20-30%'
+    instead of '30-40%'.
+    """
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=11).id
+        _make_submission(assignment_id, score=3.3, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["30-40%"] == 1
+        assert buckets_by_label["20-30%"] == 0
+
+
+def test_get_grade_statistics_prefers_results_derived_max_over_stale_autograder_points(app, client):
+    """Assignment.autograder_points can drift from what the autograder
+    actually grades out of (e.g. left at a stale default of 100 while the
+    configured test suite only totals 20 points). A submission that aced
+    every test should show up as 100%, not get diluted against the stale
+    field.
+    """
+    results = {
+        "tests": [
+            {"name": "test_1", "score": 10, "max_score": 10, "status": "passed"},
+            {"name": "test_2", "score": 10, "max_score": 10, "status": "passed"},
+        ]
+    }
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        _make_submission(assignment_id, score=20, active=True, results=results)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["max_points"] == 20
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["90-100%"] == 1
+
+
+def test_get_grade_statistics_falls_back_to_autograder_points_when_no_results(app, client):
+    """When no submission has parseable results yet (e.g. all still
+    processing), fall back to the assignment's configured max points
+    rather than reporting a max of 0.
+    """
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=50).id
+        _make_submission(assignment_id, score=25, active=True, results=None)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["max_points"] == 50
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["50-60%"] == 1
 
