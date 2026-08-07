@@ -113,7 +113,8 @@ export default () => {
       try {
         // First get all submissions
         const allSubmissions = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_all_assignment_submissions?assignment_id=${assignmentId}`
+          `${process.env.REACT_APP_API_URL}/get_all_assignment_submissions?assignment_id=${assignmentId}`,
+          { credentials: "include" }
         );
         if (!allSubmissions.ok) {
           throw new Error("Failed to load all submissions.");
@@ -122,7 +123,8 @@ export default () => {
 
         // Now fetch all the students
         const students = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`
+          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`,
+          { credentials: "include" }
         );
         if (!students.ok) {
           throw new Error("Failed to load students list.");
@@ -226,6 +228,7 @@ export default () => {
       <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
+        assignmentId={assignmentId}
       />
     </>
   );
