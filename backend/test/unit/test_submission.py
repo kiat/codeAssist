@@ -531,6 +531,25 @@ def test_get_grade_statistics_extra_credit_overflow_bucket(app, client):
         assert buckets_by_label["90-100%"] == 0
 
 
+def test_get_grade_statistics_boundary_score_not_misclassified_by_float_error(app, client):
+    """A score exactly on a bucket boundary must land in the bucket it
+    starts, not the one below it. For max_points=11, bucket_width=1.1, and
+    3.3 / 1.1 evaluates to 2.9999999999999996 in floating point -- a naive
+    int() truncation would misfile the boundary score into '20-30%'
+    instead of '30-40%'.
+    """
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=11).id
+        _make_submission(assignment_id, score=3.3, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["30-40%"] == 1
+        assert buckets_by_label["20-30%"] == 0
+
+
 def test_get_grade_statistics_prefers_results_derived_max_over_stale_autograder_points(app, client):
     """Assignment.autograder_points can drift from what the autograder
     actually grades out of (e.g. left at a stale default of 100 while the

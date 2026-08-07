@@ -8,7 +8,7 @@ import {
 } from "@ant-design/icons";
 import { Button, PageHeader, Space, Table, Typography, Card, Input } from "antd";
 import { useState, useEffect, useCallback, useContext, } from "react";
-import { formatDayTimeEn } from "../../common/format";
+import { formatDayTimeEn, scorePercent } from "../../common/format";
 import { GRADES } from "./mock";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
@@ -25,7 +25,13 @@ export default () => {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [statisticsModalOpen, setStatisticsModalOpen] = useState(false);
   const [submissions, setSubmissions] = useState([]);
-  const [maxPoints, setMaxPoints] = useState(null);
+  // Fetched once here (not re-fetched when the Statistics modal opens) and
+  // passed down as a prop, so the SCORE column and the modal always agree
+  // on the same max points, and the expensive backend histogram
+  // computation only runs once per assignment view.
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState(false);
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
@@ -70,9 +76,9 @@ export default () => {
       align: "center",
       render: (score) => {
         if (score == null) return "-";
-        if (!maxPoints) return score;
-        const pct = Math.round((score / maxPoints) * 100);
-        return `${score}/${maxPoints} (${pct}%)`;
+        const pct = scorePercent(score, stats?.max_points);
+        if (pct == null) return score;
+        return `${score}/${stats.max_points} (${pct}%)`;
       },
       sorter: (a, b) => (a.score ?? -1) - (b.score ?? -1),
     },
@@ -121,6 +127,13 @@ export default () => {
       console.error('No course info or assignment_id provided');
       return;
     }
+
+    // Reset immediately on navigation to a different assignment, so a
+    // slow/failed refetch below can't leave the previous assignment's
+    // stats (and max points) displayed against this assignment's rows.
+    setStats(null);
+    setStatsError(false);
+    setStatsLoading(true);
 
     (async () => {
       try {
@@ -174,15 +187,18 @@ export default () => {
       }
     })();
 
-    // Separate from the roster load above: max_points is a "nice to have"
-    // for the SCORE column display, not required for the table to render,
-    // so a failure here shouldn't block showing the roster.
+    // Separate from the roster load above: stats are a "nice to have" for
+    // the SCORE column / Statistics modal, not required for the table to
+    // render, so a failure here shouldn't block showing the roster.
     (async () => {
       try {
         const response = await getGradeStatistics({ assignment_id: assignmentId });
-        setMaxPoints(response.data?.max_points ?? null);
+        setStats(response.data);
       } catch (err) {
-        console.error("Error fetching max points:", err);
+        console.error("Error fetching statistics:", err);
+        setStatsError(true);
+      } finally {
+        setStatsLoading(false);
       }
     })();
   }, [
@@ -260,7 +276,9 @@ export default () => {
       <GradeStatistics
         open={statisticsModalOpen}
         onCancel={toggleStatisticsModalOpen}
-        assignmentId={assignmentId}
+        stats={stats}
+        loading={statsLoading}
+        error={statsError}
       />
     </>
   );

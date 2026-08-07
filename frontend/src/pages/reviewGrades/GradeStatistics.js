@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
 import { CloseOutlined } from "@ant-design/icons";
-import { Button, Col, Empty, Modal, Row, Space, Spin, Statistic, message } from "antd";
+import { Button, Col, Empty, Modal, Row, Space, Spin, Statistic } from "antd";
 import {
   Bar,
   BarChart,
@@ -10,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getGradeStatistics } from "../../services/submission";
+import { scorePercent } from "../../common/format";
 
 const BAR_COLOR = "#1890ff";
 
@@ -18,42 +17,33 @@ const BAR_COLOR = "#1890ff";
 // "80-90%") so each tick marks the line between two bars unambiguously,
 // rather than a range label centered under one bar. 0% (the left edge of
 // the chart, before the first bar) is implied rather than spelled out. The
-// full range is always available on hover via the default Tooltip, which
-// reads the unmodified `label` field.
-const formatAxisTick = (label) => {
-  if (!label.includes("-")) return label;
-  return label.split("-").pop();
-};
-
-const formatStatValue = (value, mode, maxPoints) => {
-  if (value == null) return "-";
-  if (mode === "percentage" && maxPoints) {
-    const pct = Math.round((value / maxPoints) * 100);
-    return `${pct}% (${value}/${maxPoints})`;
+// full range is always available on hover via the default Tooltip.
+//
+// Reads bucket_start/bucket_end directly (numeric) rather than parsing the
+// display `label` string -- bucket_end is in raw points even in percentage
+// mode (it's a point value the label's "X-Y%" text is derived from
+// separately), so it's converted back to a percentage here. Working from
+// the numbers also sidesteps string-parsing edge cases a hyphen-split
+// would get wrong, like a negative raw-mode boundary ("-8.0") being
+// mistaken for a range separator.
+export const formatAxisTick = (bucket, mode, maxPoints) => {
+  if (!bucket || bucket.bucket_start == null || bucket.bucket_end == null) {
+    return bucket ? bucket.label : "";
   }
-  return value;
+  if (mode === "percentage" && maxPoints) {
+    return `${Math.round((bucket.bucket_end / maxPoints) * 100)}%`;
+  }
+  return `${bucket.bucket_end}`;
 };
 
-export default ({ open, onCancel, assignmentId }) => {
-  const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState(null);
+export const formatStatValue = (value, mode, maxPoints) => {
+  if (value == null) return "-";
+  const pct = mode === "percentage" ? scorePercent(value, maxPoints) : null;
+  if (pct == null) return value;
+  return `${pct}% (${value}/${maxPoints})`;
+};
 
-  useEffect(() => {
-    if (!open) return;
-
-    setLoading(true);
-    (async () => {
-      try {
-        const response = await getGradeStatistics({ assignment_id: assignmentId });
-        setStats(response.data);
-      } catch (err) {
-        message.error("Failed to load statistics.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [open, assignmentId]);
-
+export default ({ open, onCancel, stats, loading, error }) => {
   const hasData = stats && stats.count > 0;
 
   return (
@@ -73,6 +63,8 @@ export default ({ open, onCancel, assignmentId }) => {
         <Space style={{ width: "100%", justifyContent: "center", padding: "32px 0" }}>
           <Spin />
         </Space>
+      ) : error ? (
+        <Empty description='Failed to load statistics.' />
       ) : !hasData ? (
         <Empty description='No graded submissions yet.' />
       ) : (
@@ -102,7 +94,7 @@ export default ({ open, onCancel, assignmentId }) => {
               <XAxis
                 dataKey='label'
                 tick={{ fontSize: 12 }}
-                tickFormatter={formatAxisTick}
+                tickFormatter={(_, index) => formatAxisTick(stats.histogram[index], stats.mode, stats.max_points)}
                 interval={0}
               />
               <YAxis allowDecimals={false} />

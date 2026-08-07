@@ -565,8 +565,11 @@ def _percentage_histogram(scores, max_points):
             overflow += 1
             continue
         # min(..., 9) so a score exactly equal to max_points lands in the
-        # last bucket (90-100%) instead of a nonexistent 11th bucket.
-        idx = min(int(s / bucket_width), 9)
+        # last bucket (90-100%) instead of a nonexistent 11th bucket. The
+        # tiny epsilon guards against float division landing just under an
+        # exact bucket boundary (e.g. 3.3 / 1.1 == 2.9999999999999996) and
+        # misclassifying a boundary score into the bucket below it.
+        idx = min(int(s / bucket_width + 1e-9), 9)
         buckets[idx] += 1
 
     histogram = [
@@ -603,7 +606,7 @@ def _raw_histogram(scores, score_min, score_max):
     bucket_width = (score_max - score_min) / 10
     buckets = [0] * 10
     for s in scores:
-        idx = min(int((s - score_min) / bucket_width), 9)
+        idx = min(int((s - score_min) / bucket_width + 1e-9), 9)
         buckets[idx] += 1
 
     return [
