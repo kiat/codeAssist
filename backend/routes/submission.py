@@ -570,13 +570,15 @@ def export_submissions():
         assignment_id=assignment_id, active=True
     ).order_by(Submission.submitted_at.asc()).all()
 
-    if not active_submissions:
-        raise NotFoundError("No active submissions found for this assignment")
-
     zip_buffer = io.BytesIO()
     used_names = {}
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        if not active_submissions:
+            zf.writestr(
+                "README.txt",
+                "No active submissions found for this assignment yet.\n",
+            )
         for sub in active_submissions:
             student = db.session.query(User).filter_by(id=sub.student_id).first()
 

@@ -63,11 +63,17 @@ describe('<ExportSubmissions />', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('downloads the zip when Download Submissions is clicked', async () => {
-    exportSubmissions.mockResolvedValue({ data: new Blob(['zip-bytes']) });
+  it('downloads the zip using the filename from Content-Disposition', async () => {
+    exportSubmissions.mockResolvedValue({
+      data: new Blob(['zip-bytes']),
+      headers: { 'content-disposition': 'attachment; filename="HW1_submissions.zip"' },
+    });
+    let capturedDownloadName;
     const clickSpy = jest
       .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => {});
+      .mockImplementation(function () {
+        capturedDownloadName = this.download;
+      });
 
     renderModal(true);
     fireEvent.click(screen.getByRole('button', { name: /download submissions/i }));
@@ -76,8 +82,27 @@ describe('<ExportSubmissions />', () => {
       expect(exportSubmissions).toHaveBeenCalledWith({ assignment_id: 'assgn1' })
     );
     expect(clickSpy).toHaveBeenCalled();
+    expect(capturedDownloadName).toBe('HW1_submissions.zip');
     expect(window.URL.createObjectURL).toHaveBeenCalled();
     expect(window.URL.revokeObjectURL).toHaveBeenCalled();
+
+    clickSpy.mockRestore();
+  });
+
+  it('falls back to a default filename when Content-Disposition is missing', async () => {
+    exportSubmissions.mockResolvedValue({ data: new Blob(['zip-bytes']), headers: {} });
+    let capturedDownloadName;
+    const clickSpy = jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function () {
+        capturedDownloadName = this.download;
+      });
+
+    renderModal(true);
+    fireEvent.click(screen.getByRole('button', { name: /download submissions/i }));
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalled());
+    expect(capturedDownloadName).toBe('submissions.zip');
 
     clickSpy.mockRestore();
   });
@@ -93,6 +118,17 @@ describe('<ExportSubmissions />', () => {
       expect(message.error).toHaveBeenCalledWith(
         'No active submissions found for this assignment'
       )
+    );
+  });
+
+  it('shows a generic error toast on a network failure with no response', async () => {
+    exportSubmissions.mockRejectedValue(new Error('Network Error'));
+
+    renderModal(true);
+    fireEvent.click(screen.getByRole('button', { name: /download submissions/i }));
+
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith('Failed to export submissions.')
     );
   });
 });

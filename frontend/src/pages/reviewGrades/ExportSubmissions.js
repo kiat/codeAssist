@@ -3,6 +3,14 @@ import { CloseOutlined, DownloadOutlined } from "@ant-design/icons";
 import { Button, Modal, Space, message } from "antd";
 import { exportSubmissions } from "../../services/submission";
 
+const DEFAULT_DOWNLOAD_NAME = "submissions.zip";
+
+const getFilenameFromContentDisposition = (headerValue) => {
+  if (!headerValue) return DEFAULT_DOWNLOAD_NAME;
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(headerValue);
+  return match ? decodeURIComponent(match[1]) : DEFAULT_DOWNLOAD_NAME;
+};
+
 export default ({ open, onCancel, assignmentId }) => {
   const [downloading, setDownloading] = useState(false);
 
@@ -14,7 +22,9 @@ export default ({ open, onCancel, assignmentId }) => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "submissions.zip";
+      link.download = getFilenameFromContentDisposition(
+        response.headers?.["content-disposition"]
+      );
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -33,6 +43,8 @@ export default ({ open, onCancel, assignmentId }) => {
         } catch {
           message.error("Failed to export submissions.");
         }
+      } else {
+        message.error("Failed to export submissions.");
       }
     } finally {
       setDownloading(false);

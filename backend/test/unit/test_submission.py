@@ -382,7 +382,7 @@ def test_export_submissions_assignment_not_found(client, mocker):
 
 
 def test_export_submissions_no_active_submissions(client, mocker):
-    """Test /export_submissions returns 404 when there are no active submissions."""
+    """Test /export_submissions returns an empty zip with a README when there are no active submissions."""
     fake_assignment = SimpleNamespace(id="assgn1", name="HW1")
 
     def query_side_effect(*args, **kwargs):
@@ -397,9 +397,12 @@ def test_export_submissions_no_active_submissions(client, mocker):
     mock_submission_query.filter_by.return_value.order_by.return_value.all.return_value = []
 
     response = client.get("/export_submissions?assignment_id=assgn1")
-    assert response.status_code == 404
-    data = response.get_json()
-    assert data["message"] == "No active submissions found for this assignment"
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "application/zip"
+
+    with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+        assert zf.namelist() == ["README.txt"]
+        assert b"No active submissions" in zf.read("README.txt")
 
 
 def test_export_submissions_success(client, mocker):
