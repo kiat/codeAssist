@@ -27,6 +27,7 @@ export default ({ open, onCancel, autograderFile, onSuccess }) => {
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/test_autograder_submission`, {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
 

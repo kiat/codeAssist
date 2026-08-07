@@ -13,6 +13,7 @@ import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import PopoverDownload from "../../components/download/PopoverDownload";
 import ExportSubmissions from "./ExportSubmissions";
+import ExportEvaluations from "./ExportEvaluations";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -20,6 +21,7 @@ import { useNavigate, useParams } from "react-router-dom";
 export default () => {
   const [assignmentDetail, setAssignmentDetail] = useState();
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [evaluationsModalOpen, setEvaluationsModalOpen] = useState(false);
   const [submissions, setSubmissions] = useState([]);
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
   const { userInfo, courseInfo } = useContext(GlobalContext);
@@ -29,6 +31,10 @@ export default () => {
 
   const toggleDownloadModalOpen = useCallback(() => {
     setDownloadModalOpen(t => !t);
+  }, []);
+
+  const toggleEvaluationsModalOpen = useCallback(() => {
+    setEvaluationsModalOpen(t => !t);
   }, []);
 
   const goAssignmentResult = (submissionId) => {
@@ -113,7 +119,8 @@ export default () => {
       try {
         // First get all submissions
         const allSubmissions = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_all_assignment_submissions?assignment_id=${assignmentId}`
+          `${process.env.REACT_APP_API_URL}/get_all_assignment_submissions?assignment_id=${assignmentId}`,
+          { credentials: "include" }
         );
         if (!allSubmissions.ok) {
           throw new Error("Failed to load all submissions.");
@@ -122,7 +129,8 @@ export default () => {
 
         // Now fetch all the students
         const students = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`
+          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`,
+          { credentials: "include" }
         );
         if (!students.ok) {
           throw new Error("Failed to load students list.");
@@ -211,7 +219,7 @@ export default () => {
           <Button icon={<DownloadOutlined />} >
             Download Grades
           </Button>
-          <Button icon={<DownloadOutlined />} >
+          <Button icon={<DownloadOutlined />} onClick={toggleEvaluationsModalOpen}>
             Export Evaluations
           </Button>
           <Button icon={<DownloadOutlined />} onClick={toggleDownloadModalOpen}>
@@ -226,6 +234,11 @@ export default () => {
       <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
+      />
+      <ExportEvaluations
+        open={evaluationsModalOpen}
+        onCancel={toggleEvaluationsModalOpen}
+        assignmentId={assignmentId}
       />
     </>
   );
