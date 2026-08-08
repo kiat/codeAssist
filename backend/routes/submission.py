@@ -2,6 +2,7 @@ import uuid
 import json
 import sys
 import io
+import csv
 import tarfile
 import subprocess
 import os
@@ -550,6 +551,52 @@ def get_all_assignment_submissions():
     submissions_data = submissions_schema.dump(all_submissions)
 
     return jsonify(submissions_data), 200
+
+@submission.route('/export_grades_csv', methods=["GET"])
+def export_grades_csv():
+    assignment_id = request.args.get("assignment_id")
+
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    # Security: Verify the requester is course staff or admin
+    session_user_id = _verify_course_staff(assignment_id)
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    all_submissions = Submission.query.filter_by(assignment_id=assignment_id).all()
+    subs_by_student = {}
+    for sub in all_submissions:
+        subs_by_student.setdefault(sub.student_id, []).append(sub)
+
+    enrolled_users = db.session.query(User).join(
+        Enrollment, Enrollment.student_id == User.id
+    ).filter(Enrollment.course_id == assignment.course_id).all()
+    # Matches the frontend's row set: everyone enrolled except the viewer.
+    students = [u for u in enrolled_users if u.id != session_user_id]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["First & Last Name", "Email", "Score", "Graded", "Submitted At (UTC)"])
+
+    for student in students:
+        active_sub = next((s for s in subs_by_student.get(student.id, []) if s.active), None)
+        writer.writerow([
+            student.name,
+            student.email_address,
+            active_sub.score if active_sub and active_sub.score is not None else "",
+            "Yes" if active_sub else "No",
+            active_sub.submitted_at.isoformat() if active_sub and active_sub.submitted_at else "",
+        ])
+
+    filename = secure_filename(f"{assignment.name}_grades.csv")
+    return current_app.response_class(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 @submission.route('/delete_submission', methods=["DELETE"])
 def delete_submission():
