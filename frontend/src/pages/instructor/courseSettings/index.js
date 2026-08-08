@@ -29,13 +29,17 @@ export default () => {
   const { courseId } = useParams();
   const [assignments, setAssignments] = useState([]);
 
-
-
   // Used to manage form state
   const [form] = Form.useForm();
 
-  const { courseInfo, updateCourseInfo, userInfo } = useContext(GlobalContext);
+  const { courseInfo, updateCourseInfo, courseRole } = useContext(GlobalContext);
+  const navigate = useNavigate();
 
+  useEffect(() => {
+    if (courseRole && courseRole !== "instructor") {
+      navigate(`/instructorDashboard/${courseId}`);
+    }
+  }, [courseRole, courseId, navigate]);
 
   useEffect(() => {
     fetchCourseData();
@@ -52,20 +56,18 @@ export default () => {
   };
 
   const getAssignments = useCallback(() => {
-    getCourseAssignments({ course_id: courseId, user_id: userInfo.id }).then((res) => {
+    getCourseAssignments({ course_id: courseId }).then((res) => {
       setAssignments(res.data);
     });
-  }, [courseId, userInfo.id]);
+  }, [courseId]);
 
   useEffect(() => {
     getAssignments();
   }, [getAssignments]);
 
-  const navigate = useNavigate();
-
   const handleDeleteAllAssignments = async (courseId) => {
     try {
-      await deleteAllAssignments({"course_id": courseId});
+      await deleteAllAssignments({ course_id: courseId });
       message.success("All assignments deleted successfully");
     }
     catch(error) {
@@ -75,7 +77,7 @@ export default () => {
 
   const handleDeleteCourse = async (courseId) => {
     try {
-      await deleteCourse({"course_id" : courseId});
+      await deleteCourse({ course_id: courseId });
       message.success("Course deleted successfully");
       navigateHome();
     }

@@ -12,7 +12,7 @@ import styles from "./styles.module.css";
 
 export default () => {
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
-  const { courseInfo, userInfo, updateCourseInfo } = useContext(GlobalContext);
+  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
   const [assignmentInfoCurrent, setAssignmentInfoCurrent] = useState();
 
   const pathname = window.location.pathname;
@@ -26,7 +26,7 @@ export default () => {
   }, [pathname, updateAssignmentInfo]);
 
   useEffect(() => {
-    if (!courseInfo.id || !userInfo.id || !assignmentId) {
+    if (!courseInfo.id || !assignmentId) {
       return;
     }
     if (!assignmentInfo.id) {
@@ -38,11 +38,12 @@ export default () => {
     fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
     new URLSearchParams({
       course_id: courseInfo.id,
-      user_id: userInfo.id,
-    })
+    }),
+    { credentials: "include" }
     )
     .then((res) => res.json())
-        .then((data) =>
+        .then((data) => {
+          if (!Array.isArray(data)) return;
           data.forEach((element) => {
             if (element.id === assignmentId) {
               updateAssignmentInfo({
@@ -51,8 +52,8 @@ export default () => {
               });
             }
           })
-        );
-    }, [assignmentInfo.id, assignmentId, assignmentInfo.name, courseInfo.id, userInfo.id, updateAssignmentInfo])
+        });
+    }, [assignmentInfo.id, assignmentId, assignmentInfo.name, courseInfo.id, updateAssignmentInfo])
   
   return (
     <>

@@ -50,12 +50,12 @@ jest.mock('antd', () => {
   const Input = props => <input {...props} />;
   Input.Password = props => <input type="password" {...props} />;
 
-  const Button = ({ htmlType, children }) => (
-    <button type={htmlType || 'button'}>{children}</button>
+  const Button = ({ htmlType, children, disabled }) => (
+    <button type={htmlType || 'button'} disabled={disabled}>{children}</button>
   );
 
   const Radio = {
-    Group: ({ children }) => <div role="radiogroup">{children}</div>,
+    Group: ({ children, onChange }) => <div role="radiogroup" onChange={onChange}>{children}</div>,
     Button: ({ value, children }) => (
       <label>
         <input type="radio" name="role" value={value} />
@@ -112,6 +112,8 @@ describe('<SignUpModal />', () => {
     expect(screen.getByTestId('modal')).toBeInTheDocument();
 
     expect(screen.getAllByRole('radio')).toHaveLength(2);
+    expect(screen.getByText(/student/i)).toBeInTheDocument();
+    expect(screen.getByText(/instructor/i)).toBeInTheDocument();
 
     expect(screen.getByLabelText(/EID/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Name/i)).toBeInTheDocument();
@@ -130,13 +132,11 @@ describe('<SignUpModal />', () => {
     expect(mockCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('submits form (selecting student), calls createUser, updates context, and writes localStorage', async () => {
+  it('submits form as a student, calls createUser, updates context, and writes localStorage', async () => {
     const fakeRes = { data: { name: 'Alice', id: 7, role: 'student' } };
     createUser.mockResolvedValueOnce(fakeRes);
 
     render(<Wrapped open={true} onCancel={() => {}} />);
-
-    await userEvent.click(screen.getByRole('radio', { name: /student/i }));
 
     await userEvent.type(screen.getByLabelText(/EID/i), 'E123');
     await userEvent.type(screen.getByLabelText(/Name/i), 'Alice');
@@ -165,6 +165,38 @@ describe('<SignUpModal />', () => {
         id: 7,
         isStudent: true,
         role: 'student',
+        isAdmin: false,
+      });
+    });
+  });
+
+  it('submits form as an instructor when instructor is selected', async () => {
+    const fakeRes = { data: { name: 'Prof Alice', id: 8, role: 'instructor' } };
+    createUser.mockResolvedValueOnce(fakeRes);
+
+    render(<Wrapped open={true} onCancel={() => {}} />);
+
+    await userEvent.click(screen.getAllByRole('radio')[1]);
+    await userEvent.type(screen.getByLabelText(/EID/i), 'P123');
+    await userEvent.type(screen.getByLabelText(/Name/i), 'Prof Alice');
+    await userEvent.type(screen.getByLabelText(/Email/i), 'prof@example.com');
+    await userEvent.type(screen.getByLabelText(/Password/i), 'securepass');
+
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+
+    await waitFor(() => {
+      expect(createUser).toHaveBeenCalledWith({
+        role: 'instructor',
+        eid: 'P123',
+        name: 'Prof Alice',
+        email_address: 'prof@example.com',
+        password: 'securepass'
+      });
+      expect(mockUpdate).toHaveBeenCalledWith({
+        name: 'Prof Alice',
+        id: 8,
+        isStudent: false,
+        role: 'instructor',
         isAdmin: false,
       });
     });

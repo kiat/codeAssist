@@ -17,10 +17,22 @@ from util.errors import BadRequestError, NotFoundError, InternalProcessingError,
 from util.url_utils import validate_ollama_url
 from ai_feedback.integration import (
     async_get_ai_feedback,
+    build_claude_messages_payload,
     get_provider_and_model,
     get_provider_credentials,
     get_temperature,
     post_gemini_with_retry,
+)
+from ai_feedback.memory import get_recent_submission_history_text
+from ai_feedback.settings import (
+    build_allowed_feedback_context,
+    check_feedback_limits,
+    get_enabled_feedback_prompt,
+    record_feedback_request,
+    render_feedback_context,
+    get_student_feedback_status,
+    get_chat_history,
+    store_chat_message,
 )
 import docker
 
@@ -30,6 +42,9 @@ code_editor = Blueprint('code_editor', __name__)
 _docker_client = None
 
 # --- Rate limiting for run_code (per-user) ---
+# NOTE: This is an in-process rate limiter. If the app runs behind multiple
+# workers (e.g. gunicorn with >1 worker), each worker has its own counter.
+# For production multi-worker deployments, consider Redis-backed rate limiting.
 _run_code_timestamps = {}  # {student_id: [timestamps]}
 _run_code_rate_lock = threading.Lock()
 _RUN_CODE_RATE_LIMIT = 10  # max requests per user
@@ -111,6 +126,12 @@ def save_code_draft():
     if len(content) > 100000:
         raise BadRequestError("Code content exceeds maximum length of 100KB")
 
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
+
     # Find the latest version number for this student/assignment
     latest = (
         db.session.query(CodeDraft)
@@ -154,6 +175,12 @@ def get_code_drafts():
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
 
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
+
     drafts = (
         db.session.query(CodeDraft)
         .filter_by(student_id=student_id, assignment_id=assignment_id)
@@ -190,6 +217,12 @@ def get_latest_draft():
 
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
 
     draft = (
         db.session.query(CodeDraft)
@@ -676,18 +709,12 @@ def _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperatur
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
-            json={
-                "model": model,
-                "max_tokens": 500,
-                "temperature": float(temperature),
-                "system": AI_CHAT_SYSTEM_PROMPT,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": user_prompt,
-                    }
-                ],
-            },
+            json=build_claude_messages_payload(
+                model,
+                500,
+                AI_CHAT_SYSTEM_PROMPT,
+                user_prompt,
+            ),
             timeout=30,
         )
 
@@ -872,16 +899,17 @@ def run_code():
 def ai_chat():
     """
     Chat with AI about the current code.
-    Expects JSON: { student_id, assignment_id, message, code }
-    Returns: { reply: "..." }
+    Expects JSON: { student_id, assignment_id, message, code, prompt_id? }
+    Returns: { reply: "...", feedback_status: { remaining, wait_seconds } }
     """
     data = request.json
     student_id = data.get("student_id")
     assignment_id = data.get("assignment_id")
     user_message = data.get("message")
     code = data.get("code", "")
+    prompt_id = data.get("prompt_id")
 
-    _verify_student(student_id)
+    student = _verify_student(student_id)
 
     if not user_message:
         raise BadRequestError("Missing message")
@@ -889,7 +917,7 @@ def ai_chat():
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
 
-    # Fetch assignment and course for provider settings and credentials.
+    # Fetch assignment, course, and student for provider settings and credentials.
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment:
         raise NotFoundError("Assignment not found")
@@ -899,11 +927,59 @@ def ai_chat():
     # Verify student is enrolled in the course to prevent quota abuse
     _verify_enrollment(student_id, assignment.course_id)
 
+    # Check feedback limits (max_requests + wait_seconds)
+    limits = check_feedback_limits(assignment, student_id)
+    if not limits["allowed"]:
+        raise TooManyRequestsError(limits["message"])
+
+    # Validate prompt_id if provided and resolve the instructor prompt for API context
+    instructor_prompt_text = None
+    if prompt_id:
+        try:
+            prompt_config = get_enabled_feedback_prompt(assignment, prompt_id)
+            instructor_prompt_text = prompt_config['prompt']
+        except ValueError as e:
+            raise BadRequestError(str(e))
+
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
     if not course:
         raise BadRequestError("Course not found for this assignment.")
 
-    user_prompt = f"Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}"
+    # Load recent chat history so the LLM has memory of prior conversation.
+    chat_history = get_chat_history(student_id, assignment_id, limit=20)
+    submission_history = get_recent_submission_history_text(
+        student_id,
+        assignment_id,
+    )
+    if not submission_history:
+        legacy_insights = str(getattr(student, "coding_insights", "") or "").strip()
+        if legacy_insights and legacy_insights != "No history.":
+            submission_history = legacy_insights
+
+    # --- Build context sections ---
+    feedback_context = build_allowed_feedback_context(
+        assignment=assignment,
+        code_text=code,
+        submission_history=submission_history,
+    )
+    context_parts = [render_feedback_context(feedback_context)]
+
+    # Prior conversation turns give the model memory across messages.
+    if chat_history:
+        history_lines = []
+        for msg in chat_history:
+            role = "Student" if msg["role"] == "user" else "Assistant"
+            history_lines.append(f"{role}: {msg['content']}")
+        context_parts.append("Previous conversation:\n" + "\n".join(history_lines))
+
+    context_block = "\n\n".join(context_parts)
+    if context_block:
+        context_block += "\n\n"
+
+    # Build user prompt, incorporating the instructor's selected prompt as
+    # additional context when one was chosen via prompt_id.
+    prompt_context = f"\n\nInstructor guidance: {instructor_prompt_text}" if instructor_prompt_text else ""
+    user_prompt = f"{context_block}Student message: {user_message}{prompt_context}"
     provider, model = get_provider_and_model(assignment, course)
     temperature = get_temperature(assignment, course)
 
@@ -916,7 +992,7 @@ def ai_chat():
         raise BadRequestError(error_message)
     except Exception:
         raise InternalProcessingError("Failed to initialize AI client")
-
+  
     try:
         reply = _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperature)
     except Exception as e:
@@ -926,7 +1002,11 @@ def ai_chat():
             raise BadRequestError("AI service quota exceeded. Please contact your instructor to update the API key.")
         elif "invalid_api_key" in error_msg or "401" in error_msg:
             raise BadRequestError("Invalid API key. Please contact your instructor.")
-        elif "does not exist" in error_msg or "model_not_found" in error_msg:
+        elif (
+            "does not exist" in error_msg
+            or "model_not_found" in error_msg
+            or "not_found_error" in error_msg
+        ):
             raise BadRequestError(f"AI model '{model}' is not available. Please contact your instructor.")
         raise BadRequestError(str(e))
     except BadRequestError:
@@ -935,4 +1015,58 @@ def ai_chat():
         print(f"AI_CHAT error: {e}", flush=True)
         raise InternalProcessingError(f"Failed to get AI response: {type(e).__name__}")
 
-    return jsonify({"reply": reply}), 200
+    # Store messages for AI memory — store the raw user message only (without
+    # the instructor prompt prepended) so chat history stays concise and avoids
+    # redundant prompt text when loaded for subsequent requests.
+    try:
+        store_chat_message(student_id, assignment_id, "user", user_message, prompt_id)
+        store_chat_message(student_id, assignment_id, "assistant", reply)
+    except Exception as e:
+        logger.warning(f"AI_CHAT: Failed to store chat message: {e}")
+
+    # Record the feedback request (wrapped so a DB error doesn't 500 after a
+    # successful AI reply has already been generated).
+    try:
+        record_feedback_request(student_id, assignment_id, prompt_id)
+    except Exception as e:
+        logger.warning(f"AI_CHAT: Failed to record feedback request: {e}")
+
+    # Get updated status
+    status = get_student_feedback_status(assignment, student_id)
+
+    return jsonify({"reply": reply, "feedback_status": status}), 200
+
+
+@code_editor.route('/ai_feedback_status', methods=["GET"])
+def ai_feedback_status():
+    """
+    Get the student's current AI feedback request status for an assignment.
+    Query params: student_id, assignment_id
+    Returns: { remaining, wait_seconds, max_requests, total_requests }
+    """
+    student_id = request.args.get("student_id")
+    assignment_id = request.args.get("assignment_id")
+
+    _verify_student(student_id)
+
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    if not assignment.ai_feedback_enabled:
+        return jsonify({
+            "remaining": 0,
+            "wait_seconds": 0,
+            "max_requests": 0,
+            "total_requests": 0,
+            "ai_feedback_enabled": False,
+        }), 200
+
+    _verify_enrollment(student_id, assignment.course_id)
+
+    status = get_student_feedback_status(assignment, student_id)
+    status["ai_feedback_enabled"] = True
+    return jsonify(status), 200

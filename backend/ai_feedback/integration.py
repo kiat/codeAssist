@@ -2,7 +2,6 @@ import os
 import subprocess
 import hashlib
 import docker
-import zipfile
 import shutil
 import time
 import threading
@@ -19,10 +18,19 @@ from util.encryption_utils import decrypt_api_key
 from util.url_utils import validate_ollama_url
 from api.models import Assignment, Submission, User, Course
 from api import db
+from ai_feedback.memory import (
+    get_recent_submission_history_text,
+    record_submission_insight,
+)
 from ai_feedback.settings import (
     build_allowed_feedback_context,
     get_enabled_feedback_prompt,
+    normalize_allowed_inputs,
     render_feedback_context,
+)
+from ai_feedback.source_extraction import (
+    SourceExtractionError,
+    extract_submission_source,
 )
 
 
@@ -208,6 +216,24 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("API_SECRET_KEY")
 cipher = Fernet(SECRET_KEY) if SECRET_KEY else None
+
+
+def build_claude_messages_payload(model, max_tokens, system_prompt, user_prompt):
+    """Build a Claude Messages API payload.
+
+    Temperature is intentionally omitted because newer Claude models reject it.
+    """
+    return {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system_prompt,
+        "messages": [
+            {
+                "role": "user",
+                "content": user_prompt,
+            }
+        ],
+    }
 
 
 def fetch_submission_data(submission_id):
@@ -492,18 +518,12 @@ def get_structured_feedback_from_claude(api_key, prompt, model, temperature, pas
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         },
-        json={
-            "model": model,
-            "max_tokens": 700,
-            "temperature": temperature,
-            "system": CORRECTNESS_SYSTEM_PROMPT,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
-        },
+        json=build_claude_messages_payload(
+            model,
+            700,
+            CORRECTNESS_SYSTEM_PROMPT,
+            prompt,
+        ),
         timeout=30,
     )
 
@@ -568,7 +588,29 @@ def update_submission_feedback(submission_id, ai_feedback_json, new_insights):
         raise ValueError(f"Student ID {submission.student_id} not found")
 
     submission.ai_feedback = json.dumps(ai_feedback_json)
-    student.coding_insights = str(new_insights)
+    record_submission_insight(submission, new_insights)
+    db.session.flush()
+
+    student.coding_insights = (
+        get_recent_submission_history_text(submission.student_id, limit=10)
+        or "No history."
+    )
+
+    db.session.commit()
+
+
+def save_ai_feedback_failure(submission_id, message):
+    """Stores a safe, student-facing AI feedback failure message."""
+    submission = Submission.query.get(submission_id)
+
+    if not submission:
+        raise ValueError(f"Submission ID {submission_id} not found")
+
+    submission.ai_feedback = json.dumps({
+        "error": message,
+        "insights": [message],
+        "annotations": [],
+    })
 
     db.session.commit()
 
@@ -755,11 +797,6 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
     try:
         print(f"AI_FEEDBACK: Starting for submission {submission_id}", flush=True)
 
-        with open(file_path, "r") as code_file:
-            code_text = code_file.read()
-
-        print("AI_FEEDBACK: Code file loaded", flush=True)
-
         submission, assignment, course, student = fetch_submission_data(submission_id)
 
         print(
@@ -771,7 +808,26 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
             print(f"AI_FEEDBACK: Disabled for submission {submission_id}", flush=True)
             return
 
-        past_insights = student.coding_insights or "No prior insights."
+        try:
+            code_text = extract_submission_source(file_path)
+        except SourceExtractionError as e:
+            print(f"AI_FEEDBACK: Source extraction failed - {e}", flush=True)
+            save_ai_feedback_failure(submission_id, str(e))
+            return
+
+        print("AI_FEEDBACK: Code file loaded", flush=True)
+
+        allowed_inputs = normalize_allowed_inputs(
+            getattr(assignment, "ai_allowed_inputs", None)
+        )
+        submission_history = ""
+        if allowed_inputs["submission_history"]:
+            submission_history = get_recent_submission_history_text(
+                student.id,
+                assignment.id,
+            )
+
+        past_insights = submission_history or "No prior insights."
 
         prompt_config = get_enabled_feedback_prompt(assignment)
         base_prompt = prompt_config.get("prompt") or DEFAULT_FEEDBACK_PROMPT

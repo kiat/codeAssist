@@ -50,6 +50,7 @@ class Assignment(db.Model):
     __tablename__ = "assignments"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
     name = db.Column(db.String, nullable=False)
+    description = db.Column(db.Text, nullable=True)
     course_id = db.Column(UUID(as_uuid=False), db.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     due_date = db.Column(TIMESTAMP(timezone=True), nullable=True)
     anonymous_grading = db.Column(db.Boolean, default=False)
@@ -103,6 +104,21 @@ class Submission(db.Model):
 
     # -- AI Integration Settings -- 
     ai_feedback = db.Column(db.Text, nullable=True)
+
+
+class StudentSubmissionInsight(db.Model):
+    __tablename__ = "student_submission_insights"
+    id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    submission_id = db.Column(UUID(as_uuid=False), db.ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    insights = db.Column(db.JSON, nullable=True)
+    summary = db.Column(db.Text, nullable=True)
+    created_at = db.Column(TIMESTAMP(timezone=True), nullable=False, server_default=db.func.now())
+
+    student = db.relationship("User", backref=db.backref("submission_insights", lazy="dynamic"))
+    assignment = db.relationship("Assignment", backref=db.backref("student_submission_insights", lazy="dynamic"))
+    submission = db.relationship("Submission", backref=db.backref("student_submission_insight", uselist=False))
     
 # Handling multiple submitters for a single submission
 class SubmissionSubmitter(db.Model):
@@ -162,6 +178,32 @@ class CodeDraft(db.Model):
     version_number = db.Column(db.Integer, nullable=False, default=1)
     saved_at = db.Column(TIMESTAMP(timezone=True), nullable=False)
     auto_saved = db.Column(db.Boolean, nullable=False, default=False)
+
+class AIFeedbackRequest(db.Model):
+    __tablename__ = "ai_feedback_requests"
+    id = db.Column(db.String, primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    prompt_id = db.Column(db.String, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    student = db.relationship("User", backref=db.backref("ai_feedback_requests", lazy="dynamic"))
+    assignment = db.relationship("Assignment", backref=db.backref("ai_feedback_requests", lazy="dynamic"))
+
+
+class AIChatMessage(db.Model):
+    __tablename__ = "ai_chat_messages"
+    id = db.Column(db.String, primary_key=True, nullable=False)
+    student_id = db.Column(UUID(as_uuid=False), db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    assignment_id = db.Column(UUID(as_uuid=False), db.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = db.Column(db.String, nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    prompt_id = db.Column(db.String, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    student = db.relationship("User", backref=db.backref("ai_chat_messages", lazy="dynamic"))
+    assignment = db.relationship("Assignment", backref=db.backref("ai_chat_messages", lazy="dynamic"))
+
 
 class AdminEmail(db.Model):
     __tablename__ = 'admin_emails'

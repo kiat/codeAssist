@@ -9,11 +9,17 @@ export default function Assignments() {
   const [courseAssignment, setCourseAssignment] = useState([]);
   const urlParams = useParams();
   const navigate = useNavigate();
-  const { userInfo, courseInfo } = useContext(GlobalContext);
+  const { userInfo, courseInfo, courseRole } = useContext(GlobalContext);
   const [isModalOpen, setModalOpen] = useState(false);
   const [assignmentID, setAssignmentID] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
   const [selectedAssignment, setSelectedAssignment] = useState(null);
+
+  useEffect(() => {
+    if (courseRole && courseRole !== "student") {
+      navigate(`/instructorDashboard/${urlParams.courseId}`);
+    }
+  }, [courseRole, urlParams.courseId, navigate]);
 
   const columns = [
     {
@@ -72,7 +78,8 @@ export default function Assignments() {
             new URLSearchParams({
               student_id: userInfo.id,
               assignment_id: assignment_id,
-            })
+            }),
+          { credentials: "include" }
         );
         const extensionData = await extensionResponse.json();
         return extensionData;
@@ -90,7 +97,8 @@ export default function Assignments() {
       try {
         const assignmentsResponse = await fetch(
           `${process.env.REACT_APP_API_URL}/get_course_assignments?` +
-          new URLSearchParams({ course_id: urlParams.courseId, user_id: userInfo.id, })
+          new URLSearchParams({ course_id: urlParams.courseId }),
+          { credentials: "include" }
         );
         const assignmentsData = await assignmentsResponse.json();
         // The backend is authoritative, but retain client-side filtering as
@@ -105,7 +113,8 @@ export default function Assignments() {
                   new URLSearchParams({
                     student_id: userInfo.id,
                     assignment_id: assignment.id,
-                  })
+                  }),
+                { credentials: "include" }
               );
               const activeData = await activeSubmissions.json();
               const submitted = activeData.completed;
@@ -166,6 +175,9 @@ export default function Assignments() {
 
     // Check if we're in the late submission window
     const inLateWindow = hasLateSubmission && dueDateHasPassed && lateDueDateTime && now.isBefore(lateDueDateTime);
+
+    const canSubmitOnTime = !dueDateHasPassed;
+    const canSubmitLate = inLateWindow;
 
     if (isSubmitted) {
       navigate(`/assignmentresult/${assignment.submissionId}`);

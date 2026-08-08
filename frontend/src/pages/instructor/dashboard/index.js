@@ -84,7 +84,7 @@ export default function InstructorDashboard() {
 
   const fetchData = async (endpoint, params) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}?${new URLSearchParams(params)}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}?${new URLSearchParams(params)}`, { credentials: "include" });
       if (!response.ok) throw new Error('Network response was not ok.');
       return await response.json();
     } catch (error) {

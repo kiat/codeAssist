@@ -9,6 +9,9 @@ import config as config_module
 
 def test_create_app_raises_when_secret_key_is_not_set(monkeypatch):
     monkeypatch.delenv("SECRET_KEY", raising=False)
+    # Prevent load_dotenv() inside create_app from re-loading SECRET_KEY
+    # from a local .env file — we want the variable to stay absent.
+    monkeypatch.setattr(api_module, "load_dotenv", lambda *a, **kw: None)
 
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         api_module.create_app(config_class="config.Config")

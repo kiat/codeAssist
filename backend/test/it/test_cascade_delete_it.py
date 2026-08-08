@@ -80,23 +80,28 @@ def _create_course(client, instructor_id, name="Test Course", entry_code=None):
 
 
 def _enroll_student(client, student_id, course_id):
-    """Helper to enroll a student in a course."""
-    resp = client.post("/create_enrollment", json={
-        "student_id": student_id,
-        "course_id": course_id,
-        "role": "student",
-    })
-    assert resp.status_code == 201, resp.get_json()
+    """Enroll a student directly in the DB (bypasses the instructor/TA-gated API,
+    matching _create_submission_via_api's approach to test setup)."""
+    enrollment = Enrollment(
+        student_id=student_id,
+        course_id=course_id,
+        role="student",
+    )
+    db.session.add(enrollment)
+    db.session.commit()
 
 
 def _create_assignment(client, course_id, name="HW1"):
-    """Helper to create an assignment via the API."""
-    resp = client.post("/create_assignment", json={
-        "name": name,
-        "course_id": course_id,
-    })
-    assert resp.status_code == 200, resp.get_json()
-    return resp.get_json()["id"]
+    """Create an assignment directly in the DB (bypasses the instructor/TA-gated
+    API, matching _create_submission_via_api's approach to test setup)."""
+    assignment = Assignment(
+        id=str(uuid.uuid4()),
+        name=name,
+        course_id=course_id,
+    )
+    db.session.add(assignment)
+    db.session.commit()
+    return assignment.id
 
 
 def _create_submission_via_api(client, assignment_id, student_id):

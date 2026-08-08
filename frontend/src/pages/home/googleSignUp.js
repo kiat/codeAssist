@@ -1,4 +1,4 @@
-import React, { useContext } from 'react'
+import React, { useContext, useState } from 'react'
 import { Button, Form, Input, Modal, Radio } from "antd";
 // import axios from "axios";
 import { GlobalContext } from "../../App";
@@ -7,9 +7,11 @@ import { googleSignUp } from "../../services/user";
 
 function GoogleSignUp({ open, onCancel, googleValues }) {
   const { updateUserInfo } = useContext(GlobalContext);
+  const [selectedRole, setSelectedRole] = useState("student");
 
   const finishSignUp = async (values) => {
     values["credential"] = googleValues.credential;
+    values["role"] = selectedRole;
 
     let res;
     try {
@@ -20,7 +22,9 @@ function GoogleSignUp({ open, onCancel, googleValues }) {
           name: res.data?.name,
           email: googleValues.email,
           id: res.data?.id,
-          isStudent: res.data?.student,
+          isStudent: res.data?.role === "student",
+          isAdmin: res.data?.role === "admin",
+          role: res.data?.role,
         };
 
         localStorage.setItem("userInfo", JSON.stringify(userInfo));
@@ -43,19 +47,21 @@ function GoogleSignUp({ open, onCancel, googleValues }) {
             <Radio.Group
               optionType="button"
               buttonStyle="solid"
+              value={selectedRole}
+              onChange={(event) => setSelectedRole(event.target.value)}
               style={{ display: "flex", width: "100%" }}
             >
-              <Radio.Button
-                value={"instructor"}
-                style={{ flex: 1, textAlign: "center" }}
-              >
-                Instructor
-              </Radio.Button>
               <Radio.Button
                 value={"student"}
                 style={{ flex: 1, textAlign: "center" }}
               >
                 Student
+              </Radio.Button>
+              <Radio.Button
+                value={"instructor"}
+                style={{ flex: 1, textAlign: "center" }}
+              >
+                Instructor
               </Radio.Button>
             </Radio.Group>
           </Form.Item>

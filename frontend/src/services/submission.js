@@ -29,6 +29,10 @@ export async function aiChat(params) {
   return service("ai_chat", params, "post");
 }
 
+export async function aiFeedbackStatus(params) {
+  return service("ai_feedback_status", params);
+}
+
 export async function runCode(params) {
   return service("run_code", params, "post");
 }

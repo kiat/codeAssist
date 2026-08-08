@@ -3,20 +3,22 @@ import { useState, useContext, useEffect } from "react";
 import { GlobalContext } from "../../App";
 import CollapsedSidebar from "./CollapsedSidebar";
 import ExpandedSidebar from "./ExpandedSidebar";
+import { getMyEnrollmentRole } from "../../services/course";
 
 export default function RootSider({ pathname, courseInfo, userInfo, assignmentInfo, onLeaveCourse }) {
   const [collapsed, setCollapsed] = useState(false);
-  const { updateCourseInfo } = useContext(GlobalContext);
-  
+  const { updateCourseInfo, updateCourseRole } = useContext(GlobalContext);
+
   const toggleCollapsed = () => {
     setCollapsed(!collapsed);
   };
 
   useEffect(() => {
     if (courseInfo.id && (!courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode)) {
-      fetch(process.env.REACT_APP_API_URL + "/get_course_info?" + new URLSearchParams({ course_id: courseInfo.id }))
+      fetch(process.env.REACT_APP_API_URL + "/get_course_info?" + new URLSearchParams({ course_id: courseInfo.id }), { credentials: "include" })
         .then((res) => res.json())
         .then((data) => {
+          if (!Array.isArray(data)) return;
           data.forEach((element) => {
             if (element.id === courseInfo.id) {
               updateCourseInfo({
@@ -31,6 +33,16 @@ export default function RootSider({ pathname, courseInfo, userInfo, assignmentIn
         });
     }
   }, [courseInfo, updateCourseInfo]);
+
+  useEffect(() => {
+    if (courseInfo.id && userInfo.id) {
+      // Reset on failure so a role persisted from another course can't leak
+      // into this one; consumers fall back to the account-level role.
+      getMyEnrollmentRole({ course_id: courseInfo.id })
+        .then((res) => updateCourseRole(res.data?.role || ""))
+        .catch(() => updateCourseRole(""));
+    }
+  }, [courseInfo.id, userInfo.id, updateCourseRole]);
 
   return (
     <Layout.Sider

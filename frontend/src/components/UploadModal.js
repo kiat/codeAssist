@@ -46,7 +46,10 @@ export default function UploadModal({
 
   const getActive = async () => {
     try {
-      const submissionResponse = await fetch(`${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${userInfo.id}&assignment_id=${assignmentID}`);
+      const submissionResponse = await fetch(
+        `${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${userInfo.id}&assignment_id=${assignmentID}`,
+        { credentials: "include" }
+      );
       if (!submissionResponse.ok) {
         setActiveSubmission(null);
         setHasRequest(false);
@@ -66,6 +69,7 @@ export default function UploadModal({
         `${process.env.REACT_APP_API_URL}/check_regrade_request`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
@@ -130,6 +134,7 @@ export default function UploadModal({
           `${process.env.REACT_APP_API_URL}/delete_regrade_request`,
           {
             method: "POST",
+            credentials: "include",
             headers: {
               "Content-Type": "application/json",
             },

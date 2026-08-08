@@ -1,14 +1,13 @@
 import { Layout, message, Modal } from "antd";
 import axios from "axios";
 import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import "./setupMocks";
 import Home from "./pages/home";
 import Dashboard from "./pages/dashboard";
 import { createContext, useCallback, useEffect, useState } from "react";
 import Assignments from "./pages/assignments";
 import AssignmentResult from "./pages/result";
 import RootSider from "./components/layout/sider";
-  
-import "./mock";
 import InstructorDashboard from "./pages/instructor/dashboard";
 import CourseSettings from "./pages/instructor/courseSettings";
 import AISettings from "./pages/instructor/aiSettings";
@@ -52,19 +51,24 @@ export const GlobalContext = createContext({
   userInfo: initialUserInfo,
   courseInfo: initialCourseInfo,
   assignmentInfo: initialAssignmentInfo,
+  courseRole: "",
   updateCourseInfo: () => {},
   updateUserInfo: () => {},
   updateAssignmentInfo: () => {},
+  updateCourseRole: () => {},
 });
 
 function App() {
-  const [userInfo, setUserInfo] = useState(() => 
+  const [userInfo, setUserInfo] = useState(() =>
     JSON.parse(localStorage.getItem("userInfo")) || initialUserInfo
   );
-  const [courseInfo, setCourseInfo] = useState(() => 
+  const [courseInfo, setCourseInfo] = useState(() =>
     JSON.parse(localStorage.getItem("courseInfo")) || initialCourseInfo
   );
   const [assignmentInfo, setAssignmentInfo] = useState(initialAssignmentInfo);
+  const [courseRole, setCourseRole] = useState(() =>
+    localStorage.getItem("courseRole") || ""
+  );
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -81,10 +85,16 @@ function App() {
   useEffect(() => {
     localStorage.setItem("courseInfo", JSON.stringify(courseInfo));
   }, [courseInfo]);
+
+  useEffect(() => {
+    localStorage.setItem("courseRole", courseRole);
+  }, [courseRole]);
+
   // Callbacks for updating state, using empty dependencies to ensure they don't change
   const updateCourseInfo = useCallback(info => setCourseInfo(info), []);
   const updateUserInfo = useCallback(info => setUserInfo(info), []);
   const updateAssignmentInfo = useCallback(info => setAssignmentInfo(info), []);
+  const updateCourseRole = useCallback(role => setCourseRole(role), []);
 
   // Redirect to home if not logged in and not on home page
   useEffect(() => {
@@ -114,7 +124,8 @@ function App() {
     <GlobalContext.Provider value={{
       userInfo, updateUserInfo,
       courseInfo, updateCourseInfo,
-      assignmentInfo, updateAssignmentInfo
+      assignmentInfo, updateAssignmentInfo,
+      courseRole, updateCourseRole,
     }}>
 
       <Layout style={{ display: 'flex', height: '100vh', flexDirection: "row" }}>

@@ -180,7 +180,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
 
   const fetchSubmissionDetails = useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`, { credentials: "include" });
       const data = await response.json();
       setStudScore(data.score ?? "UNGRADED");
     } catch (error) {

@@ -72,9 +72,9 @@ describe('<UploadModal />', () => {
 
   it('handles a missing active submission without crashing', async () => {
     fetchMock.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      json: async () => ({ message: 'No such submission found' }),
+      ok: true,
+      status: 200,
+      json: async () => ({ message: 'No active submission found', data: null }),
     });
 
     renderWithContext(<UploadModal {...defaultProps} />);

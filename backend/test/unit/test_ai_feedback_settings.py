@@ -26,6 +26,9 @@ def test_normalize_feedback_prompts_returns_default_prompt_set():
         "explain_runtime_errors",
         "review_code_style",
         "suggest_algorithmic_improvements",
+        "check_code_syntax",
+        "compare_to_optimal_solution",
+        "personalized_feedback",
     ]
     assert all(prompt["enabled"] is True for prompt in prompts)
     assert all(prompt["title"] for prompt in prompts)
@@ -122,6 +125,7 @@ def test_normalize_allowed_inputs_merges_defaults_and_booleans():
         "test_results": True,
         "test_cases": True,
         "student_output": True,
+        "submission_history": True,
     }
 
 
@@ -183,6 +187,7 @@ def test_build_allowed_feedback_context_excludes_unapproved_code_and_outputs():
             "test_results": True,
             "test_cases": False,
             "student_output": False,
+            "submission_history": False,
         },
     )
 
@@ -204,6 +209,7 @@ def test_build_allowed_feedback_context_excludes_unapproved_code_and_outputs():
             "score": 0,
             "output": "student stdout",
         },
+        submission_history="Previous issue with recursion",
     )
 
     rendered = "\n".join(context.values())
@@ -213,7 +219,74 @@ def test_build_allowed_feedback_context_excludes_unapproved_code_and_outputs():
     assert "print('secret implementation')" not in rendered
     assert "expected_output" not in rendered
     assert "student stdout" not in rendered
+    assert "Previous issue with recursion" not in rendered
     assert '"output"' not in context["test_results"]
+
+
+def test_build_allowed_feedback_context_includes_submission_history_when_allowed():
+    assignment = SimpleNamespace(
+        name="Recursion Lab",
+        description="Practice recursive functions.",
+        ai_allowed_inputs={"submission_history": True},
+    )
+
+    context = build_allowed_feedback_context(
+        assignment=assignment,
+        submission_history="Submission one: missed base case",
+    )
+
+    assert context["submission_history"] == "Submission one: missed base case"
+
+
+def test_build_allowed_feedback_context_redacts_hidden_test_details():
+    assignment = SimpleNamespace(
+        name="Edge Case Lab",
+        description="Handle edge cases.",
+        ai_allowed_inputs={
+            "assignment_description": True,
+            "student_code": True,
+            "test_results": True,
+            "test_cases": True,
+            "student_output": True,
+        },
+    )
+
+    context = build_allowed_feedback_context(
+        assignment=assignment,
+        code_text="print('hello')",
+        autograder_results={
+            "tests": [
+                {
+                    "name": "secret empty input",
+                    "status": "failed",
+                    "score": 0,
+                    "max_score": 1,
+                    "visibility": "hidden",
+                    "input": "",
+                    "expected_output": "0",
+                    "output": "Traceback",
+                },
+                {
+                    "name": "public base case",
+                    "status": "passed",
+                    "score": 1,
+                    "max_score": 1,
+                    "visibility": "visible",
+                    "input": "1",
+                    "expected_output": "1",
+                    "output": "1",
+                },
+            ],
+        },
+    )
+
+    rendered_results = context["test_results"]
+
+    assert "Hidden test" in rendered_results
+    assert "secret empty input" not in rendered_results
+    assert "Traceback" not in rendered_results
+    assert "public base case" in rendered_results
+    assert '"expected_output": "1"' in rendered_results
 
 
 def test_serialize_assignment_ai_settings_combines_existing_model_and_feedback_settings():

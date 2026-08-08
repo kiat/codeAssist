@@ -5,23 +5,27 @@ import { CheckCircleOutlined } from '@ant-design/icons';
 import { GlobalContext } from '../App';
 
 function RegradeRequests() {
-  const { userInfo, courseInfo } = useContext(GlobalContext);
+  const { userInfo, courseInfo, courseRole } = useContext(GlobalContext);
+  const isStudent = (courseRole || (userInfo?.isStudent ? "student" : "instructor")) === "student";
   const [requests, setRequests] = useState([]);
 
   useEffect(() => {
     const fetchRequests = async () => {
       try {
         console.log("course info:", courseInfo.id)
-        const endpoint = userInfo.isStudent
+        const endpoint = isStudent
           ? `${process.env.REACT_APP_API_URL}/get_student_regrade_requests?student_id=${userInfo.id}&course_id=${courseInfo.id}`
           : `${process.env.REACT_APP_API_URL}/get_instructor_regrade_requests?course_id=${courseInfo.id}`;
 
-        const response = await fetch(endpoint);
+        const response = await fetch(endpoint, { credentials: "include" });
         const data = await response.json();
         
         // Fetch the latest submission for each regrade request
         const requestsWithSubmissions = await Promise.all(data.map(async (request) => {
-          const submissionResponse = await fetch(`${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${request.studentId}&assignment_id=${request.assignmentId}`);
+          const submissionResponse = await fetch(
+            `${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${request.studentId}&assignment_id=${request.assignmentId}`,
+            { credentials: "include" }
+          );
           // const submissionResponse = await fetch(
           //   `${process.env.REACT_APP_API_URL}/get_latest_submission?student_id=${request.studentId}&assignment_id=${request.assignmentId}`
           // );
@@ -83,7 +87,7 @@ function RegradeRequests() {
       <Card bordered={false}>
         <Table
           dataSource={requests}
-          columns={userInfo.isStudent ? studentColumns : columns}
+          columns={isStudent ? studentColumns : columns}
           rowKey="id"
         />
       </Card>
