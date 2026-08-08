@@ -34,7 +34,7 @@ export default () => {
   // Used to manage form state
   const [form] = Form.useForm();
 
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+  const { courseInfo, updateCourseInfo, userInfo } = useContext(GlobalContext);
 
 
   useEffect(() => {
@@ -52,10 +52,10 @@ export default () => {
   };
 
   const getAssignments = useCallback(() => {
-    getCourseAssignments({ course_id: courseId }).then((res) => {
+    getCourseAssignments({ course_id: courseId, user_id: userInfo.id }).then((res) => {
       setAssignments(res.data);
     });
-  }, [courseId]);
+  }, [courseId, userInfo.id]);
 
   useEffect(() => {
     getAssignments();

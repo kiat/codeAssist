@@ -67,6 +67,7 @@ jest.mock('react-router-dom', () => ({
 const fakeAssignment = {
   id: '1',
   name: 'Homework 1',
+  published: true,
   published_date: '2025-05-28T12:00:00-05:00',
   due_date:       '2099-12-31T23:59:00-06:00',   // far future
   late_due_date:  '2100-01-10T23:59:00-06:00',

@@ -36,8 +36,8 @@ export default function Dashboard() {
   // Function to fetch assignments count for each course
   const getAssignmentsCount = async (courseId) => {
     try {
-      const res = await getCourseAssignments({ course_id: courseId });
-      return res.data.length;
+      const res = await getCourseAssignments({ course_id: courseId, user_id: userInfo.id });
+      return res.data.length; // instructor see total number of assignments
     } catch (error) {
       console.error(`Error fetching assignments for course ${courseId}:`, error);
       return 0; 
@@ -63,7 +63,7 @@ export default function Dashboard() {
     }
 
     return formattedCourses;
-  }, []);
+  }, [userInfo.id, userInfo.isStudent]);
 
   // Function to fetch courses and assignments
   const fetchCourses = useCallback(() => {

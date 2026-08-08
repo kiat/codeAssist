@@ -4,6 +4,8 @@ import csv
 import requests
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
+from datetime import datetime, timezone
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from api import db
 from api.models import (
@@ -24,6 +26,7 @@ from ai_feedback.integration import (
     parse_feedback_json,
 )
 from openai import OpenAI
+from util.auth import require_course_role
 
 course = Blueprint("course", __name__)
 
@@ -633,18 +636,40 @@ def get_course_enrollment():
 @course.route("/get_course_assignments", methods=["GET"])
 def get_course_assignments():
     """
-    /get_course_assignments gets all assignments for a course
+    Return assignments for a course based on the requester's enrollment role.
+    Instructors and TAs receive every assignment.
+    Students receive only assignments that are published and released.
     Requires from the frontend a JSON containing:
     @param course_id        the id of a course
     """
     course_id = request.args.get("course_id")
+
     if not course_id or course_id == "":
         raise BadRequestError("Missing course_id argument")
     
-    assignments = db.session.query(Assignment).filter_by(course_id=course_id).all()
-    assignments = AssignmentSchema().dump(assignments, many=True)
+    _, course_role = require_course_role(
+        course_id,
+        {"student", "ta", "instructor"},
+        "You are not enrolled in this course",
+    )
+    
+    assignments_query = db.session.query(Assignment).filter_by(
+        course_id=course_id
+    )
+    course_role = (course_role or "").lower()
+    if course_role not in {"instructor", "ta"}:
+        now = datetime.now(timezone.utc)
+        assignments_query = assignments_query.filter(
+            Assignment.published.is_(True),
+            or_(
+                Assignment.published_date.is_(None),
+                Assignment.published_date <= now,
+            ),
+        )
+    assignments = assignments_query.all()
+    result = AssignmentSchema().dump(assignments, many=True)
 
-    return jsonify(assignments), 200
+    return jsonify(result), 200
 
 
 @course.route("/get_course_info", methods=["GET"])

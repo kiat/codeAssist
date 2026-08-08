@@ -12,7 +12,7 @@ import styles from "./styles.module.css";
 
 export default () => {
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+  const { courseInfo, userInfo, updateCourseInfo } = useContext(GlobalContext);
   const [assignmentInfoCurrent, setAssignmentInfoCurrent] = useState();
 
   const pathname = window.location.pathname;
@@ -26,6 +26,9 @@ export default () => {
   }, [pathname, updateAssignmentInfo]);
 
   useEffect(() => {
+    if (!courseInfo.id || !userInfo.id || !assignmentId) {
+      return;
+    }
     if (!assignmentInfo.id) {
       updateAssignmentInfo((prevAssignmentInfo) => ({
         ...prevAssignmentInfo,
@@ -35,6 +38,7 @@ export default () => {
     fetch(process.env.REACT_APP_API_URL + "/get_course_assignments?" +
     new URLSearchParams({
       course_id: courseInfo.id,
+      user_id: userInfo.id,
     })
     )
     .then((res) => res.json())
@@ -48,7 +52,7 @@ export default () => {
             }
           })
         );
-    }, [assignmentInfo.id, assignmentInfo.name, updateAssignmentInfo])
+    }, [assignmentInfo.id, assignmentId, assignmentInfo.name, courseInfo.id, userInfo.id, updateAssignmentInfo])
   
   return (
     <>

@@ -2,6 +2,7 @@ import pytest
 from api import create_app
 from util.errors import BadRequestError, ConflictError, NotFoundError, InternalProcessingError
 from routes.course import allowed_file, create_enrollment_bulk
+from util.errors import ForbiddenError
 
 @pytest.fixture
 def app():
@@ -437,20 +438,64 @@ def test_get_course_enrollment_missing_course_id(client):
     assert response.json["message"] == "Missing course_id argument"
 
 def test_get_course_assignments_success(client, mocker):
+    mocker.patch(
+        "routes.course.require_course_role",
+        return_value=(mocker.Mock(), "instructor"),
+    )
     mock_query = mocker.patch("routes.course.db.session.query")
-    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(id="assignment-1", name="Assignment 1")]
+    assignment_query = mocker.Mock()
+    mock_query.return_value = assignment_query
+    mock_assignments = [mocker.Mock(id="44444444-4444-4444-4444-444444444444", name="Assignment 1")]
+    assignment_query.filter_by.return_value.all.return_value = mock_assignments
     mock_schema = mocker.patch("routes.course.AssignmentSchema")
-    mock_schema.return_value.dump.return_value = [{"id": "assignment-1", "name": "Assignment 1"}]
-
-    response = client.get("/get_course_assignments", query_string={"course_id": "course-123"})
-
+    mock_schema.return_value.dump.return_value = [{"id": "44444444-4444-4444-4444-444444444444", "name": "Assignment 1"}]
+    response = client.get("/get_course_assignments", query_string={"course_id": "22222222-2222-2222-2222-222222222222",},)
     assert response.status_code == 200
-    assert response.json == [{"id": "assignment-1", "name": "Assignment 1"}]
+    assert response.json == [{"id": "44444444-4444-4444-4444-444444444444", "name": "Assignment 1"}]
+     # Instructors should receive the unfiltered assignment query.
+    assignment_query.filter_by.return_value.filter.assert_not_called()
 
 def test_get_course_assignments_missing_course_id(client):
     response = client.get("/get_course_assignments")
     assert response.status_code == 400
     assert response.json["message"] == "Missing course_id argument"
+
+def test_get_course_assignments_student_only_receives_visible_assignments(client, mocker):
+    course_id = "22222222-2222-2222-2222-222222222222"
+    mocker.patch(
+        "routes.course.require_course_role",
+        return_value=(mocker.Mock(), "student"),
+    )
+    mock_query = mocker.patch("routes.course.db.session.query")
+    assignment_query = mocker.Mock()
+    mock_query.return_value = assignment_query
+    visible_assignment = mocker.Mock(id="44444444-4444-4444-4444-444444444444", name="Published Assignment", published=True)
+    # The mocked database filter represents exclusion of unpublished and
+    # future-scheduled assignments.
+    assignment_query.filter_by.return_value.filter.return_value.all.return_value = [visible_assignment]
+
+    mock_schema = mocker.patch("routes.course.AssignmentSchema")
+    mock_schema.return_value.dump.return_value = [{"id": "44444444-4444-4444-4444-444444444444", "name": "Published Assignment", "published": True}]
+
+    response = client.get("/get_course_assignments", query_string={"course_id": course_id,})
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data == [{"id": "44444444-4444-4444-4444-444444444444", "name": "Published Assignment", "published": True}]
+    assignment_query.filter_by.return_value.filter.assert_called_once()
+
+def test_get_course_assignments_non_enrolled_user_returns_403(client,mocker):
+    mocker.patch(
+        "routes.course.require_course_role",
+        side_effect=ForbiddenError("You are not enrolled in this course"),
+    )
+    response = client.get(
+        "/get_course_assignments",
+        query_string={
+            "course_id": "22222222-2222-2222-2222-222222222222",
+        },
+    )
+    assert response.status_code == 403
+    assert response.json["message"] == ( "You are not enrolled in this course")
 
 def test_get_course_info_success(client, mocker):
     mock_query = mocker.patch("routes.course.db.session.query")

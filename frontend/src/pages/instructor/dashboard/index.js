@@ -8,6 +8,7 @@ import {
   Progress,
   Space,
   Table,
+  Tag,
 } from "antd";
 import { texts } from "./constant";
 import TextItem from "./TextItem";
@@ -16,7 +17,9 @@ import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
 import { GlobalContext } from "../../../App";
 import { useEffect, useState } from "react";
+import { getPublishStatus, publishStatusOrder, publishStatusLabels,} from "../../../common/assignmentVisibility";
 //for now change this to a course_id you have in the database
+
 const columns = [
   {
     title: "ACTIVE ASSIGNMENTS",
@@ -52,12 +55,20 @@ const columns = [
   {
     title: "PUBLISHED",
     dataIndex: "published",
-    sorter: (a, b) => a.published - b.published,
-    render: (text) => (
-      <Button type={text ? "primary" : "default"} shape="circle" size="small">
-        {" "}
-      </Button>
-    ),
+    sorter: (a, b) => publishStatusOrder[getPublishStatus(a)] - publishStatusOrder[getPublishStatus(b)],
+    render: (_, record) => {
+      const status = getPublishStatus(record);
+      const colors = {
+        published: "green",
+        scheduled: "blue",
+        unpublished: "default",
+      };
+      return (
+        <Tag color={colors[status]}>
+          {publishStatusLabels[status]}
+        </Tag>
+      );
+    },
   },
   {
     title: "REGRADES",
@@ -82,8 +93,11 @@ export default function InstructorDashboard() {
   };
   
   useEffect(() => {
+    if (!userInfo.id) {
+      return;
+    }
     const initFetch = async () => {
-      const assignmentsData = await fetchData("/get_course_assignments", { course_id: courseId });
+      const assignmentsData = await fetchData("/get_course_assignments", { course_id: courseId, user_id: userInfo.id });
       setData(assignmentsData);
       
       if (!courseInfo.id || !courseInfo.name || !courseInfo.year || !courseInfo.semester || !courseInfo.entryCode || !courseInfo.description) {
@@ -95,7 +109,7 @@ export default function InstructorDashboard() {
       }
     };
     initFetch();
-  }, [courseId, courseInfo.id, courseInfo.name, courseInfo.year, courseInfo.semester, courseInfo.entryCode, courseInfo.description, updateCourseInfo]);
+  }, [courseId, userInfo.id, courseInfo.id, courseInfo.name, courseInfo.year, courseInfo.semester, courseInfo.entryCode, courseInfo.description, updateCourseInfo]);
 
   if (!courseInfo.id) return null;
 
