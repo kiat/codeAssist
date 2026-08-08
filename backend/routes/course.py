@@ -26,6 +26,7 @@ from ai_feedback.integration import (
     parse_feedback_json,
 )
 from openai import OpenAI
+from util.auth import require_course_role
 
 course = Blueprint("course", __name__)
 
@@ -642,31 +643,20 @@ def get_course_assignments():
     @param course_id        the id of a course
     """
     course_id = request.args.get("course_id")
-    user_id = request.args.get("user_id")
+
     if not course_id or course_id == "":
         raise BadRequestError("Missing course_id argument")
-    if not user_id:
-        raise BadRequestError("Missing user_id argument")
     
-    # Validate UUID format
-    try:
-        user_id = str(uuid.UUID(user_id))
-    except (ValueError, TypeError, AttributeError):
-        raise BadRequestError("Invalid user_id format")
-    enrollment = (
-        db.session.query(Enrollment)
-        .filter_by(
-            course_id=course_id,
-            student_id=user_id,
-        )
-        .first()
+    _, course_role = require_course_role(
+        course_id,
+        {"student", "ta", "instructor"},
+        "You are not enrolled in this course",
     )
-    if not enrollment:
-        raise ForbiddenError("User is not enrolled in this course")
+    
     assignments_query = db.session.query(Assignment).filter_by(
         course_id=course_id
     )
-    course_role = (enrollment.role or "").lower()
+    course_role = (course_role or "").lower()
     if course_role not in {"instructor", "ta"}:
         now = datetime.now(timezone.utc)
         assignments_query = assignments_query.filter(

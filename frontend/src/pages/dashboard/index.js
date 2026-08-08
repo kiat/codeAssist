@@ -12,7 +12,6 @@ import {
   getCourseAssignments,
 } from "../../services/course";
 import {  message } from "antd";
-import { isAssignmentVisible } from "../../common/assignmentVisibility";
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [courses, setCourses] = useState({});
