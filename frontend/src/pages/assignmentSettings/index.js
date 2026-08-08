@@ -52,7 +52,8 @@ export default () => {
   const [assignmentModels, setAssignmentModels] = useState([]);
   const [assignmentModelsLoading, setAssignmentModelsLoading] = useState(false);
 
-  const { updateAssignmentInfo } = useContext(GlobalContext);
+  const { updateAssignmentInfo, courseRole } = useContext(GlobalContext);
+  const isInstructor = courseRole === "instructor";
   const navigate = useNavigate();
 
   const useCourseAiDefault = Form.useWatch("use_course_ai_default", form);
@@ -596,29 +597,33 @@ export default () => {
                 Save
               </Button>
 
-              <Popconfirm
-                title="Are you sure you want to delete this assignment?"
-                onConfirm={() => handleDeleteAssignment(assignmentId).then(navigateMainPage)}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Button danger type="primary" icon={<DeleteOutlined />}>
-                  Delete Assignment
-                </Button>
-              </Popconfirm>
+              {isInstructor && (
+                <>
+                  <Popconfirm
+                    title="Are you sure you want to delete this assignment?"
+                    onConfirm={() => handleDeleteAssignment(assignmentId).then(navigateMainPage)}
+                    okText="Yes"
+                    cancelText="No"
+                  >
+                    <Button danger type="primary" icon={<DeleteOutlined />}>
+                      Delete Assignment
+                    </Button>
+                  </Popconfirm>
 
-              <Popconfirm
-                title="Are you sure you want to delete all submissions?"
-                onConfirm={() => {
-                  handleDeleteSubmissions(assignmentId);
-                }}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Button danger type="primary" icon={<DeleteOutlined />}>
-                  Delete All Submissions
-                </Button>
-              </Popconfirm>
+                  <Popconfirm
+                    title="Are you sure you want to delete all submissions?"
+                    onConfirm={() => {
+                      handleDeleteSubmissions(assignmentId);
+                    }}
+                    okText="Yes"
+                    cancelText="No"
+                  >
+                    <Button danger type="primary" icon={<DeleteOutlined />}>
+                      Delete All Submissions
+                    </Button>
+                  </Popconfirm>
+                </>
+              )}
             </Space>
           </Form.Item>
         </Card>
