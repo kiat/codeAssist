@@ -1,5 +1,4 @@
 import { Layout, message, Modal } from "antd";
-import axios from "axios";
 import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import "./setupMocks";
 import Home from "./pages/home";
@@ -14,11 +13,8 @@ import AISettings from "./pages/instructor/aiSettings";
 import InstructorAssignments from "./pages/instructor/assignments";
 import Enrollment from "./pages/instructor/enrollment";
 import ReviewGrades from "./pages/reviewGrades";
-import EditOutline from "./pages/editOutline";
 import ConfigureAutograder from "./pages/configureAutograder";
-import CreateRubric from "./pages/createRubric";
 import ManageSubmissions from "./pages/manageSubmissions";
-import GradeSubmissions from "./pages/gradeSubmissions";
 import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";
@@ -51,19 +47,24 @@ export const GlobalContext = createContext({
   userInfo: initialUserInfo,
   courseInfo: initialCourseInfo,
   assignmentInfo: initialAssignmentInfo,
+  courseRole: "",
   updateCourseInfo: () => {},
   updateUserInfo: () => {},
   updateAssignmentInfo: () => {},
+  updateCourseRole: () => {},
 });
 
 function App() {
-  const [userInfo, setUserInfo] = useState(() => 
+  const [userInfo, setUserInfo] = useState(() =>
     JSON.parse(localStorage.getItem("userInfo")) || initialUserInfo
   );
-  const [courseInfo, setCourseInfo] = useState(() => 
+  const [courseInfo, setCourseInfo] = useState(() =>
     JSON.parse(localStorage.getItem("courseInfo")) || initialCourseInfo
   );
   const [assignmentInfo, setAssignmentInfo] = useState(initialAssignmentInfo);
+  const [courseRole, setCourseRole] = useState(() =>
+    localStorage.getItem("courseRole") || ""
+  );
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -80,10 +81,16 @@ function App() {
   useEffect(() => {
     localStorage.setItem("courseInfo", JSON.stringify(courseInfo));
   }, [courseInfo]);
+
+  useEffect(() => {
+    localStorage.setItem("courseRole", courseRole);
+  }, [courseRole]);
+
   // Callbacks for updating state, using empty dependencies to ensure they don't change
   const updateCourseInfo = useCallback(info => setCourseInfo(info), []);
   const updateUserInfo = useCallback(info => setUserInfo(info), []);
   const updateAssignmentInfo = useCallback(info => setAssignmentInfo(info), []);
+  const updateCourseRole = useCallback(role => setCourseRole(role), []);
 
   // Redirect to home if not logged in and not on home page
   useEffect(() => {
@@ -113,7 +120,8 @@ function App() {
     <GlobalContext.Provider value={{
       userInfo, updateUserInfo,
       courseInfo, updateCourseInfo,
-      assignmentInfo, updateAssignmentInfo
+      assignmentInfo, updateAssignmentInfo,
+      courseRole, updateCourseRole,
     }}>
 
       <Layout style={{ display: 'flex', height: '100vh', flexDirection: "row" }}>

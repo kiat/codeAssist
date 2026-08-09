@@ -8,7 +8,7 @@ import { GlobalContext } from "../../App";
 import { Link, useNavigate} from "react-router-dom";
 
 export default function AccountPopoverContent() {
-  const { updateUserInfo } = useContext(GlobalContext);
+  const { updateUserInfo, updateCourseRole } = useContext(GlobalContext);
   const navigate = useNavigate();
   const userInfo = JSON.parse(localStorage.getItem("userInfo"));
   const userId = userInfo?.id;
@@ -44,7 +44,9 @@ export default function AccountPopoverContent() {
         }}
         onClick={() => {
           localStorage.removeItem("userInfo");
+          localStorage.removeItem("courseRole");
           updateUserInfo(null);
+          updateCourseRole("");
           navigate('/');
         }}
       >

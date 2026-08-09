@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Card, Descriptions, PageHeader, Table, Typography, message } from 'antd';
+import { Link } from 'react-router-dom';
+import { Card, PageHeader, Table, message } from 'antd';
 import { CheckCircleOutlined } from '@ant-design/icons';
 import { GlobalContext } from '../App';
 
 function RegradeRequests() {
-  const { userInfo, courseInfo } = useContext(GlobalContext);
+  const { userInfo, courseInfo, courseRole } = useContext(GlobalContext);
+  const isStudent = (courseRole || (userInfo?.isStudent ? "student" : "instructor")) === "student";
   const [requests, setRequests] = useState([]);
 
   useEffect(() => {
     const fetchRequests = async () => {
       try {
         console.log("course info:", courseInfo.id)
-        const endpoint = userInfo.isStudent
+        const endpoint = isStudent
           ? `${process.env.REACT_APP_API_URL}/get_student_regrade_requests?student_id=${userInfo.id}&course_id=${courseInfo.id}`
           : `${process.env.REACT_APP_API_URL}/get_instructor_regrade_requests?course_id=${courseInfo.id}`;
 
@@ -43,7 +44,7 @@ function RegradeRequests() {
       }
     };
     fetchRequests();
-  }, [userInfo]);
+  }, [courseInfo.id, isStudent, userInfo.id]);
 
   const columns = [
     {
@@ -86,7 +87,7 @@ function RegradeRequests() {
       <Card bordered={false}>
         <Table
           dataSource={requests}
-          columns={userInfo.isStudent ? studentColumns : columns}
+          columns={isStudent ? studentColumns : columns}
           rowKey="id"
         />
       </Card>

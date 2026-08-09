@@ -23,8 +23,9 @@ import {
   Typography,
   message,
 } from "antd";
-import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useCallback, useContext, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { GlobalContext } from "../../../App";
 import {
   getCourseInfo,
   updateAiSettings,
@@ -49,7 +50,15 @@ const FEEDBACK_STYLES = [
 
 export default function AISettings() {
   const { courseId } = useParams();
+  const navigate = useNavigate();
+  const { courseRole } = useContext(GlobalContext);
   const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (courseRole && courseRole !== "instructor") {
+      navigate(`/instructorDashboard/${courseId}`);
+    }
+  }, [courseRole, courseId, navigate]);
 
   const [provider, setProvider] = useState("openai");
   const [apiKey, setApiKey] = useState("");

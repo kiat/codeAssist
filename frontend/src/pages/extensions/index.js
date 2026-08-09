@@ -57,7 +57,7 @@ export default () => {
     console.log("ID", record.id);
     const response = await fetch(
       `${process.env.REACT_APP_API_URL}/delete_extension?extension_id=${record.id}`,
-      { method: "DELETE" }
+      { method: "DELETE", credentials: "include" }
     );
     if (response.ok) {
       setForceUpdate((u) => u + 1);
@@ -71,14 +71,16 @@ export default () => {
     const fetchAssignmentExtensions = async () => {
       try {
         const extensionsResponse = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_assignment_extensions?assignment_id=${assignmentId}`
+          `${process.env.REACT_APP_API_URL}/get_assignment_extensions?assignment_id=${assignmentId}`,
+          { credentials: "include" }
         );
         const extensionsData = await extensionsResponse.json();
         const updatedExtensions = await Promise.all(
           extensionsData.map(async (extension) => {
             try {
               const student = await fetch(
-                `${process.env.REACT_APP_API_URL}/get_user_by_id?id=${extension.student_id}`
+                `${process.env.REACT_APP_API_URL}/get_user_by_id?id=${extension.student_id}`,
+                { credentials: "include" }
               );
               const studentData = await student.json();
               return {
@@ -100,7 +102,8 @@ export default () => {
     const fetchCourseStudents = async () => {
       try {
         const studentsResponse = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`
+          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`,
+          { credentials: "include" }
         );
         const studentsData = await studentsResponse.json();
         setCourseStudents(studentsData);
@@ -113,7 +116,8 @@ export default () => {
     const fetchAssignmentDetails = async () => {
       try {
         const assignmentResponse = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`
+          `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`,
+          { credentials: "include" }
         );
         const assignmentData = await assignmentResponse.json();
         setAssignmentInfo(assignmentData);
@@ -123,7 +127,7 @@ export default () => {
       }
     };
     fetchAssignmentDetails();
-  }, [courseInfo.id, forceUpdate]);
+  }, [assignmentId, courseInfo.id, forceUpdate]);
   const [extensionModalOpen, setExtensionModalOpen] = useState(false);
 
   const toggleExtensionModalOpen = useCallback(() => {

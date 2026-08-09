@@ -1,7 +1,6 @@
 import {
   Button,
   Card,
-  Input,
   PageHeader,
   Space,
   Table,
@@ -39,7 +38,7 @@ const SubmissionsManager = () => {
   const deleteSubmission = async (record) => {
     const response = await fetch(
       `${process.env.REACT_APP_API_URL}/delete_submission?submission_id=${record.id}`,
-      { method: "DELETE" }
+      { method: "DELETE", credentials: "include" }
     );
     if (response.ok) {
       // Increment forceUpdate to trigger a re-fetch of submissions
@@ -101,7 +100,8 @@ const SubmissionsManager = () => {
       try {
         if (assignmentId) {
           const response = await fetch(
-            `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`
+            `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`,
+            { credentials: "include" }
           );
           if (!response.ok) throw new Error("Failed to fetch assignment");
           const data = await response.json();
@@ -123,7 +123,8 @@ const SubmissionsManager = () => {
   useEffect(() => {
     const fetchStudents = async () => {
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`
+        `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`,
+        { credentials: "include" }
       );
       const students = await response.json();
       if (students && students.length > 0) {

@@ -6,11 +6,8 @@ import {
   Divider,
   PageHeader,
   Progress,
-  Space,
   Table,
 } from "antd";
-import { texts } from "./constant";
-import TextItem from "./TextItem";
 import moment from "moment";
 import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
@@ -69,11 +66,11 @@ const columns = [
 export default function InstructorDashboard() {
   const { courseId } = useParams();
   const [data, setData] = useState([]);
-  const { courseInfo, updateCourseInfo, userInfo } = useContext(GlobalContext);
+  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
 
   const fetchData = async (endpoint, params) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}?${new URLSearchParams(params)}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}?${new URLSearchParams(params)}`, { credentials: "include" });
       if (!response.ok) throw new Error('Network response was not ok.');
       return await response.json();
     } catch (error) {

@@ -1,28 +1,17 @@
-import { DeleteOutlined, EyeTwoTone, EyeInvisibleOutlined } from "@ant-design/icons";
+import { EyeTwoTone, EyeInvisibleOutlined } from "@ant-design/icons";
 import {
   Button,
   Card,
-  Checkbox,
-  Col,
   Form,
   Input,
   PageHeader,
-  Popover,
-  Radio,
-  Row,
-  Select,
   Space,
-  Typography,
-  Modal
 } from "antd";
-import { useEffect, useState, useCallback } from "react";
-import { useContext } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { GlobalContext } from "../../App";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default () => {
     const userId = JSON.parse(localStorage.getItem("userInfo"))?.id;
-    const isStudent = JSON.parse(localStorage.getItem("userInfo"))?.isStudent;
     const [formData, setFormData] = useState({});
     const [placeholders, setPlaceholders] = useState({});
     const [passwordVisible, setPasswordVisible] = useState(false); // State for password visibility

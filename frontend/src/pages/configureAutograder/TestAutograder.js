@@ -1,13 +1,9 @@
 import { useState } from "react";
 import { Button, Form, Modal, Radio, Select, Typography, Upload, message } from "antd";
-import { useNavigate } from "react-router-dom";
 
 export default ({ open, onCancel, autograderFile, onSuccess }) => {
   const [uploadedSubmission, setUploadedSubmission] = useState(null);
-  const [uploadedAutograder, setUploadedAutograder] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  const navigate = useNavigate();
 
   const handleTestAutograder = async () => {
     if (!uploadedSubmission || !autograderFile) {
@@ -27,6 +23,7 @@ export default ({ open, onCancel, autograderFile, onSuccess }) => {
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/test_autograder_submission`, {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
 

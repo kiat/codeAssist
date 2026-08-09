@@ -180,16 +180,17 @@ def test_enroll_course_invalid_code(client, mocker):
     assert response.status_code == 404
     assert response.json["message"] == "Course with the provided entry code does not exist"
 
-def test_update_course_success(client, mocker):
+def test_update_course_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
-    # Mock the query object and its methods
     mock_query_instance = mocker.Mock()
     mock_query.return_value.filter_by.return_value = mock_query_instance
     mock_query_instance.update = mocker.Mock()
-
     mock_query.return_value.filter_by.return_value.first.return_value = None  # No duplicate entryCode
+
+    login_as("instructor-uuid")
 
     payload = {
         "course_id": "course-123",
@@ -209,9 +210,12 @@ def test_update_course_success(client, mocker):
     mock_commit.assert_called_once()
 
 
-def test_update_course_duplicate_entry_code(client, mocker):
+def test_update_course_duplicate_entry_code(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.first.return_value = mocker.Mock(id="different-course-id")  # Duplicate entryCode
+
+    login_as("instructor-uuid")
 
     payload = {
         "course_id": "course-123",
@@ -228,15 +232,18 @@ def test_update_course_duplicate_entry_code(client, mocker):
     assert response.status_code == 409
     assert response.json["message"] == "Course with the provided entry code already exists"
 
-def test_delete_course_success(client, mocker):
+def test_delete_course_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_delete = mocker.patch("routes.course.db.session.delete")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         mocker.Mock(),  # Course exists
         None            # No assignments
     ]
+
+    login_as("instructor-uuid")
 
     response = client.delete("/delete_course", query_string={"course_id": "course-123"})
 
@@ -246,23 +253,29 @@ def test_delete_course_success(client, mocker):
     mock_commit.assert_called()
 
 
-def test_delete_course_with_assignments(client, mocker):
+def test_delete_course_with_assignments(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         mocker.Mock(),  # Course exists
         mocker.Mock()   # Assignments exist
     ]
+
+    login_as("instructor-uuid")
 
     response = client.delete("/delete_course", query_string={"course_id": "course-123"})
 
     assert response.status_code == 409
     assert response.json["message"] == "Cannot delete course with assignments"
 
-def test_delete_all_assignments_success(client, mocker):
+def test_delete_all_assignments_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(id="assignment-1")]
+
+    login_as("instructor-uuid")
 
     response = client.delete("/delete_all_assignments", query_string={"course_id": "course-123"})
 
@@ -271,21 +284,27 @@ def test_delete_all_assignments_success(client, mocker):
     mock_commit.assert_called()
 
 
-def test_delete_all_assignments_not_found(client, mocker):
+def test_delete_all_assignments_not_found(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.all.return_value = []
+
+    login_as("instructor-uuid")
 
     response = client.delete("/delete_all_assignments", query_string={"course_id": "course-123"})
 
     assert response.status_code == 404
     assert response.json["message"] == "No assignments found for this course"
 
-def test_create_enrollment_success(client, mocker):
+def test_create_enrollment_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_add = mocker.patch("routes.course.db.session.add")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_query.return_value.filter_by.return_value.first.return_value = None  # No existing enrollment
+
+    login_as("instructor-uuid")
 
     payload = {
         "student_id": "student-123",
@@ -299,9 +318,12 @@ def test_create_enrollment_success(client, mocker):
     mock_add.assert_called_once()
     mock_commit.assert_called_once()
 
-def test_create_enrollment_already_enrolled(client, mocker):
+def test_create_enrollment_already_enrolled(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     mock_query.return_value.filter_by.return_value.first.return_value = mocker.Mock()  # Already enrolled
+
+    login_as("instructor-uuid")
 
     payload = {
         "student_id": "student-123",
@@ -313,34 +335,143 @@ def test_create_enrollment_already_enrolled(client, mocker):
     assert response.status_code == 409
     assert response.json["message"] == "User is already enrolled in this course"
 
-def test_update_role_success(client, mocker):
+def test_create_enrollment_unauthenticated(client):
+    response = client.post("/create_enrollment", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+    })
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+def test_create_enrollment_student_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+    response = client.post("/create_enrollment", json={
+        "student_id": "other-student",
+        "course_id": "course-123",
+    })
+    assert response.status_code == 403
+    assert "Only instructors" in response.json["message"]
+
+def test_create_enrollment_invalid_role(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+    response = client.post("/create_enrollment", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "role": "superadmin",
+    })
+    assert response.status_code == 400
+    assert "Invalid role" in response.json["message"]
+
+def test_create_enrollment_ta_can_add_student(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.db.session.add")
+    mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    login_as("ta-uuid")
+
+    response = client.post("/create_enrollment", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "role": "student",
+    })
+
+    assert response.status_code == 201
+
+def test_create_enrollment_ta_cannot_add_ta_or_instructor(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+    login_as("ta-uuid")
+
+    response = client.post("/create_enrollment", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "role": "ta",
+    })
+
+    assert response.status_code == 403
+    assert "Only instructors can assign a role other than student" in response.json["message"]
+
+def test_update_role_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     enrollment = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = enrollment
 
+    login_as("instructor-uuid")
+
     payload = {
         "student_id": "student-123",
         "course_id": "course-123",
-        "new_role": "TA"
+        "new_role": "TA",
     }
 
     response = client.post("/update_role", json=payload)
 
     assert response.status_code == 200
-    assert response.json["role"] == "TA"
-    assert enrollment.role == "TA"
+    assert response.json["role"] == "ta"
+    assert enrollment.role == "ta"
     mock_commit.assert_called_once()
 
-def test_update_role_not_found(client, mocker):
+def test_update_role_cannot_demote_other_instructor(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mock_query.return_value.filter_by.return_value.first.return_value = None  # Enrollment not found
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    enrollment = mocker.Mock()
+    enrollment.role = "instructor"
+    mock_query.return_value.filter_by.return_value.first.return_value = enrollment
+
+    login_as("instructor-uuid")
+
+    payload = {
+        "student_id": "other-instructor-uuid",
+        "course_id": "course-123",
+        "new_role": "ta",
+    }
+
+    response = client.post("/update_role", json=payload)
+
+    assert response.status_code == 403
+    assert "cannot demote another instructor" in response.json["message"]
+
+def test_update_role_promote_to_instructor_success(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    enrollment = mocker.Mock()
+    enrollment.role = "student"
+    mock_query.return_value.filter_by.return_value.first.return_value = enrollment
+
+    login_as("instructor-uuid")
 
     payload = {
         "student_id": "student-123",
         "course_id": "course-123",
-        "new_role": "TA"
+        "new_role": "instructor",
+    }
+
+    response = client.post("/update_role", json=payload)
+
+    assert response.status_code == 200
+    assert enrollment.role == "instructor"
+    mock_commit.assert_called_once()
+
+def test_update_role_not_found(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    mock_query.return_value.filter_by.return_value.first.return_value = None  # Enrollment not found
+
+    login_as("instructor-uuid")
+
+    payload = {
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "new_role": "TA",
     }
 
     response = client.post("/update_role", json=payload)
@@ -350,7 +481,7 @@ def test_update_role_not_found(client, mocker):
 
 import io
 
-def test_create_enrollment_csv_success(client, mocker):
+def test_create_enrollment_csv_success(client, mocker, login_as):
     file_content = "Email\nstudent1@test.com\nstudent2@test.com"
     mock_file = (io.BytesIO(file_content.encode()), "students.csv")
 
@@ -361,6 +492,7 @@ def test_create_enrollment_csv_success(client, mocker):
 
     mock_query = mocker.patch("routes.course.User.query")
     mock_query.filter_by.return_value.first.side_effect = [mock_user_1, mock_user_2]
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mocker.patch("routes.course.allowed_file", return_value=True)
     mocker.patch("routes.course.os.path.exists", return_value=False)
@@ -368,6 +500,8 @@ def test_create_enrollment_csv_success(client, mocker):
     mocker.patch("routes.course.os.remove")
     mock_open = mocker.patch("builtins.open", mocker.mock_open(read_data=file_content))
     mock_create_bulk = mocker.patch("routes.course.create_enrollment_bulk", return_value={"failed_enrollments": []})
+
+    login_as("instructor-uuid")
 
     data = {
         "file": mock_file,
@@ -382,7 +516,7 @@ def test_create_enrollment_csv_success(client, mocker):
     mock_create_bulk.assert_called_once_with({
         "course_id": "course-123",
         "student_ids": ["uuid-1", "uuid-2"],
-        "role": "student"
+        "roles": {"uuid-1": "student", "uuid-2": "student"},
     })
 
 
@@ -391,26 +525,162 @@ def test_create_enrollment_csv_missing_file(client, mocker):
     assert response.status_code == 400
     assert response.json["message"] == "Missing file part"
 
-def test_get_user_enrollments_success(client, mocker):
+def test_create_enrollment_csv_unauthenticated(client, mocker):
+    file_content = "Email\nstudent1@test.com"
+    mock_file = (io.BytesIO(file_content.encode()), "students.csv")
+    mocker.patch("routes.course.allowed_file", return_value=True)
+
+    response = client.post(
+        "/create_enrollment_csv",
+        data={"file": mock_file, "course_id": "course-123"},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+def test_create_enrollment_csv_student_forbidden(client, mocker, login_as):
+    file_content = "Email\nstudent1@test.com"
+    mock_file = (io.BytesIO(file_content.encode()), "students.csv")
+    mocker.patch("routes.course.allowed_file", return_value=True)
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+
+    login_as("student-uuid")
+
+    response = client.post(
+        "/create_enrollment_csv",
+        data={"file": mock_file, "course_id": "course-123"},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.json["message"]
+
+def test_create_enrollment_csv_ta_per_row_cap(client, mocker, login_as):
+    file_content = "Email,Role\nstudent1@test.com,student\nstudent2@test.com,ta"
+    mock_file = (io.BytesIO(file_content.encode()), "students.csv")
+
+    mock_user_1 = mocker.Mock()
+    mock_user_1.id = "uuid-1"
+    mock_user_2 = mocker.Mock()
+    mock_user_2.id = "uuid-2"
+
+    mock_query = mocker.patch("routes.course.User.query")
+    mock_query.filter_by.return_value.first.side_effect = [mock_user_1, mock_user_2]
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+
+    mocker.patch("routes.course.allowed_file", return_value=True)
+    mocker.patch("routes.course.os.path.exists", return_value=False)
+    mocker.patch("routes.course.os.makedirs")
+    mocker.patch("routes.course.os.remove")
+    mocker.patch("builtins.open", mocker.mock_open(read_data=file_content))
+    mock_create_bulk = mocker.patch("routes.course.create_enrollment_bulk", return_value={"failed_enrollments": []})
+
+    login_as("ta-uuid")
+
+    response = client.post(
+        "/create_enrollment_csv",
+        data={"file": mock_file, "course_id": "course-123"},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    mock_create_bulk.assert_called_once_with({
+        "course_id": "course-123",
+        "student_ids": ["uuid-1"],
+        "roles": {"uuid-1": "student"},
+    })
+    assert {"email": "student2@test.com", "reason": "Only instructors can assign a role other than student"} in response.json["failed_enrollments"]
+
+def test_create_enrollment_csv_per_row_roles(client, mocker, login_as):
+    file_content = "Email,Role\nstudent1@test.com,ta\nstudent2@test.com,student"
+    mock_file = (io.BytesIO(file_content.encode()), "students.csv")
+
+    mock_user_1 = mocker.Mock()
+    mock_user_1.id = "uuid-1"
+    mock_user_2 = mocker.Mock()
+    mock_user_2.id = "uuid-2"
+
+    mock_query = mocker.patch("routes.course.User.query")
+    mock_query.filter_by.return_value.first.side_effect = [mock_user_1, mock_user_2]
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    mocker.patch("routes.course.allowed_file", return_value=True)
+    mocker.patch("routes.course.os.path.exists", return_value=False)
+    mocker.patch("routes.course.os.makedirs")
+    mocker.patch("routes.course.os.remove")
+    mocker.patch("builtins.open", mocker.mock_open(read_data=file_content))
+    mock_create_bulk = mocker.patch("routes.course.create_enrollment_bulk", return_value={"failed_enrollments": []})
+
+    login_as("instructor-uuid")
+
+    response = client.post(
+        "/create_enrollment_csv",
+        data={"file": mock_file, "course_id": "course-123"},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    mock_create_bulk.assert_called_once_with({
+        "course_id": "course-123",
+        "student_ids": ["uuid-1", "uuid-2"],
+        "roles": {"uuid-1": "ta", "uuid-2": "student"},
+    })
+
+def test_get_user_enrollments_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
-    mock_query.return_value.filter_by.return_value = [mocker.Mock(course_id="course-123")]
+    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(course_id="course-123", role="student")]
     mock_query.return_value.filter.return_value = [mocker.Mock(id="course-123", name="CS101")]
     mock_schema = mocker.patch("routes.course.CourseSchema")
     mock_schema.return_value.dump.return_value = [{"id": "course-123", "name": "CS101"}]
 
-    response = client.get("/get_user_enrollments", query_string={"user_id": "user-123"})
+    login_as("user-123")
+
+    response = client.get("/get_user_enrollments")
 
     assert response.status_code == 200
-    assert response.json == [{"id": "course-123", "name": "CS101"}]
+    assert response.json == [{"id": "course-123", "name": "CS101", "enrollment_role": "student"}]
 
-def test_get_user_enrollments_missing_user_id(client):
+def test_get_user_enrollments_unauthenticated(client):
     response = client.get("/get_user_enrollments")
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+def test_get_my_enrollment_role_success(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+
+    login_as("user-123")
+
+    response = client.get("/get_my_enrollment_role", query_string={"course_id": "course-123"})
+
+    assert response.status_code == 200
+    assert response.json == {"role": "ta"}
+
+def test_get_my_enrollment_role_unauthenticated(client):
+    response = client.get("/get_my_enrollment_role", query_string={"course_id": "course-123"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+def test_get_my_enrollment_role_missing_course_id(client, login_as):
+    login_as("user-123")
+    response = client.get("/get_my_enrollment_role")
     assert response.status_code == 400
-    assert response.json["message"] == "Missing user_id argument"
+    assert "Missing course_id" in response.json["message"]
+
+def test_get_my_enrollment_role_not_enrolled(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value=None)
+
+    login_as("user-123")
+
+    response = client.get("/get_my_enrollment_role", query_string={"course_id": "course-123"})
+
+    assert response.status_code == 403
+    assert "Not authorized" in response.json["message"]
 
 from types import SimpleNamespace
 
-def test_get_course_enrollment_success(client, mocker):
+def test_get_course_enrollment_success(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+
     # Mock the query chain used in the new route (query -> join -> filter)
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_query_instance = mock_query.return_value
@@ -437,11 +707,25 @@ def test_get_course_enrollment_missing_course_id(client):
     assert response.status_code == 400
     assert response.json["message"] == "Missing course_id argument"
 
-def test_get_course_assignments_success(client, mocker):
+def test_get_course_enrollment_unauthenticated(client):
+    response = client.get("/get_course_enrollment", query_string={"course_id": "course-123"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+def test_get_course_enrollment_student_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+    response = client.get("/get_course_enrollment", query_string={"course_id": "course-123"})
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.json["message"]
+
+def test_get_course_assignments_success(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(id="assignment-1", name="Assignment 1")]
     mock_schema = mocker.patch("routes.course.AssignmentSchema")
     mock_schema.return_value.dump.return_value = [{"id": "assignment-1", "name": "Assignment 1"}]
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
 
     response = client.get("/get_course_assignments", query_string={"course_id": "course-123"})
 
@@ -453,7 +737,22 @@ def test_get_course_assignments_missing_course_id(client):
     assert response.status_code == 400
     assert response.json["message"] == "Missing course_id argument"
 
-def test_get_course_info_success(client, mocker):
+def test_get_course_assignments_unauthenticated(client):
+    response = client.get("/get_course_assignments", query_string={"course_id": "course-123"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+def test_get_course_assignments_not_enrolled_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value=None)
+    login_as("outsider-uuid")
+
+    response = client.get("/get_course_assignments", query_string={"course_id": "course-123"})
+    assert response.status_code == 403
+    assert "not enrolled" in response.json["message"]
+
+def test_get_course_info_success(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
     mock_query = mocker.patch("routes.course.db.session.query")
     mocker.patch("routes.course.has_vertex_configuration", return_value=False)
 
@@ -506,6 +805,19 @@ def test_get_course_info_missing_course_id(client):
     assert response.status_code == 400
     assert response.json["message"] == "Missing course_id argument"
 
+def test_get_course_info_unauthenticated(client):
+    response = client.get("/get_course_info", query_string={"course_id": "course-123"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+def test_get_course_info_not_enrolled_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value=None)
+    login_as("outsider-uuid")
+
+    response = client.get("/get_course_info", query_string={"course_id": "course-123"})
+    assert response.status_code == 403
+    assert "not enrolled" in response.json["message"]
+
 def test_allowed_file_true():
     assert allowed_file("students.csv") == True
 
@@ -545,6 +857,16 @@ def test_create_enrollment_bulk_with_failures(mocker):
     failed_ids = {f["id"] for f in result["failed_enrollments"]}
     assert failed_ids == {"a", "b"}
 
+def test_create_enrollment_bulk_rejects_invalid_role(mocker):
+    data = {
+        "course_id": "course-1",
+        "student_ids": ["a"],
+        "role": "superadmin",
+    }
+
+    with pytest.raises(BadRequestError):
+        create_enrollment_bulk(data)
+
 def test_create_course_get_not_allowed(client):
     response = client.get("/create_course")
     assert response.status_code == 415
@@ -571,10 +893,13 @@ def test_create_course_db_error(client, mocker):
     assert response.status_code == 500
     assert response.json["message"] == "Failed to create course"
 
-def test_update_course_db_error(client, mocker):
+def test_update_course_db_error(client, mocker, login_as):
     mocker.patch("routes.course.db.session.query")
     mocker.patch("routes.course.db.session.commit", side_effect=Exception("fail"))
     mocker.patch("routes.course.db.session.rollback")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    login_as("instructor-uuid")
 
     payload = {
         "course_id": "course-123",
@@ -590,10 +915,13 @@ def test_update_course_db_error(client, mocker):
     assert response.status_code == 409
     assert response.json["message"] == "Course with the provided entry code already exists"
 
-def test_delete_course_db_error(client, mocker):
+def test_delete_course_db_error(client, mocker, login_as):
     mocker.patch("routes.course.db.session.query")
     mocker.patch("routes.course.db.session.commit", side_effect=Exception("fail"))
     mocker.patch("routes.course.db.session.rollback")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    login_as("instructor-uuid")
 
     response = client.delete("/delete_course", query_string={"course_id": "course-123"})
     assert response.status_code == 409
@@ -683,7 +1011,7 @@ def test_test_ai_api_key_claude_success(client, mocker):
     assert mock_get.call_args.kwargs["headers"]["anthropic-version"] == "2023-06-01"
 
 
-def test_test_ai_api_key_missing_saved_key_returns_400(client, mocker):
+def test_test_ai_api_key_missing_saved_key_returns_400(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
 
     mock_course = mocker.Mock(
@@ -694,6 +1022,8 @@ def test_test_ai_api_key_missing_saved_key_returns_400(client, mocker):
     )
 
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
 
     response = client.post(
         "/test_ai_api_key",
@@ -733,7 +1063,7 @@ def test_test_ai_model_ollama_success(client, mocker):
     mock_post.assert_called_once()
 
 
-def test_test_ai_model_ollama_saved_url_success(client, mocker, monkeypatch):
+def test_test_ai_model_ollama_saved_url_success(client, mocker, monkeypatch, login_as):
     monkeypatch.setenv("ALLOWED_OLLAMA_HOSTS", "saved-ollama-url")
     mock_post = mocker.patch("routes.course.requests.post")
     mock_response = mocker.Mock()
@@ -751,6 +1081,8 @@ def test_test_ai_model_ollama_saved_url_success(client, mocker, monkeypatch):
         ollama_base_url="http://saved-ollama-url:11434",
     )
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
 
     response = client.post(
         "/test_ai_model",
@@ -769,7 +1101,7 @@ def test_test_ai_model_ollama_saved_url_success(client, mocker, monkeypatch):
     assert mock_post.call_args[0][0] == "http://saved-ollama-url:11434/api/chat"
 
 
-def test_test_ai_model_ollama_missing_saved_url_fallback(client, mocker):
+def test_test_ai_model_ollama_missing_saved_url_fallback(client, mocker, login_as):
     mock_post = mocker.patch("routes.course.requests.post")
     mock_response = mocker.Mock()
     mock_response.status_code = 200
@@ -786,6 +1118,8 @@ def test_test_ai_model_ollama_missing_saved_url_fallback(client, mocker):
         ollama_base_url="",
     )
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
 
     response = client.post(
         "/test_ai_model",
@@ -1161,7 +1495,7 @@ def test_test_ai_api_key_unsupported_provider_returns_400(client):
     assert response.json["message"] == "Unsupported AI provider"
 
 
-def test_test_ai_api_key_uses_saved_gemini_key(client, mocker):
+def test_test_ai_api_key_uses_saved_gemini_key(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_decrypt = mocker.patch(
         "routes.course.decrypt_api_key",
@@ -1176,6 +1510,8 @@ def test_test_ai_api_key_uses_saved_gemini_key(client, mocker):
     )
 
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
 
     mock_response = mocker.Mock()
     mock_response.status_code = 200
@@ -1198,9 +1534,11 @@ def test_test_ai_api_key_uses_saved_gemini_key(client, mocker):
     assert mock_get.call_args.kwargs["params"] == {"key": "decrypted-gemini-key"}
 
 
-def test_test_ai_api_key_saved_course_not_found_returns_404(client, mocker):
+def test_test_ai_api_key_saved_course_not_found_returns_404(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
 
     response = client.post(
         "/test_ai_api_key",
@@ -1254,7 +1592,7 @@ def test_test_ai_model_unsupported_provider_returns_400(client):
     assert response.json["message"] == "Unsupported AI provider"
 
 
-def test_test_ai_model_uses_saved_claude_key(client, mocker):
+def test_test_ai_model_uses_saved_claude_key(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_decrypt = mocker.patch(
         "routes.course.decrypt_api_key",
@@ -1269,6 +1607,8 @@ def test_test_ai_model_uses_saved_claude_key(client, mocker):
     )
 
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
 
     mock_response = mocker.Mock()
     mock_response.status_code = 200
@@ -1462,16 +1802,109 @@ def test_fetch_ai_models_claude_api_error_returns_provider_error(client, mocker)
     assert "invalid x-api-key" in response.json["error"]
 
 
-def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker):
+# ---------------------------------------------------------------------------
+# Negative-path auth tests for store_api_key / fetch_ai_models / test_ai_api_key /
+# test_ai_model (course-scoped saved-key access)
+# ---------------------------------------------------------------------------
+
+def test_store_api_key_unauthenticated(client):
+    response = client.put("/store_api_key", json={"course_id": "course-123", "api_key": "sk-test"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+
+def test_store_api_key_student_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.put("/store_api_key", json={"course_id": "course-123", "api_key": "sk-test"})
+    assert response.status_code == 403
+    assert "Only instructors" in response.json["message"]
+
+
+def test_store_api_key_ta_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+    login_as("ta-uuid")
+
+    response = client.put("/store_api_key", json={"course_id": "course-123", "api_key": "sk-test"})
+    assert response.status_code == 403
+    assert "Only instructors" in response.json["message"]
+
+
+def test_fetch_ai_models_saved_key_unauthenticated(client):
+    response = client.post("/fetch_ai_models", json={"course_id": "course-123", "provider": "openai"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+
+def test_fetch_ai_models_saved_key_student_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.post("/fetch_ai_models", json={"course_id": "course-123", "provider": "openai"})
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.json["message"]
+
+
+def test_fetch_ai_models_own_api_key_does_not_require_course_auth(client, mocker):
+    """Providing your own api_key directly (no saved course key involved) isn't course-scoped."""
+    mock_response = mocker.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"data": []}
+    mocker.patch("routes.course.OpenAI").return_value.models.list.return_value.data = []
+
+    response = client.post("/fetch_ai_models", json={"provider": "openai", "api_key": "sk-own-key"})
+    assert response.status_code != 401
+    assert response.status_code != 403
+
+
+def test_test_ai_api_key_saved_key_unauthenticated(client):
+    response = client.post("/test_ai_api_key", json={"course_id": "course-123", "provider": "openai"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+
+def test_test_ai_api_key_saved_key_student_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.post("/test_ai_api_key", json={"course_id": "course-123", "provider": "openai"})
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.json["message"]
+
+
+def test_test_ai_model_saved_key_unauthenticated(client):
+    response = client.post(
+        "/test_ai_model", json={"course_id": "course-123", "provider": "openai", "model": "gpt-4o-mini"}
+    )
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+
+def test_test_ai_model_saved_key_student_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.post(
+        "/test_ai_model", json={"course_id": "course-123", "provider": "openai", "model": "gpt-4o-mini"}
+    )
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.json["message"]
+
+
+def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_encrypt = mocker.patch(
         "routes.course.encrypt_api_key",
         return_value="encrypted-openai-key",
     )
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
 
     response = client.put(
         "/update_ai_settings",
@@ -1498,13 +1931,16 @@ def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker):
     mock_commit.assert_called_once()
 
 
-def test_update_ai_settings_accepts_gemini_vertex_without_api_key(client, mocker):
+def test_update_ai_settings_accepts_gemini_vertex_without_api_key(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_encrypt = mocker.patch("routes.course.encrypt_api_key")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
 
     response = client.put(
         "/update_ai_settings",
@@ -1526,12 +1962,15 @@ def test_update_ai_settings_accepts_gemini_vertex_without_api_key(client, mocker
     mock_commit.assert_called_once()
 
 
-def test_update_ai_settings_rejects_gemini_vertex_api_key(client, mocker):
+def test_update_ai_settings_rejects_gemini_vertex_api_key(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
 
     response = client.put(
         "/update_ai_settings",
@@ -1548,11 +1987,14 @@ def test_update_ai_settings_rejects_gemini_vertex_api_key(client, mocker):
     mock_commit.assert_not_called()
 
 
-def test_update_ai_settings_invalid_temperature_returns_400(client, mocker):
+def test_update_ai_settings_invalid_temperature_returns_400(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
 
     response = client.put(
         "/update_ai_settings",
@@ -1567,11 +2009,14 @@ def test_update_ai_settings_invalid_temperature_returns_400(client, mocker):
     assert response.json["message"] == "Invalid temperature"
 
 
-def test_update_ai_settings_temperature_out_of_range_returns_400(client, mocker):
+def test_update_ai_settings_temperature_out_of_range_returns_400(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
 
     response = client.put(
         "/update_ai_settings",
@@ -1586,12 +2031,15 @@ def test_update_ai_settings_temperature_out_of_range_returns_400(client, mocker)
     assert response.json["message"] == "Temperature must be between 0 and 1"
 
 
-def test_update_ai_settings_unsupported_provider_without_api_key_returns_400(client, mocker):
+def test_update_ai_settings_unsupported_provider_without_api_key_returns_400(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
 
     response = client.put(
         "/update_ai_settings",
@@ -1607,11 +2055,14 @@ def test_update_ai_settings_unsupported_provider_without_api_key_returns_400(cli
     mock_commit.assert_not_called()
 
 
-def test_update_ai_settings_unsupported_provider_for_api_key_returns_400(client, mocker):
+def test_update_ai_settings_unsupported_provider_for_api_key_returns_400(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
 
     response = client.put(
         "/update_ai_settings",
@@ -1626,11 +2077,107 @@ def test_update_ai_settings_unsupported_provider_for_api_key_returns_400(client,
     assert response.json["message"] == "Unsupported AI provider"
 
 
-def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocker):
+# ---------------------------------------------------------------------------
+# Negative-path auth tests (session-based guards)
+# ---------------------------------------------------------------------------
+
+def test_delete_course_unauthenticated(client):
+    response = client.delete("/delete_course", query_string={"course_id": "course-123"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+
+def test_delete_course_student_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+    response = client.delete("/delete_course", query_string={"course_id": "course-123"})
+    assert response.status_code == 403
+    assert "Only instructors" in response.json["message"]
+
+
+def test_update_role_unauthenticated(client):
+    response = client.post("/update_role", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "new_role": "ta",
+    })
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+
+def test_update_role_ta_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+    login_as("ta-uuid")
+    response = client.post("/update_role", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "new_role": "instructor",
+    })
+    assert response.status_code == 403
+    assert "Only instructors" in response.json["message"]
+
+
+def test_update_role_student_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+    response = client.post("/update_role", json={
+        "student_id": "other-student-123",
+        "course_id": "course-123",
+        "new_role": "ta",
+    })
+    assert response.status_code == 403
+    assert "Only instructors" in response.json["message"]
+
+
+def test_update_role_invalid_role(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+    response = client.post("/update_role", json={
+        "student_id": "student-123",
+        "course_id": "course-123",
+        "new_role": "superadmin",
+    })
+    assert response.status_code == 400
+    assert "Invalid role" in response.json["message"]
+
+
+def test_update_role_self_demotion_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+    response = client.post("/update_role", json={
+        "student_id": "instructor-uuid",
+        "course_id": "course-123",
+        "new_role": "ta",
+    })
+    assert response.status_code == 403
+    assert "cannot change their own role" in response.json["message"]
+
+
+def test_update_ai_settings_unauthenticated(client):
+    response = client.put("/update_ai_settings", json={"course_id": "course-123"})
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json["message"]
+
+
+def test_update_ai_settings_ta_forbidden(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+    login_as("ta-uuid")
+    response = client.put("/update_ai_settings", json={
+        "course_id": "course-123",
+        "provider": "openai",
+    })
+    assert response.status_code == 403
+    assert "Only instructors" in response.json["message"]
+
+
+def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
 
     mock_course = mocker.Mock()
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
 
     response = client.put(
         "/update_ai_settings",

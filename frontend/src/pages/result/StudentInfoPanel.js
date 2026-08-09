@@ -7,12 +7,12 @@ import { useParams } from "react-router-dom";
 export default function StudentInfoPanel({ assignmentName, studentName, score, totalPoints, active, onGradeUpdate }) {
   //if it is a student I want to display a button to submit a regrade request --> will take them to the add justification modal
   //if it is an instructor i want to be able to see the regarde request if it exists --> should have an edit butotn somewhere that opens a modal to chnage th student's grade
-  const { userInfo } = useContext(GlobalContext);
+  const { userInfo, courseRole } = useContext(GlobalContext);
+  const isStudent = (courseRole || (userInfo?.isStudent ? "student" : "instructor")) === "student";
   const [RequestModalVisible, setRequestModalVisible] = useState(false);
   const [EditGradeModalVisible, setEditGradeModalVisible] = useState(false);
   const [Grade, setGrade] = useState("");
   const [Justification, setJustification] = useState(null); // Initialize as null
-  const [SubmissionId, setSubmissionId] = useState();
   const [highlight, setHighlight] = useState(false);
   const justificationRef = useRef(null);
   const [CheckColor, SetCheckColor] = useState("grey");
@@ -30,14 +30,15 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
             `${process.env.REACT_APP_API_URL}/get_regrade_request?` +
               new URLSearchParams({
                 submission_id: submissionId,
-              })
+              }),
+            { credentials: "include" }
           );
           const request = await response.json();
           if (request.justification) {
             if (request.reviewed === true) {
               SetCheckColor("green");
             }
-            if (userInfo.isStudent) {
+            if (isStudent) {
               setJustification(request.justification);
             } else {
               setJustification(request.justification);
@@ -63,7 +64,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
       }
     };
     fetchJustificationDetails();
-  }, [submissionId, userInfo]);
+  }, [infoShown, isStudent, submissionId]);
 
   const handleStudentClick = () => {
     setRequestModalVisible(true);
@@ -85,6 +86,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           submission_id: submissionId,
           justification: TempJustification,
@@ -115,6 +117,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           submission_id: submissionId,
           new_grade: parseFloat(Grade), // Ensure the grade is a float
@@ -128,6 +131,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: "include",
           body: JSON.stringify({
             submission_id: submissionId,
           }),
@@ -203,12 +207,12 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
         <Space>
           {/* displaying the correct button if the user is a student or an instructor */}
           <Space direction="vertical" size="middle">
-            {(userInfo.isStudent && Justification == "" && (
+            {(isStudent && Justification === "" && (
               <Button type="primary" onClick={handleStudentClick}>
                 Submit a Regrade Request
               </Button>
             )) ||
-              (!userInfo.isStudent && (
+              (!isStudent && (
                 <Button type="primary" onClick={handleInstructorClick}>
                   Edit Grade
                 </Button>
