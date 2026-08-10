@@ -8,7 +8,7 @@ import {
   Space,
 } from "antd";
 
-export default ({ open, toggleAddModalOpen, onFinish }) => {
+export default ({ open, toggleAddModalOpen, onFinish, isTA }) => {
   const [form] = Form.useForm();
 
   const handleCancel = () => {
@@ -33,7 +33,7 @@ export default ({ open, toggleAddModalOpen, onFinish }) => {
           <Input />
         </Form.Item>
         <Form.Item label="ROLE" name="role">
-          <Radio.Group options={["student", "instructor", "TA"]} />
+          <Radio.Group options={isTA ? ["student"] : ["student", "instructor", "TA"]} />
         </Form.Item>
         <Form.Item
           label="EMAIL NOTIFICATION"

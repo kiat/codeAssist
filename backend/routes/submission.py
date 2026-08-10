@@ -3,6 +3,7 @@ import json
 import sys
 import io
 import statistics
+import csv
 import tarfile
 import subprocess
 import os
@@ -16,6 +17,7 @@ from api import db
 from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
+from util.auth import get_user_course_role, require_authenticated, require_course_role
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -39,7 +41,7 @@ def allowed_file(filename):
 
 
 def _verify_course_staff(assignment_id):
-    """Verify the requester is course staff (instructor/TA) or admin for the given assignment.
+    """Verify the requester is course staff (instructor/TA) for the given assignment.
     Returns the authenticated user id.
     Raises ForbiddenError if not authorized.
     """
@@ -52,9 +54,6 @@ def _verify_course_staff(assignment_id):
     course = db.session.query(Course).filter_by(id=assignment.course_id).first()
     if not course:
         raise NotFoundError("Course not found")
-    session_user = db.session.query(User).filter_by(id=session_user_id).first()
-    if session_user and session_user.role == "admin":
-        return session_user_id
     if str(course.instructor_id) == str(session_user_id):
         return session_user_id
     enrollment = db.session.query(Enrollment).filter_by(
@@ -63,7 +62,7 @@ def _verify_course_staff(assignment_id):
     ).first()
     if enrollment and str(enrollment.role).lower() in {"instructor", "ta"}:
         return session_user_id
-    raise ForbiddenError("Only course staff or administrators can perform this action")
+    raise ForbiddenError("Only course staff can perform this action")
 
 
 def _verify_student_owner(student_id, assignment_id=None):
@@ -414,6 +413,14 @@ def upload_assignment_autograder():
     if not assignment_id or not file.filename:
         raise BadRequestError("Missing required fields")
 
+    require_authenticated()
+
+    assignment_for_auth = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment_for_auth:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(assignment_for_auth.course_id, {"instructor", "ta"}, "Only instructors or TAs can upload an autograder")
+
     # Set up paths
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
@@ -723,6 +730,52 @@ def get_grade_statistics():
     return jsonify(stats), 200
 
 
+@submission.route('/export_grades_csv', methods=["GET"])
+def export_grades_csv():
+    assignment_id = request.args.get("assignment_id")
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    # Security: Verify the requester is course staff or admin
+    session_user_id = _verify_course_staff(assignment_id)
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    all_submissions = Submission.query.filter_by(assignment_id=assignment_id).all()
+    subs_by_student = {}
+    for sub in all_submissions:
+        subs_by_student.setdefault(sub.student_id, []).append(sub)
+
+    enrolled_users = db.session.query(User).join(
+        Enrollment, Enrollment.student_id == User.id
+    ).filter(Enrollment.course_id == assignment.course_id).all()
+    # Matches the frontend's row set: everyone enrolled except the viewer.
+    students = [u for u in enrolled_users if u.id != session_user_id]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["First & Last Name", "Email", "Score", "Graded", "Submitted At (UTC)"])
+
+    for student in students:
+        active_sub = next((s for s in subs_by_student.get(student.id, []) if s.active), None)
+        writer.writerow([
+            student.name,
+            student.email_address,
+            active_sub.score if active_sub and active_sub.score is not None else "",
+            "Yes" if active_sub else "No",
+            active_sub.submitted_at.isoformat() if active_sub and active_sub.submitted_at else "",
+        ])
+
+    filename = secure_filename(f"{assignment.name}_grades.csv")
+    return current_app.response_class(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @submission.route('/delete_submission', methods=["DELETE"])
 def delete_submission():
     submission_id = request.args.get("submission_id")
@@ -730,13 +783,18 @@ def delete_submission():
     if not submission_id:
         raise BadRequestError("Missing submission_id")
 
+    require_authenticated()
+
     submission_to_delete = db.session.get(Submission, submission_id)
 
     if not submission_to_delete:
         raise NotFoundError("No submission found to delete")
 
-    # Security: Verify the requester is course staff or admin
-    _verify_course_staff(submission_to_delete.assignment_id)
+    submission_assignment = db.session.get(Assignment, submission_to_delete.assignment_id)
+    if not submission_assignment:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(submission_assignment.course_id, {"instructor"}, "Only instructors can delete submissions")
 
     try:
         db.session.delete(submission_to_delete)
@@ -773,11 +831,6 @@ def get_submission_details():
 
 @submission.route('/rerun_submission_autograder', methods=["POST"])
 def rerun_submission_autograder():
-    # Verify the requester is authenticated
-    session_user_id = session.get("user_id")
-    if not session_user_id:
-        raise ForbiddenError("Not authenticated. Please log in.")
-
     data = request.json or {}
     submission_id = data.get("submission_id")
 
@@ -792,8 +845,12 @@ def rerun_submission_autograder():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
-    # Security: Only course staff (instructor/TA) or admins can rerun submissions
-    _verify_course_staff(assignment.id)
+    requester_id = require_authenticated()
+
+    is_owner = str(submission_to_rerun.student_id) == str(requester_id)
+    is_staff = get_user_course_role(requester_id, assignment.course_id) in {"instructor", "ta"}
+    if not (is_owner or is_staff):
+        raise ForbiddenError("Not authorized to rerun this submission")
 
     if (
         not assignment.autograder_image_name
@@ -889,6 +946,14 @@ def rerun_submission_autograder():
             "Submitted program took too long to run",
             submission_to_rerun.id,
         )
+    except Exception:
+        if container:
+            try:
+                container.stop()
+                container.remove()
+            except Exception:
+                pass
+        raise InternalProcessingError("Failed to rerun autograder")
 
     if exec_proc.returncode != 0:
         stderr = getattr(exec_proc, "stderr", b"") or getattr(exec_proc, "output", b"")
@@ -1000,12 +1065,21 @@ def activate_submission():
 
     _verify_student_owner(student_id, assignment_id)
 
+    submission_to_activate = db.session.get(Submission, submission_id)
+    if not submission_to_activate:
+        raise NotFoundError("No submission found")
+    if (
+        str(submission_to_activate.student_id) != str(student_id)
+        or str(submission_to_activate.assignment_id) != str(assignment_id)
+    ):
+        raise ForbiddenError("Submission does not belong to the given student and assignment")
+
     try:
         # Deactivate the current active submission for the same assignment and student
         old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
         if old:
             old.update({'active': False})
-        
+
         # Activate the specified submission
         db.session.query(Submission).filter_by(id=submission_id).update({'active': True})
         db.session.commit()
