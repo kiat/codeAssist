@@ -1,16 +1,16 @@
 import {
   Button,
   Card,
-  Form,
+  Checkbox,
+  Dropdown,
   Input,
   PageHeader,
-  Select,
   Space,
   Table,
   Typography,
   message
 } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined, DownOutlined } from "@ant-design/icons";
 import AddUserModal from "./AddUserModal";
 import { useCallback, useState, useContext } from "react";
 import {
@@ -22,33 +22,51 @@ import {
 import {
   getUserByEmail,
 } from "../../../services/user";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect } from "react";
 import AddMoreUsersModal from "./AddMoreUsersModal";
 import { GlobalContext } from "../../../App";
 import AddCSVModal from "./AddCSVModal";
+import RolePill from "../../../components/RolePill";
+const ROLE_ORDER = { instructor: 0, ta: 1, student: 2 };
+
+function roleSort(a, b) {
+  const ra = ROLE_ORDER[a.role?.toLowerCase()] ?? 3;
+  const rb = ROLE_ORDER[b.role?.toLowerCase()] ?? 3;
+  if (ra !== rb) return ra - rb;
+  return (a.name || "").localeCompare(b.name || "");
+}
+
 const columns = [
-  { title: "NAME", dataIndex: "name" },
+  { title: "NAME", dataIndex: "name", sorter: (a, b) => (a.name || "").localeCompare(b.name || "") },
   { title: "EMAIL", dataIndex: "email_address" },
 ];
 
 export default () => {
-  const { userInfo } = useContext(GlobalContext);
-  
+  const { courseRole } = useContext(GlobalContext);
+  const isTA = courseRole === "ta";
+
+  const [filterRoles, setFilterRoles] = useState([]);
+  const [filterName, setFilterName] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addCSVModalOpen, setAddCSVModalOpen] = useState(false);
   const [addMoreUsersModalOpen, setAddMoreUsersModalOpen] = useState(false);
-  const [originalEnrollment, setOriginalEnrollment] = useState([]); 
+  const [originalEnrollment, setOriginalEnrollment] = useState([]);
   const [enrollment, setEnrollment] = useState([]);
 
-  const urlParams = useParams();
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
-  const { courseId } = urlParams;
+  const { courseId } = useParams();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (courseRole && courseRole !== "instructor" && courseRole !== "ta") {
+      navigate(`/instructorDashboard/${courseId}`);
+    }
+  }, [courseRole, courseId, navigate]);
 
   const toggleAddModalOpen = useCallback(() => {
     setAddModalOpen((t) => !t);
   }, []);
-  
+
   const toggleAddCSVModalOpen = useCallback(() => {
     setAddCSVModalOpen((t) => !t);
   }, []);
@@ -58,10 +76,14 @@ export default () => {
   }, []);
 
   const getEnrollment = useCallback(() => {
-    getCourseEnrollment({ course_id: courseId }).then((res) => {
-      setEnrollment(res.data);
-      setOriginalEnrollment(res.data); 
-    });
+    getCourseEnrollment({ course_id: courseId })
+      .then((res) => {
+        setEnrollment(res.data);
+        setOriginalEnrollment(res.data);
+      })
+      .catch((error) => {
+        console.error("Error fetching enrollment: ", error);
+      });
   }, [courseId]);
 
 
@@ -71,7 +93,7 @@ export default () => {
         await updateRole({
           "student_id": studentId,
           "course_id": courseId,
-          "new_role": newRole
+          "new_role": newRole,
         });
         message.info("User role updated")
         getEnrollment();
@@ -140,6 +162,19 @@ export default () => {
   useEffect(() => {
     getEnrollment();
   }, [getEnrollment, courseId]);
+
+  useEffect(() => {
+    let filtered = originalEnrollment;
+    if (filterRoles.length > 0) {
+      filtered = filtered.filter((e) => filterRoles.includes(e.role?.toLowerCase()));
+    }
+    if (filterName.trim()) {
+      filtered = filtered.filter((e) =>
+        (e.name || "").toLowerCase().includes(filterName.toLowerCase())
+      );
+    }
+    setEnrollment(filtered);
+  }, [originalEnrollment, filterRoles, filterName]);
   // count the number of students, instructors, and TAs for the course
   const studentCount = originalEnrollment.filter(
     (e) => e.role?.toLowerCase() === "student"
@@ -157,75 +192,61 @@ export default () => {
         style={{ borderBottom: "1px solid #f0f0f0" }}
       />
       <Card bordered={false}>
-        <Form
-          layout="inline"
-          style={{ marginBottom: "20px" }}
-          onFinish={(values) => {
-            const { role, username } = values;
-            // Always start from the full list, not the already filtered one
-            let filtered = originalEnrollment;
-
-            if (role && role !== "All") {
-              filtered = filtered.filter(
-                (e) => e.role.toLowerCase() === role.toLowerCase()
-              );
-            }
-
-            if (username) {
-              filtered = filtered.filter((e) =>
-                e.name.toLowerCase().includes(username.toLowerCase())
-              );
-            }
-
-            setEnrollment(filtered);
-          }}
-
-        >
-          <Form.Item name="role">
-            <Select
-              placeholder="view by role"
-              style={{ width: "180px" }}
-              options={[
-                { label: "All", value: "All" },
-                { label: "Student", value: "Student" },
-                { label: "Instructor", value: "Instructor" },
-                { label: "TA", value: "TA" },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="username">
-            <Input placeholder="view by name" />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">
-              search
-            </Button>
-          </Form.Item>
-          <Form.Item>
-            <Button onClick={() => setEnrollment(originalEnrollment)}>Reset</Button>
-          </Form.Item>
-        </Form> 
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+          <Checkbox.Group
+            value={filterRoles}
+            onChange={setFilterRoles}
+            options={[
+              { label: "Student", value: "student" },
+              { label: "TA", value: "ta" },
+              { label: "Instructor", value: "instructor" },
+            ]}
+          />
+          <Input
+            placeholder="search by name"
+            value={filterName}
+            onChange={(e) => setFilterName(e.target.value)}
+            allowClear
+            style={{ width: 200 }}
+          />
+          <Button
+            onClick={() => { setFilterRoles([]); setFilterName(""); }}
+            disabled={filterRoles.length === 0 && !filterName}
+          >
+            Reset
+          </Button>
+        </div>
         <Table
           columns={[
             ...columns,
             {
               title: "ROLE",
               dataIndex: "role",
-              render: (text, record) => (
-                <Select
-                  value={text}
-                  style={{ width: 120 }}
-                  onChange={(value) => handleUpdateRole(value, record.id)}
-                  disabled={text.toLowerCase() === "instructor"}
-                >
-                  <Select.Option value="student">Student</Select.Option>
-                  <Select.Option value="TA">TA</Select.Option>
-                  <Select.Option value="instructor">Instructor</Select.Option>
-                </Select>
-              ),
+              sorter: (a, b) => roleSort(a, b),
+              render: (text, record) => {
+                const normalised = text?.toLowerCase();
+                if (isTA || normalised === "instructor") {
+                  return <RolePill role={normalised} />;
+                }
+                const items = [
+                  { key: "student", label: <RolePill role="student" /> },
+                  { key: "ta",      label: <RolePill role="ta" /> },
+                ];
+                return (
+                  <Dropdown
+                    menu={{ items, onClick: ({ key }) => handleUpdateRole(key, record.id) }}
+                    trigger={["click"]}
+                  >
+                    <span style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <RolePill role={normalised} />
+                      <DownOutlined style={{ fontSize: 10, color: "#9ca3af" }} />
+                    </span>
+                  </Dropdown>
+                );
+              },
             },
           ]}
-          dataSource={enrollment}
+          dataSource={[...enrollment].sort(roleSort)}
           rowKey="id"
         />
       </Card>
@@ -273,6 +294,7 @@ export default () => {
         open={addModalOpen}
         toggleAddModalOpen={toggleAddModalOpen}
         onFinish={finishForm}
+        isTA={isTA}
       />
       <AddCSVModal 
         open={addCSVModalOpen} 

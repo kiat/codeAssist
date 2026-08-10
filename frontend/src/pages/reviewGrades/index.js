@@ -34,7 +34,30 @@ export default () => {
   const goAssignmentResult = (submissionId) => {
     navigate(`/assignmentResult/${submissionId}`);
   };
-  
+
+  const handleDownloadGrades = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `${process.env.REACT_APP_API_URL}/export_grades_csv?assignment_id=${assignmentId}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) {
+        throw new Error("Failed to download grades.");
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${assignmentInfo?.name || "assignment"}_grades.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error downloading grades:", err);
+    }
+  }, [assignmentId, assignmentInfo]);
+
   const columns = [
     {
       title: "FIRST & LAST NAME",
@@ -210,7 +233,7 @@ export default () => {
       </PageContent>
       <PageBottom>
         <Space>
-          <Button icon={<DownloadOutlined />} >
+          <Button icon={<DownloadOutlined />} onClick={handleDownloadGrades}>
             Download Grades
           </Button>
           <Button icon={<DownloadOutlined />} >

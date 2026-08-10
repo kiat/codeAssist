@@ -36,6 +36,10 @@ export async function getCourseEnrollment(params) {
   return service("get_course_enrollment", params);
 }
 
+export async function getMyEnrollmentRole(params) {
+  return service("get_my_enrollment_role", params);
+}
+
 export async function getCourseInfo(params) {
   return service("get_course_info", params);
 }
