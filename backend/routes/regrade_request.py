@@ -4,6 +4,7 @@ from api import db
 from api.models import Assignment, Submission, User, RegradeRequest
 from api.schemas import SubmissionSchema, UserSchema
 from util.errors import NotFoundError, BadRequestError
+from util.auth import require_authenticated, require_course_role
 
 
 regrade_request = Blueprint('regrade_request', __name__)
@@ -73,10 +74,19 @@ def update_grade():
 
     if not submission_id or new_grade is None:
         raise BadRequestError("Missing submission_id or new_grade")
+
+    require_authenticated()
+
     submission = Submission.query.filter_by(id=submission_id).first()
 
     if not submission:
         raise NotFoundError("No such submission found")
+
+    graded_assignment = db.session.query(Assignment).filter_by(id=submission.assignment_id).first()
+    if not graded_assignment:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(graded_assignment.course_id, {"instructor", "ta"}, "Only instructors or TAs can update grades")
 
     try:
         new_grade = float(new_grade)  # Ensure the grade is a float
@@ -125,6 +135,11 @@ def get_student_regrade_requests():
 @regrade_request.route('/get_instructor_regrade_requests', methods=["GET"])
 def get_instructor_regrade_requests():
     course_id = request.args.get("course_id")
+    if not course_id:
+        raise BadRequestError("Missing course_id")
+
+    require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can view course regrade requests")
+
     regrade_requests = db.session.query(RegradeRequest).join(Submission).join(Assignment).filter(Assignment.course_id == course_id)
 
     result = []
@@ -148,10 +163,21 @@ def set_reviewed():
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200  # Preflight response
     submissionid = request.json["submission_id"]
+
+    require_authenticated()
+
     entry = db.session.query(RegradeRequest).filter_by(submission_id=submissionid).first()
-    
+
     if entry is None:
         raise NotFoundError(f"No regrade request found for submission_id: {submissionid}")
+
+    reviewed_submission = db.session.query(Submission).filter_by(id=entry.submission_id).first()
+    reviewed_assignment = db.session.query(Assignment).filter_by(id=reviewed_submission.assignment_id).first() if reviewed_submission else None
+    if not reviewed_assignment:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(reviewed_assignment.course_id, {"instructor", "ta"}, "Only instructors or TAs can mark requests reviewed")
+
     entry.reviewed = True
     db.session.commit()
 

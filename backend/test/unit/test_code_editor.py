@@ -74,6 +74,23 @@ def test_save_code_draft_content_too_long(client, mocker):
     assert "maximum length" in resp.get_json()["message"].lower()
 
 
+def test_save_code_draft_rejects_when_code_editor_disabled(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mock_assignment = mocker.Mock()
+    mock_assignment.enable_code_editor = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    resp = client.post("/save_code_draft", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+    })
+    assert resp.status_code == 400
+    assert "not enabled" in resp.get_json()["message"].lower()
+
+
 def test_save_code_draft_increments_version(client, mocker):
     mock_add = mocker.patch("routes.code_editor.db.session.add")
     mock_commit = mocker.patch("routes.code_editor.db.session.commit")
@@ -145,6 +162,21 @@ def test_get_code_drafts_missing_params(client):
     assert "Missing" in resp.get_json()["message"]
 
 
+def test_get_code_drafts_rejects_when_code_editor_disabled(client, mocker):
+    mock_assignment = mocker.Mock()
+    mock_assignment.enable_code_editor = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
+    resp = client.get("/get_code_drafts?student_id=stu-1&assignment_id=asgn-1")
+    assert resp.status_code == 400
+    assert "not enabled" in resp.get_json()["message"].lower()
+
+
 def test_get_code_drafts_empty(client, mocker):
     mock_query = mocker.patch("routes.code_editor.db.session.query")
     mock_schema = mocker.patch("routes.code_editor.CodeDraftSchema")
@@ -196,6 +228,21 @@ def test_get_latest_draft_missing_params(client):
     resp = client.get("/get_latest_draft")
     assert resp.status_code == 400
     assert "Missing" in resp.get_json()["message"]
+
+
+def test_get_latest_draft_rejects_when_code_editor_disabled(client, mocker):
+    mock_assignment = mocker.Mock()
+    mock_assignment.enable_code_editor = False
+
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
+    resp = client.get("/get_latest_draft?student_id=stu-1&assignment_id=asgn-1")
+    assert resp.status_code == 400
+    assert "not enabled" in resp.get_json()["message"].lower()
 
 
 # ---------------------------------------------------------------------------
