@@ -14,6 +14,7 @@ from api.models import (
     Submission,
     RegradeRequest,
     cleanup_assignment_container,
+    cleanup_assignment_directories,
 )
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError
@@ -362,9 +363,10 @@ def delete_all_assignments():
     if not assignments:
         raise NotFoundError("No assignments found for this course")
 
-    # Delete assignment containers
+    # Delete assignment containers and generated directories
     for assignment in assignments:
         cleanup_assignment_container(None, None, assignment)
+        cleanup_assignment_directories(None, None, assignment)
     
     assignment_ids = [a.id for a in assignments]
 

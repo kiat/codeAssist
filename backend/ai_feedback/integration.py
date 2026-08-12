@@ -759,16 +759,13 @@ def get_feedback_by_provider(provider, api_key, client, prompt, model, temperatu
     raise ValueError(f"Unsupported AI provider: {provider}")
 
 
-def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
+def async_get_ai_feedback(app, submission_id, code_text, results_json_content):
     """Background task for obtaining and recording AI feedback."""
     ctx = app.app_context()
     ctx.push()
 
     try:
         print(f"AI_FEEDBACK: Starting for submission {submission_id}", flush=True)
-
-        with open(file_path, "r") as code_file:
-            code_text = code_file.read()
 
         print("AI_FEEDBACK: Code file loaded", flush=True)
 

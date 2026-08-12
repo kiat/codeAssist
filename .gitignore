@@ -134,6 +134,7 @@ dmypy.json
 
 # No need to upload loads of zip files
 backend/routes/upload_autograder/runs/
+backend/routes/upload_autograder/archive/
 
 /backend/runs
 node_modules

@@ -253,6 +253,30 @@ def reset_assignment_container(assignment):
         assignment.container_id = None
         db.session.commit()
 
+def stage_submission(submissions_dir, file, filename):
+    os.makedirs(submissions_dir, exist_ok=True)
+    file_path = os.path.join(submissions_dir, filename)
+    file.save(file_path)
+    return file_path
+
+def archive_dir(assignment_id, submission_id):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(current_dir, 'upload_autograder', 'archive', str(assignment_id), str(submission_id))
+
+def archive_staged_files(assignment_id, submission_id, submissions_dir, results_file_path=None):
+    dest = archive_dir(assignment_id, submission_id)
+    os.makedirs(dest, exist_ok=True)
+
+    if os.path.isdir(submissions_dir):
+        for name in os.listdir(submissions_dir):
+            shutil.move(os.path.join(submissions_dir, name), os.path.join(dest, name))
+        shutil.rmtree(submissions_dir, ignore_errors=True)
+
+    if results_file_path and os.path.isfile(results_file_path):
+        shutil.move(results_file_path, os.path.join(dest, os.path.basename(results_file_path)))
+
+    return dest
+
 @submission.route('/get_submissions', methods=["GET"])
 def get_submissions():
     '''
@@ -341,26 +365,13 @@ def upload_submission():
     filename = secure_filename(file.filename)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
-    submission_uuid = uuid.uuid4().hex[:8]
-    submissions_dir = os.path.join(assignment_dir, "submission", submission_uuid)
+    submission_id = uuid.uuid4()
+    submissions_dir = os.path.join(assignment_dir, "submission", str(submission_id))
     results_dir = os.path.join(assignment_dir, student_id, 'results')
     
-    for directory in [submissions_dir, results_dir]:
-        os.makedirs(directory, exist_ok=True)
+    os.makedirs(results_dir, exist_ok=True)
     
-    for filenames in os.listdir(submissions_dir):
-        file_path = os.path.join(submissions_dir, filenames)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
-        except Exception as e:
-            print(f"Failed to delete {file_path}. Reason: {e}")
-            raise InternalProcessingError("Failed to grade submission")
-    file_path = os.path.join(submissions_dir, filename)
-
-    file.save(file_path)
+    file_path = stage_submission(submissions_dir, file, filename)
 
     #get autograder if it exists
     assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
@@ -373,7 +384,7 @@ def upload_submission():
             old.update({'active': False})
         
         new_submission = Submission(
-            id=uuid.uuid4(),
+            id=submission_id,
             file_name=filename,
             student_id=uuid.UUID(student_id),
             assignment_id=uuid.UUID(assignment_id),
@@ -390,6 +401,7 @@ def upload_submission():
 
         db.session.add(new_submission)
         db.session.commit()
+        archive_staged_files(assignment_id, submission_id, submissions_dir)
 
         return jsonify({
             "message": "Submission uploaded. No autograder found.",
@@ -417,7 +429,7 @@ def upload_submission():
             container.put_archive("/autograder/submission/", tar_stream)
 
             # Run the autograder inside the container
-            results_json_name = f"results_{submission_uuid}.json"
+            results_json_name = f"results_{submission_id}.json"
             exec_proc = subprocess.run(
                 [
                     "docker", "exec", container_name, "sh", "-c",
@@ -431,6 +443,7 @@ def upload_submission():
         except concurrent.futures.TimeoutError:
             reset_assignment_container(assignment)
             os.chdir(current_dir)
+            shutil.rmtree(submissions_dir, ignore_errors=True)
             raise InternalProcessingError("Timed out cleaning up container")
 
         except subprocess.TimeoutExpired:
@@ -461,7 +474,7 @@ def upload_submission():
                 old.update({'active': False})
             
             failed_submission = Submission(
-                id=uuid.uuid4(),
+                id=submission_id,
                 file_name=filename,
                 student_id=uuid.UUID(student_id),
                 assignment_id=uuid.UUID(assignment_id),
@@ -477,12 +490,15 @@ def upload_submission():
             )
             db.session.add(failed_submission)
             db.session.commit()
+            archive_staged_files(assignment_id, submission_id, submissions_dir)
 
             raise SubmissionTimeoutError("Submitted program took too long to run", failed_submission.id)
 
         if exec_proc.returncode != 0:
             os.chdir(current_dir)
-            print(f"Error: Autograder failed, details: {exec_proc.output.decode()}", flush=True)
+            shutil.rmtree(submissions_dir, ignore_errors=True)
+            stderr = getattr(exec_proc, "stderr", b"") or b""
+            print(f"Error: Autograder failed, details: {stderr.decode(errors='replace')}", flush=True)
             raise InternalProcessingError("Failed to grade submission")
 
         # get results
@@ -491,9 +507,11 @@ def upload_submission():
         except concurrent.futures.TimeoutError:
             reset_assignment_container(assignment)
             os.chdir(current_dir)
+            shutil.rmtree(submissions_dir, ignore_errors=True)
             raise InternalProcessingError("Timed out retrieving submission results")
         if cat_result.exit_code != 0:
             os.chdir(current_dir)
+            shutil.rmtree(submissions_dir, ignore_errors=True)
             print(f"Error: Failed to retrieve {results_json_name}, details: {cat_result.output.decode()}", flush=True)
             raise InternalProcessingError("Failed to grade submission")
 
@@ -510,7 +528,7 @@ def upload_submission():
 
     # Create a new submission record. Note that we add an initial value (e.g. None) for ai_feedback.
     new_submission = Submission(
-        id=uuid.uuid4(),
+        id=submission_id,
         file_name=filename,
         student_id=uuid.UUID(student_id),
         assignment_id=uuid.UUID(assignment_id),
@@ -527,6 +545,7 @@ def upload_submission():
     )
     db.session.add(new_submission)
     db.session.commit()
+    archived = archive_staged_files(assignment_id, submission_id, submissions_dir, host_results_json_path)
 
     # Leave container running for future reuse
     os.chdir(current_dir)
@@ -535,13 +554,13 @@ def upload_submission():
     app_obj = current_app._get_current_object()
     threading.Thread(
         target=async_get_ai_feedback, 
-        args=(app_obj, new_submission.id, file_path, results_json_content)
+        args=(app_obj, new_submission.id, new_submission.student_code_file.decode("utf-8", errors="replace"), results_json_content)
     ).start()
 
     # Return the response. Note that ai_feedback might not be available immediately.
     return jsonify({
         "message": "Submission uploaded and autograded successfully",
-        "results_path": host_results_json_path,
+        "results_path": os.path.join(archived, os.path.basename(host_results_json_path)),
         "submissionID": str(new_submission.id)
     }), 200
 
@@ -924,7 +943,7 @@ def rerun_submission_autograder():
         app_obj = current_app._get_current_object()
         threading.Thread(
             target=async_get_ai_feedback,
-            args=(app_obj, submission_to_rerun.id, file_path, results_json_content),
+            args=(app_obj, submission_to_rerun.id, student_code.decode("utf-8", errors="replace"), results_json_content),
         ).start()
 
     return jsonify({

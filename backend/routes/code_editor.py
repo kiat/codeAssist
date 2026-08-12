@@ -462,7 +462,7 @@ def submit_code():
         app_obj = current_app._get_current_object()
         threading.Thread(
             target=async_get_ai_feedback,
-            args=(app_obj, new_submission.id, file_path, results_json_content),
+            args=(app_obj, new_submission.id, content, results_json_content),
         ).start()
 
         # Save a final draft copy

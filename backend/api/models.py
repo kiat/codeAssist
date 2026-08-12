@@ -5,6 +5,8 @@ from sqlalchemy.types import LargeBinary
 from api import db
 from dataclasses import dataclass
 import docker
+import os
+import shutil
 import logging
 
 class User(db.Model):
@@ -106,6 +108,14 @@ def cleanup_assignment_container(mapper, connection, target):
         )
 
 event.listen(Assignment, "after_delete", cleanup_assignment_container)
+
+def cleanup_assignment_directories(mapper, connection, target):
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_dir = os.path.join(backend_dir, "routes", "upload_autograder")
+    for subtree in ("runs", "archive"):
+        shutil.rmtree(os.path.join(base_dir, subtree, str(target.id)), ignore_errors=True)
+
+event.listen(Assignment, "after_delete", cleanup_assignment_directories)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
