@@ -17,6 +17,10 @@ def app():
 def client(app):
     return app.test_client()
 
+
+def _mock_course_role(mocker, role="instructor"):
+    return mocker.patch("util.auth.get_user_course_role", return_value=role)
+
 # Test cases
 
 # Test cases for send_regrade_request
@@ -125,10 +129,12 @@ def test_delete_regrade_request(client, mocker):
 # Test cases for set_reviewed
 
 
-def test_set_reviewed(client, mocker):
+def test_set_reviewed(client, mocker, login_as):
     mock_entry = mocker.Mock()
     mocker.patch("routes.regrade_request.db.session.query").return_value.filter_by.return_value.first.return_value = mock_entry
     commit = mocker.patch("routes.regrade_request.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
     res = client.post("/set_reviewed", json={"submission_id": "sub1"})
     assert res.status_code == 200
     assert res.get_json()["message"] == "Review updated successfully"
@@ -139,14 +145,21 @@ def test_set_reviewed(client, mocker):
 # Test cases for update_grade
 
 
-def test_update_grade_success(client, mocker):
-    fake_sub = SimpleNamespace(score=80)
+def test_update_grade_success(client, mocker, login_as):
+    fake_sub = SimpleNamespace(score=80, assignment_id="assign1")
 
     sub_query = mocker.patch("routes.regrade_request.Submission.query")
     # filter_by(...).first() should give back the fake submission
     sub_query.filter_by.return_value.first.return_value = fake_sub
 
+    mock_query = mocker.patch("routes.regrade_request.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = SimpleNamespace(
+        id="assign1", course_id="course-uuid"
+    )
+
     commit = mocker.patch("routes.regrade_request.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
 
     res = client.post("/update_grade", json={"submission_id": "sub1", "new_grade": 95})
     assert res.status_code == 200
@@ -223,11 +236,17 @@ def test_get_student_regrade_requests_success(client, mocker):
 # Test cases for get_instructor_regrade_requests
 
 
-def test_set_reviewed_success_with_simple_namespace(client, mocker):
-    entry = SimpleNamespace(reviewed=False)
+def test_set_reviewed_success_with_simple_namespace(client, mocker, login_as):
+    entry = SimpleNamespace(reviewed=False, submission_id="sub1")
     mocker.patch("routes.regrade_request.db.session.query") \
-          .return_value.filter_by.return_value.first.return_value = entry
+          .return_value.filter_by.return_value.first.side_effect = [
+        entry,
+        SimpleNamespace(id="sub1", assignment_id="assign1"),
+        SimpleNamespace(id="assign1", course_id="course-uuid"),
+    ]
     commit = mocker.patch("routes.regrade_request.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
 
     res = client.post("/set_reviewed", json={"submission_id": "sub1"})
     assert res.status_code == 200
@@ -235,9 +254,10 @@ def test_set_reviewed_success_with_simple_namespace(client, mocker):
     assert res.get_json()["message"] == "Review updated successfully"
     commit.assert_called_once()
 
-def test_update_grade_no_submission(client, mocker):
+def test_update_grade_no_submission(client, mocker, login_as):
     sub_query = mocker.patch("routes.regrade_request.Submission.query")
     sub_query.filter_by.return_value.first.return_value = None
+    login_as("instructor-uuid")
 
     res = client.post("/update_grade", json={
         "submission_id": "missing-sub",
@@ -247,11 +267,18 @@ def test_update_grade_no_submission(client, mocker):
     assert res.status_code == 404
     assert res.get_json()["message"] == "No such submission found"
 
-def test_update_grade_invalid_grade(client, mocker):
-    fake_sub = SimpleNamespace(score=80)
+def test_update_grade_invalid_grade(client, mocker, login_as):
+    fake_sub = SimpleNamespace(score=80, assignment_id="assign1")
 
     sub_query = mocker.patch("routes.regrade_request.Submission.query")
     sub_query.filter_by.return_value.first.return_value = fake_sub
+
+    mock_query = mocker.patch("routes.regrade_request.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = SimpleNamespace(
+        id="assign1", course_id="course-uuid"
+    )
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
 
     res = client.post("/update_grade", json={
         "submission_id": "sub1",
@@ -261,11 +288,114 @@ def test_update_grade_invalid_grade(client, mocker):
     assert res.status_code == 400
     assert res.get_json()["message"] == "Invalid grade value"
 
-def test_set_reviewed_not_found(client, mocker):
+def test_set_reviewed_not_found(client, mocker, login_as):
     mocker.patch("routes.regrade_request.db.session.query") \
         .return_value.filter_by.return_value.first.return_value = None
+    login_as("instructor-uuid")
 
     res = client.post("/set_reviewed", json={"submission_id": "sub404"})
 
     assert res.status_code == 404
     assert res.get_json()["message"] == "No regrade request found for submission_id: sub404"
+
+
+# ---------------------------------------------------------------------------
+# Negative-path auth tests (session-based guards)
+# ---------------------------------------------------------------------------
+
+
+def test_update_grade_unauthenticated(client):
+    res = client.post("/update_grade", json={"submission_id": "sub1", "new_grade": 90})
+    assert res.status_code == 401
+    assert "Not authenticated" in res.get_json()["message"]
+
+
+def test_update_grade_student_forbidden(client, mocker, login_as):
+    fake_sub = SimpleNamespace(score=80, assignment_id="assign1")
+    sub_query = mocker.patch("routes.regrade_request.Submission.query")
+    sub_query.filter_by.return_value.first.return_value = fake_sub
+
+    mock_query = mocker.patch("routes.regrade_request.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = SimpleNamespace(
+        id="assign1", course_id="course-uuid"
+    )
+    _mock_course_role(mocker, role="student")
+    login_as("student-uuid")
+
+    res = client.post("/update_grade", json={"submission_id": "sub1", "new_grade": 90})
+
+    assert res.status_code == 403
+    assert "Only instructors or TAs" in res.get_json()["message"]
+    assert fake_sub.score == 80
+
+
+def test_update_grade_ta_allowed(client, mocker, login_as):
+    fake_sub = SimpleNamespace(score=80, assignment_id="assign1")
+    sub_query = mocker.patch("routes.regrade_request.Submission.query")
+    sub_query.filter_by.return_value.first.return_value = fake_sub
+
+    mock_query = mocker.patch("routes.regrade_request.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = SimpleNamespace(
+        id="assign1", course_id="course-uuid"
+    )
+    commit = mocker.patch("routes.regrade_request.db.session.commit")
+    _mock_course_role(mocker, role="ta")
+    login_as("ta-uuid")
+
+    res = client.post("/update_grade", json={"submission_id": "sub1", "new_grade": 90})
+
+    assert res.status_code == 200
+    assert fake_sub.score == 90.0
+    commit.assert_called_once()
+
+
+def test_get_instructor_regrade_requests_unauthenticated(client):
+    res = client.get("/get_instructor_regrade_requests", query_string={"course_id": "course-uuid"})
+    assert res.status_code == 401
+    assert "Not authenticated" in res.get_json()["message"]
+
+
+def test_get_instructor_regrade_requests_student_forbidden(client, mocker, login_as):
+    _mock_course_role(mocker, role="student")
+    login_as("student-uuid")
+
+    res = client.get("/get_instructor_regrade_requests", query_string={"course_id": "course-uuid"})
+
+    assert res.status_code == 403
+    assert "Only instructors or TAs" in res.get_json()["message"]
+
+
+def test_get_instructor_regrade_requests_ta_allowed(client, mocker, login_as):
+    _mock_course_role(mocker, role="ta")
+    mock_query = mocker.patch("routes.regrade_request.db.session.query")
+    mock_query.return_value.join.return_value.join.return_value.filter.return_value = []
+    login_as("ta-uuid")
+
+    res = client.get("/get_instructor_regrade_requests", query_string={"course_id": "course-uuid"})
+
+    assert res.status_code == 200
+    assert res.get_json() == []
+
+
+def test_set_reviewed_unauthenticated(client):
+    res = client.post("/set_reviewed", json={"submission_id": "sub1"})
+    assert res.status_code == 401
+    assert "Not authenticated" in res.get_json()["message"]
+
+
+def test_set_reviewed_student_forbidden(client, mocker, login_as):
+    entry = SimpleNamespace(reviewed=False, submission_id="sub1")
+    mocker.patch("routes.regrade_request.db.session.query") \
+        .return_value.filter_by.return_value.first.side_effect = [
+        entry,
+        SimpleNamespace(id="sub1", assignment_id="assign1"),
+        SimpleNamespace(id="assign1", course_id="course-uuid"),
+    ]
+    _mock_course_role(mocker, role="student")
+    login_as("student-uuid")
+
+    res = client.post("/set_reviewed", json={"submission_id": "sub1"})
+
+    assert res.status_code == 403
+    assert "Only instructors or TAs" in res.get_json()["message"]
+    assert entry.reviewed is False

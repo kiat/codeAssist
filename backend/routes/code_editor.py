@@ -23,10 +23,13 @@ from ai_feedback.integration import (
     get_temperature,
     post_gemini_with_retry,
 )
+from ai_feedback.memory import get_recent_submission_history_text
 from ai_feedback.settings import (
+    build_allowed_feedback_context,
     check_feedback_limits,
     get_enabled_feedback_prompt,
     record_feedback_request,
+    render_feedback_context,
     get_student_feedback_status,
     get_chat_history,
     store_chat_message,
@@ -123,6 +126,12 @@ def save_code_draft():
     if len(content) > 100000:
         raise BadRequestError("Code content exceeds maximum length of 100KB")
 
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
+
     # Find the latest version number for this student/assignment
     latest = (
         db.session.query(CodeDraft)
@@ -166,6 +175,12 @@ def get_code_drafts():
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
 
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
+
     drafts = (
         db.session.query(CodeDraft)
         .filter_by(student_id=student_id, assignment_id=assignment_id)
@@ -202,6 +217,12 @@ def get_latest_draft():
 
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+    if not assignment.enable_code_editor:
+        raise BadRequestError("Code editor is not enabled for this assignment.")
 
     draft = (
         db.session.query(CodeDraft)
@@ -462,7 +483,7 @@ def submit_code():
         app_obj = current_app._get_current_object()
         threading.Thread(
             target=async_get_ai_feedback,
-            args=(app_obj, new_submission.id, content, results_json_content),
+            args=(app_obj, new_submission.id, file_path, results_json_content),
         ).start()
 
         # Save a final draft copy
@@ -924,23 +945,24 @@ def ai_chat():
     if not course:
         raise BadRequestError("Course not found for this assignment.")
 
-    # student is already fetched by _verify_student above — reuse for coding_insights
-
     # Load recent chat history so the LLM has memory of prior conversation.
     chat_history = get_chat_history(student_id, assignment_id, limit=20)
+    submission_history = get_recent_submission_history_text(
+        student_id,
+        assignment_id,
+    )
+    if not submission_history:
+        legacy_insights = str(getattr(student, "coding_insights", "") or "").strip()
+        if legacy_insights and legacy_insights != "No history.":
+            submission_history = legacy_insights
 
     # --- Build context sections ---
-    context_parts = []
-
-    # Assignment description gives the model grounding about what the task is.
-    assignment_desc = str(getattr(assignment, "description", "") or "").strip()
-    if assignment_desc:
-        context_parts.append(f"Assignment description:\n{assignment_desc}")
-
-    # Student's coding_insights summarises their historical patterns.
-    coding_insights = str(getattr(student, "coding_insights", "") or "").strip()
-    if coding_insights and coding_insights != "No history.":
-        context_parts.append(f"Student coding history:\n{coding_insights}")
+    feedback_context = build_allowed_feedback_context(
+        assignment=assignment,
+        code_text=code,
+        submission_history=submission_history,
+    )
+    context_parts = [render_feedback_context(feedback_context)]
 
     # Prior conversation turns give the model memory across messages.
     if chat_history:
@@ -957,7 +979,7 @@ def ai_chat():
     # Build user prompt, incorporating the instructor's selected prompt as
     # additional context when one was chosen via prompt_id.
     prompt_context = f"\n\nInstructor guidance: {instructor_prompt_text}" if instructor_prompt_text else ""
-    user_prompt = f"{context_block}Student's current code:\n```python\n{code}\n```\n\nStudent message: {user_message}{prompt_context}"
+    user_prompt = f"{context_block}Student message: {user_message}{prompt_context}"
     provider, model = get_provider_and_model(assignment, course)
     temperature = get_temperature(assignment, course)
 

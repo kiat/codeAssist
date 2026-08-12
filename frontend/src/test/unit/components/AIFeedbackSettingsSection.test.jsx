@@ -35,6 +35,7 @@ describe("AIFeedbackSettingsSection", () => {
     expect(screen.getByLabelText("Assignment description")).toBeChecked();
     expect(screen.getByLabelText("Student solution code")).toBeChecked();
     expect(screen.getByLabelText("Test cases")).not.toBeChecked();
+    expect(screen.getByLabelText("Previous submission feedback")).toBeChecked();
   });
 
   it("renders usage limit inputs with default wait time", () => {

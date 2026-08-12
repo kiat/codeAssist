@@ -47,6 +47,7 @@ CREATE TABLE assignment_extensions (
 CREATE TABLE assignments (
     id uuid PRIMARY KEY,
     name varchar(50) NOT NULL,
+    description text,
     course_id uuid NOT NULL,
     due_date timestamp,
     anonymous_grading boolean DEFAULT FALSE,
@@ -89,6 +90,22 @@ CREATE TABLE submission_submitters (
     FOREIGN KEY (submission_id) REFERENCES submissions (id),
     FOREIGN KEY (submitter_id) REFERENCES user (id)
 );
+
+CREATE TABLE student_submission_insights (
+    id uuid PRIMARY KEY,
+    student_id uuid NOT NULL,
+    assignment_id uuid NOT NULL,
+    submission_id uuid NOT NULL UNIQUE,
+    insights json,
+    summary text,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    FOREIGN KEY (student_id) REFERENCES user (id),
+    FOREIGN KEY (assignment_id) REFERENCES assignments (id),
+    FOREIGN KEY (submission_id) REFERENCES submissions (id)
+);
+
+CREATE INDEX student_submission_insights_idx
+ON student_submission_insights (student_id, assignment_id, created_at);
 
 /* Create TestCases table */
 CREATE TABLE test_cases (
