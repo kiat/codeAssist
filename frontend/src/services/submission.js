@@ -42,6 +42,9 @@ export async function rerunSubmissionAutograder(params) {
 }
 
 export async function exportSubmissions(params) {
-  return service("export_submissions", params, "get", { responseType: "blob" });
+  return service("export_submissions", params, "get", {
+    responseType: "blob",
+    skipGlobalErrorMessage: true,
+  });
 }
 

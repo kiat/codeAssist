@@ -37,6 +37,8 @@ describe('<ExportSubmissions />', () => {
     onCancel.mockReset();
     exportSubmissions.mockReset();
     message.error.mockClear();
+    window.URL.createObjectURL.mockClear();
+    window.URL.revokeObjectURL.mockClear();
   });
 
   it('does not render when open=false', () => {
@@ -61,6 +63,17 @@ describe('<ExportSubmissions />', () => {
     renderModal(true);
     fireEvent.click(screen.getByRole('button', { name: /close/i }));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not request an export before assignmentId is available', () => {
+    render(
+      <ExportSubmissions open={true} onCancel={onCancel} assignmentId={undefined} />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /download submissions/i }));
+
+    expect(exportSubmissions).not.toHaveBeenCalled();
+    expect(message.error).toHaveBeenCalledWith('Assignment is still loading.');
   });
 
   it('downloads the zip using the filename from Content-Disposition', async () => {
@@ -103,6 +116,27 @@ describe('<ExportSubmissions />', () => {
 
     await waitFor(() => expect(clickSpy).toHaveBeenCalled());
     expect(capturedDownloadName).toBe('submissions.zip');
+
+    clickSpy.mockRestore();
+  });
+
+  it('reads the download filename from a canonical Content-Disposition header', async () => {
+    exportSubmissions.mockResolvedValue({
+      data: new Blob(['zip-bytes']),
+      headers: { 'Content-Disposition': "attachment; filename*=UTF-8''HW%201_submissions.zip" },
+    });
+    let capturedDownloadName;
+    const clickSpy = jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function () {
+        capturedDownloadName = this.download;
+      });
+
+    renderModal(true);
+    fireEvent.click(screen.getByRole('button', { name: /download submissions/i }));
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalled());
+    expect(capturedDownloadName).toBe('HW 1_submissions.zip');
 
     clickSpy.mockRestore();
   });
