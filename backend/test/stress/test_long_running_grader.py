@@ -10,11 +10,14 @@ so the submitted file still matches the autograder's expected shape.
 import argparse
 import os
 import shutil
+import subprocess
 import tempfile
 import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import requests
 
 from utils import (
     add_user,
@@ -67,12 +70,13 @@ def submit_and_measure(test_config: dict, thread_index: int, current_assignment_
     student_id = None
     temp_dir = None
     start_time = time.time()
+    session = requests.Session()
 
     try:
         student_name = (
             f"long_runner_{test_config['name']}_{thread_index}_{uuid.uuid4().hex[:8]}"
         )
-        student_id = add_user(name=student_name)
+        student_id = add_user(name=student_name, session=session)
 
         with created_students_lock:
             created_students.append(student_id)
@@ -91,6 +95,7 @@ def submit_and_measure(test_config: dict, thread_index: int, current_assignment_
             assignment_id=current_assignment_id,
             student_id=student_id,
             submission_file_path=submission_file,
+            session=session,
         )
 
         duration = time.time() - start_time
@@ -123,6 +128,7 @@ def submit_and_measure(test_config: dict, thread_index: int, current_assignment_
     finally:
         if temp_dir:
             shutil.rmtree(temp_dir, ignore_errors=True)
+        session.close()
 
 
 def print_results_summary() -> None:
@@ -163,6 +169,18 @@ def cleanup(current_assignment_id: str | None) -> None:
     print("Cleanup:")
 
     if current_assignment_id:
+        container_name = f"assignment_container_{current_assignment_id}"
+        try:
+            subprocess.run(
+                ["docker", "rm", "-f", container_name],
+                capture_output=True,
+                check=True,
+            )
+            print(f"- Removed container: {container_name}")
+        except subprocess.CalledProcessError as error:
+            stderr = error.stderr.decode(errors="ignore").strip() if error.stderr else str(error)
+            print(f"- Failed to remove container {container_name}: {stderr}")
+
         try:
             delete_assignment(current_assignment_id)
             print(f"- Deleted assignment: {current_assignment_id}")

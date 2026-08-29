@@ -1,8 +1,13 @@
+import io
 import os
+import shutil
+import uuid
 import pytest
 from flask import json, session
 from api import create_app, db
 from api.models import Submission
+
+import routes.submission as submission_module
 from util.errors import ForbiddenError
 
 from routes.submission import submission
@@ -330,6 +335,131 @@ def test_upload_submission_missing_file(client):
     response = client.post("/upload_submission", data={})
     # We expect a 400 error for missing file
     assert response.status_code == 400
+
+
+def _cleanup_submission_dirs(assignment_id):
+    """Remove any runs/ and archive/ directories a test created for assignment_id."""
+    backend_routes_dir = os.path.dirname(os.path.abspath(submission_module.__file__))
+    for subtree in ("runs", "archive"):
+        path = os.path.join(backend_routes_dir, "upload_autograder", subtree, assignment_id)
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def _mock_assignment_lookups(mocker, fake_assignment):
+    """Mock the Assignment/AssignmentExtension/Submission queries upload_submission makes."""
+    def fake_query(model):
+        dummy = mocker.Mock()
+        if model.__name__ == "Assignment":
+            dummy.filter_by.return_value.first.return_value = fake_assignment
+        elif model.__name__ == "AssignmentExtension":
+            dummy.filter_by.return_value.first.return_value = None
+        elif model.__name__ == "Submission":
+            dummy.filter_by.return_value.count.return_value = 0
+        return dummy
+
+    mocker.patch("routes.submission.db.session.query", side_effect=fake_query)
+    mocker.patch("routes.submission.db.session.add")
+    mocker.patch("routes.submission.db.session.commit")
+
+
+def test_upload_submission_no_autograder_archives_staged_files(client, mocker):
+    """Test /upload_submission archives the staged files when no autograder is configured."""
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = ""
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 200
+        submission_id = response.get_json()["submissionID"]
+
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        assert os.path.isdir(archived_path)
+        assert set(os.listdir(archived_path)) == {"solution.py"}
+
+        # The temporary staging directory should be removed.
+        staging_dir = os.path.join(
+            os.path.dirname(os.path.abspath(submission_module.__file__)),
+            "upload_autograder", "runs", assignment_id, "submission", submission_id,
+        )
+        assert not os.path.exists(staging_dir)
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_success_archives_submission_and_results(client, mocker):
+    """Test /upload_submission archives the submission and results after a successful run."""
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = "autograder-test"
+    fake_assignment.autograder_timeout = 30
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    fake_container = mocker.Mock()
+    fake_container.name = "assignment_container_test"
+
+    def fake_exec_run(cmd):
+        result = mocker.Mock()
+        result.exit_code = 0
+        if cmd.startswith("cat "):
+            result.output.decode.return_value = '{"score": 100, "execution_time": 1.5}'
+        return result
+
+    fake_container.exec_run = mocker.Mock(side_effect=fake_exec_run)
+    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
+
+    fake_proc = mocker.Mock()
+    fake_proc.returncode = 0
+    mocker.patch("routes.submission.subprocess.run", return_value=fake_proc)
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.get_json()
+        submission_id = body["submissionID"]
+
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        archived_files = os.listdir(archived_path)
+        assert "solution.py" in archived_files
+        assert f"results_{submission_id}.json" in archived_files
+        assert body["results_path"] == os.path.join(archived_path, f"results_{submission_id}.json")
+    finally:
+        _cleanup_submission_dirs(assignment_id)
 
 
 def test_delete_submission_not_found(client, mocker):

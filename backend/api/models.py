@@ -1,8 +1,14 @@
 from marshmallow import Schema, fields
+from sqlalchemy import event
 from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
 from dataclasses import dataclass
+import docker
+import os
+import shutil
+import logging
+
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
@@ -64,7 +70,7 @@ class Assignment(db.Model):
     published = db.Column(db.Boolean, default=False)
     published_date = db.Column(TIMESTAMP(timezone=True), nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
-    # container_id = db.Column(db.String)
+    container_id = db.Column(db.String)
     autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
 
@@ -86,6 +92,33 @@ class Assignment(db.Model):
     ai_feedback_style = db.Column(db.String, nullable=True)
     ai_feedback_max_requests = db.Column(db.Integer, nullable=True)
     ai_feedback_wait_seconds = db.Column(db.Integer, nullable=False, default=0)
+
+def cleanup_assignment_container(mapper, connection, target):
+    container_id = target.container_id
+    if not container_id:
+        return
+    try:
+        client = docker.from_env()
+        container = client.containers.get(container_id)
+        container.stop()
+        container.remove(force=True)
+    except docker.errors.NotFound:
+        return
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "Failed to clean up container %s for deleted assignment %s",
+            container_id, target.id, exc_info=True
+        )
+
+event.listen(Assignment, "after_delete", cleanup_assignment_container)
+
+def cleanup_assignment_directories(mapper, connection, target):
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_dir = os.path.join(backend_dir, "routes", "upload_autograder")
+    for subtree in ("runs", "archive"):
+        shutil.rmtree(os.path.join(base_dir, subtree, str(target.id)), ignore_errors=True)
+
+event.listen(Assignment, "after_delete", cleanup_assignment_directories)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
