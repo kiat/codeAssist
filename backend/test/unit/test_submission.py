@@ -393,7 +393,7 @@ def test_upload_submission_no_autograder_archives_staged_files(client, mocker):
 
         archived_path = submission_module.archive_dir(assignment_id, submission_id)
         assert os.path.isdir(archived_path)
-        assert os.listdir(archived_path) == ["solution.py"]
+        assert set(os.listdir(archived_path)) == {"solution.py"}
 
         # The temporary staging directory should be removed.
         staging_dir = os.path.join(

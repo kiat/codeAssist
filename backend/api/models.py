@@ -102,6 +102,8 @@ def cleanup_assignment_container(mapper, connection, target):
         container = client.containers.get(container_id)
         container.stop()
         container.remove(force=True)
+    except docker.errors.NotFound:
+        return
     except Exception:
         logging.getLogger(__name__).warning(
             "Failed to clean up container %s for deleted assignment %s",

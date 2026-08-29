@@ -20,7 +20,6 @@ from util.auth import get_user_course_role, require_authenticated, require_cours
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
-from collections import defaultdict
 import threading
 import logging
 import concurrent.futures
@@ -28,7 +27,7 @@ import concurrent.futures
 
 submission = Blueprint('submission', __name__)
 _docker_client = None
-_container_locks = defaultdict(threading.Lock)
+_container_locks = {}
 _exec_pool = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="docker-exec")
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ def get_docker_client():
     return _docker_client
 
 def get_container_lock(assignment_id):
-    return _container_locks[assignment_id]
+    return _container_locks.setdefault(assignment_id, threading.Lock())
 
 def exec_run_with_timeout(container, cmd, timeout=30):
     future = _exec_pool.submit(container.exec_run, cmd)
@@ -134,9 +133,11 @@ def _verify_student_owner(student_id, assignment_id=None):
     raise ForbiddenError("You can only access your own data")
 
 def _normalize_tag(name):
-    if name and ':' not in name:
-        return name + ':latest'
-    return name
+    if not name:
+        return name
+    if name.rfind(":") > name.rfind("/"):
+        return name
+    return f"{name}:latest"
 
 def get_or_create_assignment_container(assignment):
     '''
