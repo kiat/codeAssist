@@ -1,13 +1,9 @@
 import { useState } from "react";
 import { Button, Form, Modal, Radio, Select, Typography, Upload, message } from "antd";
-import { useNavigate } from "react-router-dom";
 
 export default ({ open, onCancel, autograderFile, onSuccess }) => {
   const [uploadedSubmission, setUploadedSubmission] = useState(null);
-  const [uploadedAutograder, setUploadedAutograder] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  const navigate = useNavigate();
 
   const handleTestAutograder = async () => {
     if (!uploadedSubmission || !autograderFile) {

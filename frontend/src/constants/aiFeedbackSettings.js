@@ -1,5 +1,86 @@
 import { DEFAULT_AI_FEEDBACK_PROMPT } from "./aiFeedback";
 
+export const AI_PROVIDER_KEYS = {
+  OPENAI: "openai",
+  GEMINI: "gemini",
+  GEMINI_VERTEX: "gemini_vertex",
+  CLAUDE: "claude",
+  OLLAMA: "ollama",
+};
+
+export const AI_PROVIDERS = [
+  {
+    key: AI_PROVIDER_KEYS.OPENAI,
+    label: "ChatGPT",
+    displayName: "OpenAI / ChatGPT",
+  },
+  {
+    key: AI_PROVIDER_KEYS.GEMINI,
+    label: "Gemini",
+    displayName: "Google Gemini",
+  },
+  {
+    key: AI_PROVIDER_KEYS.GEMINI_VERTEX,
+    label: "Gemini over Vertex AI",
+    displayName: "Gemini over Vertex AI",
+  },
+  {
+    key: AI_PROVIDER_KEYS.CLAUDE,
+    label: "Claude",
+    displayName: "Anthropic Claude",
+  },
+  {
+    key: AI_PROVIDER_KEYS.OLLAMA,
+    label: "Ollama",
+    displayName: "Ollama (Local LLM)",
+  },
+];
+
+export const AI_PROVIDER_DEFAULT_MODELS = {
+  [AI_PROVIDER_KEYS.OPENAI]: "gpt-4o",
+  [AI_PROVIDER_KEYS.GEMINI]: "gemini-1.5-flash",
+  [AI_PROVIDER_KEYS.GEMINI_VERTEX]: "gemini-2.5-flash",
+  [AI_PROVIDER_KEYS.CLAUDE]: "claude-sonnet-5",
+  [AI_PROVIDER_KEYS.OLLAMA]: "llama3",
+};
+
+export const VERTEX_LOCATION_OPTIONS = [
+  { label: "Server default", value: "" },
+  { label: "global", value: "global" },
+  { label: "us-central1", value: "us-central1" },
+];
+
+export function isVertexProvider(provider) {
+  return provider === AI_PROVIDER_KEYS.GEMINI_VERTEX;
+}
+
+export function getAiProviderLabel(provider) {
+  return (
+    AI_PROVIDERS.find((item) => item.key === provider)?.label ||
+    provider ||
+    "No provider"
+  );
+}
+
+export function hasProviderConfiguration(course, provider) {
+  if (provider === AI_PROVIDER_KEYS.OPENAI) {
+    return !!course?.has_openai_api_key;
+  }
+  if (provider === AI_PROVIDER_KEYS.GEMINI) {
+    return !!course?.has_gemini_api_key;
+  }
+  if (provider === AI_PROVIDER_KEYS.GEMINI_VERTEX) {
+    return !!course?.has_gemini_vertex_config;
+  }
+  if (provider === AI_PROVIDER_KEYS.CLAUDE) {
+    return !!course?.has_claude_api_key;
+  }
+  if (provider === AI_PROVIDER_KEYS.OLLAMA) {
+    return !!course?.has_ollama_api_key;
+  }
+  return false;
+}
+
 export const DEFAULT_AI_ALLOWED_INPUTS = {
   assignment_description: true,
   student_code: true,

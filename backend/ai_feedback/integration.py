@@ -6,6 +6,7 @@ import shutil
 import time
 import threading
 import json
+import traceback
 import requests
 
 from openai import OpenAI
@@ -22,6 +23,17 @@ from ai_feedback.memory import (
     get_recent_submission_history_text,
     record_submission_insight,
 )
+from ai_feedback.providers.gemini import (
+    GEMINI_PROVIDER,
+    GEMINI_VERTEX_PROVIDER,
+    VERTEX_AUTH_API_KEY,
+    GeminiProvider,
+    build_developer_api_config,
+    build_vertex_config,
+    create_gemini_client,
+    validate_model,
+)
+from ai_feedback.providers.errors import ProviderConfigurationError
 from ai_feedback.settings import (
     build_allowed_feedback_context,
     get_enabled_feedback_prompt,
@@ -46,10 +58,26 @@ GEMINI_TRANSIENT_EXCEPTIONS = (
 )
 PROVIDER_DISPLAY_NAMES = {
     "openai": "OpenAI",
-    "gemini": "Gemini",
+    GEMINI_PROVIDER: "Gemini",
+    GEMINI_VERTEX_PROVIDER: "Gemini over Vertex AI",
     "claude": "Claude",
     "ollama": "Ollama",
 }
+
+
+def log_ai_feedback_exception(submission_id, provider, model, error):
+    """Log internal feedback failures without exposing details to students."""
+    provider_label = provider or "unknown"
+    model_label = model or "unknown"
+    print(
+        "AI_FEEDBACK: Unexpected error for submission "
+        f"{submission_id} provider={provider_label} model={model_label} - "
+        f"{type(error).__name__}: {error}",
+        flush=True,
+    )
+    traceback.print_exc()
+
+
 CORRECTNESS_SYSTEM_PROMPT = (
     "You are an AI feedback assistant for programming assignments. "
     "Give short, student-facing feedback about correctness, test results, "
@@ -470,43 +498,45 @@ def get_structured_feedback_from_openai(client, prompt, model, temperature, past
     return parse_feedback_json(raw_response, "OpenAI", past_insights)
 
 
+def _generate_gemini_feedback_text(client_config, prompt, model, temperature):
+    provider = GeminiProvider(create_gemini_client(client_config))
+    return provider.generate(
+        model=model,
+        prompt=f"{CORRECTNESS_SYSTEM_PROMPT}\n\n{prompt}",
+        temperature=temperature,
+        max_output_tokens=GEMINI_MAX_OUTPUT_TOKENS,
+        response_mime_type="application/json",
+    )
+
+
 def get_structured_feedback_from_gemini(api_key, prompt, model, temperature, past_insights):
-    """Sends request to Gemini and parses JSON feedback."""
-    response = post_gemini_with_retry(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        params={"key": api_key},
-        payload={
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "text": f"{CORRECTNESS_SYSTEM_PROMPT}\n\n{prompt}"
-                        }
-                    ],
-                }
-            ],
-            "generationConfig": get_gemini_generation_config(model, temperature),
-        },
-        timeout=30,
+    """Sends request to Gemini Developer API and parses JSON feedback."""
+    validate_model(GEMINI_PROVIDER, model)
+    raw_response = _generate_gemini_feedback_text(
+        build_developer_api_config(api_key),
+        prompt,
+        model,
+        temperature,
     )
-
-    if response.status_code >= 400:
-        raise ValueError(f"Gemini API error: {response.text}")
-
-    data = response.json()
-    candidate = data.get("candidates", [{}])[0]
-    finish_reason = candidate.get("finishReason")
-    if finish_reason:
-        print(f"AI_FEEDBACK: Gemini finishReason={finish_reason}", flush=True)
-
-    raw_response = "".join(
-        part.get("text", "")
-        for part in candidate.get("content", {}).get("parts", [])
-        if not part.get("thought")
-    )
-
     return parse_feedback_json(raw_response, "Gemini", past_insights)
+
+
+def get_structured_feedback_from_gemini_vertex(
+    prompt,
+    model,
+    temperature,
+    past_insights,
+    vertex_location=None,
+):
+    """Sends request to Gemini over Vertex AI and parses JSON feedback."""
+    validate_model(GEMINI_VERTEX_PROVIDER, model)
+    raw_response = _generate_gemini_feedback_text(
+        build_vertex_config(vertex_location),
+        prompt,
+        model,
+        temperature,
+    )
+    return parse_feedback_json(raw_response, "Gemini over Vertex AI", past_insights)
 
 
 def get_structured_feedback_from_claude(api_key, prompt, model, temperature, past_insights):
@@ -662,6 +692,17 @@ def get_assignment_provider_credential(assignment):
     return decrypt_api_key(encrypted_credential)
 
 
+def get_assignment_vertex_location(assignment):
+    """Returns an assignment-specific Vertex AI location override, if configured."""
+    location = (
+        getattr(assignment, "ai_feedback_vertex_location", None)
+        or getattr(assignment, "vertex_location", None)
+        or ""
+    )
+    location = str(location).strip()
+    return location or None
+
+
 def infer_api_key_provider(api_key):
     """Infers provider from common API key prefixes when possible."""
     normalized_key = (api_key or "").strip()
@@ -702,7 +743,9 @@ def get_provider_credentials(provider, course, assignment=None):
     """Returns API key and OpenAI client if needed."""
     api_key = None
     client = None
-    assignment_credential = get_assignment_provider_credential(assignment)
+    assignment_credential = None
+    if provider != GEMINI_VERTEX_PROVIDER:
+        assignment_credential = get_assignment_provider_credential(assignment)
 
     if provider == "openai":
         if assignment_credential:
@@ -715,7 +758,7 @@ def get_provider_credentials(provider, course, assignment=None):
             api_key = decrypt_api_key(course.openai_api_key)
         client = OpenAI(api_key=api_key)
 
-    elif provider == "gemini":
+    elif provider == GEMINI_PROVIDER:
         if assignment_credential:
             validate_assignment_provider_credential(provider, assignment_credential)
             api_key = assignment_credential
@@ -724,6 +767,18 @@ def get_provider_credentials(provider, course, assignment=None):
                 raise ValueError("Missing Gemini API key for this course or assignment")
 
             api_key = decrypt_api_key(course.gemini_api_key)
+
+    elif provider == GEMINI_VERTEX_PROVIDER:
+        vertex_config = build_vertex_config(get_assignment_vertex_location(assignment))
+        if vertex_config.vertex_auth_mode == VERTEX_AUTH_API_KEY:
+            if not vertex_config.api_key:
+                raise ProviderConfigurationError(
+                    "Vertex AI API key is required."
+                )
+        elif not vertex_config.project:
+            raise ProviderConfigurationError(
+                "Google Cloud project is required for Vertex AI."
+            )
 
     elif provider == "claude":
         if assignment_credential:
@@ -748,7 +803,16 @@ def get_provider_credentials(provider, course, assignment=None):
     return api_key, client
 
 
-def get_feedback_by_provider(provider, api_key, client, prompt, model, temperature, past_insights):
+def get_feedback_by_provider(
+    provider,
+    api_key,
+    client,
+    prompt,
+    model,
+    temperature,
+    past_insights,
+    vertex_location=None,
+):
     """Calls the selected AI provider."""
     if provider == "openai":
         return get_structured_feedback_from_openai(
@@ -759,13 +823,22 @@ def get_feedback_by_provider(provider, api_key, client, prompt, model, temperatu
             past_insights,
         )
 
-    if provider == "gemini":
+    if provider == GEMINI_PROVIDER:
         return get_structured_feedback_from_gemini(
             api_key,
             prompt,
             model,
             temperature,
             past_insights,
+        )
+
+    if provider == GEMINI_VERTEX_PROVIDER:
+        return get_structured_feedback_from_gemini_vertex(
+            prompt,
+            model,
+            temperature,
+            past_insights,
+            vertex_location=vertex_location,
         )
 
     if provider == "claude":
@@ -793,6 +866,8 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
     """Background task for obtaining and recording AI feedback."""
     ctx = app.app_context()
     ctx.push()
+    provider = None
+    model = None
 
     try:
         print(f"AI_FEEDBACK: Starting for submission {submission_id}", flush=True)
@@ -836,6 +911,7 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         provider, model = get_provider_and_model(assignment, course)
         temperature = get_temperature(assignment, course)
         api_key, client = get_provider_credentials(provider, course, assignment)
+        vertex_location = get_assignment_vertex_location(assignment)
 
         print(
             f"AI_FEEDBACK: Using provider={provider}, model={model}, temperature={temperature}",
@@ -867,6 +943,7 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
             model,
             temperature,
             past_insights,
+            vertex_location=vertex_location,
         )
 
         print("AI_FEEDBACK: Updating submission feedback", flush=True)
@@ -876,17 +953,16 @@ def async_get_ai_feedback(app, submission_id, file_path, results_json_content):
         print(f"AI_FEEDBACK: Saved feedback for submission {submission_id}", flush=True)
 
     except Exception as e:
-        print(f"AI_FEEDBACK: Unexpected error - {type(e).__name__}: {e}", flush=True)
+        log_ai_feedback_exception(submission_id, provider, model, e)
 
         try:
             submission = Submission.query.get(submission_id)
 
             if submission:
+                safe_message = "AI feedback could not be generated at this time."
                 submission.ai_feedback = json.dumps({
-                    "error": f"AI feedback generation failed: {type(e).__name__}: {e}",
-                    "insights": [
-                        "AI feedback could not be generated for this submission. Please review the submission manually."
-                    ],
+                    "error": safe_message,
+                    "insights": [safe_message],
                     "annotations": []
                 })
 

@@ -9,6 +9,7 @@ EXPECTED_AI_SETTINGS_KEYS = {
     "use_course_ai_default",
     "ai_feedback_provider",
     "ai_feedback_model",
+    "ai_feedback_vertex_location",
     "ai_feedback_temperature",
     "ai_feedback_style",
     "ai_feedback_max_requests",

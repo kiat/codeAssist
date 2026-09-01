@@ -1,5 +1,4 @@
 import { Layout, message, Modal } from "antd";
-import axios from "axios";
 import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import "./setupMocks";
 import Home from "./pages/home";
@@ -14,11 +13,8 @@ import AISettings from "./pages/instructor/aiSettings";
 import InstructorAssignments from "./pages/instructor/assignments";
 import Enrollment from "./pages/instructor/enrollment";
 import ReviewGrades from "./pages/reviewGrades";
-import EditOutline from "./pages/editOutline";
 import ConfigureAutograder from "./pages/configureAutograder";
-import CreateRubric from "./pages/createRubric";
 import ManageSubmissions from "./pages/manageSubmissions";
-import GradeSubmissions from "./pages/gradeSubmissions";
 import Extensions from "./pages/extensions";
 import AssignmentSettings from "./pages/assignmentSettings";
 import EditAccount from "./pages/editAccount";

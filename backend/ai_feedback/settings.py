@@ -3,10 +3,19 @@ import json
 import re
 
 from util.encryption_utils import encrypt_api_key
+from ai_feedback.providers.gemini import GEMINI_PROVIDER, GEMINI_VERTEX_PROVIDER
 
 
 LEGACY_FEEDBACK_PROMPT_ID = "legacy_feedback_prompt"
 MAX_AI_FEEDBACK_REQUESTS = 1000
+SUPPORTED_AI_FEEDBACK_PROVIDERS = {
+    "openai",
+    GEMINI_PROVIDER,
+    GEMINI_VERTEX_PROVIDER,
+    "claude",
+    "ollama",
+}
+VERTEX_LOCATION_PATTERN = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
 
 DEFAULT_AI_ALLOWED_INPUTS = {
     "assignment_description": True,
@@ -119,6 +128,7 @@ AI_FEEDBACK_SETTING_KEYS = {
     "ai_feedback_provider",
     "ai_feedback_model",
     "ai_feedback_api_key",
+    "ai_feedback_vertex_location",
     "ai_feedback_temperature",
     "ai_feedback_style",
     "ai_feedback_max_requests",
@@ -291,6 +301,20 @@ def normalize_non_negative_int(
     return value
 
 
+def normalize_vertex_location(value):
+    if value in (None, ""):
+        return None
+
+    location = str(value).strip()
+    if not location:
+        return None
+
+    if not VERTEX_LOCATION_PATTERN.fullmatch(location):
+        raise ValueError("Invalid Vertex AI location")
+
+    return location
+
+
 def serialize_assignment_ai_settings(assignment):
     feedback_prompts = normalize_feedback_prompts(
         getattr(assignment, "ai_feedback_prompts", None),
@@ -311,6 +335,11 @@ def serialize_assignment_ai_settings(assignment):
         ) is not False,
         "ai_feedback_provider": getattr(assignment, "ai_feedback_provider", None),
         "ai_feedback_model": getattr(assignment, "ai_feedback_model", None),
+        "ai_feedback_vertex_location": getattr(
+            assignment,
+            "ai_feedback_vertex_location",
+            None,
+        ),
         "has_assignment_ai_key": bool(
             getattr(assignment, "ai_feedback_api_key", None)
         ),
@@ -368,6 +397,8 @@ def update_assignment_ai_settings(assignment, data):
     if assignment.use_course_ai_default:
         assignment.ai_feedback_provider = None
         assignment.ai_feedback_model = None
+        if hasattr(assignment, "ai_feedback_vertex_location"):
+            assignment.ai_feedback_vertex_location = None
         if hasattr(assignment, "ai_feedback_api_key"):
             assignment.ai_feedback_api_key = ""
     else:
@@ -376,10 +407,19 @@ def update_assignment_ai_settings(assignment, data):
             and data["ai_feedback_provider"] != previous_provider
         )
         if "ai_feedback_provider" in data:
-            assignment.ai_feedback_provider = data["ai_feedback_provider"]
+            provider = data["ai_feedback_provider"]
+            if provider not in SUPPORTED_AI_FEEDBACK_PROVIDERS:
+                raise ValueError("Unsupported AI provider")
+            assignment.ai_feedback_provider = provider
         if "ai_feedback_model" in data:
             assignment.ai_feedback_model = data["ai_feedback_model"]
-        if "ai_feedback_api_key" in data:
+
+        current_provider = getattr(assignment, "ai_feedback_provider", None)
+
+        if current_provider == GEMINI_VERTEX_PROVIDER:
+            if hasattr(assignment, "ai_feedback_api_key"):
+                assignment.ai_feedback_api_key = ""
+        elif "ai_feedback_api_key" in data:
             credential = str(data.get("ai_feedback_api_key") or "").strip()
             if credential:
                 assignment.ai_feedback_api_key = encrypt_api_key(credential)
@@ -387,6 +427,14 @@ def update_assignment_ai_settings(assignment, data):
                 assignment.ai_feedback_api_key = ""
         elif provider_changed and hasattr(assignment, "ai_feedback_api_key"):
             assignment.ai_feedback_api_key = ""
+
+        if current_provider == GEMINI_VERTEX_PROVIDER:
+            if "ai_feedback_vertex_location" in data:
+                assignment.ai_feedback_vertex_location = normalize_vertex_location(
+                    data.get("ai_feedback_vertex_location")
+                )
+        elif hasattr(assignment, "ai_feedback_vertex_location"):
+            assignment.ai_feedback_vertex_location = None
 
     if "ai_feedback_style" in data:
         assignment.ai_feedback_style = data["ai_feedback_style"]

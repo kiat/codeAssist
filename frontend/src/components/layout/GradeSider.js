@@ -12,18 +12,18 @@ import styles from "./styles.module.css";
 
 export default () => {
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+  const { courseInfo } = useContext(GlobalContext);
   const [assignmentInfoCurrent, setAssignmentInfoCurrent] = useState();
 
   const pathname = window.location.pathname;
-  const res = /\/assignment\/\w+\/([A-Za-z0-9\-]+)/.exec(pathname);
+  const res = /\/assignment\/\w+\/([A-Za-z0-9-]+)/.exec(pathname);
   const assignmentId = res ? res[1] : null;
   useEffect(() => {
     setAssignmentInfoCurrent({
       courseName: courseInfo.name,
       courseId: courseInfo.id,
     });
-  }, [pathname, updateAssignmentInfo]);
+  }, [courseInfo.id, courseInfo.name]);
 
   useEffect(() => {
     if (!assignmentInfo.id) {
@@ -50,7 +50,7 @@ export default () => {
             }
           });
         });
-    }, [assignmentInfo.id, assignmentInfo.name, updateAssignmentInfo])
+    }, [assignmentId, assignmentInfo.id, courseInfo.id, updateAssignmentInfo])
   
   return (
     <>

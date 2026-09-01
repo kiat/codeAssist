@@ -1,5 +1,5 @@
 import { Modal, Table, message, Button } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -11,14 +11,7 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
   const [hasRequest, setHasRequest] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (open) {
-      getSubmissions();
-      getActive();
-    }
-  }, [open, studentId, assignmentId]);
-
-  const getSubmissions = async () => {
+  const getSubmissions = useCallback(async () => {
     try {
       const response = await axios.get(`${process.env.REACT_APP_API_URL}/get_submissions`, {
         params: { student_id: studentId, assignment_id: assignmentId },
@@ -31,8 +24,9 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
     } catch (error) {
       message.error("Failed to fetch submission history");
     }
-  };
-  const getActive = async () => {
+  }, [assignmentId, studentId]);
+
+  const getActive = useCallback(async () => {
     try {
       if (!studentId || !assignmentId) {
         setActiveSubmission(null);
@@ -79,7 +73,14 @@ export default function SubmissionHistoryModal({ open, onCancel, studentId, assi
       setHasRequest(false);
       message.error("Failed")
     }
-  }
+  }, [assignmentId, studentId]);
+
+  useEffect(() => {
+    if (open) {
+      getSubmissions();
+      getActive();
+    }
+  }, [getActive, getSubmissions, open]);
 
   const handleSetDefaultSubmission = async (submissionId, e) => {
     e.stopPropagation();
