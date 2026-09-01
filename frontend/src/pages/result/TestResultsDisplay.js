@@ -375,6 +375,24 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     return <p>Loading...</p>;
   }
 
+  if (data && data.grades_published === false) {
+    const pendingContent = (
+      <Alert
+        type="info"
+        showIcon
+        message="Grade pending"
+        description="Your grade and results are being finalized and haven't been published yet. Check back after your instructor publishes grades for this assignment."
+      />
+    );
+    return isModal ? (
+      <Modal open={true} title="Grade Pending" footer={null} onCancel={onCancel} width="60%">
+        {pendingContent}
+      </Modal>
+    ) : (
+      pendingContent
+    );
+  }
+
   if (!testResults || !Array.isArray(testResults.tests)) {
     return <p>No data available or data is malformed.</p>;
   }

@@ -41,3 +41,6 @@ export async function rerunSubmissionAutograder(params) {
   return service("rerun_submission_autograder", params, "post");
 }
 
+export async function publishGrades(params) {
+  return service("publish_grades", params, "post");
+}
