@@ -45,6 +45,10 @@ export async function getGradeStatistics(params) {
   return service("get_grade_statistics", params);
 }
 
+export async function exportEvaluations(params) {
+  return service("export_evaluations", params, "get", { responseType: "blob" });
+}
+
 export async function exportSubmissions(params) {
   return service("export_submissions", params, "get", {
     responseType: "blob",

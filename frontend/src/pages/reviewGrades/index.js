@@ -12,6 +12,7 @@ import { formatDayTimeEn, scorePercent } from "../../common/format";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import ExportSubmissions from "./ExportSubmissions";
+import ExportEvaluations from "./ExportEvaluations";
 import GradeStatistics from "./GradeStatistics";
 import { getGradeStatistics } from "../../services/submission";
 import { GlobalContext } from "../../App";
@@ -21,6 +22,7 @@ import { useNavigate, useParams } from "react-router-dom";
 export default () => {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [statisticsModalOpen, setStatisticsModalOpen] = useState(false);
+  const [evaluationsModalOpen, setEvaluationsModalOpen] = useState(false);
   const [submissions, setSubmissions] = useState([]);
   // Fetched once here (not re-fetched when the Statistics modal opens) and
   // passed down as a prop, so the SCORE column and the modal always agree
@@ -41,6 +43,10 @@ export default () => {
 
   const toggleStatisticsModalOpen = useCallback(() => {
     setStatisticsModalOpen(t => !t);
+  }, []);
+
+  const toggleEvaluationsModalOpen = useCallback(() => {
+    setEvaluationsModalOpen(t => !t);
   }, []);
 
   const goAssignmentResult = (submissionId) => {
@@ -274,7 +280,7 @@ export default () => {
           <Button icon={<DownloadOutlined />} onClick={handleDownloadGrades}>
             Download Grades
           </Button>
-          <Button icon={<DownloadOutlined />} >
+          <Button icon={<DownloadOutlined />} onClick={toggleEvaluationsModalOpen}>
             Export Evaluations
           </Button>
           <Button icon={<DownloadOutlined />} onClick={toggleDownloadModalOpen}>
@@ -300,6 +306,11 @@ export default () => {
         stats={stats}
         loading={statsLoading}
         error={statsError}
+      />
+      <ExportEvaluations
+        open={evaluationsModalOpen}
+        onCancel={toggleEvaluationsModalOpen}
+        assignmentId={assignmentId}
       />
     </>
   );

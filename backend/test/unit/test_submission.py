@@ -1,12 +1,14 @@
 import os
 import io
+import csv
 import uuid
 import zipfile
 import pytest
 from types import SimpleNamespace
+from datetime import datetime, timedelta, timezone
 from flask import json, session
 from api import create_app, db
-from api.models import Assignment, Submission, User, SubmissionSubmitter, TestCaseResult, TestCase
+from api.models import Assignment, Course, Enrollment, Submission, User, SubmissionSubmitter, TestCaseResult, TestCase
 from util.errors import ForbiddenError
 
 from routes.submission import submission
@@ -639,6 +641,24 @@ def test_get_grade_statistics_falls_back_to_autograder_points_when_no_results(ap
         assert buckets_by_label["50-60%"] == 1
 
 
+# Tests for /export_evaluations
+
+
+def test_export_evaluations_missing_assignment_id(client):
+    response = client.get("/export_evaluations")
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data["message"] == "Missing assignment_id"
+
+
+def test_export_evaluations_assignment_not_found(client, mocker):
+    mocker.patch("routes.submission.db.session.query").return_value.filter_by.return_value.first.return_value = None
+    response = client.get("/export_evaluations?assignment_id=missing-assignment")
+    assert response.status_code == 404
+    data = response.get_json()
+    assert data["message"] == "Assignment not found"
+
+
 # Tests for exporting submissions
 
 
@@ -664,6 +684,215 @@ def test_export_submissions_assignment_not_found(client, mocker):
     assert response.status_code == 404
     data = response.get_json()
     assert data["message"] == "Assignment not found"
+
+
+def test_export_evaluations_no_graded_results(app, client):
+    with app.app_context():
+        assignment_id = str(uuid.uuid4())
+        db.session.add(Assignment(id=assignment_id, name="No Results Yet", course_id=str(uuid.uuid4())))
+        db.session.commit()
+
+    response = client.get(f"/export_evaluations?assignment_id={assignment_id}")
+    assert response.status_code == 200
+
+    zf = zipfile.ZipFile(io.BytesIO(response.data))
+    assert zf.namelist() == ["README.txt"]
+    assert "No graded test results found" in zf.read("README.txt").decode()
+
+
+def _make_student(name, email, sis_id):
+    return User(
+        id=str(uuid.uuid4()),
+        password="pw",
+        name=name,
+        email_address=email,
+        sis_user_id=sis_id,
+        role="student",
+    )
+
+
+def test_export_evaluations_success(app, client):
+    with app.app_context():
+        assignment_id = str(uuid.uuid4())
+        course_id = str(uuid.uuid4())
+        instructor_id = str(uuid.uuid4())
+        base_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+        alice = _make_student("Alice Example", "alice@example.com", "alice")
+        bob = _make_student("Bob Example", "bob@example.com", "bob")
+        carol = _make_student("Carol Example", "carol@example.com", "carol")
+        # Dave is enrolled but never submits, to verify non-submitters still
+        # show up in the export instead of silently disappearing.
+        dave = _make_student("Dave Example", "dave@example.com", "dave")
+
+        db.session.add(Course(
+            id=course_id,
+            name="CS 101",
+            instructor_id=instructor_id,
+            semester="Fall",
+            year="2026",
+            entryCode=f"entry-{course_id[:8]}",
+        ))
+        db.session.add(Assignment(id=assignment_id, name="HW1", course_id=course_id))
+        db.session.add_all([alice, bob, carol, dave])
+        db.session.add_all([
+            Enrollment(student_id=alice.id, course_id=course_id, role="student"),
+            Enrollment(student_id=bob.id, course_id=course_id, role="student"),
+            Enrollment(student_id=carol.id, course_id=course_id, role="student"),
+            Enrollment(student_id=dave.id, course_id=course_id, role="student"),
+        ])
+
+        alice_results = json.dumps({
+            "tests": [
+                {"name": "Evaluate 8 / 4 * 2", "number": "2.3", "status": "passed",
+                 "score": 1, "max_score": 1, "output": "42", "expected_output": "42"},
+                {"name": "Check submitted files", "status": "failed", "score": 0,
+                 "max_score": 1, "output": "wrong", "expected_output": "hello"},
+            ],
+            "score": 1,
+        }).encode()
+        bob_results = json.dumps({
+            "tests": [
+                {"name": "Evaluate 8 / 4 * 2", "number": "2.3", "status": "passed",
+                 "score": 1, "max_score": 1, "output": "42", "expected_output": "42"},
+            ],
+            "score": 1,
+        }).encode()
+
+        db.session.add(Submission(
+            id=str(uuid.uuid4()),
+            file_name="alice.py",
+            submission_number=1,
+            student_id=alice.id,
+            assignment_id=assignment_id,
+            student_code_file=b"print(42)",
+            results=alice_results,
+            active=True,
+            completed=True,
+            submitted_at=base_time,
+        ))
+        db.session.add(Submission(
+            id=str(uuid.uuid4()),
+            file_name="bob.py",
+            submission_number=1,
+            student_id=bob.id,
+            assignment_id=assignment_id,
+            student_code_file=b"print(42)",
+            results=bob_results,
+            active=True,
+            completed=True,
+            submitted_at=base_time + timedelta(minutes=1),
+        ))
+        db.session.add(Submission(
+            id=str(uuid.uuid4()),
+            file_name="carol.py",
+            submission_number=1,
+            student_id=carol.id,
+            assignment_id=assignment_id,
+            student_code_file=b"print(0)",
+            results=b"not valid json",
+            active=True,
+            completed=True,
+            submitted_at=base_time + timedelta(minutes=2),
+        ))
+        db.session.commit()
+
+    response = client.get(f"/export_evaluations?assignment_id={assignment_id}")
+    assert response.status_code == 200
+    assert "HW1_evaluations.zip" in response.headers.get("Content-Disposition", "")
+
+    zf = zipfile.ZipFile(io.BytesIO(response.data))
+    # Numbered test -> filename keyed off "number", not the mangled name.
+    # Unnumbered test -> falls back to the sanitized name.
+    assert set(zf.namelist()) == {"Question_2.3.csv", "Check_submitted_files.csv"}
+
+    q1_rows = list(csv.DictReader(io.StringIO(zf.read("Question_2.3.csv").decode())))
+    assert q1_rows == [
+        {
+            "question": "Evaluate 8 / 4 * 2",
+            "student_name": "Alice Example",
+            "student_email": "alice@example.com",
+            "status": "passed",
+            "score": "1",
+            "max_score": "1",
+            "output": "42",
+            "expected_output": "42",
+        },
+        {
+            "question": "Evaluate 8 / 4 * 2",
+            "student_name": "Bob Example",
+            "student_email": "bob@example.com",
+            "status": "passed",
+            "score": "1",
+            "max_score": "1",
+            "output": "42",
+            "expected_output": "42",
+        },
+        {
+            "question": "Evaluate 8 / 4 * 2",
+            "student_name": "Carol Example",
+            "student_email": "carol@example.com",
+            "status": "",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+        {
+            "question": "Evaluate 8 / 4 * 2",
+            "student_name": "Dave Example",
+            "student_email": "dave@example.com",
+            "status": "no submission",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+    ]
+
+    q2_rows = list(csv.DictReader(io.StringIO(zf.read("Check_submitted_files.csv").decode())))
+    assert q2_rows == [
+        {
+            "question": "Check submitted files",
+            "student_name": "Alice Example",
+            "student_email": "alice@example.com",
+            "status": "failed",
+            "score": "0",
+            "max_score": "1",
+            "output": "wrong",
+            "expected_output": "hello",
+        },
+        {
+            "question": "Check submitted files",
+            "student_name": "Bob Example",
+            "student_email": "bob@example.com",
+            "status": "",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+        {
+            "question": "Check submitted files",
+            "student_name": "Carol Example",
+            "student_email": "carol@example.com",
+            "status": "",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+        {
+            "question": "Check submitted files",
+            "student_name": "Dave Example",
+            "student_email": "dave@example.com",
+            "status": "no submission",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+    ]
 
 
 def test_export_submissions_no_active_submissions(client, mocker):
