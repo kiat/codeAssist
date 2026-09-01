@@ -23,10 +23,16 @@ instance.interceptors.response.use(
       return Promise.reject(err);
     }
 
+    if (err.config?.skipGlobalErrorMessage) {
+      return Promise.reject(err);
+    }
+
     if (err.response) {
       // Server responded with a status other than 200 range
       if (err.response.status) {
-        errorMessage = err.response.data.message;
+        errorMessage =
+          err.response.data?.message ||
+          (typeof err.response.data === "string" ? err.response.data : "Operation failed");
       } else {
         errorMessage = 'An unexpected error occurred. Please try again.';
       }

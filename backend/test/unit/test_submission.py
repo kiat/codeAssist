@@ -650,6 +650,15 @@ def test_export_submissions_success(client, mocker):
     fake_student = SimpleNamespace(
         id="stu1", name="Jane Doe", email_address="jane@example.com", sis_user_id="jdoe123"
     )
+    fake_results = {
+        "tests": [{"name": "case 1", "score": 1, "max_score": 1, "status": "passed"}],
+        "score": 95.0,
+        "execution_time": 1.23,
+    }
+    fake_ai_feedback = {
+        "insights": ["Great job"],
+        "annotations": [{"pattern": "print", "comment": "Readable output"}],
+    }
     fake_submission = SimpleNamespace(
         id="sub1",
         student_id="stu1",
@@ -658,12 +667,12 @@ def test_export_submissions_success(client, mocker):
         submission_number=1,
         submitted_at=None,
         student_code_file=b"print('hi')",
-        results=None,
+        results=json.dumps(fake_results).encode(),
         score=95.0,
         execution_time=1.23,
         active=True,
         completed=True,
-        ai_feedback="Great job",
+        ai_feedback=json.dumps(fake_ai_feedback),
     )
 
     user_mock = mocker.MagicMock()
@@ -706,11 +715,24 @@ def test_export_submissions_success(client, mocker):
         names = zf.namelist()
         assert "jdoe123/main.py" in names
         assert "jdoe123/metadata.json" in names
+        assert "jdoe123/results.json" in names
+        assert zf.read("jdoe123/main.py") == b"print('hi')"
+        assert json.loads(zf.read("jdoe123/results.json")) == fake_results
 
         metadata = json.loads(zf.read("jdoe123/metadata.json"))
         assert metadata["submission_id"] == "sub1"
+        assert metadata["student_sis_user_id"] == "jdoe123"
         assert metadata["score"] == 95.0
-        assert metadata["ai_feedback"] == "Great job"
+        assert metadata["ai_feedback"] == fake_ai_feedback
+        assert metadata["autograder_results"] == fake_results
+        assert metadata["submitters"] == [
+            {
+                "id": "stu1",
+                "name": "Jane Doe",
+                "email": "jane@example.com",
+                "sis_user_id": "jdoe123",
+            }
+        ]
         assert metadata["test_case_results"] == []
 
 

@@ -40,6 +40,45 @@ def allowed_file(filename):
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def _stored_file_to_bytes(value):
+    if value is None:
+        return None
+    if isinstance(value, memoryview):
+        return value.tobytes()
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, str):
+        return value.encode("utf-8")
+    return bytes(value)
+
+
+def _json_from_stored_value(value):
+    raw_value = _stored_file_to_bytes(value)
+    if not raw_value:
+        return None
+    try:
+        return json.loads(raw_value.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
+def _json_or_text_from_stored_value(value):
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+
+    raw_value = _stored_file_to_bytes(value)
+    if raw_value is None:
+        return None
+
+    text_value = raw_value.decode("utf-8", errors="replace")
+    try:
+        return json.loads(text_value)
+    except json.JSONDecodeError:
+        return text_value
+
+
 def _verify_course_staff(assignment_id):
     """Verify the requester is course staff (instructor/TA) for the given assignment.
     Returns the authenticated user id.
@@ -661,6 +700,18 @@ def export_submissions():
             submitter_names = sorted(u.name for u in submitter_users) or (
                 [student.name] if student else ["unknown_student"]
             )
+            submitter_metadata = sorted(
+                [
+                    {
+                        "id": str(u.id),
+                        "name": u.name,
+                        "email": u.email_address,
+                        "sis_user_id": u.sis_user_id,
+                    }
+                    for u in submitter_users
+                ],
+                key=lambda u: u["name"] or "",
+            )
 
             base_label = secure_filename(
                 (student.sis_user_id if student else None) or str(sub.student_id)
@@ -669,11 +720,14 @@ def export_submissions():
             used_names[base_label] = count + 1
             folder_name = base_label if count == 0 else f"{base_label}_{count}"
 
-            code_bytes = sub.student_code_file
-            if isinstance(code_bytes, memoryview):
-                code_bytes = code_bytes.tobytes()
+            code_bytes = _stored_file_to_bytes(sub.student_code_file)
             code_filename = secure_filename(sub.file_name or "submission")
             zf.writestr(f"{folder_name}/{code_filename}", code_bytes or b"")
+
+            results_bytes = _stored_file_to_bytes(sub.results)
+            autograder_results = _json_from_stored_value(sub.results)
+            if results_bytes:
+                zf.writestr(f"{folder_name}/results.json", results_bytes)
 
             test_case_rows = db.session.query(TestCaseResult, TestCase).join(
                 TestCase, TestCaseResult.test_case_id == TestCase.id
@@ -684,14 +738,17 @@ def export_submissions():
                 "student_id": str(sub.student_id),
                 "student_name": student.name if student else None,
                 "student_email": student.email_address if student else None,
+                "student_sis_user_id": student.sis_user_id if student else None,
                 "group_submitters": submitter_names,
+                "submitters": submitter_metadata,
                 "file_name": sub.file_name,
                 "submission_number": sub.submission_number,
                 "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None,
                 "score": sub.score,
                 "execution_time": sub.execution_time,
                 "completed": sub.completed,
-                "ai_feedback": sub.ai_feedback,
+                "ai_feedback": _json_or_text_from_stored_value(sub.ai_feedback),
+                "autograder_results": autograder_results,
                 "test_case_results": [
                     {
                         "test_case_name": tc.test_case_name,
