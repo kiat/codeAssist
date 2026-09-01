@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from api import create_app, db
@@ -95,6 +96,38 @@ def test_update_assignment_saves_description(client, mocker, login_as):
 
     assert resp.status_code == 200
     assert mock_assignment.description == "Implement BFS over an unweighted graph."
+
+
+def test_update_assignment_cannot_change_hold_grades(client, mocker, login_as):
+    """hold_grades is locked at creation; grades_published(_at) only via /publish_grades."""
+    mock_assignment = Assignment(
+        id="some-uuid",
+        name="Old",
+        course_id="course-uuid",
+        hold_grades=False,
+        grades_published=False,
+        grades_published_at=None,
+    )
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query.return_value.filter.return_value.first.return_value = None
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+    mocker.patch("routes.assignment.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+
+    resp = client.put("/update_assignment", json={
+        "assignment_id": "some-uuid",
+        "name": "Updated",
+        "course_id": "course-uuid",
+        "hold_grades": True,
+        "grades_published": True,
+        "grades_published_at": "2026-01-01T00:00:00+00:00",
+    })
+
+    assert resp.status_code == 200
+    assert mock_assignment.hold_grades is False
+    assert mock_assignment.grades_published is False
+    assert mock_assignment.grades_published_at is None
 
 
 def test_update_assignment_duplicate_name(client, mocker, login_as):
@@ -357,6 +390,33 @@ def test_create_assignment_saves_description(client, mocker, login_as):
     assert resp.json["description"] == "Explain recursion base cases."
 
 
+def test_create_assignment_saves_hold_grades(client, mocker, login_as):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query.return_value.filter_by.return_value.one_or_none.return_value = None
+    mock_add = mocker.patch("routes.assignment.db.session.add")
+    mocker.patch("routes.assignment.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+
+    created_assignment = Assignment(
+        id="123",
+        name="New Assignment",
+        course_id="course-uuid",
+        hold_grades=True,
+    )
+    mock_query.return_value.filter_by.return_value.first.return_value = created_assignment
+
+    resp = client.post("/create_assignment", json={
+        "name": "New Assignment",
+        "course_id": "course-uuid",
+        "hold_grades": True,
+    })
+
+    assert resp.status_code == 200
+    saved_assignment = mock_add.call_args.args[0]
+    assert saved_assignment.hold_grades is True
+
+
 def test_create_assignment_rejects_too_long_description(client, mocker):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.one_or_none.return_value = None
@@ -410,6 +470,39 @@ def test_duplicate_assignment_success(client, mocker, login_as):
     assert resp.json["name"] == "New Title"
     mock_add.assert_called_once()
     mock_commit.assert_called_once()
+
+
+def test_duplicate_assignment_resets_grades_published(client, mocker, login_as):
+    """hold_grades carries over as a setting; grades_published(_at) must reset
+    since the duplicate has no submissions of its own yet."""
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    old_assignment = Assignment(
+        id="old-id",
+        name="Old",
+        hold_grades=True,
+        grades_published=True,
+        grades_published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    mock_query.return_value.filter_by.return_value.one_or_none.side_effect = [
+        old_assignment,
+        None,
+    ]
+    mock_add = mocker.patch("routes.assignment.db.session.add")
+    mocker.patch("routes.assignment.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+
+    resp = client.post("/duplicate_assignment", json={
+        "oldAssignmentId": "old-id",
+        "newAssignmentTitle": "New Title",
+        "currentCourseId": "course-uuid"
+    })
+
+    assert resp.status_code == 200
+    new_assignment = mock_add.call_args.args[0]
+    assert new_assignment.hold_grades is True
+    assert new_assignment.grades_published is False
+    assert new_assignment.grades_published_at is None
 
 
 def test_duplicate_assignment_old_not_found(client, mocker, login_as):

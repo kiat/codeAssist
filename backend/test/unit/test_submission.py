@@ -2,7 +2,7 @@ import os
 import pytest
 from flask import json, session
 from api import create_app, db
-from api.models import Submission
+from api.models import Submission, Assignment
 from util.errors import ForbiddenError
 
 from routes.submission import submission
@@ -96,12 +96,18 @@ def test_get_latest_submission_success(client, mocker):
     fake_query = mocker.patch.object(Submission, "query", create=True)
     fake_query.filter_by.return_value.order_by.return_value.first.return_value = fake_submission
 
+    fake_assignment = mocker.Mock(course_id="course1", hold_grades=False, grades_published=False)
+    fake_assignment.grades_visible_to_students = True
+    fake_assignment_query = mocker.patch.object(Assignment, "query", create=True)
+    fake_assignment_query.filter_by.return_value.first.return_value = fake_assignment
+    mocker.patch("routes.submission.get_user_course_role", return_value=None)
+
     fake_schema = mocker.patch("routes.submission.SubmissionSchema")
     fake_schema.return_value.dump.return_value = fake_submission
 
     response = client.get("/get_latest_submission?student_id=stu1&assignment_id=assgn1")
     assert response.status_code == 200
-    assert response.get_json() == fake_submission
+    assert response.get_json() == {**fake_submission, "grades_published": True}
 
 
 def test_get_latest_submission_not_found(client, mocker):
@@ -109,12 +115,27 @@ def test_get_latest_submission_not_found(client, mocker):
     fake_query = mocker.patch.object(Submission, "query", create=True)
     fake_query.filter_by.return_value.order_by.return_value.first.return_value = None
 
+    fake_assignment = mocker.Mock(course_id="course1", hold_grades=False, grades_published=False)
+    fake_assignment_query = mocker.patch.object(Assignment, "query", create=True)
+    fake_assignment_query.filter_by.return_value.first.return_value = fake_assignment
+
     fake_schema = mocker.patch("routes.submission.SubmissionSchema")
     fake_schema.return_value.dump.return_value = None
 
     response = client.get("/get_latest_submission?student_id=stu1&assignment_id=assgn1")
     assert response.status_code == 200
     assert response.get_json() == {"message": "No submissions found", "data": None}
+
+
+def test_get_latest_submission_assignment_not_found(client, mocker):
+    """Test /get_latest_submission 404s when the assignment itself doesn't exist."""
+    fake_assignment_query = mocker.patch.object(Assignment, "query", create=True)
+    fake_assignment_query.filter_by.return_value.first.return_value = None
+
+    response = client.get("/get_latest_submission?student_id=stu1&assignment_id=assgn1")
+    assert response.status_code == 404
+    data = response.get_json()
+    assert data["message"] == "Assignment not found"
 
 
 # Tests for deleting a submission
@@ -223,6 +244,149 @@ def test_get_submission_details_success(client, mocker):
     assert response.get_json() == fake_submission_dumped
 
 
+# Tests for grade-visibility redaction (Publish Grades feature)
+
+
+def _mock_submission_and_assignment_query(mocker, submission, assignment):
+    def fake_query(model):
+        dummy = mocker.Mock()
+        if model.__name__ == "Submission":
+            dummy.filter_by.return_value.first.return_value = submission
+        elif model.__name__ == "Assignment":
+            dummy.filter_by.return_value.first.return_value = assignment
+        return dummy
+
+    return mocker.patch("routes.submission.db.session.query", side_effect=fake_query)
+
+
+def test_get_submission_details_redacts_when_held_and_unpublished(client, mocker, login_as):
+    """Student sees no score/results before an assignment's grades are published."""
+    login_as("stu1")
+    fake_submission = mocker.Mock(id="sub1", student_id="stu1", assignment_id="assgn1")
+    fake_assignment = mocker.Mock(course_id="course1", hold_grades=True, grades_published=False)
+    fake_assignment.grades_visible_to_students = False
+
+    _mock_submission_and_assignment_query(mocker, fake_submission, fake_assignment)
+    mocker.patch("routes.submission.get_user_course_role", return_value=None)
+
+    fake_schema = mocker.patch("routes.submission.SubmissionSchema")
+    fake_schema.return_value.dump.return_value = {"id": "sub1", "score": 95, "results": "{...}"}
+
+    response = client.get("/get_submission_details?submission_id=sub1")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["score"] is None
+    assert data["results"] is None
+    assert data["grades_published"] is False
+
+
+def test_get_submission_details_visible_when_not_held(client, mocker, login_as):
+    """Regression: a normal (not held) assignment shows the score immediately."""
+    login_as("stu1")
+    fake_submission = mocker.Mock(id="sub1", student_id="stu1", assignment_id="assgn1")
+    fake_assignment = mocker.Mock(course_id="course1", hold_grades=False, grades_published=False)
+    fake_assignment.grades_visible_to_students = True
+
+    _mock_submission_and_assignment_query(mocker, fake_submission, fake_assignment)
+    mocker.patch("routes.submission.get_user_course_role", return_value=None)
+
+    fake_schema = mocker.patch("routes.submission.SubmissionSchema")
+    fake_schema.return_value.dump.return_value = {"id": "sub1", "score": 95, "results": "{...}"}
+
+    response = client.get("/get_submission_details?submission_id=sub1")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["score"] == 95
+    assert data["results"] == "{...}"
+    assert data["grades_published"] is True
+
+
+def test_get_submission_details_staff_always_sees_score(client, mocker, login_as):
+    """Staff (instructor/TA) always see the full submission regardless of publish state."""
+    login_as("ta1")
+    fake_submission = mocker.Mock(id="sub1", student_id="stu1", assignment_id="assgn1")
+    fake_assignment = mocker.Mock(course_id="course1", hold_grades=True, grades_published=False)
+    fake_assignment.grades_visible_to_students = False
+
+    _mock_submission_and_assignment_query(mocker, fake_submission, fake_assignment)
+    mocker.patch("routes.submission.get_user_course_role", return_value="ta")
+
+    fake_schema = mocker.patch("routes.submission.SubmissionSchema")
+    fake_schema.return_value.dump.return_value = {"id": "sub1", "score": 95, "results": "{...}"}
+
+    response = client.get("/get_submission_details?submission_id=sub1")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["score"] == 95
+    assert data["grades_published"] is True
+
+
+# Tests for /publish_grades
+
+
+def test_publish_grades_missing_params(client):
+    response = client.post("/publish_grades", json={"assignment_id": "assgn1"})
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing assignment_id or published (boolean)"
+
+
+def test_publish_grades_assignment_not_found(client, mocker):
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.post("/publish_grades", json={"assignment_id": "assgn1", "published": True})
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "Assignment not found"
+
+
+def test_publish_grades_forbidden_for_student(client, mocker, login_as):
+    login_as("stu1")
+    fake_assignment = mocker.Mock(id="assgn1", course_id="course1")
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = fake_assignment
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+
+    response = client.post("/publish_grades", json={"assignment_id": "assgn1", "published": True})
+    assert response.status_code == 403
+
+
+def test_publish_grades_success_publishes_and_stamps_timestamp(client, mocker, login_as):
+    login_as("instructor1")
+    fake_assignment = mocker.Mock(
+        id="assgn1", course_id="course1", grades_published=False, grades_published_at=None
+    )
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = fake_assignment
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    mock_commit = mocker.patch("routes.submission.db.session.commit")
+
+    response = client.post("/publish_grades", json={"assignment_id": "assgn1", "published": True})
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["grades_published"] is True
+    assert data["grades_published_at"] is not None
+    assert fake_assignment.grades_published is True
+    assert fake_assignment.grades_published_at is not None
+    mock_commit.assert_called_once()
+
+
+def test_publish_grades_unpublish_clears_timestamp(client, mocker, login_as):
+    login_as("instructor1")
+    fake_assignment = mocker.Mock(id="assgn1", course_id="course1", grades_published=True)
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = fake_assignment
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    mocker.patch("routes.submission.db.session.commit")
+
+    response = client.post("/publish_grades", json={"assignment_id": "assgn1", "published": False})
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["grades_published"] is False
+    assert data["grades_published_at"] is None
+    assert fake_assignment.grades_published is False
+    assert fake_assignment.grades_published_at is None
+
+
 def test_rerun_submission_autograder_missing_id(client):
     response = client.post("/rerun_submission_autograder", json={})
 
@@ -300,25 +464,56 @@ def test_rerun_submission_autograder_forbidden_other_student(client, mocker):
 def test_get_active_submission_success(client, mocker):
     """Test /get_active_submission returns active submission details."""
     fake_submission = {"id": "sub1", "active": True}
-    dummy_query = mocker.patch("routes.submission.db.session.query")
-    dummy_query.return_value.filter_by.return_value.first.return_value = fake_submission
+    fake_assignment = mocker.Mock(course_id="course1", hold_grades=False, grades_published=False)
+    fake_assignment.grades_visible_to_students = True
+
+    def fake_query(model):
+        dummy = mocker.Mock()
+        if model.__name__ == "Assignment":
+            dummy.filter_by.return_value.first.return_value = fake_assignment
+        elif model.__name__ == "Submission":
+            dummy.filter_by.return_value.first.return_value = fake_submission
+        return dummy
+
+    mocker.patch("routes.submission.db.session.query", side_effect=fake_query)
+    mocker.patch("routes.submission.get_user_course_role", return_value=None)
 
     fake_schema = mocker.patch("routes.submission.SubmissionSchema")
     fake_schema.return_value.dump.return_value = fake_submission
 
     response = client.get("/get_active_submission?student_id=stu1&assignment_id=assgn1")
     assert response.status_code == 200
-    assert response.get_json() == fake_submission
+    assert response.get_json() == {**fake_submission, "grades_published": True}
 
 
 def test_get_active_submission_not_found(client, mocker):
     """Test /get_active_submission returns message when no active submission exists."""
-    dummy_query = mocker.patch("routes.submission.db.session.query")
-    dummy_query.return_value.filter_by.return_value.first.return_value = None
+    fake_assignment = mocker.Mock(course_id="course1", hold_grades=False, grades_published=False)
+
+    def fake_query(model):
+        dummy = mocker.Mock()
+        if model.__name__ == "Assignment":
+            dummy.filter_by.return_value.first.return_value = fake_assignment
+        elif model.__name__ == "Submission":
+            dummy.filter_by.return_value.first.return_value = None
+        return dummy
+
+    mocker.patch("routes.submission.db.session.query", side_effect=fake_query)
 
     response = client.get("/get_active_submission?student_id=stu1&assignment_id=assgn1")
     assert response.status_code == 200
     assert response.get_json() == {"message": "No active submission found", "data": None}
+
+
+def test_get_active_submission_assignment_not_found(client, mocker):
+    """Test /get_active_submission 404s when the assignment itself doesn't exist."""
+    dummy_query = mocker.patch("routes.submission.db.session.query")
+    dummy_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.get("/get_active_submission?student_id=stu1&assignment_id=assgn1")
+    assert response.status_code == 404
+    data = response.get_json()
+    assert data["message"] == "Assignment not found"
 
 
 # Edge cases to add in route implementations
