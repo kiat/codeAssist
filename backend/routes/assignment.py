@@ -64,6 +64,10 @@ def update_assignment():
         raise BadRequestError("An assignment with this name already exists")
 
     del data["assignment_id"]
+    # hold_grades is fixed at creation time; grades_published/grades_published_at are
+    # only ever set via /publish_grades (which also stamps the timestamp correctly).
+    for locked_field in ("hold_grades", "grades_published", "grades_published_at"):
+        data.pop(locked_field, None)
     assignment_data, ai_settings_data = split_ai_settings_payload(data)
 
     assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
@@ -228,6 +232,10 @@ def duplicate_assignment():
         old_assignment_data['id'] = new_assignment_id
         old_assignment_data['name'] = new_name
         old_assignment_data['course_id'] = current_course_id
+        # grades_published(_at) reflect released state for the old assignment's own
+        # submissions, not a setting to carry forward — the duplicate has none yet.
+        old_assignment_data['grades_published'] = False
+        old_assignment_data['grades_published_at'] = None
 
         new_assignment = Assignment(**old_assignment_data)
         db.session.add(new_assignment)

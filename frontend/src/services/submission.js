@@ -45,3 +45,7 @@ export async function exportSubmissions(params) {
   return service("export_submissions", params, "get", { responseType: "blob" });
 }
 
+export async function publishGrades(params) {
+  return service("publish_grades", params, "post");
+}
+

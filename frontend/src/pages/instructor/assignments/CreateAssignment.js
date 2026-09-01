@@ -198,6 +198,7 @@ export default ({
         enable_group: !!values.groupSubmission,
         group_size: values.limitGroupSize ? Number(values.limitGroupSize) : null,
         manual_grading: !!values.manualGrading,
+        hold_grades: !!values.hold_grades,
         autograder_points: values.autograderPoints
           ? Number(values.autograderPoints)
           : null,
@@ -415,6 +416,14 @@ export default ({
                       valuePropName="checked"
                     >
                       <Checkbox>Enable Manual Grading</Checkbox>
+                    </Form.Item>
+
+                    <Form.Item
+                      name="hold_grades"
+                      valuePropName="checked"
+                      tooltip="If enabled, students won't see their score or autograder results until you click Publish Grades on the Review Grades page. This cannot be changed after the assignment is created."
+                    >
+                      <Checkbox>Hold grades until published</Checkbox>
                     </Form.Item>
                   </>
                 ) : (

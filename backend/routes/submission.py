@@ -121,6 +121,20 @@ def _verify_student_owner(student_id, assignment_id=None):
     # If we get here, the requester is not authorized
     raise ForbiddenError("You can only access your own data")
 
+
+def _apply_grade_visibility(submission_dict, assignment, requester_id):
+    """Redact score/results from a serialized submission when the requester is the
+    owning student and the assignment is holding grades until publish. Course staff
+    (instructor/TA) always see the full payload regardless of publish state.
+    """
+    is_staff = get_user_course_role(requester_id, assignment.course_id) in {"instructor", "ta"}
+    visible = bool(is_staff or assignment.grades_visible_to_students)
+    submission_dict["grades_published"] = visible
+    if not visible:
+        submission_dict["score"] = None
+        submission_dict["results"] = None
+    return submission_dict
+
 @submission.route('/get_submissions', methods=["GET"])
 def get_submissions():
     '''
@@ -496,10 +510,16 @@ def get_results():
     # Security: Verify the requester owns the data or is course staff
     _verify_student_owner(student_id, assignment_id)
 
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
     submission = (db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
                     .order_by(desc(Submission.submitted_at)).limit(1))
     submission = SubmissionSchema().dump(submission, many=True)
-    
+    requester_id = session.get("user_id")
+    submission = [_apply_grade_visibility(s, assignment, requester_id) for s in submission]
+
     return jsonify(submission)
 
 
@@ -512,6 +532,10 @@ def get_latest_submission():
         raise BadRequestError("Missing student_id or assignment_id")
 
     _verify_student_owner(student_id, assignment_id)
+
+    assignment = Assignment.query.filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
 
     # Query for the latest submission based on the submitted time
     latest_submission = Submission.query.filter_by(
@@ -527,6 +551,7 @@ def get_latest_submission():
         return jsonify({"message": "No submissions found", "data": submission_schema.dump(None)}), 200
 
     submission_data = submission_schema.dump(latest_submission)
+    submission_data = _apply_grade_visibility(submission_data, assignment, session.get("user_id"))
     return jsonify(submission_data), 200
 
 @submission.route('/get_all_assignment_submissions', methods=["GET"])
@@ -552,6 +577,42 @@ def get_all_assignment_submissions():
     submissions_data = submissions_schema.dump(all_submissions)
 
     return jsonify(submissions_data), 200
+
+@submission.route('/publish_grades', methods=["POST"])
+def publish_grades():
+    '''
+    /publish_grades toggles whether an assignment's grades are visible to students.
+    Requires from the frontend a JSON containing:
+    @param assignment_id    the id of the assignment
+    @param published        boolean, True to publish grades, False to unpublish
+    '''
+    data = request.json or {}
+    assignment_id = data.get("assignment_id")
+    published = data.get("published")
+
+    if not assignment_id or not isinstance(published, bool):
+        raise BadRequestError("Missing assignment_id or published (boolean)")
+
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment_obj:
+        raise NotFoundError("Assignment not found")
+
+    require_course_role(assignment_obj.course_id, {"instructor", "ta"}, "Only instructors or TAs can publish grades")
+
+    assignment_obj.grades_published = published
+    assignment_obj.grades_published_at = datetime.now(timezone.utc) if published else None
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to update grade publish status")
+
+    return jsonify({
+        "assignment_id": assignment_id,
+        "grades_published": assignment_obj.grades_published,
+        "grades_published_at": assignment_obj.grades_published_at.isoformat() if assignment_obj.grades_published_at else None,
+    }), 200
 
 @submission.route('/export_submissions', methods=["GET"])
 def export_submissions():
@@ -749,8 +810,13 @@ def get_submission_details():
 
     # Security: Verify the requester owns the submission or is course staff
     _verify_student_owner(str(submission_to_get.student_id), str(submission_to_get.assignment_id))
-    
+
+    assignment = db.session.query(Assignment).filter_by(id=submission_to_get.assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
     submission = SubmissionSchema().dump(submission_to_get)
+    submission = _apply_grade_visibility(submission, assignment, session.get("user_id"))
     return jsonify(submission), 200
 
 
@@ -961,12 +1027,17 @@ def get_active_submission():
 
     _verify_student_owner(student, assignment)
 
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment).first()
+    if not assignment_obj:
+        raise NotFoundError("Assignment not found")
+
     submission = db.session.query(Submission).filter_by(assignment_id=assignment, student_id=student, active=True).first()
 
     if not submission:
         return jsonify({"message": "No active submission found", "data": None}), 200
-    
+
     details = SubmissionSchema().dump(submission)
+    details = _apply_grade_visibility(details, assignment_obj, session.get("user_id"))
 
     return jsonify(details), 200
 

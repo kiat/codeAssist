@@ -13,6 +13,7 @@ import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import PopoverDownload from "../../components/download/PopoverDownload";
 import ExportSubmissions from "./ExportSubmissions";
+import PublishGradesModal from "./PublishGradesModal";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -20,12 +21,25 @@ import { useNavigate, useParams } from "react-router-dom";
 export default () => {
   const [assignmentDetail, setAssignmentDetail] = useState();
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [submissions, setSubmissions] = useState([]);
+  const [gradePublishState, setGradePublishState] = useState({
+    hold_grades: false,
+    grades_published: false,
+  });
   const { assignmentInfo, updateAssignmentInfo } = useContext(GlobalContext);
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
   const { assignmentId } = useParams();
   const [searchText, setSearchText] = useState("");
+
+  const togglePublishModalOpen = useCallback(() => {
+    setPublishModalOpen(t => !t);
+  }, []);
+
+  const handlePublishSuccess = useCallback((data) => {
+    setGradePublishState(prev => ({ ...prev, grades_published: data.grades_published }));
+  }, []);
 
   const toggleDownloadModalOpen = useCallback(() => {
     setDownloadModalOpen(t => !t);
@@ -134,6 +148,20 @@ export default () => {
 
     (async () => {
       try {
+        // Grade publish state for this assignment (hold_grades is fixed at
+        // creation; grades_published is what the Publish/Unpublish button toggles)
+        const assignmentRes = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`,
+          { credentials: "include" }
+        );
+        if (assignmentRes.ok) {
+          const assignmentData = await assignmentRes.json();
+          setGradePublishState({
+            hold_grades: Boolean(assignmentData.hold_grades),
+            grades_published: Boolean(assignmentData.grades_published),
+          });
+        }
+
         // First get all submissions
         const allSubmissions = await fetch(
           `${process.env.REACT_APP_API_URL}/get_all_assignment_submissions?assignment_id=${assignmentId}`,
@@ -242,16 +270,28 @@ export default () => {
           <Button icon={<DownloadOutlined />} onClick={toggleDownloadModalOpen}>
             Export Submissions
           </Button>
-          <Button>
-            <span>Publish Grades</span>
-            <RightOutlined />
-          </Button>
+          {gradePublishState.hold_grades && (
+            <Button onClick={togglePublishModalOpen}>
+              <span>
+                {gradePublishState.grades_published ? "Unpublish Grades" : "Publish Grades"}
+              </span>
+              <RightOutlined />
+            </Button>
+          )}
         </Space>
       </PageBottom>
       <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
         assignmentId={assignmentId}
+      />
+      <PublishGradesModal
+        open={publishModalOpen}
+        onCancel={togglePublishModalOpen}
+        assignmentId={assignmentId}
+        published={gradePublishState.grades_published}
+        studentCount={filteredSubmissions.length}
+        onSuccess={handlePublishSuccess}
       />
     </>
   );
