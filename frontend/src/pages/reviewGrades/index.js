@@ -1,4 +1,5 @@
 import {
+  BarChartOutlined,
   CheckOutlined,
   DownloadOutlined,
   EyeOutlined,
@@ -7,17 +8,29 @@ import {
 } from "@ant-design/icons";
 import { Button, PageHeader, Space, Table, Typography, Card, Input } from "antd";
 import { useState, useEffect, useCallback, useContext, } from "react";
-import { formatDayTimeEn } from "../../common/format";
+import { formatDayTimeEn, scorePercent } from "../../common/format";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import ExportSubmissions from "./ExportSubmissions";
+import ExportEvaluations from "./ExportEvaluations";
+import GradeStatistics from "./GradeStatistics";
+import { getGradeStatistics } from "../../services/submission";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
 
 
 export default () => {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [statisticsModalOpen, setStatisticsModalOpen] = useState(false);
+  const [evaluationsModalOpen, setEvaluationsModalOpen] = useState(false);
   const [submissions, setSubmissions] = useState([]);
+  // Fetched once here (not re-fetched when the Statistics modal opens) and
+  // passed down as a prop, so the SCORE column and the modal always agree
+  // on the same max points, and the expensive backend histogram
+  // computation only runs once per assignment view.
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState(false);
   const { assignmentInfo } = useContext(GlobalContext);
   const { userInfo, courseInfo } = useContext(GlobalContext);
   const navigate = useNavigate();
@@ -26,6 +39,14 @@ export default () => {
 
   const toggleDownloadModalOpen = useCallback(() => {
     setDownloadModalOpen(t => !t);
+  }, []);
+
+  const toggleStatisticsModalOpen = useCallback(() => {
+    setStatisticsModalOpen(t => !t);
+  }, []);
+
+  const toggleEvaluationsModalOpen = useCallback(() => {
+    setEvaluationsModalOpen(t => !t);
   }, []);
 
   const goAssignmentResult = (submissionId) => {
@@ -79,8 +100,12 @@ export default () => {
       title: "SCORE",
       dataIndex: "score",
       align: "center",
-      render: (score) => 
-        (score != null ? score : "-"),
+      render: (score) => {
+        if (score == null) return "-";
+        const pct = scorePercent(score, stats?.max_points);
+        if (pct == null) return score;
+        return `${score}/${stats.max_points} (${pct}%)`;
+      },
       sorter: (a, b) => (a.score ?? -1) - (b.score ?? -1),
     },
     {
@@ -128,6 +153,13 @@ export default () => {
       console.error('No course info or assignment_id provided');
       return;
     }
+
+    // Reset immediately on navigation to a different assignment, so a
+    // slow/failed refetch below can't leave the previous assignment's
+    // stats (and max points) displayed against this assignment's rows.
+    setStats(null);
+    setStatsError(false);
+    setStatsLoading(true);
 
     (async () => {
       try {
@@ -178,6 +210,21 @@ export default () => {
         setSubmissions(rows);
       } catch (err) {
         console.error("Error fetching grades:", err);
+      }
+    })();
+
+    // Separate from the roster load above: stats are a "nice to have" for
+    // the SCORE column / Statistics modal, not required for the table to
+    // render, so a failure here shouldn't block showing the roster.
+    (async () => {
+      try {
+        const response = await getGradeStatistics({ assignment_id: assignmentId });
+        setStats(response.data);
+      } catch (err) {
+        console.error("Error fetching statistics:", err);
+        setStatsError(true);
+      } finally {
+        setStatsLoading(false);
       }
     })();
   }, [
@@ -233,11 +280,14 @@ export default () => {
           <Button icon={<DownloadOutlined />} onClick={handleDownloadGrades}>
             Download Grades
           </Button>
-          <Button icon={<DownloadOutlined />} >
+          <Button icon={<DownloadOutlined />} onClick={toggleEvaluationsModalOpen}>
             Export Evaluations
           </Button>
           <Button icon={<DownloadOutlined />} onClick={toggleDownloadModalOpen}>
             Export Submissions
+          </Button>
+          <Button icon={<BarChartOutlined />} onClick={toggleStatisticsModalOpen}>
+            Statistics
           </Button>
           <Button>
             <span>Publish Grades</span>
@@ -248,6 +298,18 @@ export default () => {
       <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
+        assignmentId={assignmentId}
+      />
+      <GradeStatistics
+        open={statisticsModalOpen}
+        onCancel={toggleStatisticsModalOpen}
+        stats={stats}
+        loading={statsLoading}
+        error={statsError}
+      />
+      <ExportEvaluations
+        open={evaluationsModalOpen}
+        onCancel={toggleEvaluationsModalOpen}
         assignmentId={assignmentId}
       />
     </>

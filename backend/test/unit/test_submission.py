@@ -1,11 +1,14 @@
 import os
 import io
+import csv
+import uuid
 import zipfile
 import pytest
 from types import SimpleNamespace
+from datetime import datetime, timedelta, timezone
 from flask import json, session
 from api import create_app, db
-from api.models import Submission, Assignment, User, SubmissionSubmitter, TestCaseResult, TestCase
+from api.models import Assignment, Course, Enrollment, Submission, User, SubmissionSubmitter, TestCaseResult, TestCase
 from util.errors import ForbiddenError
 
 from routes.submission import submission
@@ -398,6 +401,264 @@ def test_get_active_submission_missing_params(client):
     assert data["message"] == "not sufficient details"
 
 
+# Tests for /get_grade_statistics
+
+
+def _make_assignment(autograder_points=100):
+    assignment = Assignment(
+        id=str(uuid.uuid4()),
+        name="Test Assignment",
+        course_id=str(uuid.uuid4()),
+        autograder_points=autograder_points,
+    )
+    db.session.add(assignment)
+    db.session.commit()
+    return assignment
+
+
+def _make_submission(assignment_id, score, active=True, results=None):
+    sub = Submission(
+        id=str(uuid.uuid4()),
+        file_name="solution.py",
+        submission_number=1,
+        student_id=str(uuid.uuid4()),
+        assignment_id=assignment_id,
+        student_code_file=b"",
+        score=score,
+        active=active,
+        completed=True,
+        results=json.dumps(results).encode("utf-8") if results is not None else None,
+    )
+    db.session.add(sub)
+    db.session.commit()
+    return sub
+
+
+def test_get_grade_statistics_missing_assignment_id(client):
+    response = client.get("/get_grade_statistics")
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing assignment_id"
+
+
+def test_get_grade_statistics_assignment_not_found(client, mocker):
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.get("/get_grade_statistics?assignment_id=missing")
+    assert response.status_code == 404
+    assert response.get_json()["message"] == "Assignment not found"
+
+
+def test_get_grade_statistics_forbidden(client, mocker):
+    from util.errors import ForbiddenError
+    mocker.patch(
+        "routes.submission._verify_course_staff",
+        side_effect=ForbiddenError("Only course staff or administrators can perform this action"),
+    )
+
+    response = client.get("/get_grade_statistics?assignment_id=assgn1")
+    assert response.status_code == 403
+
+
+def test_get_grade_statistics_no_graded_submissions(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["count"] == 0
+        assert data["mean"] is None
+        assert data["median"] is None
+        assert data["min"] is None
+        assert data["max"] is None
+        assert data["stdev"] is None
+        assert data["histogram"] == []
+
+
+def test_get_grade_statistics_ignores_active_but_ungraded(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        _make_submission(assignment_id, score=None, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        assert response.get_json()["count"] == 0
+
+
+def test_get_grade_statistics_ignores_inactive_submissions(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        _make_submission(assignment_id, score=90, active=True)
+        _make_submission(assignment_id, score=10, active=False)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["count"] == 1
+        assert data["mean"] == 90
+        assert data["max"] == 90
+        assert data["min"] == 90
+
+
+def test_get_grade_statistics_success_percentage_mode(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        for score in [50, 60, 70, 85, 95, 100]:
+            _make_submission(assignment_id, score=score, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["count"] == 6
+        assert data["mean"] == pytest.approx(76.67, abs=0.01)
+        assert data["median"] == 77.5
+        assert data["min"] == 50
+        assert data["max"] == 100
+        assert data["mode"] == "percentage"
+
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["50-60%"] == 1
+        assert buckets_by_label["60-70%"] == 1
+        assert buckets_by_label["70-80%"] == 1
+        assert buckets_by_label["80-90%"] == 1
+        assert buckets_by_label["90-100%"] == 2
+        assert buckets_by_label["0-10%"] == 0
+
+
+def test_get_grade_statistics_autograder_points_zero(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=0).id
+        _make_submission(assignment_id, score=5, active=True)
+        _make_submission(assignment_id, score=8, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        assert response.get_json()["mode"] == "raw"
+
+
+def test_get_grade_statistics_raw_mode_no_max_points(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=None).id
+        for score in [10, 20, 30]:
+            _make_submission(assignment_id, score=score, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["mode"] == "raw"
+        assert data["histogram"][0]["bucket_start"] == 10
+        assert data["histogram"][-1]["bucket_end"] == 30
+
+
+def test_get_grade_statistics_single_submission(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=None).id
+        _make_submission(assignment_id, score=42, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["count"] == 1
+        assert data["stdev"] == 0.0
+        assert len(data["histogram"]) == 1
+        assert data["histogram"][0]["count"] == 1
+        assert data["histogram"][0]["bucket_start"] == 42
+        assert data["histogram"][0]["bucket_end"] == 42
+
+
+def test_get_grade_statistics_extra_credit_overflow_bucket(app, client):
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        _make_submission(assignment_id, score=110, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label[">100%"] == 1
+        assert buckets_by_label["90-100%"] == 0
+
+
+def test_get_grade_statistics_boundary_score_not_misclassified_by_float_error(app, client):
+    """A score exactly on a bucket boundary must land in the bucket it
+    starts, not the one below it. For max_points=11, bucket_width=1.1, and
+    3.3 / 1.1 evaluates to 2.9999999999999996 in floating point -- a naive
+    int() truncation would misfile the boundary score into '20-30%'
+    instead of '30-40%'.
+    """
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=11).id
+        _make_submission(assignment_id, score=3.3, active=True)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["30-40%"] == 1
+        assert buckets_by_label["20-30%"] == 0
+
+
+def test_get_grade_statistics_prefers_results_derived_max_over_stale_autograder_points(app, client):
+    """Assignment.autograder_points can drift from what the autograder
+    actually grades out of (e.g. left at a stale default of 100 while the
+    configured test suite only totals 20 points). A submission that aced
+    every test should show up as 100%, not get diluted against the stale
+    field.
+    """
+    results = {
+        "tests": [
+            {"name": "test_1", "score": 10, "max_score": 10, "status": "passed"},
+            {"name": "test_2", "score": 10, "max_score": 10, "status": "passed"},
+        ]
+    }
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=100).id
+        _make_submission(assignment_id, score=20, active=True, results=results)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["max_points"] == 20
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["90-100%"] == 1
+
+
+def test_get_grade_statistics_falls_back_to_autograder_points_when_no_results(app, client):
+    """When no submission has parseable results yet (e.g. all still
+    processing), fall back to the assignment's configured max points
+    rather than reporting a max of 0.
+    """
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=50).id
+        _make_submission(assignment_id, score=25, active=True, results=None)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["max_points"] == 50
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["50-60%"] == 1
+
+
+# Tests for /export_evaluations
+
+
+def test_export_evaluations_missing_assignment_id(client):
+    response = client.get("/export_evaluations")
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data["message"] == "Missing assignment_id"
+
+
+def test_export_evaluations_assignment_not_found(client, mocker):
+    mocker.patch("routes.submission.db.session.query").return_value.filter_by.return_value.first.return_value = None
+    response = client.get("/export_evaluations?assignment_id=missing-assignment")
+    assert response.status_code == 404
+    data = response.get_json()
+    assert data["message"] == "Assignment not found"
+
+
 # Tests for exporting submissions
 
 
@@ -423,6 +684,215 @@ def test_export_submissions_assignment_not_found(client, mocker):
     assert response.status_code == 404
     data = response.get_json()
     assert data["message"] == "Assignment not found"
+
+
+def test_export_evaluations_no_graded_results(app, client):
+    with app.app_context():
+        assignment_id = str(uuid.uuid4())
+        db.session.add(Assignment(id=assignment_id, name="No Results Yet", course_id=str(uuid.uuid4())))
+        db.session.commit()
+
+    response = client.get(f"/export_evaluations?assignment_id={assignment_id}")
+    assert response.status_code == 200
+
+    zf = zipfile.ZipFile(io.BytesIO(response.data))
+    assert zf.namelist() == ["README.txt"]
+    assert "No graded test results found" in zf.read("README.txt").decode()
+
+
+def _make_student(name, email, sis_id):
+    return User(
+        id=str(uuid.uuid4()),
+        password="pw",
+        name=name,
+        email_address=email,
+        sis_user_id=sis_id,
+        role="student",
+    )
+
+
+def test_export_evaluations_success(app, client):
+    with app.app_context():
+        assignment_id = str(uuid.uuid4())
+        course_id = str(uuid.uuid4())
+        instructor_id = str(uuid.uuid4())
+        base_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+        alice = _make_student("Alice Example", "alice@example.com", "alice")
+        bob = _make_student("Bob Example", "bob@example.com", "bob")
+        carol = _make_student("Carol Example", "carol@example.com", "carol")
+        # Dave is enrolled but never submits, to verify non-submitters still
+        # show up in the export instead of silently disappearing.
+        dave = _make_student("Dave Example", "dave@example.com", "dave")
+
+        db.session.add(Course(
+            id=course_id,
+            name="CS 101",
+            instructor_id=instructor_id,
+            semester="Fall",
+            year="2026",
+            entryCode=f"entry-{course_id[:8]}",
+        ))
+        db.session.add(Assignment(id=assignment_id, name="HW1", course_id=course_id))
+        db.session.add_all([alice, bob, carol, dave])
+        db.session.add_all([
+            Enrollment(student_id=alice.id, course_id=course_id, role="student"),
+            Enrollment(student_id=bob.id, course_id=course_id, role="student"),
+            Enrollment(student_id=carol.id, course_id=course_id, role="student"),
+            Enrollment(student_id=dave.id, course_id=course_id, role="student"),
+        ])
+
+        alice_results = json.dumps({
+            "tests": [
+                {"name": "Evaluate 8 / 4 * 2", "number": "2.3", "status": "passed",
+                 "score": 1, "max_score": 1, "output": "42", "expected_output": "42"},
+                {"name": "Check submitted files", "status": "failed", "score": 0,
+                 "max_score": 1, "output": "wrong", "expected_output": "hello"},
+            ],
+            "score": 1,
+        }).encode()
+        bob_results = json.dumps({
+            "tests": [
+                {"name": "Evaluate 8 / 4 * 2", "number": "2.3", "status": "passed",
+                 "score": 1, "max_score": 1, "output": "42", "expected_output": "42"},
+            ],
+            "score": 1,
+        }).encode()
+
+        db.session.add(Submission(
+            id=str(uuid.uuid4()),
+            file_name="alice.py",
+            submission_number=1,
+            student_id=alice.id,
+            assignment_id=assignment_id,
+            student_code_file=b"print(42)",
+            results=alice_results,
+            active=True,
+            completed=True,
+            submitted_at=base_time,
+        ))
+        db.session.add(Submission(
+            id=str(uuid.uuid4()),
+            file_name="bob.py",
+            submission_number=1,
+            student_id=bob.id,
+            assignment_id=assignment_id,
+            student_code_file=b"print(42)",
+            results=bob_results,
+            active=True,
+            completed=True,
+            submitted_at=base_time + timedelta(minutes=1),
+        ))
+        db.session.add(Submission(
+            id=str(uuid.uuid4()),
+            file_name="carol.py",
+            submission_number=1,
+            student_id=carol.id,
+            assignment_id=assignment_id,
+            student_code_file=b"print(0)",
+            results=b"not valid json",
+            active=True,
+            completed=True,
+            submitted_at=base_time + timedelta(minutes=2),
+        ))
+        db.session.commit()
+
+    response = client.get(f"/export_evaluations?assignment_id={assignment_id}")
+    assert response.status_code == 200
+    assert "HW1_evaluations.zip" in response.headers.get("Content-Disposition", "")
+
+    zf = zipfile.ZipFile(io.BytesIO(response.data))
+    # Numbered test -> filename keyed off "number", not the mangled name.
+    # Unnumbered test -> falls back to the sanitized name.
+    assert set(zf.namelist()) == {"Question_2.3.csv", "Check_submitted_files.csv"}
+
+    q1_rows = list(csv.DictReader(io.StringIO(zf.read("Question_2.3.csv").decode())))
+    assert q1_rows == [
+        {
+            "question": "Evaluate 8 / 4 * 2",
+            "student_name": "Alice Example",
+            "student_email": "alice@example.com",
+            "status": "passed",
+            "score": "1",
+            "max_score": "1",
+            "output": "42",
+            "expected_output": "42",
+        },
+        {
+            "question": "Evaluate 8 / 4 * 2",
+            "student_name": "Bob Example",
+            "student_email": "bob@example.com",
+            "status": "passed",
+            "score": "1",
+            "max_score": "1",
+            "output": "42",
+            "expected_output": "42",
+        },
+        {
+            "question": "Evaluate 8 / 4 * 2",
+            "student_name": "Carol Example",
+            "student_email": "carol@example.com",
+            "status": "",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+        {
+            "question": "Evaluate 8 / 4 * 2",
+            "student_name": "Dave Example",
+            "student_email": "dave@example.com",
+            "status": "no submission",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+    ]
+
+    q2_rows = list(csv.DictReader(io.StringIO(zf.read("Check_submitted_files.csv").decode())))
+    assert q2_rows == [
+        {
+            "question": "Check submitted files",
+            "student_name": "Alice Example",
+            "student_email": "alice@example.com",
+            "status": "failed",
+            "score": "0",
+            "max_score": "1",
+            "output": "wrong",
+            "expected_output": "hello",
+        },
+        {
+            "question": "Check submitted files",
+            "student_name": "Bob Example",
+            "student_email": "bob@example.com",
+            "status": "",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+        {
+            "question": "Check submitted files",
+            "student_name": "Carol Example",
+            "student_email": "carol@example.com",
+            "status": "",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+        {
+            "question": "Check submitted files",
+            "student_name": "Dave Example",
+            "student_email": "dave@example.com",
+            "status": "no submission",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+    ]
 
 
 def test_export_submissions_no_active_submissions(client, mocker):
