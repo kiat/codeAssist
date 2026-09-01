@@ -48,7 +48,3 @@ export async function exportSubmissions(params) {
   });
 }
 
-export async function publishGrades(params) {
-  return service("publish_grades", params, "post");
-}
-

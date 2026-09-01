@@ -165,69 +165,6 @@ it('redirects a TA away from the student assignments page', async () => {
   );
 });
 
-it('shows "Pending" in the GRADES column when grades are held and not yet published', async () => {
-  global.fetch = jest
-    .fn()
-    /* /get_course_assignments */
-    .mockResolvedValueOnce({ json: () => Promise.resolve([fakeAssignment]) })
-    /* /get_extension */
-    .mockResolvedValueOnce({ json: () => Promise.resolve({}) })
-    /* /get_active_submission */
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve({
-          completed: true,
-          score: null,
-          grades_published: false,
-          id: 'sub1',
-          late: false,
-        }),
-    });
-
-  render(
-    <GlobalContext.Provider
-      value={{
-        userInfo:  { id: 42 },
-        courseInfo:{ name: 'Intro CS', semester: 'Fall', year: '2025' },
-      }}
-    >
-      <Assignments />
-    </GlobalContext.Provider>
-  );
-
-  expect(await screen.findByTestId('cell-0-2')).toHaveTextContent('Pending');
-});
-
-it('shows the score in the GRADES column once grades are published', async () => {
-  global.fetch = jest
-    .fn()
-    .mockResolvedValueOnce({ json: () => Promise.resolve([fakeAssignment]) })
-    .mockResolvedValueOnce({ json: () => Promise.resolve({}) })
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve({
-          completed: true,
-          score: 92,
-          grades_published: true,
-          id: 'sub1',
-          late: false,
-        }),
-    });
-
-  render(
-    <GlobalContext.Provider
-      value={{
-        userInfo:  { id: 42 },
-        courseInfo:{ name: 'Intro CS', semester: 'Fall', year: '2025' },
-      }}
-    >
-      <Assignments />
-    </GlobalContext.Provider>
-  );
-
-  expect(await screen.findByTestId('cell-0-2')).toHaveTextContent('92');
-});
-
 it('redirects an instructor away from the student assignments page', async () => {
   queueFetches();
 

@@ -71,35 +71,4 @@ describe("TestResultsDisplay AI feedback", () => {
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
   });
-
-  it("shows a pending message instead of results when grades are held", async () => {
-    const data = {
-      score: null,
-      results: null,
-      grades_published: false,
-      student_code_file: "def add(a, b):\n    return a + b\n",
-      file_name: "student.py",
-      ai_feedback: null,
-    };
-
-    render(
-      <GlobalContext.Provider value={{ userInfo: { id: "user-1" }, courseInfo: {} }}>
-        <TestResultsDisplay
-          viewMode="Results"
-          assignmentName="Calculator"
-          studentName="Ada Lovelace"
-          score={null}
-          totalPoints={10}
-          data={data}
-          aiFeedbackEnabled={false}
-        />
-      </GlobalContext.Provider>
-    );
-
-    expect(await screen.findByText("Grade pending")).toBeInTheDocument();
-    expect(
-      screen.getByText(/haven't been published yet/)
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Autograder Results")).toBeNull();
-  });
 });

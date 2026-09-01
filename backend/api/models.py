@@ -63,15 +63,6 @@ class Assignment(db.Model):
     autograder_points = db.Column(db.Float, nullable=True)
     published = db.Column(db.Boolean, default=False)
     published_date = db.Column(TIMESTAMP(timezone=True), nullable=True)
-
-    # -- Grade Publishing --
-    # NOTE: distinct from `published`/`published_date` above, which gate whether the
-    # assignment is open for submission. These gate whether *grades* are visible to
-    # students after grading, independent of the submission window.
-    hold_grades = db.Column(db.Boolean, nullable=False, default=False)
-    grades_published = db.Column(db.Boolean, nullable=False, default=False)
-    grades_published_at = db.Column(TIMESTAMP(timezone=True), nullable=True)
-
     autograder_file = db.Column(LargeBinary, nullable=True)
     # container_id = db.Column(db.String)
     autograder_image_name = db.Column(db.String)
@@ -95,10 +86,6 @@ class Assignment(db.Model):
     ai_feedback_style = db.Column(db.String, nullable=True)
     ai_feedback_max_requests = db.Column(db.Integer, nullable=True)
     ai_feedback_wait_seconds = db.Column(db.Integer, nullable=False, default=0)
-
-    @property
-    def grades_visible_to_students(self):
-        return (not self.hold_grades) or self.grades_published
 
 class Submission(db.Model):
     __tablename__ = "submissions"
