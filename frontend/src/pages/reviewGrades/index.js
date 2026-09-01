@@ -11,12 +11,14 @@ import { formatDayTimeEn } from "../../common/format";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
 import ExportSubmissions from "./ExportSubmissions";
+import ExportEvaluations from "./ExportEvaluations";
 import { GlobalContext } from "../../App";
 import { useNavigate, useParams } from "react-router-dom";
 
 
 export default () => {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [evaluationsModalOpen, setEvaluationsModalOpen] = useState(false);
   const [submissions, setSubmissions] = useState([]);
   const { assignmentInfo } = useContext(GlobalContext);
   const { userInfo, courseInfo } = useContext(GlobalContext);
@@ -26,6 +28,10 @@ export default () => {
 
   const toggleDownloadModalOpen = useCallback(() => {
     setDownloadModalOpen(t => !t);
+  }, []);
+
+  const toggleEvaluationsModalOpen = useCallback(() => {
+    setEvaluationsModalOpen(t => !t);
   }, []);
 
   const goAssignmentResult = (submissionId) => {
@@ -233,7 +239,7 @@ export default () => {
           <Button icon={<DownloadOutlined />} onClick={handleDownloadGrades}>
             Download Grades
           </Button>
-          <Button icon={<DownloadOutlined />} >
+          <Button icon={<DownloadOutlined />} onClick={toggleEvaluationsModalOpen}>
             Export Evaluations
           </Button>
           <Button icon={<DownloadOutlined />} onClick={toggleDownloadModalOpen}>
@@ -248,6 +254,11 @@ export default () => {
       <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
+        assignmentId={assignmentId}
+      />
+      <ExportEvaluations
+        open={evaluationsModalOpen}
+        onCancel={toggleEvaluationsModalOpen}
         assignmentId={assignmentId}
       />
     </>
