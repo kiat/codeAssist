@@ -14,7 +14,7 @@ from werkzeug.utils import secure_filename
 from functools import reduce
 from flask import Blueprint, request, jsonify, current_app, session, send_file
 from api import db
-from api.models import Assignment, Submission, User, Course, Enrollment
+from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase, SubmissionSubmitter
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
@@ -38,6 +38,45 @@ ALLOWED_EXTENSIONS = {'py','zip'}
 def allowed_file(filename):
     return "." in filename and \
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _stored_file_to_bytes(value):
+    if value is None:
+        return None
+    if isinstance(value, memoryview):
+        return value.tobytes()
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, str):
+        return value.encode("utf-8")
+    return bytes(value)
+
+
+def _json_from_stored_value(value):
+    raw_value = _stored_file_to_bytes(value)
+    if not raw_value:
+        return None
+    try:
+        return json.loads(raw_value.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
+def _json_or_text_from_stored_value(value):
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+
+    raw_value = _stored_file_to_bytes(value)
+    if raw_value is None:
+        return None
+
+    text_value = raw_value.decode("utf-8", errors="replace")
+    try:
+        return json.loads(text_value)
+    except json.JSONDecodeError:
+        return text_value
 
 
 def _verify_course_staff(assignment_id):
@@ -690,10 +729,130 @@ def export_evaluations():
         download_name=download_name,
     )
 
+@submission.route('/export_submissions', methods=["GET"])
+def export_submissions():
+    '''
+    /export_submissions builds and streams a zip file containing every
+    student's active (latest) submission code file for an assignment,
+    plus a JSON metadata file per submission (score, execution_time,
+    test case pass/fail breakdown, AI feedback text).
+    @param assignment_id  the id of the assignment
+    '''
+    assignment_id = request.args.get("assignment_id")
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    # Security: Verify the requester is course staff or admin
+    _verify_course_staff(assignment_id)
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    active_submissions = Submission.query.filter_by(
+        assignment_id=assignment_id, active=True
+    ).order_by(Submission.submitted_at.asc()).all()
+
+    zip_buffer = io.BytesIO()
+    used_names = {}
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        if not active_submissions:
+            zf.writestr(
+                "README.txt",
+                "No active submissions found for this assignment yet.\n",
+            )
+        for sub in active_submissions:
+            student = db.session.query(User).filter_by(id=sub.student_id).first()
+
+            co_submitter_rows = db.session.query(SubmissionSubmitter).filter_by(
+                submission_id=sub.id
+            ).all()
+            submitter_ids = {str(r.submitter_id) for r in co_submitter_rows}
+            submitter_ids.add(str(sub.student_id))
+            submitter_users = db.session.query(User).filter(
+                User.id.in_(submitter_ids)
+            ).all() if submitter_ids else []
+            submitter_names = sorted(u.name for u in submitter_users) or (
+                [student.name] if student else ["unknown_student"]
+            )
+            submitter_metadata = sorted(
+                [
+                    {
+                        "id": str(u.id),
+                        "name": u.name,
+                        "email": u.email_address,
+                        "sis_user_id": u.sis_user_id,
+                    }
+                    for u in submitter_users
+                ],
+                key=lambda u: u["name"] or "",
+            )
+
+            base_label = secure_filename(
+                (student.sis_user_id if student else None) or str(sub.student_id)
+            ) or str(sub.student_id)
+            count = used_names.get(base_label, 0)
+            used_names[base_label] = count + 1
+            folder_name = base_label if count == 0 else f"{base_label}_{count}"
+
+            code_bytes = _stored_file_to_bytes(sub.student_code_file)
+            code_filename = secure_filename(sub.file_name or "submission")
+            zf.writestr(f"{folder_name}/{code_filename}", code_bytes or b"")
+
+            results_bytes = _stored_file_to_bytes(sub.results)
+            autograder_results = _json_from_stored_value(sub.results)
+            if results_bytes:
+                zf.writestr(f"{folder_name}/results.json", results_bytes)
+
+            test_case_rows = db.session.query(TestCaseResult, TestCase).join(
+                TestCase, TestCaseResult.test_case_id == TestCase.id
+            ).filter(TestCaseResult.submission_id == sub.id).all()
+
+            metadata = {
+                "submission_id": str(sub.id),
+                "student_id": str(sub.student_id),
+                "student_name": student.name if student else None,
+                "student_email": student.email_address if student else None,
+                "student_sis_user_id": student.sis_user_id if student else None,
+                "group_submitters": submitter_names,
+                "submitters": submitter_metadata,
+                "file_name": sub.file_name,
+                "submission_number": sub.submission_number,
+                "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None,
+                "score": sub.score,
+                "execution_time": sub.execution_time,
+                "completed": sub.completed,
+                "ai_feedback": _json_or_text_from_stored_value(sub.ai_feedback),
+                "autograder_results": autograder_results,
+                "test_case_results": [
+                    {
+                        "test_case_name": tc.test_case_name,
+                        "passed": result.passed,
+                        "student_output": result.student_output,
+                        "expected_output": tc.expected_output,
+                    }
+                    for result, tc in test_case_rows
+                ],
+            }
+            zf.writestr(
+                f"{folder_name}/metadata.json",
+                json.dumps(metadata, indent=2, default=str),
+            )
+
+    zip_buffer.seek(0)
+    download_name = f"{secure_filename(assignment.name or str(assignment_id))}_submissions.zip"
+
+    return send_file(
+        zip_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=download_name,
+    )
+
 @submission.route('/export_grades_csv', methods=["GET"])
 def export_grades_csv():
     assignment_id = request.args.get("assignment_id")
-
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
 
