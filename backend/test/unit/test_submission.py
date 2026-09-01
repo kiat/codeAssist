@@ -1,9 +1,12 @@
 import os
+import io
 import uuid
+import zipfile
 import pytest
+from types import SimpleNamespace
 from flask import json, session
 from api import create_app, db
-from api.models import Assignment, Submission
+from api.models import Assignment, Submission, User, SubmissionSubmitter, TestCaseResult, TestCase
 from util.errors import ForbiddenError
 
 from routes.submission import submission
@@ -634,6 +637,149 @@ def test_get_grade_statistics_falls_back_to_autograder_points_when_no_results(ap
         assert data["max_points"] == 50
         buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
         assert buckets_by_label["50-60%"] == 1
+
+
+# Tests for exporting submissions
+
+
+def test_export_submissions_missing_assignment_id(client):
+    """Test /export_submissions returns 400 when assignment_id is missing."""
+    response = client.get("/export_submissions")
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data["message"] == "Missing assignment_id"
+
+
+def test_export_submissions_assignment_not_found(client, mocker):
+    """Test /export_submissions returns 404 when the assignment doesn't exist."""
+    def query_side_effect(*args, **kwargs):
+        mock = mocker.MagicMock()
+        if args and args[0] is Assignment:
+            mock.filter_by.return_value.first.return_value = None
+        return mock
+
+    mocker.patch("routes.submission.db.session.query", side_effect=query_side_effect)
+
+    response = client.get("/export_submissions?assignment_id=assgn1")
+    assert response.status_code == 404
+    data = response.get_json()
+    assert data["message"] == "Assignment not found"
+
+
+def test_export_submissions_no_active_submissions(client, mocker):
+    """Test /export_submissions returns an empty zip with a README when there are no active submissions."""
+    fake_assignment = SimpleNamespace(id="assgn1", name="HW1")
+
+    def query_side_effect(*args, **kwargs):
+        mock = mocker.MagicMock()
+        if args and args[0] is Assignment:
+            mock.filter_by.return_value.first.return_value = fake_assignment
+        return mock
+
+    mocker.patch("routes.submission.db.session.query", side_effect=query_side_effect)
+
+    mock_submission_query = mocker.patch.object(Submission, "query", create=True)
+    mock_submission_query.filter_by.return_value.order_by.return_value.all.return_value = []
+
+    response = client.get("/export_submissions?assignment_id=assgn1")
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "application/zip"
+
+    with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+        assert zf.namelist() == ["README.txt"]
+        assert b"No active submissions" in zf.read("README.txt")
+
+
+def test_export_submissions_success(client, mocker):
+    """Test /export_submissions streams back a valid zip with the expected entries."""
+    fake_assignment = SimpleNamespace(id="assgn1", name="HW1")
+    fake_student = SimpleNamespace(
+        id="stu1", name="Jane Doe", email_address="jane@example.com", sis_user_id="jdoe123"
+    )
+    fake_results = {
+        "tests": [{"name": "case 1", "score": 1, "max_score": 1, "status": "passed"}],
+        "score": 95.0,
+        "execution_time": 1.23,
+    }
+    fake_ai_feedback = {
+        "insights": ["Great job"],
+        "annotations": [{"pattern": "print", "comment": "Readable output"}],
+    }
+    fake_submission = SimpleNamespace(
+        id="sub1",
+        student_id="stu1",
+        assignment_id="assgn1",
+        file_name="main.py",
+        submission_number=1,
+        submitted_at=None,
+        student_code_file=b"print('hi')",
+        results=json.dumps(fake_results).encode(),
+        score=95.0,
+        execution_time=1.23,
+        active=True,
+        completed=True,
+        ai_feedback=json.dumps(fake_ai_feedback),
+    )
+
+    user_mock = mocker.MagicMock()
+    user_mock.filter_by.return_value.first.return_value = fake_student
+    user_mock.filter.return_value.all.return_value = [fake_student]
+
+    assignment_mock = mocker.MagicMock()
+    assignment_mock.filter_by.return_value.first.return_value = fake_assignment
+
+    submitter_mock = mocker.MagicMock()
+    submitter_mock.filter_by.return_value.all.return_value = []
+
+    testcase_join_mock = mocker.MagicMock()
+    testcase_join_mock.join.return_value.filter.return_value.all.return_value = []
+
+    def query_side_effect(*args, **kwargs):
+        if args and args[0] is Assignment:
+            return assignment_mock
+        if args and args[0] is User:
+            return user_mock
+        if args and args[0] is SubmissionSubmitter:
+            return submitter_mock
+        if args and args[0] is TestCaseResult:
+            return testcase_join_mock
+        return mocker.MagicMock()
+
+    mocker.patch("routes.submission.db.session.query", side_effect=query_side_effect)
+
+    mock_submission_query = mocker.patch.object(Submission, "query", create=True)
+    mock_submission_query.filter_by.return_value.order_by.return_value.all.return_value = [
+        fake_submission
+    ]
+
+    response = client.get("/export_submissions?assignment_id=assgn1")
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "application/zip"
+    assert "attachment" in response.headers["Content-Disposition"]
+
+    with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+        names = zf.namelist()
+        assert "jdoe123/main.py" in names
+        assert "jdoe123/metadata.json" in names
+        assert "jdoe123/results.json" in names
+        assert zf.read("jdoe123/main.py") == b"print('hi')"
+        assert json.loads(zf.read("jdoe123/results.json")) == fake_results
+
+        metadata = json.loads(zf.read("jdoe123/metadata.json"))
+        assert metadata["submission_id"] == "sub1"
+        assert metadata["student_sis_user_id"] == "jdoe123"
+        assert metadata["score"] == 95.0
+        assert metadata["ai_feedback"] == fake_ai_feedback
+        assert metadata["autograder_results"] == fake_results
+        assert metadata["submitters"] == [
+            {
+                "id": "stu1",
+                "name": "Jane Doe",
+                "email": "jane@example.com",
+                "sis_user_id": "jdoe123",
+            }
+        ]
+        assert metadata["test_case_results"] == []
 
 
 def test_get_all_assignment_submissions_missing_assignment_id(client):
