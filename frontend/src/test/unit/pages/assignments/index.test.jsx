@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 jest.mock('../../../../App', () => {
@@ -123,4 +123,64 @@ it('opens AssignmentModal when unsubmitted assignment clicked', async () => {
   expect(assignmentTitle).toBe('Homework 1');
 
   expect(mockNavigate).not.toHaveBeenCalled();
+});
+
+it('does not redirect a student away from their assignments page', async () => {
+  queueFetches();
+
+  render(
+    <GlobalContext.Provider
+      value={{
+        userInfo:  { id: 42 },
+        courseInfo:{ name: 'Intro CS', semester: 'Fall', year: '2025' },
+        courseRole: 'student',
+      }}
+    >
+      <Assignments />
+    </GlobalContext.Provider>
+  );
+
+  await screen.findByRole('button', { name: /homework 1/i });
+
+  expect(mockNavigate).not.toHaveBeenCalledWith('/instructorDashboard/CS101');
+});
+
+it('redirects a TA away from the student assignments page', async () => {
+  queueFetches();
+
+  render(
+    <GlobalContext.Provider
+      value={{
+        userInfo:  { id: 42 },
+        courseInfo:{ name: 'Intro CS', semester: 'Fall', year: '2025' },
+        courseRole: 'ta',
+      }}
+    >
+      <Assignments />
+    </GlobalContext.Provider>
+  );
+
+  await waitFor(() =>
+    expect(mockNavigate).toHaveBeenCalledWith('/instructorDashboard/CS101')
+  );
+});
+
+it('redirects an instructor away from the student assignments page', async () => {
+  queueFetches();
+
+  render(
+    <GlobalContext.Provider
+      value={{
+        userInfo:  { id: 42 },
+        courseInfo:{ name: 'Intro CS', semester: 'Fall', year: '2025' },
+        courseRole: 'instructor',
+      }}
+    >
+      <Assignments />
+    </GlobalContext.Provider>
+  );
+
+  await waitFor(() =>
+    expect(mockNavigate).toHaveBeenCalledWith('/instructorDashboard/CS101')
+  );
 });

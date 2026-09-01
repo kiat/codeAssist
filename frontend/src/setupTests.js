@@ -120,6 +120,8 @@ jest.mock('@codemirror/lint', () => ({
   lintKeymap: [],
 }));
 
+// Ant Design uses window.matchMedia for responsive grid — jsdom doesn't implement it.
+// Uses plain functions (not jest.fn) so CRA's resetMocks:true doesn't clear the implementation.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   configurable: true,
