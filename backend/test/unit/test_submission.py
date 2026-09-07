@@ -1,11 +1,17 @@
-import os
 import io
+import os
+import shutil
+import subprocess
+import uuid
 import zipfile
+import docker
 import pytest
 from types import SimpleNamespace
 from flask import json, session
 from api import create_app, db
 from api.models import Submission, Assignment, User, SubmissionSubmitter, TestCaseResult, TestCase
+
+import routes.submission as submission_module
 from util.errors import ForbiddenError
 
 from routes.submission import submission
@@ -333,6 +339,134 @@ def test_upload_submission_missing_file(client):
     response = client.post("/upload_submission", data={})
     # We expect a 400 error for missing file
     assert response.status_code == 400
+
+
+def _cleanup_submission_dirs(assignment_id):
+    """Remove any runs/ and archive/ directories a test created for assignment_id."""
+    backend_routes_dir = os.path.dirname(os.path.abspath(submission_module.__file__))
+    for subtree in ("runs", "archive"):
+        path = os.path.join(backend_routes_dir, "upload_autograder", subtree, assignment_id)
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def _mock_assignment_lookups(mocker, fake_assignment):
+    """Mock the Assignment/AssignmentExtension/Submission queries upload_submission makes."""
+    def fake_query(model):
+        dummy = mocker.Mock()
+        if model.__name__ == "Assignment":
+            dummy.filter_by.return_value.first.return_value = fake_assignment
+        elif model.__name__ == "AssignmentExtension":
+            dummy.filter_by.return_value.first.return_value = None
+        elif model.__name__ == "Submission":
+            dummy.filter_by.return_value.count.return_value = 0
+        return dummy
+
+    mocker.patch("routes.submission.db.session.query", side_effect=fake_query)
+    mocker.patch("routes.submission.db.session.add")
+    mocker.patch("routes.submission.db.session.commit")
+
+
+def test_upload_submission_no_autograder_archives_staged_files(client, mocker):
+    """Test /upload_submission archives the staged files when no autograder is configured."""
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = ""
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 200
+        submission_id = response.get_json()["submissionID"]
+
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        assert os.path.isdir(archived_path)
+        assert set(os.listdir(archived_path)) == {"solution.py"}
+
+        # The temporary staging directory should be removed.
+        staging_dir = os.path.join(
+            os.path.dirname(os.path.abspath(submission_module.__file__)),
+            "upload_autograder", "runs", assignment_id, "submission", submission_id,
+        )
+        assert not os.path.exists(staging_dir)
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_success_archives_submission_and_results(client, mocker):
+    """Test /upload_submission archives the submission and results after a successful run."""
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = "autograder-test"
+    fake_assignment.autograder_timeout = 30
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    fake_container = mocker.Mock()
+    fake_container.name = "assignment_container_test"
+    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
+
+    # Container cleanup, the autograder run and the results read all go through
+    # `docker exec` subprocesses now, so dispatch on the shell command.
+    def fake_subprocess_run(args, **kwargs):
+        proc = mocker.Mock()
+        proc.returncode = 0
+        proc.stderr = b""
+        command = args[-1] if isinstance(args, (list, tuple)) else ""
+        proc.stdout = (
+            b'{"score": 100, "execution_time": 1.5}'
+            if command.startswith("cat ")
+            else b""
+        )
+        return proc
+
+    mocker.patch("routes.submission.subprocess.run", side_effect=fake_subprocess_run)
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.get_json()
+        submission_id = body["submissionID"]
+
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        archived_files = os.listdir(archived_path)
+        assert "solution.py" in archived_files
+        assert f"results_{submission_id}.json" in archived_files
+        assert body["results_path"] == os.path.join(archived_path, f"results_{submission_id}.json")
+    finally:
+        _cleanup_submission_dirs(assignment_id)
 
 
 def test_delete_submission_not_found(client, mocker):
@@ -878,3 +1012,124 @@ def test_activate_submission_not_found(client, mocker):
 
     assert response.status_code == 404
     assert response.get_json()["message"] == "No submission found"
+
+
+def test_exec_run_with_timeout_raises_distinct_timeout(mocker):
+    """A wedged helper exec must not look like a student timeout.
+
+    upload_submission treats subprocess.TimeoutExpired as "the student's program
+    ran too long" and records a failed submission for it. Container cleanup and
+    the results read share the same subprocess mechanism now, so they raise
+    ContainerExecTimeout instead to keep the two cases apart.
+    """
+    container = mocker.Mock()
+    container.name = "assignment_container_test"
+    mocker.patch(
+        "routes.submission.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd="docker exec", timeout=30),
+    )
+
+    with pytest.raises(submission_module.ContainerExecTimeout):
+        submission_module.exec_run_with_timeout(container, "cat /autograder/results/x.json")
+
+
+def test_exec_run_with_timeout_merges_stdout_and_stderr(mocker):
+    """Callers read .output expecting exec_run(demux=False)'s merged stream."""
+    container = mocker.Mock()
+    container.name = "assignment_container_test"
+    proc = mocker.Mock()
+    proc.returncode = 1
+    proc.stdout = b"out"
+    proc.stderr = b"err"
+    mocker.patch("routes.submission.subprocess.run", return_value=proc)
+
+    result = submission_module.exec_run_with_timeout(container, "false")
+
+    assert result.exit_code == 1
+    assert result.output == b"outerr"
+
+
+def test_discard_container_lock_removes_entry():
+    """_container_locks must not grow for the lifetime of the process."""
+    assignment_id = str(uuid.uuid4())
+    submission_module.get_container_lock(assignment_id)
+    assert assignment_id in submission_module._container_locks
+
+    submission_module.discard_container_lock(assignment_id)
+    assert assignment_id not in submission_module._container_locks
+
+    # Discarding an unknown id is a no-op, not a KeyError.
+    submission_module.discard_container_lock(assignment_id)
+
+
+def test_reset_assignment_container_survives_docker_api_error(app, mocker):
+    """A daemon error must not swallow the caller's failed-submission record.
+
+    reset_assignment_container runs while the caller is already handling a
+    timeout and still has a Submission row to write. If an APIError escaped
+    here, the student would get an opaque 500 and no timeout submission at all.
+    """
+    assignment = mocker.Mock()
+    assignment.id = "assign-id"
+    assignment.container_id = "container-abc"
+
+    client_mock = mocker.Mock()
+    client_mock.containers.get.side_effect = docker.errors.APIError("daemon busy")
+    mocker.patch("routes.submission.get_docker_client", return_value=client_mock)
+    mocker.patch("routes.submission.db.session.commit")
+
+    submission_module.reset_assignment_container(assignment)
+
+    assert assignment.container_id is None
+
+
+def test_archive_staged_files_prunes_empty_scaffolding(app):
+    """runs/ should be left holding only in-progress work."""
+    assignment_id = str(uuid.uuid4())
+    submission_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    routes_dir = os.path.dirname(os.path.abspath(submission_module.__file__))
+    assignment_dir = os.path.join(routes_dir, "upload_autograder", "runs", assignment_id)
+    submissions_dir = os.path.join(assignment_dir, "submission", submission_id)
+    results_dir = os.path.join(assignment_dir, student_id, "results")
+
+    try:
+        os.makedirs(submissions_dir)
+        os.makedirs(results_dir)
+        with open(os.path.join(submissions_dir, "solution.py"), "w") as f:
+            f.write("print('hi')")
+        results_path = os.path.join(results_dir, "results.json")
+        with open(results_path, "w") as f:
+            f.write("{}")
+
+        submission_module.archive_staged_files(
+            assignment_id, submission_id, submissions_dir, results_path
+        )
+
+        assert not os.path.exists(os.path.join(assignment_dir, "submission"))
+        assert not os.path.exists(os.path.join(assignment_dir, student_id))
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_archive_staged_files_keeps_parent_with_concurrent_submission(app):
+    """Pruning must never disturb another submission still staging."""
+    assignment_id = str(uuid.uuid4())
+    mine = str(uuid.uuid4())
+    theirs = str(uuid.uuid4())
+    routes_dir = os.path.dirname(os.path.abspath(submission_module.__file__))
+    assignment_dir = os.path.join(routes_dir, "upload_autograder", "runs", assignment_id)
+    my_dir = os.path.join(assignment_dir, "submission", mine)
+    their_dir = os.path.join(assignment_dir, "submission", theirs)
+
+    try:
+        os.makedirs(my_dir)
+        os.makedirs(their_dir)
+        with open(os.path.join(my_dir, "solution.py"), "w") as f:
+            f.write("print('hi')")
+
+        submission_module.archive_staged_files(assignment_id, mine, my_dir)
+
+        assert os.path.isdir(their_dir)
+    finally:
+        _cleanup_submission_dirs(assignment_id)

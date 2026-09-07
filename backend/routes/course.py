@@ -13,7 +13,10 @@ from api.models import (
     User,
     Submission,
     RegradeRequest,
+    cleanup_assignment_container,
+    cleanup_assignment_directories,
 )
+from routes.submission import discard_container_lock
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, UnauthorizedError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
@@ -367,8 +370,9 @@ def delete_all_assignments():
 
     if not assignments:
         raise NotFoundError("No assignments found for this course")
-    
-    assignment_ids = [a.id for a in assignments]
+
+    cleanup_items = [(a.id, a.container_id) for a in assignments]
+    assignment_ids = [aid for aid, _ in cleanup_items]
 
     try:
         db.session.query(RegradeRequest).filter(
@@ -389,11 +393,18 @@ def delete_all_assignments():
 
         db.session.commit()
 
-        return jsonify("Assignments deleted successfully"), 200
-    
     except Exception as e:
         db.session.rollback()
         raise InternalProcessingError("Failed to delete assignments")
+
+    # Tear down containers and delete archived submissions/results after db commit.
+    for assignment_id, container_id in cleanup_items:
+        cleanup_assignment_container(container_id, assignment_id)
+        cleanup_assignment_directories(assignment_id)
+        discard_container_lock(assignment_id)
+
+    return jsonify("Assignments deleted successfully"), 200
+
 
 @course.route("/create_enrollment", methods=["POST"])
 def create_enrollment():

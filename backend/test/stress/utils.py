@@ -172,7 +172,8 @@ def delete_assignment(assignment_id):
     return response.json()
 
 
-def upload_submission(assignment_id, student_id=None, submission_file_path=None):
+def upload_submission(assignment_id, student_id=None, submission_file_path=None, session=None):
+    http = session or requests
     url = f"{BASE_URL}/upload_submission"
 
     if submission_file_path is None:
@@ -189,13 +190,14 @@ def upload_submission(assignment_id, student_id=None, submission_file_path=None)
             "assignment_id": assignment_id,
             "student_id": student_id,
         }
-        response = requests.post(url, files=files, data=data)
+        response = http.post(url, files=files, data=data)
 
     raise_for_status_with_body(response, "Upload submission")
     return response.json()
 
 
-def add_user(name="Stress Student", email=None, password="test123", eid=None, role="Student"):
+def add_user(name="Stress Student", email=None, password="test123", eid=None, role="Student", session=None):
+    http = session or requests
     url = f"{BASE_URL}/create_user"
 
     if email is None:
@@ -211,11 +213,11 @@ def add_user(name="Stress Student", email=None, password="test123", eid=None, ro
         "role": role,
     }
 
-    response = requests.post(url, json=payload)
+    response = http.post(url, json=payload)
 
     if response.status_code == 409:
         print("User already exists. Attempting to fetch by email...")
-        user_lookup = requests.get(f"{BASE_URL}/get_user_by_email", params={"email": email})
+        user_lookup = http.get(f"{BASE_URL}/get_user_by_email", params={"email": email})
         raise_for_status_with_body(user_lookup, "Get user by email")
         return user_lookup.json()["id"]
 
