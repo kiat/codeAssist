@@ -839,3 +839,65 @@ def test_delete_extension_student_forbidden(client, mocker, login_as):
 
     assert resp.status_code == 403
     assert "Only instructors or TAs" in resp.json["message"]
+
+
+def _mock_delete_assignment_lookups(mocker, assignment):
+    """Wire the two filter_by().first() lookups /delete_assignment performs."""
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    enrollment = mocker.Mock()
+    enrollment.role = "instructor"
+    mock_query.return_value.filter_by.return_value.first.side_effect = [assignment, enrollment]
+    mock_query.return_value.filter.return_value.all.return_value = []
+    return mock_query
+
+
+def test_delete_assignment_defers_teardown_until_after_commit(client, mocker):
+    """Containers and archived work are destroyed only once the delete commits."""
+    events = []
+
+    assignment = Assignment(id="assign-id", course_id="course-uuid")
+    assignment.container_id = "container-abc"
+    _mock_delete_assignment_lookups(mocker, assignment)
+
+    mocker.patch("routes.assignment.db.session.delete")
+    mocker.patch("routes.assignment.db.session.commit", side_effect=lambda: events.append("commit"))
+    mocker.patch("routes.assignment.cleanup_assignment_container",
+                 side_effect=lambda cid, aid=None: events.append(("container", cid, aid)))
+    mocker.patch("routes.assignment.cleanup_assignment_directories",
+                 side_effect=lambda aid: events.append(("dirs", aid)))
+    mocker.patch("routes.assignment.discard_container_lock",
+                 side_effect=lambda aid: events.append(("lock", aid)))
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
+    resp = client.delete("/delete_assignment?assignment_id=assign-id")
+
+    assert resp.status_code == 200
+    assert events[0] == "commit", "teardown ran before the transaction committed"
+    assert ("container", "container-abc", "assign-id") in events
+    assert ("dirs", "assign-id") in events
+    assert ("lock", "assign-id") in events
+
+
+def test_delete_assignment_commit_failure_leaves_containers_and_archives(client, mocker):
+    """A rolled-back delete must not have already destroyed the data it names."""
+    assignment = Assignment(id="assign-id", course_id="course-uuid")
+    assignment.container_id = "container-abc"
+    _mock_delete_assignment_lookups(mocker, assignment)
+
+    mocker.patch("routes.assignment.db.session.delete")
+    mocker.patch("routes.assignment.db.session.commit", side_effect=Exception("FK violation"))
+    mock_rollback = mocker.patch("routes.assignment.db.session.rollback")
+    cleanup_container = mocker.patch("routes.assignment.cleanup_assignment_container")
+    cleanup_dirs = mocker.patch("routes.assignment.cleanup_assignment_directories")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "instructor-uuid"
+
+    resp = client.delete("/delete_assignment?assignment_id=assign-id")
+
+    assert resp.status_code == 500
+    mock_rollback.assert_called()
+    cleanup_container.assert_not_called()
+    cleanup_dirs.assert_not_called()

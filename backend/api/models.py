@@ -1,5 +1,4 @@
 from marshmallow import Schema, fields
-from sqlalchemy import event
 from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
@@ -93,8 +92,16 @@ class Assignment(db.Model):
     ai_feedback_max_requests = db.Column(db.Integer, nullable=True)
     ai_feedback_wait_seconds = db.Column(db.Integer, nullable=False, default=0)
 
-def cleanup_assignment_container(mapper, connection, target):
-    container_id = target.container_id
+def cleanup_assignment_container(container_id, assignment_id=None):
+    """Stop and remove the persistent grading container of a deleted assignment.
+
+    Call this from the delete route *after* its transaction has committed, never
+    from a mapper-level flush event. Blocking Docker I/O during flush holds the
+    transaction and its row locks open across a round trip to the Docker socket,
+    which SQLAlchemy warns against and which a hung daemon turns into a stalled
+    request. Running it before the commit is worse still: a failed commit rolls
+    the rows back, but a destroyed container does not come back.
+    """
     if not container_id:
         return
     try:
@@ -107,18 +114,21 @@ def cleanup_assignment_container(mapper, connection, target):
     except Exception:
         logging.getLogger(__name__).warning(
             "Failed to clean up container %s for deleted assignment %s",
-            container_id, target.id, exc_info=True
+            container_id, assignment_id, exc_info=True
         )
 
-event.listen(Assignment, "after_delete", cleanup_assignment_container)
 
-def cleanup_assignment_directories(mapper, connection, target):
+def cleanup_assignment_directories(assignment_id):
+    """Remove the runs/ and archive/ trees of a deleted assignment.
+
+    Same contract as cleanup_assignment_container: after a successful commit
+    only. These trees hold the archived student submissions and results JSON,
+    so deleting them ahead of the commit loses data a rollback cannot restore.
+    """
     backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     base_dir = os.path.join(backend_dir, "routes", "upload_autograder")
     for subtree in ("runs", "archive"):
-        shutil.rmtree(os.path.join(base_dir, subtree, str(target.id)), ignore_errors=True)
-
-event.listen(Assignment, "after_delete", cleanup_assignment_directories)
+        shutil.rmtree(os.path.join(base_dir, subtree, str(assignment_id)), ignore_errors=True)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
