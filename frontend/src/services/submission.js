@@ -41,3 +41,23 @@ export async function rerunSubmissionAutograder(params) {
   return service("rerun_submission_autograder", params, "post");
 }
 
+export async function getGradeStatistics(params) {
+  return service("get_grade_statistics", params, "get", {
+    skipGlobalErrorMessage: true,
+  });
+}
+
+export async function exportEvaluations(params) {
+  return service("export_evaluations", params, "get", {
+    responseType: "blob",
+    skipGlobalErrorMessage: true,
+  });
+}
+
+export async function exportSubmissions(params) {
+  return service("export_submissions", params, "get", {
+    responseType: "blob",
+    skipGlobalErrorMessage: true,
+  });
+}
+

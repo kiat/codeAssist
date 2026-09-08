@@ -49,7 +49,9 @@ def create_app(config_class='config.Config'):
             "Set FRONTEND_ORIGIN to your actual frontend URL in production."
         )
         frontend_origin = 'http://localhost:3000'
-    CORS(app, supports_credentials=True, origins=[frontend_origin])
+    # Content-Disposition is exposed so the frontend can read the server-provided
+    # filename for file downloads (e.g. exported zips).
+    CORS(app, supports_credentials=True, origins=[frontend_origin], expose_headers=["Content-Disposition"])
     ma.init_app(app)
     db.init_app(app)
     migrate.init_app(app, db)

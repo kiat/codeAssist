@@ -2,21 +2,24 @@ import uuid
 import json
 import sys
 import io
+import statistics
 import csv
 import tarfile
+import zipfile
 import subprocess
 import os
-import docker 
+import docker
 import shutil
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from functools import reduce
-from flask import Blueprint, request, jsonify, current_app, session
+from flask import Blueprint, request, jsonify, current_app, session, send_file
 from api import db
-from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase
+from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase, SubmissionSubmitter
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
+from util.csv_utils import csv_safe_cell
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -37,6 +40,45 @@ ALLOWED_EXTENSIONS = {'py','zip'}
 def allowed_file(filename):
     return "." in filename and \
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _stored_file_to_bytes(value):
+    if value is None:
+        return None
+    if isinstance(value, memoryview):
+        return value.tobytes()
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, str):
+        return value.encode("utf-8")
+    return bytes(value)
+
+
+def _json_from_stored_value(value):
+    raw_value = _stored_file_to_bytes(value)
+    if not raw_value:
+        return None
+    try:
+        return json.loads(raw_value.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
+def _json_or_text_from_stored_value(value):
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+
+    raw_value = _stored_file_to_bytes(value)
+    if raw_value is None:
+        return None
+
+    text_value = raw_value.decode("utf-8", errors="replace")
+    try:
+        return json.loads(text_value)
+    except json.JSONDecodeError:
+        return text_value
 
 
 def _verify_course_staff(assignment_id):
@@ -552,10 +594,449 @@ def get_all_assignment_submissions():
 
     return jsonify(submissions_data), 200
 
+
+def _percentage_histogram(scores, max_points):
+    """10 fixed-width buckets over [0, max_points]. Scores outside that
+    range (extra credit above max_points, or a negative score, which
+    Submission.score has no DB constraint against) get their own overflow/
+    underflow bucket rather than being silently clamped into 0-10%/90-100%.
+    """
+    bucket_width = max_points / 10
+    buckets = [0] * 10
+    overflow = 0
+    underflow = 0
+    for s in scores:
+        if s < 0:
+            underflow += 1
+            continue
+        if s > max_points:
+            overflow += 1
+            continue
+        # min(..., 9) so a score exactly equal to max_points lands in the
+        # last bucket (90-100%) instead of a nonexistent 11th bucket. The
+        # tiny epsilon guards against float division landing just under an
+        # exact bucket boundary (e.g. 3.3 / 1.1 == 2.9999999999999996) and
+        # misclassifying a boundary score into the bucket below it.
+        idx = min(int(s / bucket_width + 1e-9), 9)
+        buckets[idx] += 1
+
+    histogram = [
+        {
+            "label": f"{i * 10}-{(i + 1) * 10}%",
+            "bucket_start": round(i * bucket_width, 2),
+            "bucket_end": round((i + 1) * bucket_width, 2),
+            "count": buckets[i],
+        }
+        for i in range(10)
+    ]
+    if underflow:
+        histogram.insert(0, {"label": "<0%", "bucket_start": None, "bucket_end": 0, "count": underflow})
+    if overflow:
+        histogram.append({"label": ">100%", "bucket_start": max_points, "bucket_end": None, "count": overflow})
+    return histogram
+
+
+def _raw_histogram(scores, score_min, score_max):
+    """Fallback bucketing when the assignment has no autograder_points (or
+    it's 0) to build percentage buckets against: 10 fixed-width buckets over
+    the observed score range instead.
+    """
+    if score_min == score_max:
+        # A single submission, or every graded score being identical, can't
+        # be split into 10 non-degenerate buckets.
+        return [{
+            "label": f"{score_min:g}",
+            "bucket_start": score_min,
+            "bucket_end": score_min,
+            "count": len(scores),
+        }]
+
+    bucket_width = (score_max - score_min) / 10
+    buckets = [0] * 10
+    for s in scores:
+        idx = min(int((s - score_min) / bucket_width + 1e-9), 9)
+        buckets[idx] += 1
+
+    return [
+        {
+            "label": f"{score_min + i * bucket_width:.1f}-{score_min + (i + 1) * bucket_width:.1f}",
+            "bucket_start": round(score_min + i * bucket_width, 2),
+            "bucket_end": round(score_min + (i + 1) * bucket_width, 2),
+            "count": buckets[i],
+        }
+        for i in range(10)
+    ]
+
+
+def _effective_max_points(active_submissions, assignment_max_points):
+    """Resolve the single point total to draw the score distribution against.
+
+    Prefer Assignment.autograder_points: it is a persisted field (defaulted
+    to 100 at creation and editable in assignment settings), so it gives a
+    stable denominator that does not shift as submissions arrive. Deriving it
+    from submissions instead -- taking the max test-total across results.json
+    blobs -- distorts every percentage whenever the autograder rubric changed
+    mid-assignment (submissions graded out of 10 shown against a max of 20).
+
+    Fall back to the results-derived total only when autograder_points is
+    unset / 0, so assignments created before the field existed still work.
+    """
+    if assignment_max_points and assignment_max_points > 0:
+        return assignment_max_points
+
+    computed_max = 0
+    for sub in active_submissions:
+        data = _json_from_stored_value(sub.results)
+        if not isinstance(data, dict):
+            continue
+        total = sum((t.get("max_score", 0) or 0) for t in (data.get("tests") or []))
+        computed_max = max(computed_max, total)
+    return computed_max if computed_max > 0 else assignment_max_points
+
+
+def _compute_grade_statistics(scores, max_points):
+    count = len(scores)
+    if count == 0:
+        return {
+            "count": 0,
+            "mean": None,
+            "median": None,
+            "min": None,
+            "max": None,
+            "stdev": None,
+            "max_points": max_points,
+            "mode": "percentage" if (max_points and max_points > 0) else "raw",
+            "histogram": [],
+        }
+
+    score_min = min(scores)
+    score_max = max(scores)
+
+    if max_points and max_points > 0:
+        histogram = _percentage_histogram(scores, max_points)
+        mode = "percentage"
+    else:
+        histogram = _raw_histogram(scores, score_min, score_max)
+        mode = "raw"
+
+    return {
+        "count": count,
+        "mean": round(statistics.mean(scores), 2),
+        "median": round(statistics.median(scores), 2),
+        "min": score_min,
+        "max": score_max,
+        # Population stdev, not sample stdev: `scores` is the entire set of
+        # graded submissions for this assignment, not a sample drawn from a
+        # larger population. Also defined for n == 1 (returns 0.0), which
+        # avoids a separate low-n guard that statistics.stdev would need.
+        "stdev": round(statistics.pstdev(scores), 2),
+        "max_points": max_points,
+        "mode": mode,
+        "histogram": histogram,
+    }
+
+
+@submission.route('/get_grade_statistics', methods=["GET"])
+def get_grade_statistics():
+    '''
+    /get_grade_statistics computes summary stats (mean, median, min, max,
+    stdev) and a histogram of the score distribution for an assignment's
+    graded submissions.
+    @param assignment_id  the id of the assignment
+    '''
+    assignment_id = request.args.get("assignment_id")
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    # Security: Verify the requester is course staff or admin
+    _verify_course_staff(assignment_id)
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    # Only the active submission counts per student, and only if it's been
+    # graded (an active submission can still have score == None while
+    # autograding/AI feedback is in progress).
+    active_submissions = Submission.query.filter_by(
+        assignment_id=assignment_id, active=True
+    ).all()
+    scores = [s.score for s in active_submissions if s.score is not None]
+    max_points = _effective_max_points(active_submissions, assignment.autograder_points)
+
+    stats = _compute_grade_statistics(scores, max_points)
+    return jsonify(stats), 200
+
+
+@submission.route('/export_evaluations', methods=["GET"])
+def export_evaluations():
+    '''
+    /export_evaluations builds and streams a zip file containing one CSV per
+    autograder test (keyed by each test's "name" in the submission's
+    results.json), each listing every enrolled student's result for that
+    test ("no submission" for students who never submitted).
+    @param assignment_id  the id of the assignment
+    '''
+    assignment_id = request.args.get("assignment_id")
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    # Security: Verify the requester is course staff or admin
+    _verify_course_staff(assignment_id)
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    active_submissions = Submission.query.filter_by(
+        assignment_id=assignment_id, active=True
+    ).order_by(Submission.submitted_at.asc()).all()
+    submission_by_student = {sub.student_id: sub for sub in active_submissions}
+
+    # Roster = everyone currently enrolled as a student, plus anyone who has a
+    # graded submission but is no longer enrolled (leaving a course deletes the
+    # Enrollment row but not the Submission). Basing it on enrollment alone
+    # would silently drop a student who submitted and then dropped the course;
+    # get_grade_statistics already counts those submissions, so this keeps the
+    # export consistent with the stats. Students with no submission still get a
+    # "no submission" row.
+    enrolled_ids = {
+        row[0]
+        for row in db.session.query(Enrollment.student_id).filter(
+            Enrollment.course_id == assignment.course_id,
+            func.lower(Enrollment.role) == "student",
+        )
+    }
+    roster_ids = enrolled_ids | set(submission_by_student.keys())
+    roster = (
+        db.session.query(User)
+        .filter(User.id.in_(roster_ids))
+        .order_by(User.name.asc(), User.id.asc())
+        .all()
+        if roster_ids
+        else []
+    )
+
+    # Parse each submission's results.json (stored as a raw blob on
+    # Submission.results) once, keyed by student id then test name, and
+    # track the order test names first appear in so spreadsheets follow the
+    # assignment's actual test order rather than an arbitrary one. Also
+    # remember each test's "number" (e.g. "2.3"), if the autograder set one,
+    # since test names are often full sentences/expressions (e.g. "Evaluate
+    # 8 / 4 * 2") that lose their meaning once filename-sanitized.
+    tests_by_student = {}
+    test_name_order = []
+    seen_names = set()
+    number_by_name = {}
+    for sub in active_submissions:
+        tests_by_name = {}
+        data = _json_from_stored_value(sub.results)
+        if isinstance(data, dict):
+            for test in data.get("tests", []) or []:
+                name = test.get("name")
+                if not name:
+                    continue
+                tests_by_name[name] = test
+                if name not in seen_names:
+                    seen_names.add(name)
+                    test_name_order.append(name)
+                    number_by_name[name] = test.get("number")
+        tests_by_student[sub.student_id] = tests_by_name
+
+    zip_buffer = io.BytesIO()
+    used_names = {}
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        if not test_name_order:
+            zf.writestr(
+                "README.txt",
+                "No graded test results found for this assignment yet.\n",
+            )
+        for name in test_name_order:
+            csv_buffer = io.StringIO()
+            writer = csv.writer(csv_buffer)
+            writer.writerow([
+                "question",
+                "student_name",
+                "student_email",
+                "enrolled",
+                "status",
+                "score",
+                "max_score",
+                "output",
+                "expected_output",
+            ])
+            for student in roster:
+                enrolled = "yes" if student.id in enrolled_ids else "no"
+                if student.id not in submission_by_student:
+                    row = [name, student.name, student.email_address, enrolled,
+                           "no submission", "", "", "", ""]
+                else:
+                    test = tests_by_student.get(student.id, {}).get(name, {})
+                    row = [
+                        name,
+                        student.name,
+                        student.email_address,
+                        enrolled,
+                        test.get("status", ""),
+                        test.get("score", ""),
+                        test.get("max_score", ""),
+                        test.get("output", ""),
+                        test.get("expected_output", ""),
+                    ]
+                # Neutralize spreadsheet formula injection: autograder output is
+                # student program stdout, and student name/email are user-set.
+                writer.writerow([csv_safe_cell(cell) for cell in row])
+
+            # Prefer the autograder's own question number for the filename
+            # (e.g. "Question_2.3.csv") since test names are often full
+            # sentences/expressions that don't survive filename-sanitizing
+            # intact (e.g. "Evaluate 8 / 4 * 2" -> "Evaluate_8_4__2"). The
+            # full name is still preserved as the "question" column above.
+            number = number_by_name.get(name)
+            if number:
+                base_label = secure_filename(f"Question_{number}") or "question"
+            else:
+                base_label = secure_filename(name) or "question"
+            count = used_names.get(base_label, 0)
+            used_names[base_label] = count + 1
+            file_name = f"{base_label}.csv" if count == 0 else f"{base_label}_{count}.csv"
+            zf.writestr(file_name, csv_buffer.getvalue())
+
+    zip_buffer.seek(0)
+    download_name = f"{secure_filename(assignment.name or str(assignment_id))}_evaluations.zip"
+
+    return send_file(
+        zip_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=download_name,
+    )
+
+@submission.route('/export_submissions', methods=["GET"])
+def export_submissions():
+    '''
+    /export_submissions builds and streams a zip file containing every
+    student's active (latest) submission code file for an assignment,
+    plus a JSON metadata file per submission (score, execution_time,
+    test case pass/fail breakdown, AI feedback text).
+    @param assignment_id  the id of the assignment
+    '''
+    assignment_id = request.args.get("assignment_id")
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    # Security: Verify the requester is course staff or admin
+    _verify_course_staff(assignment_id)
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    active_submissions = Submission.query.filter_by(
+        assignment_id=assignment_id, active=True
+    ).order_by(Submission.submitted_at.asc()).all()
+
+    zip_buffer = io.BytesIO()
+    used_names = {}
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        if not active_submissions:
+            zf.writestr(
+                "README.txt",
+                "No active submissions found for this assignment yet.\n",
+            )
+        for sub in active_submissions:
+            student = db.session.query(User).filter_by(id=sub.student_id).first()
+
+            co_submitter_rows = db.session.query(SubmissionSubmitter).filter_by(
+                submission_id=sub.id
+            ).all()
+            submitter_ids = {str(r.submitter_id) for r in co_submitter_rows}
+            submitter_ids.add(str(sub.student_id))
+            submitter_users = db.session.query(User).filter(
+                User.id.in_(submitter_ids)
+            ).all() if submitter_ids else []
+            submitter_names = sorted(u.name for u in submitter_users) or (
+                [student.name] if student else ["unknown_student"]
+            )
+            submitter_metadata = sorted(
+                [
+                    {
+                        "id": str(u.id),
+                        "name": u.name,
+                        "email": u.email_address,
+                        "sis_user_id": u.sis_user_id,
+                    }
+                    for u in submitter_users
+                ],
+                key=lambda u: u["name"] or "",
+            )
+
+            base_label = secure_filename(
+                (student.sis_user_id if student else None) or str(sub.student_id)
+            ) or str(sub.student_id)
+            count = used_names.get(base_label, 0)
+            used_names[base_label] = count + 1
+            folder_name = base_label if count == 0 else f"{base_label}_{count}"
+
+            code_bytes = _stored_file_to_bytes(sub.student_code_file)
+            code_filename = secure_filename(sub.file_name or "submission")
+            zf.writestr(f"{folder_name}/{code_filename}", code_bytes or b"")
+
+            results_bytes = _stored_file_to_bytes(sub.results)
+            autograder_results = _json_from_stored_value(sub.results)
+            if results_bytes:
+                zf.writestr(f"{folder_name}/results.json", results_bytes)
+
+            test_case_rows = db.session.query(TestCaseResult, TestCase).join(
+                TestCase, TestCaseResult.test_case_id == TestCase.id
+            ).filter(TestCaseResult.submission_id == sub.id).all()
+
+            metadata = {
+                "submission_id": str(sub.id),
+                "student_id": str(sub.student_id),
+                "student_name": student.name if student else None,
+                "student_email": student.email_address if student else None,
+                "student_sis_user_id": student.sis_user_id if student else None,
+                "group_submitters": submitter_names,
+                "submitters": submitter_metadata,
+                "file_name": sub.file_name,
+                "submission_number": sub.submission_number,
+                "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None,
+                "score": sub.score,
+                "execution_time": sub.execution_time,
+                "completed": sub.completed,
+                "ai_feedback": _json_or_text_from_stored_value(sub.ai_feedback),
+                "autograder_results": autograder_results,
+                "test_case_results": [
+                    {
+                        "test_case_name": tc.test_case_name,
+                        "passed": result.passed,
+                        "student_output": result.student_output,
+                        "expected_output": tc.expected_output,
+                    }
+                    for result, tc in test_case_rows
+                ],
+            }
+            zf.writestr(
+                f"{folder_name}/metadata.json",
+                json.dumps(metadata, indent=2, default=str),
+            )
+
+    zip_buffer.seek(0)
+    download_name = f"{secure_filename(assignment.name or str(assignment_id))}_submissions.zip"
+
+    return send_file(
+        zip_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=download_name,
+    )
+
 @submission.route('/export_grades_csv', methods=["GET"])
 def export_grades_csv():
     assignment_id = request.args.get("assignment_id")
-
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
 
@@ -597,6 +1078,7 @@ def export_grades_csv():
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
 
 @submission.route('/delete_submission', methods=["DELETE"])
 def delete_submission():
