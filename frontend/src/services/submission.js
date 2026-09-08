@@ -42,7 +42,9 @@ export async function rerunSubmissionAutograder(params) {
 }
 
 export async function getGradeStatistics(params) {
-  return service("get_grade_statistics", params);
+  return service("get_grade_statistics", params, "get", {
+    skipGlobalErrorMessage: true,
+  });
 }
 
 export async function exportEvaluations(params) {

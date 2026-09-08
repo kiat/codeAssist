@@ -161,6 +161,10 @@ export default () => {
     setStatsError(false);
     setStatsLoading(true);
 
+    // Guard against a slow response from a previous assignment landing after
+    // we've navigated away and overwriting this assignment's data.
+    let ignore = false;
+
     (async () => {
       try {
         // First get all submissions
@@ -207,7 +211,7 @@ export default () => {
           };
         });
 
-        setSubmissions(rows);
+        if (!ignore) setSubmissions(rows);
       } catch (err) {
         console.error("Error fetching grades:", err);
       }
@@ -219,14 +223,18 @@ export default () => {
     (async () => {
       try {
         const response = await getGradeStatistics({ assignment_id: assignmentId });
-        setStats(response.data);
+        if (!ignore) setStats(response.data);
       } catch (err) {
         console.error("Error fetching statistics:", err);
-        setStatsError(true);
+        if (!ignore) setStatsError(true);
       } finally {
-        setStatsLoading(false);
+        if (!ignore) setStatsLoading(false);
       }
     })();
+
+    return () => {
+      ignore = true;
+    };
   }, [
     userInfo,
     courseInfo,
