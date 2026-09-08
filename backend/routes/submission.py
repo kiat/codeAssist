@@ -18,6 +18,7 @@ from api.models import Assignment, Submission, User, Course, Enrollment, TestCas
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
+from util.csv_utils import csv_safe_cell
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -591,6 +592,151 @@ def get_all_assignment_submissions():
     submissions_data = submissions_schema.dump(all_submissions)
 
     return jsonify(submissions_data), 200
+
+@submission.route('/export_evaluations', methods=["GET"])
+def export_evaluations():
+    '''
+    /export_evaluations builds and streams a zip file containing one CSV per
+    autograder test (keyed by each test's "name" in the submission's
+    results.json), each listing every enrolled student's result for that
+    test ("no submission" for students who never submitted).
+    @param assignment_id  the id of the assignment
+    '''
+    assignment_id = request.args.get("assignment_id")
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    # Security: Verify the requester is course staff or admin
+    _verify_course_staff(assignment_id)
+
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
+    active_submissions = Submission.query.filter_by(
+        assignment_id=assignment_id, active=True
+    ).order_by(Submission.submitted_at.asc()).all()
+    submission_by_student = {sub.student_id: sub for sub in active_submissions}
+
+    # Roster = everyone currently enrolled as a student, plus anyone who has a
+    # graded submission but is no longer enrolled (leaving a course deletes the
+    # Enrollment row but not the Submission). Basing it on enrollment alone
+    # would silently drop a student who submitted and then dropped the course;
+    # get_grade_statistics already counts those submissions, so this keeps the
+    # export consistent with the stats. Students with no submission still get a
+    # "no submission" row.
+    enrolled_ids = {
+        row[0]
+        for row in db.session.query(Enrollment.student_id).filter(
+            Enrollment.course_id == assignment.course_id,
+            func.lower(Enrollment.role) == "student",
+        )
+    }
+    roster_ids = enrolled_ids | set(submission_by_student.keys())
+    roster = (
+        db.session.query(User)
+        .filter(User.id.in_(roster_ids))
+        .order_by(User.name.asc(), User.id.asc())
+        .all()
+        if roster_ids
+        else []
+    )
+
+    # Parse each submission's results.json (stored as a raw blob on
+    # Submission.results) once, keyed by student id then test name, and
+    # track the order test names first appear in so spreadsheets follow the
+    # assignment's actual test order rather than an arbitrary one. Also
+    # remember each test's "number" (e.g. "2.3"), if the autograder set one,
+    # since test names are often full sentences/expressions (e.g. "Evaluate
+    # 8 / 4 * 2") that lose their meaning once filename-sanitized.
+    tests_by_student = {}
+    test_name_order = []
+    seen_names = set()
+    number_by_name = {}
+    for sub in active_submissions:
+        tests_by_name = {}
+        data = _json_from_stored_value(sub.results)
+        if isinstance(data, dict):
+            for test in data.get("tests", []) or []:
+                name = test.get("name")
+                if not name:
+                    continue
+                tests_by_name[name] = test
+                if name not in seen_names:
+                    seen_names.add(name)
+                    test_name_order.append(name)
+                    number_by_name[name] = test.get("number")
+        tests_by_student[sub.student_id] = tests_by_name
+
+    zip_buffer = io.BytesIO()
+    used_names = {}
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        if not test_name_order:
+            zf.writestr(
+                "README.txt",
+                "No graded test results found for this assignment yet.\n",
+            )
+        for name in test_name_order:
+            csv_buffer = io.StringIO()
+            writer = csv.writer(csv_buffer)
+            writer.writerow([
+                "question",
+                "student_name",
+                "student_email",
+                "enrolled",
+                "status",
+                "score",
+                "max_score",
+                "output",
+                "expected_output",
+            ])
+            for student in roster:
+                enrolled = "yes" if student.id in enrolled_ids else "no"
+                if student.id not in submission_by_student:
+                    row = [name, student.name, student.email_address, enrolled,
+                           "no submission", "", "", "", ""]
+                else:
+                    test = tests_by_student.get(student.id, {}).get(name, {})
+                    row = [
+                        name,
+                        student.name,
+                        student.email_address,
+                        enrolled,
+                        test.get("status", ""),
+                        test.get("score", ""),
+                        test.get("max_score", ""),
+                        test.get("output", ""),
+                        test.get("expected_output", ""),
+                    ]
+                # Neutralize spreadsheet formula injection: autograder output is
+                # student program stdout, and student name/email are user-set.
+                writer.writerow([csv_safe_cell(cell) for cell in row])
+
+            # Prefer the autograder's own question number for the filename
+            # (e.g. "Question_2.3.csv") since test names are often full
+            # sentences/expressions that don't survive filename-sanitizing
+            # intact (e.g. "Evaluate 8 / 4 * 2" -> "Evaluate_8_4__2"). The
+            # full name is still preserved as the "question" column above.
+            number = number_by_name.get(name)
+            if number:
+                base_label = secure_filename(f"Question_{number}") or "question"
+            else:
+                base_label = secure_filename(name) or "question"
+            count = used_names.get(base_label, 0)
+            used_names[base_label] = count + 1
+            file_name = f"{base_label}.csv" if count == 0 else f"{base_label}_{count}.csv"
+            zf.writestr(file_name, csv_buffer.getvalue())
+
+    zip_buffer.seek(0)
+    download_name = f"{secure_filename(assignment.name or str(assignment_id))}_evaluations.zip"
+
+    return send_file(
+        zip_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=download_name,
+    )
 
 @submission.route('/export_submissions', methods=["GET"])
 def export_submissions():

@@ -50,7 +50,7 @@ def create_app(config_class='config.Config'):
         )
         frontend_origin = 'http://localhost:3000'
     # Content-Disposition is exposed so the frontend can read the server-provided
-    # filename off file-download responses (e.g. export_submissions).
+    # filename for file downloads (e.g. exported zips).
     CORS(app, supports_credentials=True, origins=[frontend_origin], expose_headers=["Content-Disposition"])
     ma.init_app(app)
     db.init_app(app)
