@@ -46,7 +46,10 @@ export async function getGradeStatistics(params) {
 }
 
 export async function exportEvaluations(params) {
-  return service("export_evaluations", params, "get", { responseType: "blob" });
+  return service("export_evaluations", params, "get", {
+    responseType: "blob",
+    skipGlobalErrorMessage: true,
+  });
 }
 
 export async function exportSubmissions(params) {

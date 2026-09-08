@@ -724,6 +724,12 @@ def test_export_evaluations_success(app, client):
         # Dave is enrolled but never submits, to verify non-submitters still
         # show up in the export instead of silently disappearing.
         dave = _make_student("Dave Example", "dave@example.com", "dave")
+        # Erin submitted and was graded but is no longer enrolled (dropped the
+        # course). Her graded work must still appear, marked enrolled=no.
+        erin = _make_student("Erin Example", "erin@example.com", "erin")
+        # Mallory's display name and program output are crafted to trigger
+        # spreadsheet formula injection; every dynamic cell must be neutralized.
+        mallory = _make_student("=1+2 Formula", "mallory@example.com", "mallory")
 
         db.session.add(Course(
             id=course_id,
@@ -734,12 +740,13 @@ def test_export_evaluations_success(app, client):
             entryCode=f"entry-{course_id[:8]}",
         ))
         db.session.add(Assignment(id=assignment_id, name="HW1", course_id=course_id))
-        db.session.add_all([alice, bob, carol, dave])
+        db.session.add_all([alice, bob, carol, dave, erin, mallory])
         db.session.add_all([
             Enrollment(student_id=alice.id, course_id=course_id, role="student"),
             Enrollment(student_id=bob.id, course_id=course_id, role="student"),
             Enrollment(student_id=carol.id, course_id=course_id, role="student"),
             Enrollment(student_id=dave.id, course_id=course_id, role="student"),
+            Enrollment(student_id=mallory.id, course_id=course_id, role="student"),
         ])
 
         alice_results = json.dumps({
@@ -795,6 +802,47 @@ def test_export_evaluations_success(app, client):
             completed=True,
             submitted_at=base_time + timedelta(minutes=2),
         ))
+
+        erin_results = json.dumps({
+            "tests": [
+                {"name": "Evaluate 8 / 4 * 2", "number": "2.3", "status": "error",
+                 "score": 0, "max_score": 1,
+                 "output": "=cmd|'/c calc'!A1", "expected_output": "-3+2"},
+            ],
+            "score": 0,
+        }).encode()
+        mallory_results = json.dumps({
+            "tests": [
+                {"name": "Evaluate 8 / 4 * 2", "number": "2.3", "status": "passed",
+                 "score": 1, "max_score": 1, "output": "=2+2", "expected_output": "42"},
+            ],
+            "score": 1,
+        }).encode()
+
+        db.session.add(Submission(
+            id=str(uuid.uuid4()),
+            file_name="erin.py",
+            submission_number=1,
+            student_id=erin.id,
+            assignment_id=assignment_id,
+            student_code_file=b"print('boom')",
+            results=erin_results,
+            active=True,
+            completed=True,
+            submitted_at=base_time + timedelta(minutes=3),
+        ))
+        db.session.add(Submission(
+            id=str(uuid.uuid4()),
+            file_name="mallory.py",
+            submission_number=1,
+            student_id=mallory.id,
+            assignment_id=assignment_id,
+            student_code_file=b"print(4)",
+            results=mallory_results,
+            active=True,
+            completed=True,
+            submitted_at=base_time + timedelta(minutes=4),
+        ))
         db.session.commit()
 
     response = client.get(f"/export_evaluations?assignment_id={assignment_id}")
@@ -810,8 +858,20 @@ def test_export_evaluations_success(app, client):
     assert q1_rows == [
         {
             "question": "Evaluate 8 / 4 * 2",
+            "student_name": "'=1+2 Formula",
+            "student_email": "mallory@example.com",
+            "enrolled": "yes",
+            "status": "passed",
+            "score": "1",
+            "max_score": "1",
+            "output": "'=2+2",
+            "expected_output": "42",
+        },
+        {
+            "question": "Evaluate 8 / 4 * 2",
             "student_name": "Alice Example",
             "student_email": "alice@example.com",
+            "enrolled": "yes",
             "status": "passed",
             "score": "1",
             "max_score": "1",
@@ -822,6 +882,7 @@ def test_export_evaluations_success(app, client):
             "question": "Evaluate 8 / 4 * 2",
             "student_name": "Bob Example",
             "student_email": "bob@example.com",
+            "enrolled": "yes",
             "status": "passed",
             "score": "1",
             "max_score": "1",
@@ -832,6 +893,7 @@ def test_export_evaluations_success(app, client):
             "question": "Evaluate 8 / 4 * 2",
             "student_name": "Carol Example",
             "student_email": "carol@example.com",
+            "enrolled": "yes",
             "status": "",
             "score": "",
             "max_score": "",
@@ -842,11 +904,23 @@ def test_export_evaluations_success(app, client):
             "question": "Evaluate 8 / 4 * 2",
             "student_name": "Dave Example",
             "student_email": "dave@example.com",
+            "enrolled": "yes",
             "status": "no submission",
             "score": "",
             "max_score": "",
             "output": "",
             "expected_output": "",
+        },
+        {
+            "question": "Evaluate 8 / 4 * 2",
+            "student_name": "Erin Example",
+            "student_email": "erin@example.com",
+            "enrolled": "no",
+            "status": "error",
+            "score": "0",
+            "max_score": "1",
+            "output": "'=cmd|'/c calc'!A1",
+            "expected_output": "'-3+2",
         },
     ]
 
@@ -854,8 +928,20 @@ def test_export_evaluations_success(app, client):
     assert q2_rows == [
         {
             "question": "Check submitted files",
+            "student_name": "'=1+2 Formula",
+            "student_email": "mallory@example.com",
+            "enrolled": "yes",
+            "status": "",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+        {
+            "question": "Check submitted files",
             "student_name": "Alice Example",
             "student_email": "alice@example.com",
+            "enrolled": "yes",
             "status": "failed",
             "score": "0",
             "max_score": "1",
@@ -866,6 +952,7 @@ def test_export_evaluations_success(app, client):
             "question": "Check submitted files",
             "student_name": "Bob Example",
             "student_email": "bob@example.com",
+            "enrolled": "yes",
             "status": "",
             "score": "",
             "max_score": "",
@@ -876,6 +963,7 @@ def test_export_evaluations_success(app, client):
             "question": "Check submitted files",
             "student_name": "Carol Example",
             "student_email": "carol@example.com",
+            "enrolled": "yes",
             "status": "",
             "score": "",
             "max_score": "",
@@ -886,7 +974,19 @@ def test_export_evaluations_success(app, client):
             "question": "Check submitted files",
             "student_name": "Dave Example",
             "student_email": "dave@example.com",
+            "enrolled": "yes",
             "status": "no submission",
+            "score": "",
+            "max_score": "",
+            "output": "",
+            "expected_output": "",
+        },
+        {
+            "question": "Check submitted files",
+            "student_name": "Erin Example",
+            "student_email": "erin@example.com",
+            "enrolled": "no",
+            "status": "",
             "score": "",
             "max_score": "",
             "output": "",

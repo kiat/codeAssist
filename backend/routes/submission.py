@@ -19,6 +19,7 @@ from api.models import Assignment, Submission, User, Course, Enrollment, TestCas
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
+from util.csv_utils import csv_safe_cell
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -790,25 +791,34 @@ def export_evaluations():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
-    # Full student roster for the course, not just students who submitted --
-    # a student who never submitted has no Submission row at all, so basing
-    # the export on submissions alone would silently drop them instead of
-    # showing them as a "no submission" row.
-    enrolled_students = (
-        db.session.query(User)
-        .join(Enrollment, Enrollment.student_id == User.id)
-        .filter(
-            Enrollment.course_id == assignment.course_id,
-            func.lower(Enrollment.role) == "student",
-        )
-        .order_by(User.name.asc())
-        .all()
-    )
-
     active_submissions = Submission.query.filter_by(
         assignment_id=assignment_id, active=True
     ).order_by(Submission.submitted_at.asc()).all()
     submission_by_student = {sub.student_id: sub for sub in active_submissions}
+
+    # Roster = everyone currently enrolled as a student, plus anyone who has a
+    # graded submission but is no longer enrolled (leaving a course deletes the
+    # Enrollment row but not the Submission). Basing it on enrollment alone
+    # would silently drop a student who submitted and then dropped the course;
+    # get_grade_statistics already counts those submissions, so this keeps the
+    # export consistent with the stats. Students with no submission still get a
+    # "no submission" row.
+    enrolled_ids = {
+        row[0]
+        for row in db.session.query(Enrollment.student_id).filter(
+            Enrollment.course_id == assignment.course_id,
+            func.lower(Enrollment.role) == "student",
+        )
+    }
+    roster_ids = enrolled_ids | set(submission_by_student.keys())
+    roster = (
+        db.session.query(User)
+        .filter(User.id.in_(roster_ids))
+        .order_by(User.name.asc(), User.id.asc())
+        .all()
+        if roster_ids
+        else []
+    )
 
     # Parse each submission's results.json (stored as a raw blob on
     # Submission.results) once, keyed by student id then test name, and
@@ -823,25 +833,17 @@ def export_evaluations():
     number_by_name = {}
     for sub in active_submissions:
         tests_by_name = {}
-        raw = sub.results
-        if isinstance(raw, memoryview):
-            raw = raw.tobytes()
-        if raw:
-            try:
-                if isinstance(raw, bytes):
-                    raw = raw.decode("utf-8")
-                data = json.loads(raw)
-                for test in data.get("tests", []) or []:
-                    name = test.get("name")
-                    if not name:
-                        continue
-                    tests_by_name[name] = test
-                    if name not in seen_names:
-                        seen_names.add(name)
-                        test_name_order.append(name)
-                        number_by_name[name] = test.get("number")
-            except (ValueError, TypeError, AttributeError):
-                pass
+        data = _json_from_stored_value(sub.results)
+        if isinstance(data, dict):
+            for test in data.get("tests", []) or []:
+                name = test.get("name")
+                if not name:
+                    continue
+                tests_by_name[name] = test
+                if name not in seen_names:
+                    seen_names.add(name)
+                    test_name_order.append(name)
+                    number_by_name[name] = test.get("number")
         tests_by_student[sub.student_id] = tests_by_name
 
     zip_buffer = io.BytesIO()
@@ -860,27 +862,34 @@ def export_evaluations():
                 "question",
                 "student_name",
                 "student_email",
+                "enrolled",
                 "status",
                 "score",
                 "max_score",
                 "output",
                 "expected_output",
             ])
-            for student in enrolled_students:
+            for student in roster:
+                enrolled = "yes" if student.id in enrolled_ids else "no"
                 if student.id not in submission_by_student:
-                    writer.writerow([name, student.name, student.email_address, "no submission", "", "", "", ""])
-                    continue
-                test = tests_by_student.get(student.id, {}).get(name, {})
-                writer.writerow([
-                    name,
-                    student.name,
-                    student.email_address,
-                    test.get("status", ""),
-                    test.get("score", ""),
-                    test.get("max_score", ""),
-                    test.get("output", ""),
-                    test.get("expected_output", ""),
-                ])
+                    row = [name, student.name, student.email_address, enrolled,
+                           "no submission", "", "", "", ""]
+                else:
+                    test = tests_by_student.get(student.id, {}).get(name, {})
+                    row = [
+                        name,
+                        student.name,
+                        student.email_address,
+                        enrolled,
+                        test.get("status", ""),
+                        test.get("score", ""),
+                        test.get("max_score", ""),
+                        test.get("output", ""),
+                        test.get("expected_output", ""),
+                    ]
+                # Neutralize spreadsheet formula injection: autograder output is
+                # student program stdout, and student name/email are user-set.
+                writer.writerow([csv_safe_cell(cell) for cell in row])
 
             # Prefer the autograder's own question number for the filename
             # (e.g. "Question_2.3.csv") since test names are often full
