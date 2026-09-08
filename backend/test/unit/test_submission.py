@@ -599,35 +599,59 @@ def test_get_grade_statistics_boundary_score_not_misclassified_by_float_error(ap
         assert buckets_by_label["20-30%"] == 0
 
 
-def test_get_grade_statistics_prefers_results_derived_max_over_stale_autograder_points(app, client):
-    """Assignment.autograder_points can drift from what the autograder
-    actually grades out of (e.g. left at a stale default of 100 while the
-    configured test suite only totals 20 points). A submission that aced
-    every test should show up as 100%, not get diluted against the stale
-    field.
+def test_get_grade_statistics_uses_configured_autograder_points_as_denominator(app, client):
+    """The configured autograder_points is a stable denominator: it does not
+    shift as submissions arrive and is not thrown off when the autograder
+    rubric changed mid-assignment. A submission whose results.json only
+    totals 20 points is still scored against the assignment's configured 100.
     """
-    results = {
-        "tests": [
-            {"name": "test_1", "score": 10, "max_score": 10, "status": "passed"},
-            {"name": "test_2", "score": 10, "max_score": 10, "status": "passed"},
-        ]
-    }
+    rubric_a = {"tests": [
+        {"name": "t1", "score": 15, "max_score": 20, "status": "partial"},
+    ]}
+    rubric_b = {"tests": [
+        {"name": "t1", "score": 10, "max_score": 10, "status": "passed"},
+    ]}
     with app.app_context():
         assignment_id = _make_assignment(autograder_points=100).id
-        _make_submission(assignment_id, score=20, active=True, results=results)
+        _make_submission(assignment_id, score=15, active=True, results=rubric_a)
+        _make_submission(assignment_id, score=10, active=True, results=rubric_b)
 
         response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
         assert response.status_code == 200
         data = response.get_json()
-        assert data["max_points"] == 20
+        assert data["max_points"] == 100
+        assert data["mode"] == "percentage"
         buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
-        assert buckets_by_label["90-100%"] == 1
+        # 15/100 and 10/100 -- both in the low buckets, not diluted or inflated
+        # by the differing per-submission results totals.
+        assert buckets_by_label["10-20%"] == 2
+
+
+def test_get_grade_statistics_falls_back_to_results_total_when_autograder_points_unset(app, client):
+    """When autograder_points is unset/0 (e.g. an assignment created before
+    the field existed), fall back to the total derived from a graded
+    submission's own results.json.
+    """
+    results = {"tests": [
+        {"name": "t1", "score": 10, "max_score": 10, "status": "passed"},
+        {"name": "t2", "score": 15, "max_score": 20, "status": "partial"},
+    ]}
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=None).id
+        _make_submission(assignment_id, score=25, active=True, results=results)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["max_points"] == 30
+        buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
+        assert buckets_by_label["80-90%"] == 1
 
 
 def test_get_grade_statistics_falls_back_to_autograder_points_when_no_results(app, client):
-    """When no submission has parseable results yet (e.g. all still
-    processing), fall back to the assignment's configured max points
-    rather than reporting a max of 0.
+    """When autograder_points is unset AND no submission has parseable
+    results yet, fall back to the configured max points rather than
+    reporting a max of 0.
     """
     with app.app_context():
         assignment_id = _make_assignment(autograder_points=50).id
@@ -639,6 +663,23 @@ def test_get_grade_statistics_falls_back_to_autograder_points_when_no_results(ap
         assert data["max_points"] == 50
         buckets_by_label = {b["label"]: b["count"] for b in data["histogram"]}
         assert buckets_by_label["50-60%"] == 1
+
+
+def test_get_grade_statistics_ignores_non_dict_results_blob(app, client):
+    """A results blob that parses as JSON but isn't an object (e.g. "[]")
+    must not break the results-derived fallback for the other submissions.
+    """
+    valid = {"tests": [
+        {"name": "t1", "score": 40, "max_score": 40, "status": "passed"},
+    ]}
+    with app.app_context():
+        assignment_id = _make_assignment(autograder_points=None).id
+        _make_submission(assignment_id, score=0, active=True, results=[])
+        _make_submission(assignment_id, score=40, active=True, results=valid)
+
+        response = client.get(f"/get_grade_statistics?assignment_id={assignment_id}")
+        assert response.status_code == 200
+        assert response.get_json()["max_points"] == 40
 
 
 # Tests for /export_evaluations

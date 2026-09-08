@@ -669,31 +669,28 @@ def _raw_histogram(scores, score_min, score_max):
 
 
 def _effective_max_points(active_submissions, assignment_max_points):
-    """Assignment.autograder_points is a manually-entered field on the
-    assignment and can drift from what the autograder actually grades out
-    of (e.g. it's left at a default of 100 while the configured test suite
-    only totals 20 points) -- so prefer the real total computed from a
-    graded submission's own results.json (sum of each test's max_score,
-    the same source of truth /export_evaluations reads from) over the
-    configured field, falling back to it only when no submission has
-    parseable results yet.
+    """Resolve the single point total to draw the score distribution against.
+
+    Prefer Assignment.autograder_points: it is a persisted field (defaulted
+    to 100 at creation and editable in assignment settings), so it gives a
+    stable denominator that does not shift as submissions arrive. Deriving it
+    from submissions instead -- taking the max test-total across results.json
+    blobs -- distorts every percentage whenever the autograder rubric changed
+    mid-assignment (submissions graded out of 10 shown against a max of 20).
+
+    Fall back to the results-derived total only when autograder_points is
+    unset / 0, so assignments created before the field existed still work.
     """
+    if assignment_max_points and assignment_max_points > 0:
+        return assignment_max_points
+
     computed_max = 0
     for sub in active_submissions:
-        raw = sub.results
-        if isinstance(raw, memoryview):
-            raw = raw.tobytes()
-        if not raw:
+        data = _json_from_stored_value(sub.results)
+        if not isinstance(data, dict):
             continue
-        try:
-            if isinstance(raw, bytes):
-                raw = raw.decode("utf-8")
-            data = json.loads(raw)
-            total = sum(t.get("max_score", 0) or 0 for t in data.get("tests", []) or [])
-            if total > computed_max:
-                computed_max = total
-        except (ValueError, TypeError, AttributeError):
-            continue
+        total = sum((t.get("max_score", 0) or 0) for t in (data.get("tests") or []))
+        computed_max = max(computed_max, total)
     return computed_max if computed_max > 0 else assignment_max_points
 
 
