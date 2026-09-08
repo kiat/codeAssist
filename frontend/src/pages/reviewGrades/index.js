@@ -8,10 +8,8 @@ import {
 import { Button, PageHeader, Space, Table, Typography, Card, Input } from "antd";
 import { useState, useEffect, useCallback, useContext, } from "react";
 import { formatDayTimeEn } from "../../common/format";
-import { GRADES } from "./mock";
 import PageBottom from "../../components/layout/pageBottom";
 import PageContent from "../../components/layout/pageContent";
-import PopoverDownload from "../../components/download/PopoverDownload";
 import ExportSubmissions from "./ExportSubmissions";
 import PublishGradesModal from "./PublishGradesModal";
 import { GlobalContext } from "../../App";
@@ -19,7 +17,6 @@ import { useNavigate, useParams } from "react-router-dom";
 
 
 export default () => {
-  const [assignmentDetail, setAssignmentDetail] = useState();
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [submissions, setSubmissions] = useState([]);
@@ -283,6 +280,7 @@ export default () => {
       <ExportSubmissions
         open={downloadModalOpen}
         onCancel={toggleDownloadModalOpen}
+        assignmentId={assignmentId}
       />
       <PublishGradesModal
         open={publishModalOpen}
