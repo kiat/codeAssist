@@ -151,4 +151,19 @@ docker compose exec backend flask db upgrade
 
 If the database schema is not updated, new backend fields or tables may not exist locally, and the feature may fail even if the code is correct.
 
+### Frontend dependency note
+
+If you are testing a PR that adds or updates a frontend dependency (`frontend/package.json` / `frontend/package-lock.json` changed), do a clean reinstall before testing rather than reusing your existing `node_modules`.
+
+From the `frontend` directory:
+
+```bash
+cd frontend
+rm -rf node_modules
+npm ci
+npm start
+```
+
+`npm ci` installs the exact versions recorded in `package-lock.json`, so this avoids picking up a different (possibly incompatible) version of a new dependency than what was actually tested.
+
 
