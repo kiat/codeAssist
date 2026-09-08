@@ -1,5 +1,5 @@
 import React from 'react';
-import { MenuUnfoldOutlined, PicRightOutlined, UserOutlined } from '@ant-design/icons';
+import { MenuUnfoldOutlined, UserOutlined } from '@ant-design/icons';
 import { Typography } from 'antd';
 
 function CollapsedSidebar({ toggleCollapsed, pathname }) {

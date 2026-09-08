@@ -127,7 +127,7 @@ export default () => {
       }
     };
     fetchAssignmentDetails();
-  }, [courseInfo.id, forceUpdate]);
+  }, [assignmentId, courseInfo.id, forceUpdate]);
   const [extensionModalOpen, setExtensionModalOpen] = useState(false);
 
   const toggleExtensionModalOpen = useCallback(() => {

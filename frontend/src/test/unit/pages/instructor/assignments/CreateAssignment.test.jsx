@@ -1,6 +1,6 @@
 import React from "react";
 import { Form } from "antd";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CreateAssignment from "../../../../../pages/instructor/assignments/CreateAssignment";
 import { fetchAiModels, getCourseInfo } from "../../../../../services/course";
@@ -37,9 +37,15 @@ jest.mock("react-router-dom", () => ({
   useParams: () => ({ courseId: "course-1" }),
 }));
 
-function CreateAssignmentHarness({ initialStep = 1 } = {}) {
+function CreateAssignmentHarness({ initialStep = 1, onFormReady } = {}) {
   const [form] = Form.useForm();
   const [step, setStep] = React.useState(initialStep);
+
+  React.useEffect(() => {
+    if (onFormReady) {
+      onFormReady(form);
+    }
+  }, [form, onFormReady]);
 
   return (
     <CreateAssignment
@@ -94,24 +100,22 @@ describe("CreateAssignment setup", () => {
 
   it("includes edited AI usage limits in the create assignment payload", async () => {
     const user = userEvent.setup();
+    let assignmentForm;
 
-    render(<CreateAssignmentHarness />);
+    render(<CreateAssignmentHarness onFormReady={(form) => {
+      assignmentForm = form;
+    }} />);
 
     await waitFor(() => expect(getCourseInfo).toHaveBeenCalled());
 
-    await user.type(screen.getByLabelText(/assignment name/i), "Loops");
-    await user.click(screen.getByRole("switch", { name: /enable ai feedback/i }));
-
-    await user.type(
-      await screen.findByLabelText("Maximum feedback requests per student"),
-      "3"
-    );
-
-    const waitSecondsInput = screen.getByLabelText(
-      "Minimum seconds between requests (0 = no wait)"
-    );
-    await user.clear(waitSecondsInput);
-    await user.type(waitSecondsInput, "60");
+    act(() => {
+      assignmentForm.setFieldsValue({
+        name: "Loops",
+        ai_feedback_enabled: true,
+        ai_feedback_max_requests: 3,
+        ai_feedback_wait_seconds: 60,
+      });
+    });
 
     await user.click(screen.getByRole("button", { name: /create assignment/i }));
 

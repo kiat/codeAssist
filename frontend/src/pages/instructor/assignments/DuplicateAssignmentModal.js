@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext, useCallback } from "react";
-import { Button, Form, Input, Modal, Select, Space, Typography, message } from "antd";
+import { Button, Form, Input, Modal, Select, Space, message } from "antd";
 import axios from "axios";
 import { GlobalContext } from "../../../App";
 import { getCourseAssignments } from "../../../services/course";
@@ -66,7 +66,7 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
       currentCourseId: courseInfo.id,
     };
 
-    const response = await duplicateAssignment(params);
+    await duplicateAssignment(params);
 
     // Show a success message
     message.success("Assignment duplicated successfully");

@@ -1,6 +1,6 @@
 import { Button, Form, message, Modal, Upload } from "antd";
 import { InboxOutlined } from '@ant-design/icons';
-import { useState, useContext, useEffect } from "react";
+import { useCallback, useState, useContext, useEffect } from "react";
 import { GlobalContext } from "../App";
 import { useNavigate } from "react-router-dom";
 import LoadingOverlay from './LoadingOverlay'; // Import the LoadingOverlay component
@@ -32,22 +32,10 @@ export default function UploadModal({
   const [hasRequest, setHasRequest] = useState(false);
   const [fileList, setFileList] = useState([]);
 
-  useEffect(() => {
-    if (!open) {
-      setFileList([]);
-      setFile(null);
-      return;
-    }
-
-    if (open && userInfo?.id && assignmentID) {
-      getActive();
-    }
-  }, [open, userInfo?.id, assignmentID]);
-
-  const getActive = async () => {
+  const getActive = useCallback(async () => {
     try {
       const submissionResponse = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${userInfo.id}&assignment_id=${assignmentID}`,
+        `${process.env.REACT_APP_API_URL}/get_active_submission?student_id=${userInfo?.id}&assignment_id=${assignmentID}`,
         { credentials: "include" }
       );
       if (!submissionResponse.ok) {
@@ -85,7 +73,19 @@ export default function UploadModal({
       setHasRequest(false);
       message.error("Failed")
     }
-  }
+  }, [assignmentID, userInfo?.id]);
+
+  useEffect(() => {
+    if (!open) {
+      setFileList([]);
+      setFile(null);
+      return;
+    }
+
+    if (userInfo?.id && assignmentID) {
+      getActive();
+    }
+  }, [assignmentID, getActive, open, userInfo?.id]);
 
 
   const handleFileChange = (info) => {

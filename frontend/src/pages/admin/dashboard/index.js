@@ -1,12 +1,9 @@
 import { PageHeader, Card, Row, Col, Statistic } from "antd";
 import { UserOutlined, BookOutlined, TeamOutlined } from "@ant-design/icons";
-import { useCallback, useContext, useEffect, useState } from "react";
-import { GlobalContext } from "../../../App";
+import { useCallback, useEffect, useState } from "react";
 import PageContent from "../../../components/layout/pageContent";
-import PageBottom from "../../../components/layout/pageBottom";
 
 export default function AdminDashboard() {
-  const { userInfo } = useContext(GlobalContext);
   const [stats, setStats] = useState({
     totalCourses: 0,
     totalInstructors: 0,
@@ -73,11 +70,6 @@ export default function AdminDashboard() {
           </Col>
         </Row>
       </PageContent>
-      {/* <PageBottom>
-        <div style={{ color: "white" }}>
-          Welcome, {userInfo?.name}
-        </div>
-      </PageBottom> */}
     </>
   );
-} 
+}

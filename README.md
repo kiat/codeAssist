@@ -27,55 +27,107 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     ```
     make install
     ```
-3. Create a `.env` file in the frontend directory (don't forget to take out the curly braces)
+3. Create a `.env` file in the frontend directory.
     ```bash
     touch ./frontend/.env
     ```
-    In your `.env` file, add this React environment variable:
-
-    ```
-    REACT_APP_API_URL={where your backend is hosted}
-    ```
-
-4. Create a `.env` file in the backend directory and add your DB connection string
+    In `frontend/.env`, add the backend URL used by the React app:
 
     ```bash
-    touch ./backend/.env
+    REACT_APP_API_URL=http://localhost:5001
+    GENERATE_SOURCEMAP=false
     ```
 
-    In your `.env` file, add your connection string:
+    `REACT_APP_API_URL` should point at the Flask backend. For normal local Docker development, use `http://localhost:5001`.
+
+4. Create a backend `.env` file from the committed example, then fill in the values.
 
     ```bash
-    DB_CONNECTION_STRING="postgresql://postgres:postgres@host.docker.internal:5432/codeassist"
-    PASSWORD_SALT="obtain this value from the main developer or project lead"
+    cp ./backend/.env.example ./backend/.env
     ```
-Note: PASSWORD_SALT is used for password hashing so the same password produces consistent hashed values across local environments. The backend can still run without this value, but it may fall back to less secure password handling depending on the local configuration. For normal development and testing, developers should use the shared project salt in their .env file when available.
 
-    Optional backend environment variables (session auth / CORS):
+    On Windows PowerShell, the same copy command is:
+
+    ```powershell
+    Copy-Item .\backend\.env.example .\backend\.env
+    ```
+
+    The backend example file is `backend/.env.example`. It documents every supported backend environment variable without committing real secrets. A local Docker development `.env` usually starts like this:
 
     ```bash
-    SECRET_KEY="random secret used to sign session cookies; required in production, auto-generated fallback otherwise"
-    FRONTEND_URL="http://localhost:3000"          # comma-separated list of allowed CORS origins
-    SESSION_COOKIE_SAMESITE="Lax"                 # set to "None" if the frontend is on a different domain
-    SESSION_COOKIE_SECURE="false"                 # must be "true" (HTTPS) whenever SameSite is "None"
+    DB_CONNECTION_STRING="postgresql://postgres:postgres@db:5432/codeassist"
+    SECRET_KEY="replace-with-random-session-secret"
+    API_SECRET_KEY=
+    PASSWORD_SALT=
+    FRONTEND_ORIGIN="http://localhost:3000"
     ```
 
-5. run `docker compose up`
+    Backend environment variables:
 
-6. Visit the pgadmin website via the url in the container. login with the default login:  
+    - `DB_CONNECTION_STRING`: SQLAlchemy/PostgreSQL connection URL. Use `db` as the hostname when the backend runs in Docker Compose with the included Postgres service. If you run Flask directly on your host machine and Postgres is exposed locally, use `localhost` instead.
+    - `SECRET_KEY`: Flask session signing secret. Set this to a long random value and never commit it.
+    - `API_SECRET_KEY`: Fernet key used to encrypt stored course/assignment AI provider API keys. Keep it stable for the same database, otherwise previously encrypted keys cannot be decrypted.
+    - `PASSWORD_SALT`: Salt used for password hashing. For shared dev databases, obtain the shared value from the project lead; for isolated local testing, use a stable dev-only value.
+    - `FRONTEND_ORIGIN`: Exact React origin allowed by backend CORS, normally `http://localhost:3000` in local development.
+
+    Do not leave placeholder text in `API_SECRET_KEY` or `PASSWORD_SALT`. To generate both values automatically, leave them blank and run:
+
+    ```bash
+    cd backend
+    python init_encryption_keys.py
+    ```
+
+    Optional backend environment variables for session auth:
+
+    ```bash
+    SESSION_COOKIE_SAMESITE="Lax"   # set to "None" if the frontend is on a different domain
+    SESSION_COOKIE_SECURE="false"   # must be "true" over HTTPS whenever SameSite is "None"
+    ```
+
+5. Optional: configure Gemini over Vertex AI in `backend/.env`.
+
+    CodeAssist supports Gemini through the regular Gemini Developer API and through Google Cloud Vertex AI. Vertex AI credentials are server-level deployment settings, so instructors should not paste Vertex credentials into a course or assignment form.
+
+    For Vertex AI Express / API-key mode:
+
+    ```bash
+    VERTEX_AI_AUTH_MODE=api_key
+    VERTEX_AI_API_KEY="replace-with-server-managed-vertex-key"
+    GOOGLE_CLOUD_LOCATION=global
+    ```
+
+    `GOOGLE_CLOUD_PROJECT` is optional in API-key mode. If it is set, CodeAssist passes both project and location to the Vertex client.
+
+    For standard Vertex AI with Application Default Credentials:
+
+    ```bash
+    GOOGLE_CLOUD_PROJECT="your-google-cloud-project-id"
+    GOOGLE_CLOUD_LOCATION=global
+    GOOGLE_APPLICATION_CREDENTIALS="/path/inside/backend/container/service-account.json"
+    ```
+
+    Leave `VERTEX_AI_AUTH_MODE` unset for ADC mode. The Google Cloud project must have Vertex AI enabled, and the configured identity or API key needs the `aiplatform.endpoints.predict` permission. More details are in `docs/ai/vertex-setup.md`.
+
+6. Run Docker Compose:
+
+    ```bash
+    docker compose up
+    ```
+
+7. Visit the pgadmin website via the url in the container. login with the default login:
     `user: admin@admin.com`  
     `password: 12345`
 
-7. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:  
+8. In the pgadmin website, register a new server, name it whatever you want. The important information is the connections tab:
     `Host name/address: db` (use `db` if connecting from the pgAdmin container, or `host.docker.internal`/`localhost` if running pgAdmin locally outside Docker)  
     `Username: postgres`  
     `Password: postgres`  
 
-8. In this newly created server, create a new database. Name it `codeassist`. This is important for `init_db.py`
+9. In this newly created server, create a new database. Name it `codeassist`. This is important for `init_db.py`
 
-9. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
+10. Now in your `flask` container console, run `python3 init_db.py`. This should generate your tables in the codeassist database. You can check that it is populated in the pgadmin website. (under codeassist/Schemas/public/Tables)
 
-10. Start the frontend service -- will automatically open the webpage
+11. Start the frontend service -- will automatically open the webpage
     In a NEW terminal  
     cd into the frontend folder and run:
     ```bash
@@ -86,7 +138,7 @@ Note: PASSWORD_SALT is used for password hashing so the same password produces c
     npm start 
     ```
 
-11. If you can access the website and can create a user, you can now begin development :bowtie:
+12. If you can access the website and can create a user, you can now begin development :bowtie:
 
 
 Notes: 

@@ -143,7 +143,7 @@ const AIChatPanel = forwardRef(function AIChatPanel(
         clearInterval(countdownRef.current);
       }
     };
-  }, [countdown > 0]);
+  }, [countdown]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {

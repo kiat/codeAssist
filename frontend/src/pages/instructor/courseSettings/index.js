@@ -1,4 +1,4 @@
-import { DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from "@ant-design/icons";
+import { DeleteOutlined } from "@ant-design/icons";
 
 import {
   Button,
@@ -8,32 +8,36 @@ import {
   Form,
   Input,
   PageHeader,
-  Popover,
-  Radio,
   Row,
   Select,
   Space,
   Typography,
   message,
   Popconfirm,
-  Spin
 } from "antd";
-import { useEffect, useState, useCallback } from "react";
-import { useContext } from "react";
+import { useCallback, useContext, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalContext } from "../../../App";
-import { getCourseAssignments, updateCourse , deleteCourse, deleteAllAssignments, getCourseInfo} from "../../../services/course";
-import axios from "axios";
+import { updateCourse, deleteCourse, deleteAllAssignments, getCourseInfo } from "../../../services/course";
 
 export default () => {
   const { courseId } = useParams();
-  const [assignments, setAssignments] = useState([]);
 
   // Used to manage form state
   const [form] = Form.useForm();
 
-  const { courseInfo, updateCourseInfo, courseRole } = useContext(GlobalContext);
+  const { updateCourseInfo, courseRole } = useContext(GlobalContext);
   const navigate = useNavigate();
+
+  const fetchCourseData = useCallback(async () => {
+    try {
+      const res = await getCourseInfo({course_id: courseId});
+      form.setFieldsValue(res.data[0]);
+    }
+    catch(error) {
+      console.error("Error fetching course data: ", error)
+    }
+  }, [courseId, form]);
 
   useEffect(() => {
     if (courseRole && courseRole !== "instructor") {
@@ -43,27 +47,7 @@ export default () => {
 
   useEffect(() => {
     fetchCourseData();
-  }, []);
-
-  const fetchCourseData = async () => {
-    try {
-      const res = await getCourseInfo({course_id: courseId});
-      form.setFieldsValue(res.data[0]);
-    }
-    catch(error) {
-      console.error("Error fetching course data: ", error)
-    }
-  };
-
-  const getAssignments = useCallback(() => {
-    getCourseAssignments({ course_id: courseId }).then((res) => {
-      setAssignments(res.data);
-    });
-  }, [courseId]);
-
-  useEffect(() => {
-    getAssignments();
-  }, [getAssignments]);
+  }, [fetchCourseData]);
 
   const handleDeleteAllAssignments = async (courseId) => {
     try {
