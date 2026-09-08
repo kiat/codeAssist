@@ -44,7 +44,10 @@ export default function Assignments() {
       title: "GRADES",
       dataIndex: "score",
       key: "score",
-      render: score => score !== null ? score : "-",
+      render: (score, record) => {
+        if (record.gradesPending) return "Pending";
+        return score !== null ? score : "-";
+      },
       sorter: (a, b) => (a.score || 0) - (b.score || 0),
     },
     {
@@ -116,7 +119,8 @@ export default function Assignments() {
               );
               const activeData = await activeSubmissions.json();
               const submitted = activeData.completed;
-              const score = submitted ? activeData.score : null;
+              const gradesPending = Boolean(submitted) && activeData.grades_published === false;
+              const score = submitted && !gradesPending ? activeData.score : null;
               const submissionId = activeData.id;
               const late = activeData.late;
               if (extension.release_date_extension) {
@@ -133,6 +137,7 @@ export default function Assignments() {
                 ...assignment,
                 submitted,
                 score,
+                gradesPending,
                 submissionId,
                 late,
               };
