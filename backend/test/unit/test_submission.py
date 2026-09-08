@@ -461,6 +461,56 @@ def test_rerun_submission_autograder_forbidden_other_student(client, mocker):
     assert "Not authorized" in response.get_json()["message"]
 
 
+def test_rerun_submission_autograder_redacts_held_grades(client, mocker):
+    """A student rerunning the autograder on a held/unpublished assignment must
+    not get the real score/results back in the response (grade-hold bypass)."""
+    existing_submission, assignment = _mock_rerun_submission_and_assignment(
+        mocker, student_id="student-uuid", autograder_image_name="grader-image"
+    )
+    existing_submission.student_code_file = b"print('hi')"
+    existing_submission.file_name = "main.py"
+    assignment.autograder_timeout = 60
+    assignment.ai_feedback_enabled = False
+    assignment.grades_visible_to_students = False
+
+    mocker.patch("routes.submission.get_user_course_role", return_value=None)
+    mocker.patch("routes.submission.db.session.commit")
+
+    fake_schema = mocker.patch("routes.submission.SubmissionSchema")
+    fake_schema.return_value.dump.return_value = {
+        "id": "sub1",
+        "score": 88,
+        "results": '{"score": 88}',
+    }
+
+    fake_container = mocker.Mock()
+    fake_container.exec_run.return_value = mocker.Mock(
+        exit_code=0, output=b'{"score": 88, "execution_time": 2.5}'
+    )
+    fake_docker_client = mocker.Mock()
+    fake_docker_client.containers.run.return_value = fake_container
+    mocker.patch("routes.submission.get_docker_client", return_value=fake_docker_client)
+
+    mocker.patch(
+        "routes.submission.subprocess.run",
+        return_value=mocker.Mock(returncode=0),
+    )
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "student-uuid"
+
+    response = client.post(
+        "/rerun_submission_autograder",
+        json={"submission_id": "sub1"},
+    )
+
+    assert response.status_code == 200
+    submission_data = response.get_json()["submission"]
+    assert submission_data["score"] is None
+    assert submission_data["results"] is None
+    assert submission_data["grades_published"] is False
+
+
 #  Tests for getting active submission
 
 

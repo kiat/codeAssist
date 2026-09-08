@@ -63,8 +63,11 @@ def test_get_regrade_request_no_submission(client, mocker):
 
 
 def test_get_regrade_request_no_request(client, mocker):
+    fake_sub = mocker.Mock(student_id="stu1", assignment_id="assgn1")
     sub_query = mocker.patch("routes.regrade_request.Submission.query")
-    sub_query.filter_by.return_value.first.return_value = object()
+    sub_query.filter_by.return_value.first.return_value = fake_sub
+
+    mocker.patch("routes.regrade_request._verify_student_owner")
 
     req_query = mocker.patch("routes.regrade_request.RegradeRequest.query")
     req_query.filter_by.return_value.first.return_value = None
@@ -74,28 +77,60 @@ def test_get_regrade_request_no_request(client, mocker):
     assert res.get_json()["message"] == "No regrade request found"
 
 
-def test_get_regrade_request_success(client, mocker):
-    fake_sub = object()
+def test_get_regrade_request_unauthorized(client, mocker, login_as):
+    """A caller who is neither the submission's owner nor course staff is denied."""
+    fake_sub = mocker.Mock(student_id="stu1", assignment_id="assgn1")
+    sub_query = mocker.patch("routes.regrade_request.Submission.query")
+    sub_query.filter_by.return_value.first.return_value = fake_sub
+
+    from util.errors import ForbiddenError
+    mocker.patch(
+        "routes.regrade_request._verify_student_owner",
+        side_effect=ForbiddenError("You can only access your own data"),
+    )
+
+    login_as("stu2")
+    res = client.get("/get_regrade_request?submission_id=sub1")
+    assert res.status_code == 403
+
+
+def test_get_regrade_request_success(client, mocker, login_as):
+    fake_sub = mocker.Mock(student_id="stu1", assignment_id="assgn1")
     fake_req = mocker.Mock(justification="Because…", reviewed=False)
+    fake_assignment = mocker.Mock()
 
     # Submission exists
-    sub_query = mocker.patch("routes.regrade_request.Submission.query")  
+    sub_query = mocker.patch("routes.regrade_request.Submission.query")
     sub_query.filter_by.return_value.first.return_value = fake_sub
-    
+
+    mocker.patch("routes.regrade_request._verify_student_owner")
+
+    assignment_query = mocker.patch("routes.regrade_request.Assignment.query")
+    assignment_query.filter_by.return_value.first.return_value = fake_assignment
+
     # RegradeRequest exists
     req_query = mocker.patch("routes.regrade_request.RegradeRequest.query")
     req_query.filter_by.return_value.first.return_value = fake_req
 
     mocker.patch("routes.regrade_request.SubmissionSchema") \
-          .return_value.dump.return_value = {"id": "sub1"}
+          .return_value.dump.return_value = {"id": "sub1", "score": 95}
 
+    mock_apply_visibility = mocker.patch(
+        "routes.regrade_request._apply_grade_visibility",
+        return_value={"id": "sub1", "score": 95, "grades_published": True},
+    )
+
+    login_as("stu1")
     res = client.get("/get_regrade_request?submission_id=sub1")
     assert res.status_code == 200
     assert res.get_json() == {
-        "submission": {"id": "sub1"},
+        "submission": {"id": "sub1", "score": 95, "grades_published": True},
         "justification": "Because…",
         "reviewed": False,
     }
+    mock_apply_visibility.assert_called_once_with(
+        {"id": "sub1", "score": 95}, fake_assignment, "stu1"
+    )
 
 
 # Test cases for check_regrade_request

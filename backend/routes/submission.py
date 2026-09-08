@@ -1065,10 +1065,13 @@ def rerun_submission_autograder():
             args=(app_obj, submission_to_rerun.id, file_path, results_json_content),
         ).start()
 
+    rerun_submission_data = _apply_grade_visibility(
+        SubmissionSchema().dump(submission_to_rerun), assignment, requester_id
+    )
     return jsonify({
         "message": "Autograder rerun completed",
         "results_path": host_results_json_path,
-        "submission": SubmissionSchema().dump(submission_to_rerun),
+        "submission": rerun_submission_data,
     }), 200
 
 
