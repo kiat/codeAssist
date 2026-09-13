@@ -16,7 +16,7 @@ from api.models import (
     cleanup_assignment_container,
     cleanup_assignment_directories,
 )
-from routes.submission import discard_container_lock
+from routes.submission import discard_container_lock, assignment_container_lock
 from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, UnauthorizedError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
@@ -399,8 +399,9 @@ def delete_all_assignments():
 
     # Tear down containers and delete archived submissions/results after db commit.
     for assignment_id, container_id in cleanup_items:
-        cleanup_assignment_container(container_id, assignment_id)
-        cleanup_assignment_directories(assignment_id)
+        with assignment_container_lock(assignment_id):
+            cleanup_assignment_container(container_id, assignment_id)
+            cleanup_assignment_directories(assignment_id)
         discard_container_lock(assignment_id)
 
     return jsonify("Assignments deleted successfully"), 200

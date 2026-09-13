@@ -10,7 +10,7 @@ from api.models import (
     cleanup_assignment_container,
     cleanup_assignment_directories,
 )
-from routes.submission import discard_container_lock
+from routes.submission import discard_container_lock, assignment_container_lock
 from api.schemas import AssignmentSchema, CourseSchema, AssignmentExtensionSchema
 from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError
 from util.auth import require_authenticated, require_course_role
@@ -287,8 +287,9 @@ def delete_assignment():
         db.session.rollback()
         raise InternalProcessingError("Failed to delete assignment")
 
-    cleanup_assignment_container(container_id, deleted_assignment_id)
-    cleanup_assignment_directories(deleted_assignment_id)
+    with assignment_container_lock(deleted_assignment_id):
+        cleanup_assignment_container(container_id, deleted_assignment_id)
+        cleanup_assignment_directories(deleted_assignment_id)
     discard_container_lock(deleted_assignment_id)
 
     return jsonify({"message": "Assignment deleted successfully"}), 200

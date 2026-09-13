@@ -1,3 +1,4 @@
+import docker
 import uuid
 
 import pytest
@@ -901,3 +902,47 @@ def test_delete_assignment_commit_failure_leaves_containers_and_archives(client,
     mock_rollback.assert_called()
     cleanup_container.assert_not_called()
     cleanup_dirs.assert_not_called()
+
+
+def test_cleanup_assignment_container_falls_back_to_name(mocker):
+    """A container whose id was cleared but which was never removed must still go.
+
+    reset_assignment_container has a "clearing container_id anyway" branch, and
+    a daemon restart has the same effect. Deleting the assignment then called
+    this with container_id=None, which returned immediately and left
+    assignment_container_<id> running with nothing referencing it.
+    """
+    from api import models as models_module
+
+    container = mocker.Mock()
+    container.id = "container-real"
+
+    client_mock = mocker.Mock()
+
+    def get_by(name):
+        if name == "assignment_container_assign-1":
+            return container
+        raise docker.errors.NotFound("no such container")
+
+    client_mock.containers.get.side_effect = get_by
+    mocker.patch("api.models.docker.from_env", return_value=client_mock)
+
+    models_module.cleanup_assignment_container(None, "assign-1")
+
+    container.remove.assert_called_once()
+
+
+def test_cleanup_assignment_container_removes_once_when_id_and_name_agree(mocker):
+    """The id and the name usually resolve to the same container - remove it once."""
+    from api import models as models_module
+
+    container = mocker.Mock()
+    container.id = "container-real"
+
+    client_mock = mocker.Mock()
+    client_mock.containers.get.return_value = container
+    mocker.patch("api.models.docker.from_env", return_value=client_mock)
+
+    models_module.cleanup_assignment_container("container-real", "assign-1")
+
+    container.remove.assert_called_once()

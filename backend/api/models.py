@@ -102,20 +102,40 @@ def cleanup_assignment_container(container_id, assignment_id=None):
     request. Running it before the commit is worse still: a failed commit rolls
     the rows back, but a destroyed container does not come back.
     """
-    if not container_id:
-        return
+    logger = logging.getLogger(__name__)
     try:
         client = docker.from_env()
-        container = client.containers.get(container_id)
-        container.stop()
-        container.remove(force=True)
-    except docker.errors.NotFound:
-        return
     except Exception:
-        logging.getLogger(__name__).warning(
-            "Failed to clean up container %s for deleted assignment %s",
-            container_id, assignment_id, exc_info=True
+        logger.warning(
+            "Could not reach Docker to clean up the container of deleted assignment %s",
+            assignment_id, exc_info=True
         )
+        return
+
+    candidates = []
+    if container_id:
+        candidates.append(container_id)
+    if assignment_id:
+        candidates.append(f"assignment_container_{assignment_id}")
+    if not candidates:
+        return
+
+    removed = set()
+    for candidate in candidates:
+        try:
+            container = client.containers.get(candidate)
+            if container.id in removed:
+                continue
+            container.stop()
+            container.remove(force=True)
+            removed.add(container.id)
+        except docker.errors.NotFound:
+            continue
+        except Exception:
+            logger.warning(
+                "Failed to clean up container %s for deleted assignment %s",
+                candidate, assignment_id, exc_info=True
+            )
 
 
 def cleanup_assignment_directories(assignment_id):
