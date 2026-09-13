@@ -93,15 +93,7 @@ class Assignment(db.Model):
     ai_feedback_wait_seconds = db.Column(db.Integer, nullable=False, default=0)
 
 def cleanup_assignment_container(container_id, assignment_id=None):
-    """Stop and remove the persistent grading container of a deleted assignment.
-
-    Call this from the delete route *after* its transaction has committed, never
-    from a mapper-level flush event. Blocking Docker I/O during flush holds the
-    transaction and its row locks open across a round trip to the Docker socket,
-    which SQLAlchemy warns against and which a hung daemon turns into a stalled
-    request. Running it before the commit is worse still: a failed commit rolls
-    the rows back, but a destroyed container does not come back.
-    """
+    """Stop and remove a deleted assignment's grading container. Call after the commit."""
     logger = logging.getLogger(__name__)
     try:
         client = docker.from_env()
@@ -139,12 +131,7 @@ def cleanup_assignment_container(container_id, assignment_id=None):
 
 
 def cleanup_assignment_directories(assignment_id):
-    """Remove the runs/ and archive/ trees of a deleted assignment.
-
-    Same contract as cleanup_assignment_container: after a successful commit
-    only. These trees hold the archived student submissions and results JSON,
-    so deleting them ahead of the commit loses data a rollback cannot restore.
-    """
+    """Remove the runs/ and archive/ trees of a deleted assignment. Call after the commit."""
     backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     base_dir = os.path.join(backend_dir, "routes", "upload_autograder")
     for subtree in ("runs", "archive"):
