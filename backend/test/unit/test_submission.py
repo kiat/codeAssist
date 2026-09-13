@@ -1,15 +1,21 @@
-import os
 import io
+import os
+import shutil
+import subprocess
+import uuid
 import csv
 import uuid
 import zipfile
+import docker
 import pytest
 from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 from flask import json, session
 from api import create_app, db
-from api.models import Assignment, Course, Enrollment, Submission, User, SubmissionSubmitter, TestCaseResult, TestCase
-from util.errors import ForbiddenError
+from api.models import Submission, Assignment, Course, Enrollment, User, SubmissionSubmitter, TestCaseResult, TestCase
+
+import routes.submission as submission_module
+from util.errors import ForbiddenError, InternalProcessingError
 
 from routes.submission import submission
 # Captured at import time, before the autouse mock below patches the name on
@@ -336,6 +342,140 @@ def test_upload_submission_missing_file(client):
     response = client.post("/upload_submission", data={})
     # We expect a 400 error for missing file
     assert response.status_code == 400
+
+
+def _cleanup_submission_dirs(assignment_id):
+    """Remove any runs/ and archive/ directories a test created for assignment_id."""
+    backend_routes_dir = os.path.dirname(os.path.abspath(submission_module.__file__))
+    for subtree in ("runs", "archive"):
+        path = os.path.join(backend_routes_dir, "upload_autograder", subtree, assignment_id)
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def _mock_assignment_lookups(mocker, fake_assignment):
+    """Mock the Assignment/AssignmentExtension/Submission queries upload_submission makes."""
+    def fake_query(model):
+        dummy = mocker.Mock()
+        if model.__name__ == "Assignment":
+            dummy.filter_by.return_value.first.return_value = fake_assignment
+        elif model.__name__ == "AssignmentExtension":
+            dummy.filter_by.return_value.first.return_value = None
+        elif model.__name__ == "Submission":
+            dummy.filter_by.return_value.count.return_value = 0
+        return dummy
+
+    mocker.patch("routes.submission.db.session.query", side_effect=fake_query)
+    mocker.patch("routes.submission.db.session.add")
+    mocker.patch("routes.submission.db.session.commit")
+
+
+def test_upload_submission_no_autograder_archives_staged_files(client, mocker):
+    """Test /upload_submission archives the staged files when no autograder is configured."""
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = ""
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 200
+        submission_id = response.get_json()["submissionID"]
+
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        assert os.path.isdir(archived_path)
+        assert set(os.listdir(archived_path)) == {"solution.py"}
+
+        # The temporary staging directory should be removed.
+        staging_dir = os.path.join(
+            os.path.dirname(os.path.abspath(submission_module.__file__)),
+            "upload_autograder", "runs", assignment_id, "submission", submission_id,
+        )
+        assert not os.path.exists(staging_dir)
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_success_archives_submission_and_results(client, mocker):
+    """Test /upload_submission archives the submission and results after a successful run."""
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = "autograder-test"
+    fake_assignment.autograder_timeout = 30
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    fake_container = mocker.Mock()
+    fake_container.name = "assignment_container_test"
+    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
+
+    # Container cleanup, the autograder run and the results read all go through
+    # `docker exec` subprocesses now, so dispatch on the shell command.
+    def fake_subprocess_run(args, **kwargs):
+        proc = mocker.Mock()
+        proc.returncode = 0
+        proc.stderr = b""
+        command = args[-1] if isinstance(args, (list, tuple)) else ""
+        proc.stdout = (
+            b'{"score": 100, "execution_time": 1.5}'
+            if command.startswith("cat ")
+            else b""
+        )
+        return proc
+
+    mocker.patch("routes.submission.subprocess.run", side_effect=fake_subprocess_run)
+    # Without this the route spawns a real async_get_ai_feedback thread against
+    # the test database after the response returns. It happens to pass today,
+    # but it is a background thread racing test teardown - exactly the shape of
+    # a future flake.
+    fake_thread = mocker.patch("routes.submission.threading.Thread")
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 200
+        assert fake_thread.called
+        body = response.get_json()
+        submission_id = body["submissionID"]
+
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        archived_files = os.listdir(archived_path)
+        assert "solution.py" in archived_files
+        assert f"results_{submission_id}.json" in archived_files
+        assert body["results_path"] == os.path.join(archived_path, f"results_{submission_id}.json")
+    finally:
+        _cleanup_submission_dirs(assignment_id)
 
 
 def test_delete_submission_not_found(client, mocker):
@@ -1489,3 +1629,501 @@ def test_activate_submission_not_found(client, mocker):
 
     assert response.status_code == 404
     assert response.get_json()["message"] == "No submission found"
+
+
+def test_exec_run_with_timeout_raises_distinct_timeout(mocker):
+    """A wedged helper exec must not look like a student timeout.
+
+    upload_submission treats subprocess.TimeoutExpired as "the student's program
+    ran too long" and records a failed submission for it. Container cleanup and
+    the results read share the same subprocess mechanism now, so they raise
+    ContainerExecTimeout instead to keep the two cases apart.
+    """
+    container = mocker.Mock()
+    container.name = "assignment_container_test"
+    mocker.patch(
+        "routes.submission.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd="docker exec", timeout=30),
+    )
+
+    with pytest.raises(submission_module.ContainerExecTimeout):
+        submission_module.exec_run_with_timeout(container, "cat /autograder/results/x.json")
+
+
+def test_exec_run_with_timeout_merges_stdout_and_stderr(mocker):
+    """Callers read .output expecting exec_run(demux=False)'s merged stream."""
+    container = mocker.Mock()
+    container.name = "assignment_container_test"
+    proc = mocker.Mock()
+    proc.returncode = 1
+    proc.stdout = b"out"
+    proc.stderr = b"err"
+    mocker.patch("routes.submission.subprocess.run", return_value=proc)
+
+    result = submission_module.exec_run_with_timeout(container, "false")
+
+    assert result.exit_code == 1
+    assert result.output == b"outerr"
+
+
+def test_discard_container_lock_removes_entry():
+    """_container_locks must not grow for the lifetime of the process."""
+    assignment_id = str(uuid.uuid4())
+    submission_module.get_container_lock(assignment_id)
+    assert assignment_id in submission_module._container_locks
+
+    submission_module.discard_container_lock(assignment_id)
+    assert assignment_id not in submission_module._container_locks
+
+    # Discarding an unknown id is a no-op, not a KeyError.
+    submission_module.discard_container_lock(assignment_id)
+
+
+def test_reset_assignment_container_survives_docker_api_error(app, mocker):
+    """A daemon error must not swallow the caller's failed-submission record.
+
+    reset_assignment_container runs while the caller is already handling a
+    timeout and still has a Submission row to write. If an APIError escaped
+    here, the student would get an opaque 500 and no timeout submission at all.
+    """
+    assignment = mocker.Mock()
+    assignment.id = "assign-id"
+    assignment.container_id = "container-abc"
+
+    client_mock = mocker.Mock()
+    client_mock.containers.get.side_effect = docker.errors.APIError("daemon busy")
+    mocker.patch("routes.submission.get_docker_client", return_value=client_mock)
+    mocker.patch("routes.submission.db.session.commit")
+
+    submission_module.reset_assignment_container(assignment)
+
+    assert assignment.container_id is None
+
+
+def test_archive_staged_files_prunes_empty_scaffolding(app):
+    """runs/ should be left holding only in-progress work."""
+    assignment_id = str(uuid.uuid4())
+    submission_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    routes_dir = os.path.dirname(os.path.abspath(submission_module.__file__))
+    assignment_dir = os.path.join(routes_dir, "upload_autograder", "runs", assignment_id)
+    submissions_dir = os.path.join(assignment_dir, "submission", submission_id)
+    results_dir = os.path.join(assignment_dir, student_id, "results")
+
+    try:
+        os.makedirs(submissions_dir)
+        os.makedirs(results_dir)
+        with open(os.path.join(submissions_dir, "solution.py"), "w") as f:
+            f.write("print('hi')")
+        results_path = os.path.join(results_dir, "results.json")
+        with open(results_path, "w") as f:
+            f.write("{}")
+
+        submission_module.archive_staged_files(
+            assignment_id, submission_id, submissions_dir, results_path
+        )
+
+        assert not os.path.exists(os.path.join(assignment_dir, "submission"))
+        assert not os.path.exists(os.path.join(assignment_dir, student_id))
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_archive_staged_files_keeps_parent_with_concurrent_submission(app):
+    """Pruning must never disturb another submission still staging."""
+    assignment_id = str(uuid.uuid4())
+    mine = str(uuid.uuid4())
+    theirs = str(uuid.uuid4())
+    routes_dir = os.path.dirname(os.path.abspath(submission_module.__file__))
+    assignment_dir = os.path.join(routes_dir, "upload_autograder", "runs", assignment_id)
+    my_dir = os.path.join(assignment_dir, "submission", mine)
+    their_dir = os.path.join(assignment_dir, "submission", theirs)
+
+    try:
+        os.makedirs(my_dir)
+        os.makedirs(their_dir)
+        with open(os.path.join(my_dir, "solution.py"), "w") as f:
+            f.write("print('hi')")
+
+        submission_module.archive_staged_files(assignment_id, mine, my_dir)
+
+        assert os.path.isdir(their_dir)
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+# --- Persistent container isolation, staleness and locking -------------------
+
+
+def _fake_image(mocker, image_id):
+    image = mocker.Mock()
+    image.id = image_id
+    return image
+
+
+def test_container_image_is_stale_detects_cache_hit_rebuild(app, mocker):
+    """A rebuild that Docker served from cache must still be caught.
+
+    The old check compared image *tags*. It only ever worked because a genuine
+    rebuild orphans the old tag, leaving container.image.tags empty. When the
+    build context is byte-identical Docker returns the cached image, the tag
+    never moves, and a tag comparison sees nothing wrong - so students keep
+    grading against the container the instructor thought they had replaced.
+    Comparing image IDs is what actually answers the question.
+    """
+    assignment = mocker.Mock()
+    assignment.autograder_image_name = "autograder-1"
+
+    container = mocker.Mock()
+    container.image = _fake_image(mocker, "sha256:old")
+
+    client_mock = mocker.Mock()
+    client_mock.images.get.return_value = _fake_image(mocker, "sha256:new")
+    mocker.patch("routes.submission.get_docker_client", return_value=client_mock)
+
+    assert submission_module._container_image_is_stale(container, assignment) is True
+
+    # Same image ID, and the tag still points at it: nothing to do.
+    container.image = _fake_image(mocker, "sha256:new")
+    assert submission_module._container_image_is_stale(container, assignment) is False
+
+
+def test_get_or_create_recreates_container_when_image_changed(app, mocker):
+    """The riskiest untested path: rebuild the autograder, next run uses it."""
+    assignment = mocker.Mock()
+    assignment.id = "assign-1"
+    assignment.container_id = "container-old"
+    assignment.autograder_image_name = "autograder-1"
+
+    stale_container = mocker.Mock()
+    stale_container.id = "container-old"
+    stale_container.status = "running"
+    stale_container.image = _fake_image(mocker, "sha256:old")
+
+    fresh_container = mocker.Mock()
+    fresh_container.id = "container-new"
+    fresh_container.status = "running"
+    fresh_container.image = _fake_image(mocker, "sha256:new")
+
+    client_mock = mocker.Mock()
+    client_mock.containers.get.return_value = stale_container
+    client_mock.containers.run.return_value = fresh_container
+    client_mock.images.get.return_value = _fake_image(mocker, "sha256:new")
+    mocker.patch("routes.submission.get_docker_client", return_value=client_mock)
+    mocker.patch("routes.submission.db.session.refresh")
+    mocker.patch("routes.submission.db.session.expire")
+    mocker.patch("routes.submission.exec_run_with_timeout",
+                 return_value=submission_module.ExecResult(0, b""))
+
+    engine_conn = mocker.MagicMock()
+    engine = mocker.MagicMock()
+    engine.begin.return_value.__enter__.return_value = engine_conn
+    mocker.patch("routes.submission._get_engine", return_value=engine)
+
+    result = submission_module.get_or_create_assignment_container(assignment)
+
+    stale_container.remove.assert_called_once()
+    assert result is fresh_container
+    # container_id is persisted on its own connection, not the caller's session.
+    assert engine_conn.execute.called
+
+
+def test_get_or_create_starts_stopped_container_from_409_path(app, mocker):
+    """A 409 hands back a container by name that may well be exited.
+
+    reset_assignment_container can clear container_id without the container
+    actually going away, and a daemon restart leaves it exited. The next
+    submission then finds container_id NULL, hits 409 on create, fetches the
+    stopped container and used to exec straight into it - a 500 for the student
+    that only cleared itself on some later request that happened to take the
+    other branch.
+    """
+    assignment = mocker.Mock()
+    assignment.id = "assign-1"
+    assignment.container_id = None
+    assignment.autograder_image_name = "autograder-1"
+
+    stopped_container = mocker.Mock()
+    stopped_container.id = "container-existing"
+    stopped_container.status = "exited"
+
+    def start_it():
+        stopped_container.status = "running"
+
+    stopped_container.start.side_effect = start_it
+
+    client_mock = mocker.Mock()
+    client_mock.containers.run.side_effect = docker.errors.APIError(
+        "conflict", response=SimpleNamespace(status_code=409)
+    )
+    client_mock.containers.get.return_value = stopped_container
+    mocker.patch("routes.submission.get_docker_client", return_value=client_mock)
+    mocker.patch("routes.submission.db.session.refresh")
+    mocker.patch("routes.submission.db.session.expire")
+    mocker.patch("routes.submission.exec_run_with_timeout",
+                 return_value=submission_module.ExecResult(0, b""))
+
+    engine_conn = mocker.MagicMock()
+    engine = mocker.MagicMock()
+    engine.begin.return_value.__enter__.return_value = engine_conn
+    mocker.patch("routes.submission._get_engine", return_value=engine)
+
+    result = submission_module.get_or_create_assignment_container(assignment)
+
+    stopped_container.start.assert_called_once()
+    assert result is stopped_container
+
+
+def test_reset_workspace_removes_dotfiles_and_restores_source(app, mocker):
+    """The between-students reset has to cover more than `rm -rf dir/*`.
+
+    A glob skips dotfiles, so a dropped .pth, sitecustomize.py, conftest.py or
+    .pytest_cache used to survive into the next student's run. rm -rf also does
+    not kill processes, and nothing restored /autograder/source, so a
+    submission that wrote to run_autograder or the test files could influence
+    every student graded after it on that container.
+    """
+    container = mocker.Mock()
+    exec_mock = mocker.patch(
+        "routes.submission.exec_run_with_timeout",
+        return_value=submission_module.ExecResult(0, b""),
+    )
+
+    submission_module.reset_container_workspace(container)
+
+    script = exec_mock.call_args[0][1]
+    assert "find /autograder/submission -mindepth 1 -delete" in script
+    assert "find /autograder/results -mindepth 1 -delete" in script
+    assert "kill -9 -1" in script
+    assert submission_module.SOURCE_BASELINE_PATH in script
+    assert "rm -rf /autograder/source" in script
+
+
+def test_reset_workspace_refuses_to_grade_on_a_dirty_container(app, mocker):
+    """A failed reset must fail the request, not grade against leftovers."""
+    container = mocker.Mock()
+    mocker.patch(
+        "routes.submission.exec_run_with_timeout",
+        return_value=submission_module.ExecResult(1, b"permission denied"),
+    )
+
+    with pytest.raises(InternalProcessingError):
+        submission_module.reset_container_workspace(container)
+
+
+def test_source_baseline_snapshot_is_idempotent(app, mocker):
+    """Never re-snapshot: the baseline must come from the pristine image only."""
+    container = mocker.Mock()
+    assignment = mocker.Mock()
+    assignment.id = "assign-1"
+    exec_mock = mocker.patch(
+        "routes.submission.exec_run_with_timeout",
+        return_value=submission_module.ExecResult(0, b""),
+    )
+
+    submission_module._snapshot_autograder_source(container, assignment)
+
+    script = exec_mock.call_args[0][1]
+    assert script.startswith(f"test -d {submission_module.SOURCE_BASELINE_PATH} ||")
+
+
+def test_advisory_lock_key_is_stable_across_processes():
+    """hash() is randomised per process; the lock key must not be.
+
+    Two gunicorn workers deriving different keys for the same assignment would
+    take different advisory locks and grade concurrently in one container,
+    which is the whole failure this lock exists to prevent.
+    """
+    assignment_id = "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+    key = submission_module._advisory_lock_key(assignment_id)
+
+    assert key == submission_module._advisory_lock_key(assignment_id)
+    assert key != submission_module._advisory_lock_key(str(uuid.uuid4()))
+    # Must fit Postgres bigint.
+    assert -(2 ** 63) <= key < 2 ** 63
+
+
+def test_assignment_container_lock_takes_and_releases_advisory_lock(app, mocker):
+    """On Postgres the lock has to span processes, not just threads."""
+    conn = mocker.MagicMock()
+    engine = mocker.MagicMock()
+    engine.dialect.name = "postgresql"
+    engine.connect.return_value = conn
+    mocker.patch("routes.submission._get_engine", return_value=engine)
+
+    assignment_id = str(uuid.uuid4())
+    with submission_module.assignment_container_lock(assignment_id):
+        pass
+
+    statements = [call.args[0] for call in conn.exec_driver_sql.call_args_list]
+    assert any("pg_advisory_lock" in s for s in statements)
+    assert any("pg_advisory_unlock" in s for s in statements)
+    conn.close.assert_called_once()
+
+
+def test_assignment_container_lock_releases_on_exception(app, mocker):
+    """A failed grading run must not leave the advisory lock held."""
+    conn = mocker.MagicMock()
+    engine = mocker.MagicMock()
+    engine.dialect.name = "postgresql"
+    engine.connect.return_value = conn
+    mocker.patch("routes.submission._get_engine", return_value=engine)
+
+    with pytest.raises(RuntimeError):
+        with submission_module.assignment_container_lock(str(uuid.uuid4())):
+            raise RuntimeError("autograder exploded")
+
+    statements = [call.args[0] for call in conn.exec_driver_sql.call_args_list]
+    assert any("pg_advisory_unlock" in s for s in statements)
+    conn.close.assert_called_once()
+
+
+def test_assignment_container_lock_skips_advisory_on_sqlite(app, mocker):
+    """sqlite has no advisory locks; the in-process lock stands alone there."""
+    engine = mocker.MagicMock()
+    engine.dialect.name = "sqlite"
+    mocker.patch("routes.submission._get_engine", return_value=engine)
+
+    with submission_module.assignment_container_lock(str(uuid.uuid4())):
+        pass
+
+    engine.connect.assert_not_called()
+
+
+def test_reset_assignment_container_survives_commit_failure(app, mocker):
+    """The docstring promises this never raises - including from its finally.
+
+    On a timeout the caller runs this and then records the student's failed
+    submission. A commit error escaping here replaced that record with a bare
+    500 and lost the row entirely, which is the outcome the swallow-and-log
+    contract exists to prevent.
+    """
+    assignment = mocker.Mock()
+    assignment.id = "assign-id"
+    assignment.container_id = "container-abc"
+
+    client_mock = mocker.Mock()
+    client_mock.containers.get.return_value = mocker.Mock()
+    mocker.patch("routes.submission.get_docker_client", return_value=client_mock)
+    mocker.patch("routes.submission.db.session.commit",
+                 side_effect=Exception("database is gone"))
+    rollback = mocker.patch("routes.submission.db.session.rollback")
+
+    submission_module.reset_assignment_container(assignment)
+
+    assert assignment.container_id is None
+    rollback.assert_called_once()
+
+
+def test_upload_submission_records_row_for_malformed_results(client, mocker):
+    """Unusable autograder output must still leave the student a record.
+
+    json.loads(...)['score'] used to raise straight out of the Submission
+    constructor: a bare 500, no submission row, and the finally deleting the
+    staged code, so the attempt left no trace anyone could look at.
+    """
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = "autograder-test"
+    fake_assignment.autograder_timeout = 30
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    fake_container = mocker.Mock()
+    fake_container.name = "assignment_container_test"
+    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
+    mocker.patch("routes.submission.threading.Thread")
+
+    def fake_subprocess_run(args, **kwargs):
+        proc = mocker.Mock()
+        proc.returncode = 0
+        proc.stderr = b""
+        command = args[-1] if isinstance(args, (list, tuple)) else ""
+        # Valid JSON, but no `score` key - the KeyError half of the finding.
+        proc.stdout = b'{"tests": []}' if command.startswith("cat ") else b""
+        return proc
+
+    mocker.patch("routes.submission.subprocess.run", side_effect=fake_subprocess_run)
+    recorded = mocker.patch("routes.submission._record_failed_submission")
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 500
+        assert recorded.called
+        # The staged code is archived rather than dropped on the floor.
+        kwargs = recorded.call_args.kwargs
+        assert kwargs["assignment_id"] == assignment_id
+        assert kwargs["results"]["score"] == 0
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_discards_container_on_autograder_failure(client, mocker):
+    """A non-zero autograder exit must tear the shared container down.
+
+    The run went off the rails somewhere we cannot see, and anything the
+    submission spawned is still alive in there. The old per-submission
+    container was destroyed on every exit path; leaving this one running hands
+    the next student someone else's processes.
+    """
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = "autograder-test"
+    fake_assignment.autograder_timeout = 30
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    fake_container = mocker.Mock()
+    fake_container.name = "assignment_container_test"
+    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
+
+    def fake_subprocess_run(args, **kwargs):
+        proc = mocker.Mock()
+        command = args[-1] if isinstance(args, (list, tuple)) else ""
+        proc.returncode = 0 if command.startswith(("test ", "\n", "kill")) else 1
+        proc.stdout = b""
+        proc.stderr = b"Traceback ..."
+        return proc
+
+    mocker.patch("routes.submission.subprocess.run", side_effect=fake_subprocess_run)
+    mocker.patch("routes.submission.reset_container_workspace")
+    reset = mocker.patch("routes.submission.reset_assignment_container")
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 500
+        reset.assert_called_once()
+    finally:
+        _cleanup_submission_dirs(assignment_id)

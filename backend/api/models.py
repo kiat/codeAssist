@@ -3,6 +3,11 @@ from sqlalchemy.dialects.postgresql import DATE, TIMESTAMP, UUID
 from sqlalchemy.types import LargeBinary
 from api import db
 from dataclasses import dataclass
+import docker
+import os
+import shutil
+import logging
+
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
@@ -64,7 +69,7 @@ class Assignment(db.Model):
     published = db.Column(db.Boolean, default=False)
     published_date = db.Column(TIMESTAMP(timezone=True), nullable=True)
     autograder_file = db.Column(LargeBinary, nullable=True)
-    # container_id = db.Column(db.String)
+    container_id = db.Column(db.String)
     autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
 
@@ -86,6 +91,51 @@ class Assignment(db.Model):
     ai_feedback_style = db.Column(db.String, nullable=True)
     ai_feedback_max_requests = db.Column(db.Integer, nullable=True)
     ai_feedback_wait_seconds = db.Column(db.Integer, nullable=False, default=0)
+
+def cleanup_assignment_container(container_id, assignment_id=None):
+    """Stop and remove a deleted assignment's grading container. Call after the commit."""
+    logger = logging.getLogger(__name__)
+    try:
+        client = docker.from_env()
+    except Exception:
+        logger.warning(
+            "Could not reach Docker to clean up the container of deleted assignment %s",
+            assignment_id, exc_info=True
+        )
+        return
+
+    candidates = []
+    if container_id:
+        candidates.append(container_id)
+    if assignment_id:
+        candidates.append(f"assignment_container_{assignment_id}")
+    if not candidates:
+        return
+
+    removed = set()
+    for candidate in candidates:
+        try:
+            container = client.containers.get(candidate)
+            if container.id in removed:
+                continue
+            container.stop()
+            container.remove(force=True)
+            removed.add(container.id)
+        except docker.errors.NotFound:
+            continue
+        except Exception:
+            logger.warning(
+                "Failed to clean up container %s for deleted assignment %s",
+                candidate, assignment_id, exc_info=True
+            )
+
+
+def cleanup_assignment_directories(assignment_id):
+    """Remove the runs/ and archive/ trees of a deleted assignment. Call after the commit."""
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_dir = os.path.join(backend_dir, "routes", "upload_autograder")
+    for subtree in ("runs", "archive"):
+        shutil.rmtree(os.path.join(base_dir, subtree, str(assignment_id)), ignore_errors=True)
 
 class Submission(db.Model):
     __tablename__ = "submissions"
