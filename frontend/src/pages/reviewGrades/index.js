@@ -187,8 +187,11 @@ export default () => {
           `${process.env.REACT_APP_API_URL}/get_assignment?assignment_id=${assignmentId}`,
           { credentials: "include" }
         );
-        if (assignmentRes.ok) {
-          const assignmentData = await assignmentRes.json();
+        if (!assignmentRes.ok) {
+          throw new Error("Failed to load assignment publish state.");
+        }
+        const assignmentData = await assignmentRes.json();
+        if (!ignore) {
           setGradePublishState({
             hold_grades: Boolean(assignmentData.hold_grades),
             grades_published: Boolean(assignmentData.grades_published),
@@ -345,7 +348,7 @@ export default () => {
         onCancel={togglePublishModalOpen}
         assignmentId={assignmentId}
         published={gradePublishState.grades_published}
-        studentCount={filteredSubmissions.length}
+        studentCount={submissions.length}
         onSuccess={handlePublishSuccess}
       />
       <GradeStatistics

@@ -262,6 +262,47 @@ describe("<ReviewGrades />", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the true (unfiltered) student count in the confirm modal even while the search box narrows the table", async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ hold_grades: true, grades_published: false }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            { id: 10, student_id: 1, score: 88, active: true, submitted_at: 1658362327000 },
+            { id: 11, student_id: 2, score: 70, active: true, submitted_at: 1658362327000 },
+          ]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            { id: 1, name: "Alice Example", email_address: "alice@example.com" },
+            { id: 2, name: "Bob Example", email_address: "bob@example.com" },
+          ]),
+      });
+
+    renderWithCtx();
+
+    await waitFor(() =>
+      expect(screen.getByText("Alice Example")).toBeInTheDocument()
+    );
+
+    const searchInput = screen.getByPlaceholderText("Search by name or email address");
+    fireEvent.change(searchInput, { target: { value: "Alice" } });
+    fireEvent.keyDown(searchInput, { key: "Enter", code: "Enter" });
+
+    await waitFor(() => expect(screen.queryByText("Bob Example")).toBeNull());
+
+    fireEvent.click(screen.getByText("Publish Grades"));
+
+    const dialog = await screen.findByRole("dialog", { name: "Publish Grades" });
+    expect(within(dialog).getByText(/visible to all 2 students/)).toBeInTheDocument();
+  });
+
   it("toggles the button to Unpublish Grades after a successful publish", async () => {
     publishGrades.mockResolvedValue({
       data: { assignment_id: "123", grades_published: true, grades_published_at: "2026-08-25T00:00:00Z" },

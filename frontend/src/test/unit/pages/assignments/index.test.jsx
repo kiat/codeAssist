@@ -178,7 +178,7 @@ it('shows "Pending" in the GRADES column when grades are held and not yet publis
         Promise.resolve({
           completed: true,
           score: null,
-          grades_published: false,
+          grades_visible: false,
           id: 'sub1',
           late: false,
         }),
@@ -208,7 +208,7 @@ it('shows the score in the GRADES column once grades are published', async () =>
         Promise.resolve({
           completed: true,
           score: 92,
-          grades_published: true,
+          grades_visible: true,
           id: 'sub1',
           late: false,
         }),

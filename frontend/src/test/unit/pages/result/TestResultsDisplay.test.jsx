@@ -76,7 +76,7 @@ describe("TestResultsDisplay AI feedback", () => {
     const data = {
       score: null,
       results: null,
-      grades_published: false,
+      grades_visible: false,
       student_code_file: "def add(a, b):\n    return a + b\n",
       file_name: "student.py",
       ai_feedback: null,

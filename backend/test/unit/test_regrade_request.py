@@ -117,14 +117,14 @@ def test_get_regrade_request_success(client, mocker, login_as):
 
     mock_apply_visibility = mocker.patch(
         "routes.regrade_request._apply_grade_visibility",
-        return_value={"id": "sub1", "score": 95, "grades_published": True},
+        return_value={"id": "sub1", "score": 95, "grades_visible": True},
     )
 
     login_as("stu1")
     res = client.get("/get_regrade_request?submission_id=sub1")
     assert res.status_code == 200
     assert res.get_json() == {
-        "submission": {"id": "sub1", "score": 95, "grades_published": True},
+        "submission": {"id": "sub1", "score": 95, "grades_visible": True},
         "justification": "Because…",
         "reviewed": False,
     }

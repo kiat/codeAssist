@@ -164,16 +164,23 @@ def _verify_student_owner(student_id, assignment_id=None):
 
 
 def _apply_grade_visibility(submission_dict, assignment, requester_id):
-    """Redact score/results from a serialized submission when the requester is the
-    owning student and the assignment is holding grades until publish. Course staff
-    (instructor/TA) always see the full payload regardless of publish state.
+    """Redact score/results/ai_feedback from a serialized submission when the
+    requester is the owning student and the assignment is holding grades until
+    publish. Course staff (instructor/TA) always see the full payload
+    regardless of publish state.
     """
     is_staff = get_user_course_role(requester_id, assignment.course_id) in {"instructor", "ta"}
     visible = bool(is_staff or assignment.grades_visible_to_students)
-    submission_dict["grades_published"] = visible
+    # Named "grades_visible" (not "grades_published") to avoid colliding with
+    # Assignment.grades_published, which means something different: this key
+    # is "can this requester see the grade right now", not "has the
+    # instructor published grades" (the assignment can be visible to the
+    # requester because they're staff, or because hold_grades is off).
+    submission_dict["grades_visible"] = visible
     if not visible:
         submission_dict["score"] = None
         submission_dict["results"] = None
+        submission_dict["ai_feedback"] = None
     return submission_dict
 
 @submission.route('/get_submissions', methods=["GET"])
@@ -192,15 +199,20 @@ def get_submissions():
 
     _verify_student_owner(student_id, assignment_id)
 
+    assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not assignment:
+        raise NotFoundError("Assignment not found")
+
     submissions = db.session.query(Submission).filter_by(
-        student_id=student_id, 
+        student_id=student_id,
         assignment_id=assignment_id
-    ).all()  
+    ).all()
 
     if not submissions:
         raise NotFoundError("No submissions found for the provided student and assignment")
     submission_schema = SubmissionSchema(many=True)
     result = submission_schema.dump(submissions)
+    result = [_apply_grade_visibility(s, assignment, session.get("user_id")) for s in result]
 
     return jsonify(result)
 
@@ -639,6 +651,9 @@ def publish_grades():
         raise NotFoundError("Assignment not found")
 
     require_course_role(assignment_obj.course_id, {"instructor", "ta"}, "Only instructors or TAs can publish grades")
+
+    if not assignment_obj.hold_grades:
+        raise BadRequestError("This assignment is not holding grades")
 
     assignment_obj.grades_published = published
     assignment_obj.grades_published_at = datetime.now(timezone.utc) if published else None

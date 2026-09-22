@@ -375,7 +375,7 @@ const TestResultsDisplay = ({ viewMode, studentId, assignmentName, studentName, 
     return <p>Loading...</p>;
   }
 
-  if (data && data.grades_published === false) {
+  if (data && data.grades_visible === false) {
     const pendingContent = (
       <Alert
         type="info"

@@ -417,21 +417,21 @@ export default ({
                     >
                       <Checkbox>Enable Manual Grading</Checkbox>
                     </Form.Item>
-
-                    <Form.Item
-                      label="GRADE VISIBILITY"
-                      name="hold_grades"
-                      valuePropName="checked"
-                      tooltip="If enabled, students won't see their score or autograder results until you click Publish Grades on the Review Grades page. This cannot be changed after the assignment is created."
-                    >
-                      <Checkbox>Hold grades until published</Checkbox>
-                    </Form.Item>
                   </>
                 ) : (
                   <Form.Item label="WHO WILL UPLOAD SUBMISSIONS?" name="identify">
                     <Radio.Group options={["Instructor", "Student"]} />
                   </Form.Item>
                 )}
+
+                <Form.Item
+                  label="GRADE VISIBILITY"
+                  name="hold_grades"
+                  valuePropName="checked"
+                  tooltip="If enabled, students won't see their score or autograder results until you click Publish Grades on the Review Grades page. This cannot be changed after the assignment is created."
+                >
+                  <Checkbox>Hold grades until published</Checkbox>
+                </Form.Item>
 
                 {assignmentType === "0" ? null : (
                   <>

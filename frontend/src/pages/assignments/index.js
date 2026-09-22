@@ -119,7 +119,7 @@ export default function Assignments() {
               );
               const activeData = await activeSubmissions.json();
               const submitted = activeData.completed;
-              const gradesPending = Boolean(submitted) && activeData.grades_published === false;
+              const gradesPending = Boolean(submitted) && activeData.grades_visible === false;
               const score = submitted && !gradesPending ? activeData.score : null;
               const submissionId = activeData.id;
               const late = activeData.late;
