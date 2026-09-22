@@ -1,10 +1,11 @@
 import uuid
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from api import db
 from api.models import Assignment, Submission, User, RegradeRequest
 from api.schemas import SubmissionSchema, UserSchema
 from util.errors import NotFoundError, BadRequestError
 from util.auth import require_authenticated, require_course_role
+from routes.submission import _verify_student_owner, _apply_grade_visibility
 
 
 regrade_request = Blueprint('regrade_request', __name__)
@@ -50,11 +51,19 @@ def get_regrade_request():
     submission = Submission.query.filter_by(id=submission_id).first()
     if not submission:
         raise NotFoundError("No such submission")
+
+    _verify_student_owner(submission.student_id, submission.assignment_id)
+
     regrade = RegradeRequest.query.filter_by(submission_id=submission_id).first()
     if not regrade :
         raise NotFoundError("No regrade request found")
+
+    assignment = Assignment.query.filter_by(id=submission.assignment_id).first()
+    submission_data = _apply_grade_visibility(
+        SubmissionSchema().dump(submission), assignment, session.get("user_id")
+    )
     response = {
-        "submission": SubmissionSchema().dump(submission),
+        "submission": submission_data,
         "justification": regrade.justification,
         "reviewed": regrade.reviewed
     }

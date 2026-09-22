@@ -1,9 +1,9 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ReviewGrades from "../../../../pages/reviewGrades/index";
 import { GlobalContext } from "../../../../App";
-import { getGradeStatistics } from "../../../../services/submission";
+import { publishGrades, getGradeStatistics } from "../../../../services/submission";
 
 const mockNavigate = jest.fn();
 let mockParams = { assignmentId: "123" };
@@ -18,6 +18,7 @@ jest.mock("react-router-dom", () => {
 });
 
 jest.mock("../../../../services/submission", () => ({
+  publishGrades: jest.fn(),
   getGradeStatistics: jest.fn(),
 }));
 
@@ -84,6 +85,10 @@ describe("<ReviewGrades />", () => {
     ];
 
     global.fetch = jest.fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ hold_grades: false, grades_published: false }),
+    })
     .mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve(fakeSubmission),
@@ -201,6 +206,10 @@ describe("<ReviewGrades />", () => {
     global.fetch = jest.fn()
     .mockResolvedValueOnce({
       ok: true,
+      json: () => Promise.resolve({ hold_grades: false, grades_published: false }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve(fakeSubmission),
     })
     .mockResolvedValueOnce({
@@ -213,6 +222,115 @@ describe("<ReviewGrades />", () => {
 
     await waitFor(() =>
       expect(screen.getByText("88")).toBeInTheDocument()
+    );
+  });
+
+  it("does not render the Publish Grades button when hold_grades is false", async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ hold_grades: false, grades_published: false }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
+
+    renderWithCtx();
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+    expect(screen.queryByText("Publish Grades")).toBeNull();
+  });
+
+  it("renders Publish Grades and opens the confirmation modal when hold_grades is true", async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ hold_grades: true, grades_published: false }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
+
+    renderWithCtx();
+
+    await waitFor(() =>
+      expect(screen.getByText("Publish Grades")).toBeInTheDocument()
+    );
+
+    fireEvent.click(screen.getByText("Publish Grades"));
+
+    expect(
+      await screen.findByRole("dialog", { name: "Publish Grades" })
+    ).toBeInTheDocument();
+  });
+
+  it("shows the true (unfiltered) student count in the confirm modal even while the search box narrows the table", async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ hold_grades: true, grades_published: false }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            { id: 10, student_id: 1, score: 88, active: true, submitted_at: 1658362327000 },
+            { id: 11, student_id: 2, score: 70, active: true, submitted_at: 1658362327000 },
+          ]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            { id: 1, name: "Alice Example", email_address: "alice@example.com" },
+            { id: 2, name: "Bob Example", email_address: "bob@example.com" },
+          ]),
+      });
+
+    renderWithCtx();
+
+    await waitFor(() =>
+      expect(screen.getByText("Alice Example")).toBeInTheDocument()
+    );
+
+    const searchInput = screen.getByPlaceholderText("Search by name or email address");
+    fireEvent.change(searchInput, { target: { value: "Alice" } });
+    fireEvent.keyDown(searchInput, { key: "Enter", code: "Enter" });
+
+    await waitFor(() => expect(screen.queryByText("Bob Example")).toBeNull());
+
+    fireEvent.click(screen.getByText("Publish Grades"));
+
+    const dialog = await screen.findByRole("dialog", { name: "Publish Grades" });
+    expect(within(dialog).getByText(/visible to all 2 students/)).toBeInTheDocument();
+  });
+
+  it("toggles the button to Unpublish Grades after a successful publish", async () => {
+    publishGrades.mockResolvedValue({
+      data: { assignment_id: "123", grades_published: true, grades_published_at: "2026-08-25T00:00:00Z" },
+    });
+
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ hold_grades: true, grades_published: false }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
+
+    renderWithCtx();
+
+    await waitFor(() =>
+      expect(screen.getByText("Publish Grades")).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByText("Publish Grades"));
+
+    const dialog = await screen.findByRole("dialog", { name: "Publish Grades" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Publish Grades/i }));
+
+    await waitFor(() =>
+      expect(publishGrades).toHaveBeenCalledWith({ assignment_id: "123", published: true })
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Unpublish Grades")).toBeInTheDocument()
     );
   });
 });
