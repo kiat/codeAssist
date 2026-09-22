@@ -206,6 +206,10 @@ describe("<ReviewGrades />", () => {
     global.fetch = jest.fn()
     .mockResolvedValueOnce({
       ok: true,
+      json: () => Promise.resolve({ hold_grades: false, grades_published: false }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve(fakeSubmission),
     })
     .mockResolvedValueOnce({
