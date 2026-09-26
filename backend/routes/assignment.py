@@ -237,6 +237,7 @@ def duplicate_assignment():
         old_assignment_data['id'] = new_assignment_id
         old_assignment_data['name'] = new_name
         old_assignment_data['course_id'] = current_course_id
+        old_assignment_data['container_id'] = None
 
         new_assignment = Assignment(**old_assignment_data)
         db.session.add(new_assignment)

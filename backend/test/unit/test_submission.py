@@ -2112,6 +2112,8 @@ def test_upload_submission_discards_container_on_autograder_failure(client, mock
     mocker.patch("routes.submission.subprocess.run", side_effect=fake_subprocess_run)
     mocker.patch("routes.submission.reset_container_workspace")
     reset = mocker.patch("routes.submission.reset_assignment_container")
+    recorded = mocker.patch("routes.submission._record_failed_submission")
+    archived = mocker.patch("routes.submission.archive_staged_files")
 
     try:
         response = client.post(
@@ -2125,5 +2127,62 @@ def test_upload_submission_discards_container_on_autograder_failure(client, mock
 
         assert response.status_code == 500
         reset.assert_called_once()
+
+        # The attempt is recorded and archived rather than vanishing.
+        recorded.assert_called_once()
+        kwargs = recorded.call_args.kwargs
+        assert kwargs["assignment_id"] == assignment_id
+        assert kwargs["student_id"] == student_id
+        assert kwargs["filename"] == "solution.py"
+        assert kwargs["results"]["score"] == 0
+        assert kwargs["results"]["tests"][0]["name"] == "Autograder Error"
+        # stderr stays in the server log, never in what the student sees.
+        assert "Traceback" not in json.dumps(kwargs["results"])
+        archived.assert_called_once()
+        assert archived.call_args.args[0] == assignment_id
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_discards_container_when_workspace_reset_fails(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = "autograder-test"
+    fake_assignment.autograder_timeout = 30
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    fake_container = mocker.Mock()
+    fake_container.name = "assignment_container_test"
+    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
+    mocker.patch(
+        "routes.submission.reset_container_workspace",
+        side_effect=InternalProcessingError("Failed to cleanup container"),
+    )
+    run = mocker.patch("routes.submission.subprocess.run")
+    reset = mocker.patch("routes.submission.reset_assignment_container")
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 500
+        reset.assert_called_once_with(fake_assignment)
+        run.assert_not_called()
+        fake_container.put_archive.assert_not_called()
     finally:
         _cleanup_submission_dirs(assignment_id)

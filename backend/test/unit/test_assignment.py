@@ -413,6 +413,37 @@ def test_duplicate_assignment_success(client, mocker, login_as):
     mock_commit.assert_called_once()
 
 
+def test_duplicate_assignment_does_not_share_container(client, mocker, login_as):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    old_assignment = Assignment(
+        id="old-id",
+        name="Old",
+        container_id="live-container-id",
+        autograder_image_name="autograder-old-id",
+    )
+    mock_query.return_value.filter_by.return_value.one_or_none.side_effect = [
+        old_assignment,
+        None,
+    ]
+    mock_add = mocker.patch("routes.assignment.db.session.add")
+    mocker.patch("routes.assignment.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+
+    resp = client.post("/duplicate_assignment", json={
+        "oldAssignmentId": "old-id",
+        "newAssignmentTitle": "New Title",
+        "currentCourseId": "course-uuid"
+    })
+
+    assert resp.status_code == 200
+    new_assignment = mock_add.call_args.args[0]
+    assert new_assignment.id != "old-id"
+    assert new_assignment.container_id is None
+    assert new_assignment.autograder_image_name == "autograder-old-id"
+    assert old_assignment.container_id == "live-container-id"
+
+
 def test_duplicate_assignment_old_not_found(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter_by.return_value.one_or_none.side_effect = [None, None]

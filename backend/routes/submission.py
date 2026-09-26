@@ -551,6 +551,32 @@ def _malformed_results_payload(raw_output):
     }
 
 
+def _autograder_crash_payload():
+    '''A results-shaped record for an autograder that exited non-zero.
+
+    stderr is logged server-side only: the instructor's script can print hidden
+    test names or paths that students should not see.
+    '''
+    return {
+        "tests": [
+            {
+                "name": "Autograder Error",
+                "score": 0,
+                "max_score": 0,
+                "status": "failed",
+                "output": (
+                    "The autograder crashed before producing results. "
+                    "Please contact your instructor."
+                ),
+            }
+        ],
+        "leaderboard": [],
+        "visibility": "visible",
+        "execution_time": "0.00",
+        "score": 0,
+    }
+
+
 def _record_failed_submission(submission_id, filename, file_path, student_id,
                               assignment_id, results, execution_time):
     '''Write a score-zero, completed=False Submission row for a run that failed.'''
@@ -744,6 +770,10 @@ def upload_submission():
                 reset_assignment_container(assignment)
                 raise InternalProcessingError("Timed out cleaning up container")
 
+            except InternalProcessingError:
+                reset_assignment_container(assignment)
+                raise
+
             except subprocess.TimeoutExpired:
                 # clean up container
                 reset_assignment_container(assignment)
@@ -775,7 +805,6 @@ def upload_submission():
                     execution_time=float(assignment.autograder_timeout),
                 )
                 archive_staged_files(assignment_id, submission_id, submissions_dir)
-
                 raise SubmissionTimeoutError("Submitted program took too long to run", failed_submission.id)
 
             if exec_proc.returncode != 0:
@@ -785,6 +814,16 @@ def upload_submission():
                     "Autograder failed for assignment %s, details: %s",
                     assignment_id, stderr.decode(errors='replace')
                 )
+                _record_failed_submission(
+                    submission_id=submission_id,
+                    filename=filename,
+                    file_path=file_path,
+                    student_id=student_id,
+                    assignment_id=assignment_id,
+                    results=_autograder_crash_payload(),
+                    execution_time=0.0,
+                )
+                archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise InternalProcessingError("Failed to grade submission")
 
             # get results
