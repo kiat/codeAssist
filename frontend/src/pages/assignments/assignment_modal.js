@@ -8,15 +8,11 @@ import LoadingOverlay from "../../components/LoadingOverlay";
 
 export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle, allowFileUpload = true, enableCodeEditor }) {
   const [file, setFile] = useState(null);
-  const [fileList, setFileList] = useState([]);
   const { userInfo } = useContext(GlobalContext);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleFileChange = (info) => {
-    const nextFileList = Array.isArray(info.fileList) ? info.fileList.slice(-1) : [];
-    setFileList(nextFileList);
-
     if (info.file.status === 'done') {
       setFile(info.file.originFileObj || info.file);
       message.success(`${info.file.name} file uploaded successfully.`);

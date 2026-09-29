@@ -1,7 +1,6 @@
 import {
   Button,
   Card,
-  Input,
   PageHeader,
   Space,
   Table,

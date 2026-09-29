@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+
+.coverage
+.mypy_cache/
+.pytest_cache/
+.pytest_tmp_root/
+.ruff_cache/
+htmlcov/
+
+.env
+*.log
+
+routes/upload_autograder/runs/

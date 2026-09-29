@@ -1,11 +1,9 @@
 import React from 'react';
 import { MenuUnfoldOutlined, BookOutlined, UserOutlined, TeamOutlined } from '@ant-design/icons';
-import { Typography, Modal, Menu, Button } from 'antd';
+import { Modal, Menu, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useContext } from 'react';
 import { GlobalContext } from '../../App';
-
-const { Title } = Typography;
 
 function AdminCollapsedSidebar({ toggleCollapsed }) {
   const navigate = useNavigate();
@@ -69,4 +67,4 @@ function AdminCollapsedSidebar({ toggleCollapsed }) {
   );
 }
 
-export default AdminCollapsedSidebar; 
+export default AdminCollapsedSidebar;

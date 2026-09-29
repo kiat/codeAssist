@@ -24,7 +24,6 @@ export default function AdminCourseManage() {
   const [form] = Form.useForm();
 
   const [course, setCourse] = useState(null);
-  const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [enrolledStudents, setEnrolledStudents] = useState([]);
@@ -61,12 +60,6 @@ export default function AdminCourseManage() {
           allowEntryCode: courseObj.allowEntryCode ?? true,
           instructor_eid: instructorEid, // pre-fill EID here
         });
-
-        const instRes = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_all_instructors`
-        );
-        const instructorsData = await instRes.json();
-        setInstructors(instructorsData);
 
         // Fetch students enrolled in this course
         const studentsRes = await fetch(

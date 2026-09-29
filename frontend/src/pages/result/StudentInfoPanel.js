@@ -13,7 +13,6 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
   const [EditGradeModalVisible, setEditGradeModalVisible] = useState(false);
   const [Grade, setGrade] = useState("");
   const [Justification, setJustification] = useState(null); // Initialize as null
-  const [SubmissionId, setSubmissionId] = useState();
   const [highlight, setHighlight] = useState(false);
   const justificationRef = useRef(null);
   const [CheckColor, SetCheckColor] = useState("grey");
@@ -65,7 +64,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
       }
     };
     fetchJustificationDetails();
-  }, [submissionId, userInfo]);
+  }, [infoShown, isStudent, submissionId]);
 
   const handleStudentClick = () => {
     setRequestModalVisible(true);
@@ -208,7 +207,7 @@ export default function StudentInfoPanel({ assignmentName, studentName, score, t
         <Space>
           {/* displaying the correct button if the user is a student or an instructor */}
           <Space direction="vertical" size="middle">
-            {(isStudent && Justification == "" && (
+            {(isStudent && Justification === "" && (
               <Button type="primary" onClick={handleStudentClick}>
                 Submit a Regrade Request
               </Button>
