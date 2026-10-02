@@ -41,6 +41,10 @@ export async function rerunSubmissionAutograder(params) {
   return service("rerun_submission_autograder", params, "post");
 }
 
+export async function publishGrades(params) {
+  return service("publish_grades", params, "post");
+}
+
 export async function getGradeStatistics(params) {
   return service("get_grade_statistics", params, "get", {
     skipGlobalErrorMessage: true,
@@ -60,4 +64,3 @@ export async function exportSubmissions(params) {
     skipGlobalErrorMessage: true,
   });
 }
-

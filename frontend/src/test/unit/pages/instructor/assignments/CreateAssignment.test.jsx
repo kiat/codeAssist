@@ -172,6 +172,40 @@ describe("CreateAssignment setup", () => {
     });
   });
 
+  it("includes hold_grades in the create assignment payload when checked", async () => {
+    const user = userEvent.setup();
+
+    render(<CreateAssignmentHarness initialStep={0} />);
+    await user.click(await screen.findByText(/programming assignment/i));
+
+    await user.type(screen.getByLabelText(/assignment name/i), "Loops");
+    await user.click(screen.getByLabelText(/hold grades until published/i));
+
+    await user.click(screen.getByRole("button", { name: /create assignment/i }));
+
+    await waitFor(() => {
+      expect(createAssignment).toHaveBeenCalledWith(
+        expect.objectContaining({ hold_grades: true })
+      );
+    });
+  });
+
+  it("defaults hold_grades to false when left unchecked", async () => {
+    const user = userEvent.setup();
+
+    render(<CreateAssignmentHarness initialStep={0} />);
+    await user.click(await screen.findByText(/programming assignment/i));
+
+    await user.type(screen.getByLabelText(/assignment name/i), "Loops");
+    await user.click(screen.getByRole("button", { name: /create assignment/i }));
+
+    await waitFor(() => {
+      expect(createAssignment).toHaveBeenCalledWith(
+        expect.objectContaining({ hold_grades: false })
+      );
+    });
+  });
+
   it("shows late due date only when late submissions are enabled", async () => {
     const user = userEvent.setup();
 
