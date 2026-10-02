@@ -279,6 +279,9 @@ def _normalize_tag(name):
     return f"{name}:latest"
 
 SOURCE_BASELINE_PATH = "/autograder/.source_baseline"
+# run autograder as nobody instead of root
+AUTOGRADER_UID = 65534
+AUTOGRADER_USER = f"{AUTOGRADER_UID}:{AUTOGRADER_UID}"
 
 
 def _container_image_is_stale(container, assignment):
@@ -305,7 +308,8 @@ def _snapshot_autograder_source(container, assignment):
     try:
         result = exec_run_with_timeout(
             container,
-            f"test -d {SOURCE_BASELINE_PATH} || cp -a /autograder/source {SOURCE_BASELINE_PATH}",
+            f"test -d {SOURCE_BASELINE_PATH} || "
+            f"{{ cp -a /autograder/source {SOURCE_BASELINE_PATH} && chmod 700 {SOURCE_BASELINE_PATH}; }}",
         )
         if result.exit_code != 0:
             logger.warning(
@@ -322,6 +326,7 @@ def _snapshot_autograder_source(container, assignment):
 _RESET_WORKSPACE_SCRIPT = f"""
 set -e
 kill -9 -1 2>/dev/null || true
+find / /dev/shm -xdev -depth -user {AUTOGRADER_UID} -not -path '/autograder/*' -delete
 if [ -d {SOURCE_BASELINE_PATH} ]; then
     rm -rf /autograder/source
     cp -a {SOURCE_BASELINE_PATH} /autograder/source
@@ -329,6 +334,7 @@ fi
 mkdir -p /autograder/submission /autograder/results
 find /autograder/submission -mindepth 1 -delete
 find /autograder/results -mindepth 1 -delete
+chown -R {AUTOGRADER_USER} /autograder/source /autograder/submission /autograder/results
 """
 
 
@@ -341,6 +347,29 @@ def reset_container_workspace(container):
             result.output.decode(errors="replace")
         )
         raise InternalProcessingError("Failed to cleanup container")
+
+
+def _run_assignment_container(assignment, container_name):
+    return get_docker_client().containers.run(
+        image=assignment.autograder_image_name,
+        name=container_name,
+        detach=True,
+        tty=True,
+        command="tail -f /dev/null"
+    )
+
+
+def _remove_container_by_name(container_name, assignment):
+    try:
+        get_docker_client().containers.get(container_name).remove(force=True)
+    except docker.errors.NotFound:
+        pass
+    except Exception:
+        logger.warning(
+            "Failed to remove leftover container %s for assignment %s",
+            container_name, assignment.id, exc_info=True
+        )
+        raise InternalProcessingError("Failed to create assignment container")
 
 
 def get_or_create_assignment_container(assignment):
@@ -359,10 +388,7 @@ def get_or_create_assignment_container(assignment):
         try:
             container = get_docker_client().containers.get(assignment.container_id)
         except docker.errors.NotFound:
-            try:
-                container = get_docker_client().containers.get(container_name)
-            except docker.errors.NotFound:
-                container = None
+            container = None
         except Exception as e:
             logger.warning(
                 "Unexpected error getting container %s for assignment %s: %s",
@@ -391,22 +417,20 @@ def get_or_create_assignment_container(assignment):
     if container is None:
         # Create container
         try:
-            container = get_docker_client().containers.run(
-                image=assignment.autograder_image_name,
-                name=container_name,
-                detach=True,
-                tty=True,
-                command="tail -f /dev/null"
-            )
-            created = True
+            container = _run_assignment_container(assignment, container_name)
         except docker.errors.APIError as e:
-            if e.status_code == 409:
-                try:
-                    container = get_docker_client().containers.get(container_name)
-                except docker.errors.NotFound:
-                    raise InternalProcessingError("Failed to create or locate assignment container")
-            else:
+            if e.status_code != 409:
                 raise
+            _remove_container_by_name(container_name, assignment)
+            try:
+                container = _run_assignment_container(assignment, container_name)
+            except docker.errors.APIError:
+                logger.warning(
+                    "Failed to create container %s for assignment %s after removing the old one",
+                    container_name, assignment.id, exc_info=True
+                )
+                raise InternalProcessingError("Failed to create assignment container")
+        created = True
 
     try:
         container.reload()
@@ -741,7 +765,9 @@ def upload_submission():
         os.makedirs(results_dir, exist_ok=True)
         results_json_name = f"results_{submission_id}.json"
 
-        with assignment_container_lock(assignment.id):
+        lock_id = assignment.id
+        db.session.rollback()
+        with assignment_container_lock(lock_id):
             # Reuse (or create, on first submission) a persistent container for this assignment
             container = get_or_create_assignment_container(assignment)
             container_name = container.name
@@ -759,7 +785,8 @@ def upload_submission():
                 # Run the autograder inside the container
                 exec_proc = subprocess.run(
                     [
-                        "docker", "exec", container_name, "sh", "-c",
+                        "docker", "exec", "-u", AUTOGRADER_USER, "-e", "HOME=/tmp",
+                        container_name, "sh", "-c",
                         "/bin/bash /autograder/source/run_autograder"
                     ],
                     capture_output=True,
@@ -831,12 +858,32 @@ def upload_submission():
                 cat_result = exec_run_with_timeout(container, "cat /autograder/results/results.json")
             except ContainerExecTimeout:
                 reset_assignment_container(assignment)
+                _record_failed_submission(
+                    submission_id=submission_id,
+                    filename=filename,
+                    file_path=file_path,
+                    student_id=student_id,
+                    assignment_id=assignment_id,
+                    results=_malformed_results_payload(""),
+                    execution_time=0.0,
+                )
+                archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise InternalProcessingError("Timed out retrieving submission results")
             if cat_result.exit_code != 0:
                 logger.warning(
                     "Failed to retrieve results.json for assignment %s, details: %s",
                     assignment_id, cat_result.output.decode(errors='replace')
                 )
+                _record_failed_submission(
+                    submission_id=submission_id,
+                    filename=filename,
+                    file_path=file_path,
+                    student_id=student_id,
+                    assignment_id=assignment_id,
+                    results=_malformed_results_payload(""),
+                    execution_time=0.0,
+                )
+                archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise InternalProcessingError("Failed to grade submission")
 
         results_json_content = cat_result.output.decode()
@@ -984,10 +1031,11 @@ def upload_assignment_autograder():
     # Save image name and timeout to assignment
     assignment.autograder_image_name = image_name
     assignment.autograder_timeout = autograder_timeout
+    lock_id = assignment.id
     db.session.commit()
 
     # Eager container creation
-    with assignment_container_lock(assignment.id):
+    with assignment_container_lock(lock_id):
         reset_assignment_container(assignment)
         try:
             get_or_create_assignment_container(assignment)
