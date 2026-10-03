@@ -2083,3 +2083,61 @@ def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocke
 
     assert response.status_code == 400
     assert "Ollama host is not permitted" in response.json["message"]
+
+
+def test_delete_all_assignments_defers_teardown_until_after_commit(client, mocker, login_as):
+    """Bulk delete must commit before any container or archive is destroyed."""
+    events = []
+
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.db.session.commit", side_effect=lambda: events.append("commit"))
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    assignment = mocker.Mock(id="assignment-1")
+    assignment.container_id = "container-abc"
+    mock_query.return_value.filter_by.return_value.all.return_value = [assignment]
+
+    mocker.patch("routes.course.cleanup_assignment_container",
+                 side_effect=lambda cid, aid=None: events.append(("container", cid, aid)))
+    mocker.patch("routes.course.cleanup_assignment_directories",
+                 side_effect=lambda aid: events.append(("dirs", aid)))
+    mocker.patch("routes.course.discard_container_lock",
+                 side_effect=lambda aid: events.append(("lock", aid)))
+
+    login_as("instructor-uuid")
+
+    response = client.delete("/delete_all_assignments", query_string={"course_id": "course-123"})
+
+    assert response.status_code == 200
+    assert events[0] == "commit", "teardown ran before the transaction committed"
+    assert ("container", "container-abc", "assignment-1") in events
+    assert ("dirs", "assignment-1") in events
+    assert ("lock", "assignment-1") in events
+
+
+def test_delete_all_assignments_commit_failure_preserves_archives(client, mocker, login_as):
+    """The reported failure mode: rows roll back, archived work already gone.
+
+    If the bulk delete raises, the rows survive the rollback -- so the archived
+    student submissions, the results JSON and the containers must survive too.
+    """
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.db.session.commit", side_effect=Exception("lock timeout"))
+    mock_rollback = mocker.patch("routes.course.db.session.rollback")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    assignment = mocker.Mock(id="assignment-1")
+    assignment.container_id = "container-abc"
+    mock_query.return_value.filter_by.return_value.all.return_value = [assignment]
+
+    cleanup_container = mocker.patch("routes.course.cleanup_assignment_container")
+    cleanup_dirs = mocker.patch("routes.course.cleanup_assignment_directories")
+
+    login_as("instructor-uuid")
+
+    response = client.delete("/delete_all_assignments", query_string={"course_id": "course-123"})
+
+    assert response.status_code == 500
+    mock_rollback.assert_called()
+    cleanup_container.assert_not_called()
+    cleanup_dirs.assert_not_called()
