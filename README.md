@@ -2,6 +2,8 @@
 
 ## Quickstart: Local Development
 
+To deploy CodeAssist on a public Linux server (e.g. a Google Cloud VM), see [`docs/Linux-Installation/Linux_Documentation.md`](docs/Linux-Installation/Linux_Documentation.md).
+
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
 Backend is hosted at `localhost:5001`  
@@ -51,11 +53,16 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     ```
 Note: PASSWORD_SALT is used for password hashing so the same password produces consistent hashed values across local environments. The backend can still run without this value, but it may fall back to less secure password handling depending on the local configuration. For normal development and testing, developers should use the shared project salt in their .env file when available.
 
-    Optional backend environment variables (session auth / CORS):
+    Also add a session secret. The backend refuses to start without it:
 
     ```bash
-    SECRET_KEY="random secret used to sign session cookies; required in production, auto-generated fallback otherwise"
-    FRONTEND_URL="http://localhost:3000"          # comma-separated list of allowed CORS origins
+    SECRET_KEY="paste-a-long-random-string-here"   # generate one with: python3 -c 'import secrets; print(secrets.token_hex(32))'
+    ```
+
+    Optional backend environment variables (CORS / cookies):
+
+    ```bash
+    FRONTEND_ORIGIN="http://localhost:3000"       # the single origin allowed by CORS (this is the default)
     SESSION_COOKIE_SAMESITE="Lax"                 # set to "None" if the frontend is on a different domain
     SESSION_COOKIE_SECURE="false"                 # must be "true" (HTTPS) whenever SameSite is "None"
     ```

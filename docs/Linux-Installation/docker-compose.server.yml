@@ -1,0 +1,29 @@
+# Server overrides for docker-compose.yml.
+#
+# Copy to the repo root as docker-compose.override.yml (Compose loads it
+# automatically) and replace the two CHANGE_ME values. DB_PASSWORD must match
+# the password in DB_CONNECTION_STRING in backend/.env.
+#
+# Postgres only reads POSTGRES_PASSWORD when it creates a new volume. If the
+# database already exists, change the password inside Postgres instead.
+#
+# `!override` needs Docker Compose v2.24.4 or newer (`docker compose version`).
+
+services:
+  backend:
+    environment:
+      FLASK_DEBUG: 0
+    # Bind to localhost so only nginx on this machine can reach the backend.
+    # Docker-published ports bypass ufw, so 0.0.0.0 would expose them publicly.
+    ports: !override
+      - "127.0.0.1:5001:5001"
+  db:
+    environment:
+      POSTGRES_PASSWORD: CHANGE_ME_DB_PASSWORD
+    ports: !override
+      - "127.0.0.1:5432:5432"
+  pgadmin:
+    environment:
+      PGADMIN_DEFAULT_PASSWORD: CHANGE_ME_PGADMIN_PASSWORD
+    ports: !override
+      - "127.0.0.1:5050:80"
