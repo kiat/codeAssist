@@ -1,7 +1,16 @@
 import uuid
 from flask import Blueprint, request, jsonify
 from api import db
-from api.models import Assignment, AssignmentExtension, Submission, RegradeRequest, Course
+from api.models import (
+    Assignment,
+    AssignmentExtension,
+    Submission,
+    RegradeRequest,
+    Course,
+    cleanup_assignment_container,
+    cleanup_assignment_directories,
+)
+from routes.submission import discard_container_lock, assignment_container_lock
 from api.schemas import AssignmentSchema, CourseSchema, AssignmentExtensionSchema
 from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError
 from util.auth import require_authenticated, require_course_role
@@ -232,6 +241,7 @@ def duplicate_assignment():
         old_assignment_data['id'] = new_assignment_id
         old_assignment_data['name'] = new_name
         old_assignment_data['course_id'] = current_course_id
+        old_assignment_data['container_id'] = None
         # grades_published(_at) reflect released state for the old assignment's own
         # submissions, not a setting to carry forward — the duplicate has none yet.
         old_assignment_data['grades_published'] = False
@@ -266,6 +276,9 @@ def delete_assignment():
 
     require_course_role(assignment.course_id, {"instructor"}, "Only instructors can delete assignments")
 
+    deleted_assignment_id = assignment.id
+    container_id = assignment.container_id
+
     try:
         #delete regrade requests and submissions first
         submissions = db.session.query(Submission).filter(Submission.assignment_id == assignment_id).all()
@@ -279,11 +292,17 @@ def delete_assignment():
         db.session.delete(assignment)
         db.session.commit()
 
-        return jsonify({"message": "Assignment deleted successfully"}), 200
-        
     except Exception:
         db.session.rollback()
         raise InternalProcessingError("Failed to delete assignment")
+
+    with assignment_container_lock(deleted_assignment_id):
+        cleanup_assignment_container(container_id, deleted_assignment_id)
+        cleanup_assignment_directories(deleted_assignment_id)
+    discard_container_lock(deleted_assignment_id)
+
+    return jsonify({"message": "Assignment deleted successfully"}), 200
+
 
 @assignment.route('/delete_submissions', methods=["DELETE"])
 def delete_submissions():
