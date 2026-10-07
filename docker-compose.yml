@@ -1,4 +1,3 @@
-version: "3.8"
 services:
     # frontend:
     #     build:
@@ -22,6 +21,7 @@ services:
     #     command: npm run test
     backend:
         container_name: flask_container
+        restart: unless-stopped
         build: 
             context: "./backend/"
             dockerfile: Dockerfile

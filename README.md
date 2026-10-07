@@ -2,6 +2,8 @@
 
 ## Quickstart: Local Development
 
+To deploy CodeAssist on a public Linux server (e.g. a Google Cloud VM), see [`docs/Linux-Installation/Linux_Documentation.md`](docs/Linux-Installation/Linux_Documentation.md).
+
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
 Backend is hosted at `localhost:5001`  
@@ -77,11 +79,18 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     python init_encryption_keys.py
     ```
 
-    Optional backend environment variables for session auth:
+    Also add a session secret. The backend refuses to start without it:
 
     ```bash
-    SESSION_COOKIE_SAMESITE="Lax"   # set to "None" if the frontend is on a different domain
-    SESSION_COOKIE_SECURE="false"   # must be "true" over HTTPS whenever SameSite is "None"
+    SECRET_KEY="paste-a-long-random-string-here"   # generate one with: python3 -c 'import secrets; print(secrets.token_hex(32))'
+    ```
+
+    Optional backend environment variables (CORS / cookies):
+
+    ```bash
+    FRONTEND_ORIGIN="http://localhost:3000"       # the single origin allowed by CORS (this is the default)
+    SESSION_COOKIE_SAMESITE="Lax"                 # set to "None" if the frontend is on a different domain
+    SESSION_COOKIE_SECURE="false"                 # must be "true" (HTTPS) whenever SameSite is "None"
     ```
 
 5. Optional: configure Gemini over Vertex AI in `backend/.env`.

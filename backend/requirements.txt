@@ -4,6 +4,8 @@ docker
 psycopg2-binary
 python-dotenv
 flask-sqlalchemy
+# SQLAlchemy 2.1 switched the default postgresql:// driver to psycopg 3; we ship psycopg2
+SQLAlchemy>=2.0,<2.1
 flask-marshmallow
 marshmallow-sqlalchemy
 Flask-Migrate

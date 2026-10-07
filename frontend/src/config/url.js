@@ -1,5 +1,6 @@
 /*
- * CHANGE THIS FILE TO MATCH YOUR DEVELOPMENT ENVIRONMENT
+ * Set REACT_APP_API_URL in frontend/.env to change the backend URL
+ * (e.g. /api behind nginx). Falls back to the local backend.
  */
 
 /*
@@ -12,7 +13,7 @@
  * Localhost
  */
 
-export const URL_PREFIX = "http://localhost:5001";
+export const URL_PREFIX = process.env.REACT_APP_API_URL || "http://localhost:5001";
 
 /*
  * AWS
