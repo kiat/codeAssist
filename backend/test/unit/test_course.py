@@ -2346,3 +2346,49 @@ def test_gemini_model_test_leaves_room_for_thinking_tokens(mocker):
     assert GEMINI_TEST_MAX_OUTPUT_TOKENS >= 400
     for call in mock_provider.return_value.generate.call_args_list:
         assert call.kwargs["max_output_tokens"] == GEMINI_TEST_MAX_OUTPUT_TOKENS
+
+
+def test_update_ai_settings_rejects_unsupported_vertex_model(client, mocker, login_as, monkeypatch):
+    monkeypatch.delenv("VERTEX_AI_MODELS", raising=False)
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+    login_as("instructor-uuid")
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model_name": "gemini-1.5-pro",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "not supported" in response.json["message"]
+    mock_commit.assert_not_called()
+
+
+def test_update_ai_settings_accepts_supported_vertex_model(client, mocker, login_as, monkeypatch):
+    monkeypatch.delenv("VERTEX_AI_MODELS", raising=False)
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+    login_as("instructor-uuid")
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model_name": "gemini-2.5-pro",
+        },
+    )
+
+    assert response.status_code == 200
+    assert mock_course.default_ai_model == "gemini-2.5-pro"
+    mock_commit.assert_called_once()

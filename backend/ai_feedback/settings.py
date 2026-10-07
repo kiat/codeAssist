@@ -3,7 +3,11 @@ import json
 import re
 
 from util.encryption_utils import encrypt_api_key
-from ai_feedback.providers.gemini import GEMINI_PROVIDER, GEMINI_VERTEX_PROVIDER
+from ai_feedback.providers.gemini import (
+    GEMINI_PROVIDER,
+    GEMINI_VERTEX_PROVIDER,
+    is_supported_model,
+)
 
 
 LEGACY_FEEDBACK_PROMPT_ID = "legacy_feedback_prompt"
@@ -415,6 +419,17 @@ def update_assignment_ai_settings(assignment, data):
             assignment.ai_feedback_model = data["ai_feedback_model"]
 
         current_provider = getattr(assignment, "ai_feedback_provider", None)
+        current_model = getattr(assignment, "ai_feedback_model", None)
+
+        if (
+            ("ai_feedback_provider" in data or "ai_feedback_model" in data)
+            and current_provider in (GEMINI_PROVIDER, GEMINI_VERTEX_PROVIDER)
+            and current_model
+            and not is_supported_model(current_provider, current_model)
+        ):
+            raise ValueError(
+                f"Model '{current_model}' is not supported for {current_provider}"
+            )
 
         if current_provider == GEMINI_VERTEX_PROVIDER:
             if hasattr(assignment, "ai_feedback_api_key"):

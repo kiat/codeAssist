@@ -34,6 +34,7 @@ from ai_feedback.providers.gemini import (
     get_supported_models,
     has_vertex_configuration,
     is_supported_developer_model,
+    is_supported_model,
     sort_gemini_models,
     validate_model,
 )
@@ -43,6 +44,7 @@ course = Blueprint("course", __name__)
 
 ALLOWED_EXTENSIONS = {'csv'}
 UPLOAD_FOLDER = 'uploads'
+GEMINI_PROVIDERS = {GEMINI_PROVIDER, GEMINI_VERTEX_PROVIDER}
 SUPPORTED_AI_PROVIDERS = {
     "openai",
     GEMINI_PROVIDER,
@@ -889,6 +891,16 @@ def update_ai_settings():
 
     if model_name:
         course_obj.default_ai_model = model_name
+
+    if (provider or model_name) and course_obj.default_ai_provider in GEMINI_PROVIDERS:
+        if course_obj.default_ai_model and not is_supported_model(
+            course_obj.default_ai_provider,
+            course_obj.default_ai_model,
+        ):
+            raise BadRequestError(
+                f"Model '{course_obj.default_ai_model}' is not supported for "
+                f"{course_obj.default_ai_provider}"
+            )
 
     if feedback_style:
         course_obj.default_feedback_style = feedback_style
