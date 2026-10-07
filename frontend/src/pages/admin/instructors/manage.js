@@ -114,11 +114,7 @@ export default function AdminInstructorManage() {
           <Button onClick={() => navigate("/admin/instructors")}>Cancel</Button>
           <Popconfirm
             title="Remove Instructor"
-            description={
-              teachingCourses.length > 0
-                ? `This instructor is currently teaching ${teachingCourses.length} course(s). You must reassign or remove their courses before deleting this instructor.`
-                : "This will permanently delete the instructor and their account data. This action cannot be undone. Are you sure?"
-            }
+            description="This will permanently delete the instructor and their account data. This action cannot be undone. Are you sure?"
             onConfirm={handleRemove}
             okText="Yes, Delete"
             cancelText="Cancel"
@@ -127,6 +123,12 @@ export default function AdminInstructorManage() {
             <Button danger loading={removing} disabled={teachingCourses.length > 0}>Remove Instructor</Button>
           </Popconfirm>
         </Space>
+        {teachingCourses.length > 0 && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>
+            Can't remove: this instructor is teaching {teachingCourses.length} course(s)
+            ({teachingCourses.map(c => c.name).join(", ")}). Ask them to delete those courses first.
+          </Typography.Paragraph>
+        )}
       </Form>
 
       <div style={{ marginTop: 32 }}>
