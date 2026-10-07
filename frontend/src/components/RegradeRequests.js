@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
-import { Card, PageHeader, Table, message } from 'antd';
+import { Link, useNavigate } from 'react-router-dom';
+import { Card, Descriptions, PageHeader, Table, Typography, message } from 'antd';
 import { CheckCircleOutlined } from '@ant-design/icons';
 import { GlobalContext } from '../App';
 
@@ -44,7 +44,7 @@ function RegradeRequests() {
       }
     };
     fetchRequests();
-  }, [courseInfo.id, isStudent, userInfo.id]);
+  }, [userInfo]);
 
   const columns = [
     {

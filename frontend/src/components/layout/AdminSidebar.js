@@ -1,12 +1,30 @@
 import React, { useState } from 'react';
 import { MenuFoldOutlined, BookOutlined, UserOutlined, TeamOutlined } from '@ant-design/icons';
-import { Typography, Menu, Popover } from 'antd';
-import { Link } from 'react-router-dom';
+import { Typography, Modal, Menu, Popover } from 'antd';
+import { Link, useNavigate } from 'react-router-dom';
+import { useContext } from 'react';
+import { GlobalContext } from '../../App';
 import AccountPopoverContent from './accountPopoverContent';
 import AdminCollapsedSidebar from './AdminCollapsedSidebar';
 
 function AdminSidebar() {
+  const navigate = useNavigate();
+  const { updateUserInfo } = useContext(GlobalContext);
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleLogout = () => {
+    Modal.confirm({
+      title: 'Confirm Logout',
+      content: 'Are you sure you want to logout?',
+      okText: 'Yes',
+      cancelText: 'No',
+      onOk: () => {
+        localStorage.removeItem("userInfo");
+        updateUserInfo(null);
+        navigate('/');
+      }
+    });
+  };
 
   const toggleCollapsed = () => {
     setCollapsed(!collapsed);

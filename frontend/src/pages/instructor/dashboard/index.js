@@ -6,8 +6,11 @@ import {
   Divider,
   PageHeader,
   Progress,
+  Space,
   Table,
 } from "antd";
+import { texts } from "./constant";
+import TextItem from "./TextItem";
 import moment from "moment";
 import { Link, useParams } from "react-router-dom";
 import { useContext } from "react";
@@ -66,7 +69,7 @@ const columns = [
 export default function InstructorDashboard() {
   const { courseId } = useParams();
   const [data, setData] = useState([]);
-  const { courseInfo, updateCourseInfo } = useContext(GlobalContext);
+  const { courseInfo, updateCourseInfo, userInfo } = useContext(GlobalContext);
 
   const fetchData = async (endpoint, params) => {
     try {
