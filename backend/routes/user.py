@@ -9,6 +9,7 @@ from api.models import User, Course, AdminEmail
 from api.schemas import UserSchema, CourseSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError, ForbiddenError
 from util.encryption_utils import hash_password, verify_password, needs_rehash, is_hashed
+from util.auth import require_admin, require_authenticated, require_self_or_admin, get_user_global_role
 
 
 user = Blueprint('user', __name__)
@@ -53,8 +54,7 @@ def create_user():
         session_user_id = session.get("user_id")
         if not session_user_id:
             raise ForbiddenError("Not authenticated. Please log in.")
-        session_user = db.session.query(User).filter_by(id=session_user_id).first()
-        if not session_user or session_user.role != "admin":
+        if get_user_global_role(session_user_id) != "admin":
             raise ForbiddenError("Only administrators can create admin accounts")
 
     eid_check = db.session.query(User).filter_by(sis_user_id=sis_user_id).first()
@@ -277,6 +277,8 @@ def get_user_by_id():
     Requires from the frontend a JSON containing:
     @param id    the instructor id
     '''
+    # Authenticate before validating input so unauthenticated callers always get 401
+    require_authenticated()
 
     insid = request.args.get("id")
     if not insid: 
@@ -287,7 +289,7 @@ def get_user_by_id():
     except (ValueError, TypeError):
         raise BadRequestError("Invalid user id")
 
-
+    require_self_or_admin(insid, "You can only view your own account")
 
     instructor_obj = db.session.query(User).filter_by(id=insid).first() 
     if not instructor_obj: 
@@ -302,7 +304,9 @@ def get_user_by_id():
 def delete_user():
     assert current_app
 
-    # Validate input first
+    # Security: Only admins can delete users
+    require_admin("Only administrators can delete users")
+
     user_id = request.args.get("id") 
     if not user_id: 
         raise BadRequestError("Missing User id")
@@ -311,14 +315,6 @@ def delete_user():
         user_id = str(uuid.UUID(user_id))
     except(ValueError, TypeError):
         raise BadRequestError("Invalid user id") 
-
-    # Security: Only admins can delete users
-    session_user_id = session.get("user_id")
-    if not session_user_id:
-        raise ForbiddenError("Not authenticated. Please log in.")
-    session_user = db.session.query(User).filter_by(id=session_user_id).first()
-    if not session_user or session_user.role != "admin":
-        raise ForbiddenError("Only administrators can delete users")
 
     user = db.session.query(User).filter_by(id=user_id).first()
     if not user:
@@ -355,6 +351,8 @@ def update_account():
     @param name      the name for the user (optional)
     @param password  the password for the user (optional)
     '''
+    require_authenticated()
+
     # Extract required and optional data from the request
     user_id = request.json.get('id')
     if not user_id:
@@ -364,9 +362,9 @@ def update_account():
         user_id = str(uuid.UUID(user_id))
     except(ValueError, TypeError):
         raise BadRequestError("Invalid  user id") 
-    
 
-    
+    require_self_or_admin(user_id, "You can only update your own account")
+
     new_name = request.json.get('name')
     new_password = request.json.get('password')
 
@@ -396,18 +394,21 @@ def update_account():
 @user.route('/get_all_courses', methods=["GET"])
 def get_all_courses():
     """Get all courses in the system."""
+    require_admin("Only administrators can view all courses")
     courses = db.session.query(Course).all()
     return jsonify(CourseSchema().dump(courses, many=True)), 200
 
 @user.route('/get_all_instructors', methods=["GET"])
 def get_all_instructors():
     """Get all instructors in the system."""
+    require_admin("Only administrators can view all instructors")
     instructors = db.session.query(User).filter_by(role="instructor").all()
     return jsonify(UserSchema().dump(instructors, many=True)), 200
 
 @user.route('/get_all_students', methods=["GET"])
 def get_all_students():
     """Get all students in the system."""
+    require_admin("Only administrators can view all students")
     students = db.session.query(User).filter_by(role="student").all()
     return jsonify(UserSchema().dump(students, many=True)), 200
 
@@ -421,6 +422,8 @@ def admin_update_account():
     @param email_address   the email for the user (optional)
     @param sis_user_id     the EID for the user (optional)
     '''
+    require_admin("Only administrators can update other accounts")
+
     user_id = request.json.get('id')
     new_name = request.json.get('name')
     new_email = request.json.get('email_address')
@@ -457,6 +460,8 @@ def admin_update_account():
 # New route to retrieve an instructor's id using their EID
 @user.route('/get_instructor_by_eid', methods=["GET"])
 def get_instructor_by_eid():
+    require_admin("Only administrators can look up instructors by EID")
+
     eid = request.args.get("eid")
     if not eid:
         raise BadRequestError("Missing EID")
@@ -469,15 +474,11 @@ def get_instructor_by_eid():
 
 @user.route('/get_user_by_eid', methods=["GET"])
 def get_user_by_eid():
+    require_admin("Only administrators can look up users by EID")
+
     eid = request.args.get("eid")
     if not eid:
         raise BadRequestError("Missing EID")
-    
-    print(f"Received EID: '{eid}'")
-
-    # Log all EIDs in the database for comparison
-    all_eids = [f"'{u.sis_user_id}'" for u in db.session.query(User).all()]
-    print("All DB EIDs:", all_eids)
 
     user = db.session.query(User).filter_by(sis_user_id=eid).first()
     if not user:

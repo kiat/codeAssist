@@ -2,8 +2,15 @@ import pytest
 from flask import session
 
 from api import create_app
-from api.models import Enrollment
-from util.auth import get_user_course_role, require_authenticated, require_course_role
+from api.models import Enrollment, User
+from util.auth import (
+    get_user_course_role,
+    get_user_global_role,
+    require_admin,
+    require_authenticated,
+    require_course_role,
+    require_self_or_admin,
+)
 from util.errors import ForbiddenError, UnauthorizedError
 
 
@@ -130,3 +137,78 @@ def test_get_user_course_role_cache_does_not_leak_across_requests(app, mocker):
     assert first == "student"
     assert second == "instructor"
     assert mock_query.call_count == 2
+
+
+def test_get_user_global_role_lowercases_stored_role(app, mocker):
+    mock_query = mocker.patch("util.auth.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = User(
+        id="user-123", role="Admin",
+    )
+
+    with app.app_context():
+        assert get_user_global_role("user-123") == "admin"
+
+
+def test_get_user_global_role_returns_none_for_missing_user(app, mocker):
+    mock_query = mocker.patch("util.auth.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    with app.app_context():
+        assert get_user_global_role("user-123") is None
+
+
+def test_require_admin_raises_401_without_session(app):
+    with app.test_request_context("/"):
+        with pytest.raises(UnauthorizedError):
+            require_admin()
+
+
+@pytest.mark.parametrize("role", ["student", "instructor", None])
+def test_require_admin_raises_403_for_non_admin(app, mocker, role):
+    mocker.patch("util.auth.get_user_global_role", return_value=role)
+
+    with app.test_request_context("/"):
+        session["user_id"] = "user-123"
+        with pytest.raises(ForbiddenError, match="Admins only"):
+            require_admin("Admins only")
+
+
+def test_require_admin_returns_user_id_for_admin(app, mocker):
+    mocker.patch("util.auth.get_user_global_role", return_value="admin")
+
+    with app.test_request_context("/"):
+        session["user_id"] = "admin-123"
+        assert require_admin() == "admin-123"
+
+
+def test_require_self_or_admin_raises_401_without_session(app):
+    with app.test_request_context("/"):
+        with pytest.raises(UnauthorizedError):
+            require_self_or_admin("user-123")
+
+
+def test_require_self_or_admin_allows_self_without_role_lookup(app, mocker):
+    mock_role = mocker.patch("util.auth.get_user_global_role")
+
+    with app.test_request_context("/"):
+        session["user_id"] = "user-123"
+        assert require_self_or_admin("user-123") == "user-123"
+
+    mock_role.assert_not_called()
+
+
+def test_require_self_or_admin_raises_403_for_other_non_admin(app, mocker):
+    mocker.patch("util.auth.get_user_global_role", return_value="student")
+
+    with app.test_request_context("/"):
+        session["user_id"] = "user-123"
+        with pytest.raises(ForbiddenError):
+            require_self_or_admin("someone-else")
+
+
+def test_require_self_or_admin_allows_admin_for_other_user(app, mocker):
+    mocker.patch("util.auth.get_user_global_role", return_value="admin")
+
+    with app.test_request_context("/"):
+        session["user_id"] = "admin-123"
+        assert require_self_or_admin("someone-else") == "admin-123"

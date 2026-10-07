@@ -15,7 +15,7 @@ export default function AdminInstructorManage() {
   useEffect(() => {
     async function fetchInstructor() {
       try {
-        const res = await fetch(`${process.env.REACT_APP_API_URL}/get_user_by_id?id=${instructorId}`);
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/get_user_by_id?id=${instructorId}`, { credentials: "include" });
         const data = await res.json();
         setInstructor(data);
         form.setFieldsValue({
@@ -25,7 +25,7 @@ export default function AdminInstructorManage() {
         });
 
         // Fetch courses taught by this instructor
-        const coursesRes = await fetch(`${process.env.REACT_APP_API_URL}/get_courses_by_instructor?instructor_id=${instructorId}`);
+        const coursesRes = await fetch(`${process.env.REACT_APP_API_URL}/get_courses_by_instructor?instructor_id=${instructorId}`, { credentials: "include" });
         const coursesData = await coursesRes.json();
         setTeachingCourses(coursesData);
       } catch (e) {
@@ -42,6 +42,7 @@ export default function AdminInstructorManage() {
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL}/admin_update_account`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: instructorId,
@@ -69,6 +70,7 @@ export default function AdminInstructorManage() {
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL}/delete_user?id=${instructorId}`, {
         method: "DELETE",
+        credentials: "include",
       });
       if (res.ok) {
         message.success("Instructor removed successfully");
@@ -112,11 +114,7 @@ export default function AdminInstructorManage() {
           <Button onClick={() => navigate("/admin/instructors")}>Cancel</Button>
           <Popconfirm
             title="Remove Instructor"
-            description={
-              teachingCourses.length > 0
-                ? `This instructor is currently teaching ${teachingCourses.length} course(s). You must reassign or remove their courses before deleting this instructor.`
-                : "This will permanently delete the instructor and their account data. This action cannot be undone. Are you sure?"
-            }
+            description="This will permanently delete the instructor and their account data. This action cannot be undone. Are you sure?"
             onConfirm={handleRemove}
             okText="Yes, Delete"
             cancelText="Cancel"
@@ -125,6 +123,12 @@ export default function AdminInstructorManage() {
             <Button danger loading={removing} disabled={teachingCourses.length > 0}>Remove Instructor</Button>
           </Popconfirm>
         </Space>
+        {teachingCourses.length > 0 && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>
+            Can't remove: this instructor is teaching {teachingCourses.length} course(s)
+            ({teachingCourses.map(c => c.name).join(", ")}). Ask them to delete those courses first.
+          </Typography.Paragraph>
+        )}
       </Form>
 
       <div style={{ marginTop: 32 }}>
