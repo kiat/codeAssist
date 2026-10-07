@@ -960,6 +960,44 @@ def test_ai_chat_ollama_validates_base_url_before_request(mocker):
     mock_post.assert_not_called()
 
 
+def test_ai_chat_gemini_vertex_uses_server_managed_client(mocker):
+    from routes.code_editor import _get_ai_chat_reply
+
+    captured = {}
+    fake_config = object()
+    fake_client = object()
+
+    class FakeGeminiProvider:
+        def __init__(self, client):
+            captured["client"] = client
+
+        def generate(self, **kwargs):
+            captured.update(kwargs)
+            return "Check the recursive base case."
+
+    mocker.patch("routes.code_editor.validate_model")
+    mocker.patch("routes.code_editor.build_vertex_config", return_value=fake_config)
+    mocker.patch("routes.code_editor.create_gemini_client", return_value=fake_client)
+    mocker.patch("routes.code_editor.GeminiProvider", FakeGeminiProvider)
+
+    reply = _get_ai_chat_reply(
+        "gemini_vertex",
+        None,
+        None,
+        "help me debug",
+        "gemini-2.5-flash",
+        0.4,
+        vertex_location="us-central1",
+    )
+
+    assert reply == "Check the recursive base case."
+    assert captured["client"] is fake_client
+    assert captured["model"] == "gemini-2.5-flash"
+    assert captured["temperature"] == 0.4
+    assert captured["max_output_tokens"] == 700
+    assert "help me debug" in captured["prompt"]
+
+
 def test_ai_chat_course_not_found_reports_course_issue(client, mocker):
     mock_student = mocker.Mock()
     mock_student.coding_insights = "No history."

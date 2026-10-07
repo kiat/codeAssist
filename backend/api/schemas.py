@@ -1,5 +1,10 @@
 from api.models import Course, Enrollment, Assignment, Submission, User, TestCaseResult, TestCase, RegradeRequest, AssignmentExtension, CodeDraft
+import io
+
+from marshmallow import fields
+
 from api import ma
+from ai_feedback.source_extraction import SourceExtractionError, extract_source_from_zip
 
 
 class UserSchema(ma.SQLAlchemyAutoSchema):
@@ -23,10 +28,35 @@ class AssignmentSchema(ma.SQLAlchemyAutoSchema):
         include_fk = True
         exclude = ("ai_feedback_api_key",)
 
+def submission_code_as_text(raw):
+    """Return a stored submission file as displayable text.
+
+    Plain source files are returned as-is. A .zip upload is binary, so it is
+    shown as the source files inside it instead of failing to decode.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return raw
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    try:
+        return extract_source_from_zip(io.BytesIO(raw))
+    except SourceExtractionError:
+        return "[This submission is a binary file and cannot be displayed.]"
+
+
 class SubmissionSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Submission
         include_fk = True
+
+    student_code_file = fields.Method("get_student_code_file")
+
+    def get_student_code_file(self, obj):
+        return submission_code_as_text(obj.student_code_file)
 
 
 class TestCaseSchema(ma.SQLAlchemyAutoSchema):
