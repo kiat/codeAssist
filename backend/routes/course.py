@@ -18,7 +18,7 @@ from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSc
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, UnauthorizedError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
 from util.url_utils import validate_ollama_url
-from util.auth import require_authenticated, require_course_role
+from util.auth import require_admin, require_authenticated, require_course_role
 from ai_feedback.integration import (
     CORRECTNESS_SYSTEM_PROMPT,
     get_gemini_generation_config,
@@ -1362,6 +1362,8 @@ def get_courses_by_instructor():
     Requires from the frontend a query param:
     @param instructor_id    the id of the instructor
     """
+    require_admin("Only administrators can view an instructor's courses")
+
     instructor_id = request.args.get("instructor_id")
     if not instructor_id or instructor_id == "":
         raise BadRequestError("Missing instructor_id argument")

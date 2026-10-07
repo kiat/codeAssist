@@ -2083,3 +2083,37 @@ def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocke
 
     assert response.status_code == 400
     assert "Ollama host is not permitted" in response.json["message"]
+
+
+def test_get_courses_by_instructor_returns_401_when_logged_out(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+
+    response = client.get("/get_courses_by_instructor", query_string={"instructor_id": "inst-1"})
+
+    assert response.status_code == 401
+    mock_query.assert_not_called()
+
+
+@pytest.mark.parametrize("role", ["student", "instructor"])
+def test_get_courses_by_instructor_returns_403_for_non_admin(client, mocker, login_as, role):
+    login_as("inst-1")
+    mocker.patch("util.auth.get_user_global_role", return_value=role)
+    mock_query = mocker.patch("routes.course.db.session.query")
+
+    response = client.get("/get_courses_by_instructor", query_string={"instructor_id": "inst-1"})
+
+    assert response.status_code == 403
+    mock_query.assert_not_called()
+
+
+def test_get_courses_by_instructor_as_admin(client, mocker, login_as):
+    login_as("admin-1")
+    mocker.patch("util.auth.get_user_global_role", return_value="admin")
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = []
+
+    response = client.get("/get_courses_by_instructor", query_string={"instructor_id": "inst-1"})
+
+    assert response.status_code == 200
+    assert response.json == []
+
