@@ -177,12 +177,13 @@ Some provider APIs return models that appear available but can't actually be use
 - Avoid: `o3-mini`, `o4-mini` (may reject `max_tokens`, require `max_completion_tokens`)
 
 ### Gemini
-- Recommended: `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-2.5-flash`, `gemini-2.5-pro`
-- Avoid: `gemini-2.0-flash`, deep-research models, antigravity models, embedding/audio/image/video models (may not support standard `generateContent`)
+- Recommended: `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro`
+- Any `gemini-*` model returned by the Developer API model list is accepted unless it is blocked.
+- Blocked: `gemini-2.0-flash`, preview/experimental models, deep-research models, antigravity models, embedding/audio/image/video models (may not support standard `generateContent`)
 
 ### Gemini over Vertex AI
-- Recommended: `gemini-2.5-flash`, `gemini-2.5-pro`
-- Model listing uses CodeAssist's curated allowlist for the first implementation.
+- Default list: `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro`
+- Model listing uses CodeAssist's curated list. Set `VERTEX_AI_MODELS` (comma-separated) on the server to replace it.
 - The selected model is still tested through the real Vertex AI client before use.
 - Avoid: automatic fallback to regular Gemini, course-level Vertex API key storage, assignment-level Vertex credentials.
 
@@ -240,7 +241,7 @@ WHERE default_ai_provider = 'openai'
   AND default_ai_model IN ('o3-mini', 'o4-mini');
 
 UPDATE courses
-SET default_ai_model = 'gemini-1.5-flash'
+SET default_ai_model = 'gemini-2.5-flash'
 WHERE default_ai_provider = 'gemini'
   AND (
     default_ai_model = 'gemini-2.0-flash'

@@ -33,6 +33,8 @@ from ai_feedback.providers.gemini import (
     create_gemini_client,
     get_supported_models,
     has_vertex_configuration,
+    is_supported_developer_model,
+    sort_gemini_models,
     validate_model,
 )
 from openai import OpenAI
@@ -179,33 +181,7 @@ def is_supported_gemini_model(model_id):
     Keep normal Gemini text generation models.
     Remove research, antigravity, embedding, audio, image, and other special models.
     """
-    blocked_keywords = [
-        "embedding",
-        "aqa",
-        "imagen",
-        "veo",
-        "tts",
-        "native-audio",
-        "live",
-        "learnlm",
-        "deep-research",
-        "antigravity",
-        "preview",
-        "exp",
-        "experimental",
-    ]
-
-    blocked_models = {
-        "gemini-2.0-flash",
-    }
-
-    if model_id in blocked_models:
-        return False
-
-    if any(keyword in model_id.lower() for keyword in blocked_keywords):
-        return False
-
-    return model_id in set(get_supported_models(GEMINI_PROVIDER))
+    return is_supported_developer_model(model_id)
 
 
 def is_supported_claude_model(model_id):
@@ -1070,24 +1046,7 @@ def fetch_ai_models():
                 ):
                     model_ids.append(model_name)
 
-            preferred_order = [
-                "gemini-1.5-flash",
-                "gemini-1.5-pro",
-                "gemini-2.5-flash",
-                "gemini-2.5-pro",
-            ]
-
-            sorted_models = sorted(
-                set(model_ids),
-                key=lambda model: (
-                    preferred_order.index(model)
-                    if model in preferred_order
-                    else len(preferred_order),
-                    model
-                )
-            )
-
-            return jsonify({"models": sorted_models}), 200
+            return jsonify({"models": sort_gemini_models(model_ids)}), 200
 
         if provider == "claude":
             response = requests.get(

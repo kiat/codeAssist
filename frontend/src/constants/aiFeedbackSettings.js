@@ -38,7 +38,7 @@ export const AI_PROVIDERS = [
 
 export const AI_PROVIDER_DEFAULT_MODELS = {
   [AI_PROVIDER_KEYS.OPENAI]: "gpt-4o",
-  [AI_PROVIDER_KEYS.GEMINI]: "gemini-1.5-flash",
+  [AI_PROVIDER_KEYS.GEMINI]: "gemini-2.5-flash",
   [AI_PROVIDER_KEYS.GEMINI_VERTEX]: "gemini-2.5-flash",
   [AI_PROVIDER_KEYS.CLAUDE]: "claude-sonnet-5",
   [AI_PROVIDER_KEYS.OLLAMA]: "llama3",

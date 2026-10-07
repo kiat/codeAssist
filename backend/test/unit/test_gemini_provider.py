@@ -401,3 +401,40 @@ def test_gemini_provider_single_attempt_skips_retry(monkeypatch):
 
     assert client.models.calls == 1
     assert sleeps == []
+
+
+def test_validate_model_accepts_default_vertex_models(monkeypatch):
+    monkeypatch.delenv("VERTEX_AI_MODELS", raising=False)
+
+    for model in ("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"):
+        validate_model(GEMINI_VERTEX_PROVIDER, model)
+
+
+def test_validate_model_rejects_retired_vertex_models(monkeypatch):
+    monkeypatch.delenv("VERTEX_AI_MODELS", raising=False)
+
+    for model in ("gemini-1.5-flash", "gemini-1.5-pro"):
+        with pytest.raises(ProviderModelError):
+            validate_model(GEMINI_VERTEX_PROVIDER, model)
+
+
+def test_validate_model_uses_vertex_env_override(monkeypatch):
+    monkeypatch.setenv("VERTEX_AI_MODELS", "gemini-next-pro")
+
+    validate_model(GEMINI_VERTEX_PROVIDER, "gemini-next-pro")
+    with pytest.raises(ProviderModelError):
+        validate_model(GEMINI_VERTEX_PROVIDER, "gemini-2.5-flash")
+
+
+def test_validate_model_developer_api_accepts_any_unblocked_gemini_model():
+    validate_model(GEMINI_PROVIDER, "gemini-2.5-flash-lite")
+    validate_model(GEMINI_PROVIDER, "gemini-next-flash")
+
+    for model in (
+        "gemini-2.0-flash",
+        "gemini-2.5-flash-preview-tts",
+        "gemini-embedding-001",
+        "text-bison",
+    ):
+        with pytest.raises(ProviderModelError):
+            validate_model(GEMINI_PROVIDER, model)

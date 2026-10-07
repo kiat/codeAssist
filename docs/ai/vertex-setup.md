@@ -35,6 +35,22 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/in/container/service-account.json
 
 Leave `VERTEX_AI_AUTH_MODE` unset for ADC mode.
 
+## Available Models
+
+Vertex AI does not offer CodeAssist a cheap model listing for server
+credentials, so the model dropdown uses a curated list:
+`gemini-2.5-flash`, `gemini-2.5-flash-lite`, and `gemini-2.5-pro`.
+
+To change it without a code change, set `VERTEX_AI_MODELS` to a
+comma-separated list. It replaces the default list entirely:
+
+```bash
+VERTEX_AI_MODELS=gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.5-pro
+```
+
+Models outside the list are rejected when settings are saved and when
+feedback is generated.
+
 ## Google Cloud Requirements
 
 The Google Cloud project must have the Vertex AI API enabled.

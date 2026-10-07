@@ -1271,7 +1271,25 @@ def test_fetch_ai_models_gemini_vertex_returns_supported_models(client):
     )
 
     assert response.status_code == 200
-    assert response.json["models"] == ["gemini-2.5-flash", "gemini-2.5-pro"]
+    assert response.json["models"] == [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-pro",
+    ]
+
+
+def test_fetch_ai_models_gemini_vertex_uses_env_override(client, monkeypatch):
+    monkeypatch.setenv("VERTEX_AI_MODELS", " gemini-2.5-pro, gemini-next-flash ,")
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={
+            "provider": "gemini_vertex",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["models"] == ["gemini-2.5-pro", "gemini-next-flash"]
 
 
 def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker, login_as):
@@ -1425,7 +1443,11 @@ def test_fetch_ai_models_gemini_filters_and_sorts_models(client, mocker):
                 "supportedGenerationMethods": ["generateContent"],
             },
             {
-                "name": "models/gemini-1.5-flash",
+                "name": "models/gemini-next-flash",
+                "supportedGenerationMethods": ["generateContent"],
+            },
+            {
+                "name": "models/gemini-2.5-flash-lite",
                 "supportedGenerationMethods": ["generateContent"],
             },
             {
@@ -1446,9 +1468,11 @@ def test_fetch_ai_models_gemini_filters_and_sorts_models(client, mocker):
     )
 
     assert response.status_code == 200
-    assert response.json["models"][0] == "gemini-1.5-flash"
-    assert "gemini-2.5-flash" in response.json["models"]
-    assert "text-embedding-004" not in response.json["models"]
+    assert response.json["models"] == [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-next-flash",
+    ]
 
 
 def test_fetch_ai_models_claude_filters_unavailable_models(client, mocker):

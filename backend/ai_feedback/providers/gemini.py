@@ -25,25 +25,41 @@ GEMINI_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 GEMINI_MAX_ATTEMPTS = 3
 GEMINI_RETRY_BACKOFF_SECONDS = 1
 
-SUPPORTED_MODELS = {
-    GEMINI_PROVIDER: {
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-    },
-    GEMINI_VERTEX_PROVIDER: {
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-    },
-}
+# Vertex AI has no cheap model listing for server credentials, so CodeAssist
+# keeps a curated list. VERTEX_AI_MODELS (comma-separated) overrides it.
+DEFAULT_VERTEX_MODELS = (
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+)
 
 PREFERRED_MODEL_ORDER = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
 ]
+
+# The Developer API lists its own models, so any gemini-* text model is
+# accepted unless it matches one of these special-purpose patterns.
+BLOCKED_DEVELOPER_MODEL_KEYWORDS = (
+    "embedding",
+    "aqa",
+    "imagen",
+    "veo",
+    "tts",
+    "native-audio",
+    "live",
+    "learnlm",
+    "deep-research",
+    "antigravity",
+    "preview",
+    "exp",
+    "experimental",
+)
+
+BLOCKED_DEVELOPER_MODELS = {
+    "gemini-2.0-flash",
+}
 
 
 @dataclass(frozen=True)
@@ -55,10 +71,9 @@ class GeminiClientConfig:
     vertex_auth_mode: Literal["adc", "api_key"] | None = None
 
 
-def get_supported_models(provider):
-    models = SUPPORTED_MODELS.get(provider, set())
+def sort_gemini_models(models):
     return sorted(
-        models,
+        set(models),
         key=lambda model: (
             PREFERRED_MODEL_ORDER.index(model)
             if model in PREFERRED_MODEL_ORDER
@@ -68,8 +83,40 @@ def get_supported_models(provider):
     )
 
 
+def get_vertex_models():
+    configured = os.getenv("VERTEX_AI_MODELS", "")
+    models = [model.strip() for model in configured.split(",") if model.strip()]
+    return models or list(DEFAULT_VERTEX_MODELS)
+
+
+def is_supported_developer_model(model_id):
+    normalized = (model_id or "").lower()
+
+    if normalized in BLOCKED_DEVELOPER_MODELS:
+        return False
+
+    if any(keyword in normalized for keyword in BLOCKED_DEVELOPER_MODEL_KEYWORDS):
+        return False
+
+    return normalized.startswith("gemini-")
+
+
+def get_supported_models(provider):
+    if provider == GEMINI_VERTEX_PROVIDER:
+        return sort_gemini_models(get_vertex_models())
+    return []
+
+
+def is_supported_model(provider, model):
+    if provider == GEMINI_VERTEX_PROVIDER:
+        return model in get_vertex_models()
+    if provider == GEMINI_PROVIDER:
+        return is_supported_developer_model(model)
+    return False
+
+
 def validate_model(provider, model):
-    if model not in SUPPORTED_MODELS.get(provider, set()):
+    if not is_supported_model(provider, model):
         raise ProviderModelError(
             f"Model '{model}' is not supported for {provider}.",
             "Selected AI model is not supported for this provider.",

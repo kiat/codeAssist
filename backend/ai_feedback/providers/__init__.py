@@ -1,8 +1,8 @@
 from ai_feedback.providers.gemini import (
     DEFAULT_VERTEX_LOCATION,
+    DEFAULT_VERTEX_MODELS,
     GEMINI_PROVIDER,
     GEMINI_VERTEX_PROVIDER,
-    SUPPORTED_MODELS,
     VERTEX_AUTH_ADC,
     VERTEX_AUTH_API_KEY,
     GeminiClientConfig,
@@ -14,9 +14,9 @@ from ai_feedback.providers.gemini import (
 
 __all__ = [
     "DEFAULT_VERTEX_LOCATION",
+    "DEFAULT_VERTEX_MODELS",
     "GEMINI_PROVIDER",
     "GEMINI_VERTEX_PROVIDER",
-    "SUPPORTED_MODELS",
     "VERTEX_AUTH_ADC",
     "VERTEX_AUTH_API_KEY",
     "GeminiClientConfig",
