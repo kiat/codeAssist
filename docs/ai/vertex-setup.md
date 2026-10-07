@@ -11,6 +11,11 @@ course or assignment.
 
 Use this for a server-managed Vertex-compatible API key:
 
+In the Google Cloud console, API keys for the Vertex AI API must be bound to a
+service account; the key creation dialog requires it. Create or pick a service
+account with the role described under Google Cloud Requirements first, then
+bind the key to it.
+
 ```bash
 VERTEX_AI_AUTH_MODE=api_key
 VERTEX_AI_API_KEY=<vertex-api-key>
@@ -30,10 +35,21 @@ Use this for a service account or another Application Default Credentials setup:
 ```bash
 GOOGLE_CLOUD_PROJECT=<project-id-or-number>
 GOOGLE_CLOUD_LOCATION=global
-GOOGLE_APPLICATION_CREDENTIALS=/path/in/container/service-account.json
+GOOGLE_APPLICATION_CREDENTIALS=/usr/src/app/secrets/service-account.json
 ```
 
 Leave `VERTEX_AI_AUTH_MODE` unset for ADC mode.
+
+Put the service account JSON key in `backend/secrets/` on the host. Docker
+Compose mounts `backend/` at `/usr/src/app`, so the file is available in the
+container at `/usr/src/app/secrets/<file>.json`. `backend/secrets/` and
+`*service-account*.json` are listed in `.gitignore` and `backend/.dockerignore`,
+so the key is not committed or copied into the image. Never commit a key file.
+
+If ADC mode cannot find credentials, the model test and feedback fail with a
+configuration error that mentions `GOOGLE_APPLICATION_CREDENTIALS`. The first
+failure can take several seconds because the Google auth library probes the
+Compute Engine metadata server before giving up.
 
 ## Available Models
 
@@ -54,6 +70,10 @@ feedback is generated.
 ## Google Cloud Requirements
 
 The Google Cloud project must have the Vertex AI API enabled.
+
+The Google Cloud console now labels Vertex AI as "Agent Platform" in some
+places. The API is still `aiplatform.googleapis.com`, and the roles below may
+appear as "Agent Platform User" or "Agent Platform Express User".
 
 The configured identity, API key project, or service account must be able to call
 Vertex prediction APIs. The required permission is:

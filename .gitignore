@@ -143,3 +143,8 @@ node_modules
 # Local stress test outputs
 backend/test/stress/results/
 backend/test/stress/generated_assignments.jsonbackend/test/stress/stress_test_results_*.json
+
+
+# Google Cloud service account keys for Vertex AI ADC mode
+backend/secrets/
+*service-account*.json

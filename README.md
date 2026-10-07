@@ -103,8 +103,10 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     ```bash
     GOOGLE_CLOUD_PROJECT="your-google-cloud-project-id"
     GOOGLE_CLOUD_LOCATION=global
-    GOOGLE_APPLICATION_CREDENTIALS="/path/inside/backend/container/service-account.json"
+    GOOGLE_APPLICATION_CREDENTIALS="/usr/src/app/secrets/service-account.json"
     ```
+
+    Put the key file in `backend/secrets/` on the host (Docker Compose mounts `backend/` at `/usr/src/app`). That folder is ignored by git and Docker, so the key is never committed or built into the image.
 
     Leave `VERTEX_AI_AUTH_MODE` unset for ADC mode. The Google Cloud project must have Vertex AI enabled, and the configured identity or API key needs the `aiplatform.endpoints.predict` permission. More details are in `docs/ai/vertex-setup.md`.
 

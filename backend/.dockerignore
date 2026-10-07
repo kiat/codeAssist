@@ -12,3 +12,7 @@ htmlcov/
 *.log
 
 routes/upload_autograder/runs/
+
+# Google Cloud service account keys (mounted at runtime, never baked into the image)
+secrets/
+*service-account*.json
