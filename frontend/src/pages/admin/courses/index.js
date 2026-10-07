@@ -55,19 +55,7 @@ export default function AdminCourses() {
     { title: "Course ID", dataIndex: "id", key: "id" },
     { title: "Semester", dataIndex: "semester", key: "semester" },
     { title: "Year", dataIndex: "year", key: "year" },
-    { title: "Instructor", dataIndex: "instructor_name", key: "instructor" }, // adjust key if needed
-    {
-      title: "Actions",
-      key: "actions",
-      render: (_, record) => (
-        <Button
-          type="primary"
-          onClick={() => navigate(`/admin/courses/${record.id}/manage`)}
-        >
-          Manage
-        </Button>
-      ),
-    },
+    { title: "Instructor", dataIndex: "instructor_name", key: "instructor" },
   ];
   
 
