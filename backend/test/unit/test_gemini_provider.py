@@ -1,6 +1,8 @@
 import pytest
 
 from ai_feedback.providers.errors import (
+    AIProviderError,
+    ProviderAuthenticationError,
     ProviderConfigurationError,
     ProviderModelError,
     ProviderPermissionError,
@@ -195,6 +197,48 @@ def test_classify_vertex_predict_permission_error_has_actionable_message():
     assert isinstance(error, ProviderPermissionError)
     assert "aiplatform.endpoints.predict" in error.public_message
     assert "Vertex AI User" in error.public_message
+
+
+def test_classify_invalid_developer_api_key_as_authentication_error():
+    class FakeClientError(Exception):
+        code = 400
+
+    error = classify_provider_exception(
+        FakeClientError(
+            "400 INVALID_ARGUMENT. {'error': {'message': 'API key not valid. "
+            "Please pass a valid API key.', 'reason': 'API_KEY_INVALID'}}"
+        )
+    )
+
+    assert isinstance(error, ProviderAuthenticationError)
+    assert error.public_message == "Gemini API key is not valid."
+
+
+def test_classify_missing_adc_credentials_as_configuration_error():
+    class DefaultCredentialsError(Exception):
+        pass
+
+    error = classify_provider_exception(
+        DefaultCredentialsError("Your default credentials were not found.")
+    )
+
+    assert isinstance(error, ProviderConfigurationError)
+    assert "GOOGLE_APPLICATION_CREDENTIALS" in error.public_message
+
+
+def test_classify_credential_refresh_failure_as_authentication_error():
+    class RefreshError(Exception):
+        pass
+
+    error = classify_provider_exception(RefreshError("invalid_grant"))
+
+    assert isinstance(error, ProviderAuthenticationError)
+
+
+def test_classify_unknown_error_stays_generic():
+    error = classify_provider_exception(RuntimeError("something odd"))
+
+    assert type(error) is AIProviderError
 
 
 def test_gemini_provider_generate_passes_model_prompt_and_config(monkeypatch):

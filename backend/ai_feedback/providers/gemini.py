@@ -188,6 +188,26 @@ def classify_provider_exception(exc):
     )
     message = str(exc)
     normalized = message.lower()
+    exception_name = type(exc).__name__
+
+    # google-auth errors are matched by name so the SDK stays an optional import.
+    if exception_name == "DefaultCredentialsError":
+        return ProviderConfigurationError(
+            message,
+            "Vertex AI credentials were not found on the server. Set "
+            "GOOGLE_APPLICATION_CREDENTIALS to a service account key file or "
+            "configure Application Default Credentials.",
+        )
+
+    if exception_name == "RefreshError":
+        return ProviderAuthenticationError(message)
+
+    # The Developer API reports a bad key as 400 INVALID_ARGUMENT, not 401.
+    if "api key not valid" in normalized or "api_key_invalid" in normalized:
+        return ProviderAuthenticationError(
+            message,
+            "Gemini API key is not valid.",
+        )
 
     if status_code == 429 or "quota" in normalized or "rate limit" in normalized:
         return ProviderRateLimitError(message)
