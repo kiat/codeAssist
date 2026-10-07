@@ -2,6 +2,8 @@
 
 ## Quickstart: Local Development
 
+To deploy CodeAssist on a public Linux server (e.g. a Google Cloud VM), see [`docs/Linux-Installation/Linux_Documentation.md`](docs/Linux-Installation/Linux_Documentation.md).
+
 ### Important ports:
 Frontend is hosted at `localhost:3000`  
 Backend is hosted at `localhost:5001`  
@@ -56,7 +58,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
 
     ```bash
     DB_CONNECTION_STRING="postgresql://postgres:postgres@db:5432/codeassist"
-    SECRET_KEY="replace-with-random-session-secret"
+    SECRET_KEY="replace-with-random-session-secret"   # generate one with: python3 -c 'import secrets; print(secrets.token_hex(32))'
     API_SECRET_KEY=
     PASSWORD_SALT=
     FRONTEND_ORIGIN="http://localhost:3000"
@@ -65,7 +67,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     Backend environment variables:
 
     - `DB_CONNECTION_STRING`: SQLAlchemy/PostgreSQL connection URL. Use `db` as the hostname when the backend runs in Docker Compose with the included Postgres service. If you run Flask directly on your host machine and Postgres is exposed locally, use `localhost` instead.
-    - `SECRET_KEY`: Flask session signing secret. Set this to a long random value and never commit it.
+    - `SECRET_KEY`: Flask session signing secret. Required, the backend refuses to start without it. Set this to a long random value and never commit it.
     - `API_SECRET_KEY`: Fernet key used to encrypt stored course/assignment AI provider API keys. Keep it stable for the same database, otherwise previously encrypted keys cannot be decrypted.
     - `PASSWORD_SALT`: Salt used for password hashing. For shared dev databases, obtain the shared value from the project lead; for isolated local testing, use a stable dev-only value.
     - `FRONTEND_ORIGIN`: Exact React origin allowed by backend CORS, normally `http://localhost:3000` in local development.
