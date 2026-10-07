@@ -1,4 +1,5 @@
 import os
+import time
 from dataclasses import dataclass
 from typing import Literal
 
@@ -19,6 +20,10 @@ GEMINI_VERTEX_PROVIDER = "gemini_vertex"
 VERTEX_AUTH_ADC = "adc"
 VERTEX_AUTH_API_KEY = "api_key"
 DEFAULT_VERTEX_LOCATION = "global"
+GEMINI_REQUEST_TIMEOUT_MS = 60_000
+GEMINI_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
+GEMINI_MAX_ATTEMPTS = 3
+GEMINI_RETRY_BACKOFF_SECONDS = 1
 
 SUPPORTED_MODELS = {
     GEMINI_PROVIDER: {
@@ -86,7 +91,10 @@ def _load_genai_modules():
 
 def create_gemini_client(config: GeminiClientConfig):
     genai, types = _load_genai_modules()
-    http_options = types.HttpOptions(api_version="v1")
+    http_options = types.HttpOptions(
+        api_version="v1",
+        timeout=GEMINI_REQUEST_TIMEOUT_MS,
+    )
 
     if config.provider == GEMINI_PROVIDER:
         if not config.api_key:
@@ -177,15 +185,38 @@ def _create_generate_content_config(
     return types.GenerateContentConfig(**config)
 
 
-def classify_provider_exception(exc):
-    if isinstance(exc, AIProviderError):
-        return exc
-
-    status_code = (
+def _get_status_code(exc):
+    return (
         getattr(exc, "status_code", None)
         or getattr(exc, "code", None)
         or getattr(getattr(exc, "response", None), "status_code", None)
     )
+
+
+def is_transient_provider_error(exc):
+    """Returns True for provider failures worth retrying (overload, rate limit, network)."""
+    if isinstance(exc, AIProviderError):
+        return False
+
+    if _get_status_code(exc) in GEMINI_TRANSIENT_STATUS_CODES:
+        return True
+
+    # httpx timeouts and connection failures all derive from TransportError.
+    return any(
+        cls.__name__ == "TransportError" for cls in type(exc).__mro__
+    )
+
+
+def get_retry_delay(attempt):
+    """Returns the exponential backoff delay before the next Gemini retry."""
+    return GEMINI_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+
+
+def classify_provider_exception(exc):
+    if isinstance(exc, AIProviderError):
+        return exc
+
+    status_code = _get_status_code(exc)
     message = str(exc)
     normalized = message.lower()
     exception_name = type(exc).__name__
@@ -245,8 +276,9 @@ def classify_provider_exception(exc):
 
 
 class GeminiProvider:
-    def __init__(self, client):
+    def __init__(self, client, max_attempts=GEMINI_MAX_ATTEMPTS):
         self.client = client
+        self.max_attempts = max(1, max_attempts)
 
     def generate(
         self,
@@ -264,14 +296,27 @@ class GeminiProvider:
                 max_output_tokens=max_output_tokens,
                 response_mime_type=response_mime_type,
             )
-
-            response = self.client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=config,
-            )
         except Exception as exc:
             raise classify_provider_exception(exc) from exc
+
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=config,
+                )
+                break
+            except Exception as exc:
+                if attempt < self.max_attempts and is_transient_provider_error(exc):
+                    print(
+                        f"GEMINI_RETRY: {type(exc).__name__} on attempt "
+                        f"{attempt}/{self.max_attempts}; retrying",
+                        flush=True,
+                    )
+                    time.sleep(get_retry_delay(attempt))
+                    continue
+                raise classify_provider_exception(exc) from exc
 
         return (getattr(response, "text", None) or "").strip()
 

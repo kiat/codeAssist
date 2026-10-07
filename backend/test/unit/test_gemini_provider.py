@@ -6,10 +6,13 @@ from ai_feedback.providers.errors import (
     ProviderConfigurationError,
     ProviderModelError,
     ProviderPermissionError,
+    ProviderRateLimitError,
     UnsupportedProviderError,
 )
 from ai_feedback.providers.gemini import (
+    GEMINI_MAX_ATTEMPTS,
     GEMINI_PROVIDER,
+    GEMINI_REQUEST_TIMEOUT_MS,
     GEMINI_VERTEX_PROVIDER,
     VERTEX_AUTH_API_KEY,
     GeminiClientConfig,
@@ -22,8 +25,9 @@ from ai_feedback.providers.gemini import (
 
 class FakeTypes:
     class HttpOptions:
-        def __init__(self, api_version):
+        def __init__(self, api_version, timeout=None):
             self.api_version = api_version
+            self.timeout = timeout
 
     class ThinkingConfig:
         def __init__(self, thinking_budget):
@@ -277,3 +281,123 @@ def test_gemini_provider_generate_passes_model_prompt_and_config(monkeypatch):
 def test_validate_model_rejects_unsupported_vertex_model():
     with pytest.raises(ProviderModelError):
         validate_model(GEMINI_VERTEX_PROVIDER, "gemini-2.0-flash")
+
+
+class FakeServerError(Exception):
+    def __init__(self, code, message="503 UNAVAILABLE. The model is overloaded."):
+        super().__init__(message)
+        self.code = code
+
+
+class FakeModels:
+    def __init__(self, outcomes):
+        self.outcomes = list(outcomes)
+        self.calls = 0
+
+    def generate_content(self, **kwargs):
+        self.calls += 1
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+class FakeClient:
+    def __init__(self, outcomes):
+        self.models = FakeModels(outcomes)
+
+
+class FakeResponse:
+    text = " ok "
+
+
+def _patch_generation(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(
+        "ai_feedback.providers.gemini._load_genai_modules",
+        lambda: (FakeGenAI(), FakeTypes),
+    )
+    monkeypatch.setattr(
+        "ai_feedback.providers.gemini.time.sleep",
+        lambda seconds: sleeps.append(seconds),
+    )
+    return sleeps
+
+
+def _generate(provider):
+    return provider.generate(
+        model="gemini-2.5-flash",
+        prompt="prompt",
+        temperature=0,
+        max_output_tokens=100,
+    )
+
+
+def test_create_gemini_client_sets_request_timeout(monkeypatch):
+    fake_genai = FakeGenAI()
+    monkeypatch.setattr(
+        "ai_feedback.providers.gemini._load_genai_modules",
+        lambda: (fake_genai, FakeTypes),
+    )
+
+    client = create_gemini_client(
+        GeminiClientConfig(provider=GEMINI_PROVIDER, api_key="gemini-key")
+    )
+
+    assert client["client_kwargs"]["http_options"].timeout == GEMINI_REQUEST_TIMEOUT_MS
+
+
+def test_gemini_provider_retries_transient_error_then_succeeds(monkeypatch):
+    sleeps = _patch_generation(monkeypatch)
+    client = FakeClient([FakeServerError(503), FakeResponse()])
+
+    assert _generate(GeminiProvider(client)) == "ok"
+    assert client.models.calls == 2
+    assert sleeps == [1]
+
+
+def test_gemini_provider_retries_network_errors(monkeypatch):
+    class TransportError(Exception):
+        pass
+
+    class ReadTimeout(TransportError):
+        pass
+
+    _patch_generation(monkeypatch)
+    client = FakeClient([ReadTimeout("timed out"), FakeResponse()])
+
+    assert _generate(GeminiProvider(client)) == "ok"
+    assert client.models.calls == 2
+
+
+def test_gemini_provider_gives_up_after_max_attempts(monkeypatch):
+    sleeps = _patch_generation(monkeypatch)
+    client = FakeClient([FakeServerError(429, "429 RESOURCE_EXHAUSTED quota")] * GEMINI_MAX_ATTEMPTS)
+
+    with pytest.raises(ProviderRateLimitError):
+        _generate(GeminiProvider(client))
+
+    assert client.models.calls == GEMINI_MAX_ATTEMPTS
+    assert sleeps == [1, 2]
+
+
+def test_gemini_provider_does_not_retry_client_errors(monkeypatch):
+    sleeps = _patch_generation(monkeypatch)
+    client = FakeClient([FakeServerError(404, "404 NOT_FOUND model not found")])
+
+    with pytest.raises(ProviderModelError):
+        _generate(GeminiProvider(client))
+
+    assert client.models.calls == 1
+    assert sleeps == []
+
+
+def test_gemini_provider_single_attempt_skips_retry(monkeypatch):
+    sleeps = _patch_generation(monkeypatch)
+    client = FakeClient([FakeServerError(503), FakeResponse()])
+
+    with pytest.raises(AIProviderError):
+        _generate(GeminiProvider(client, max_attempts=1))
+
+    assert client.models.calls == 1
+    assert sleeps == []

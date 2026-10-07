@@ -105,7 +105,11 @@ def _generate_gemini_model_test(provider, api_key, model, prompt, location=None)
     else:
         client_config = build_developer_api_config(api_key)
 
-    provider_adapter = GeminiProvider(create_gemini_client(client_config))
+    # The test button should report failures right away instead of retrying.
+    provider_adapter = GeminiProvider(
+        create_gemini_client(client_config),
+        max_attempts=1,
+    )
     return provider_adapter.generate(
         model=model,
         prompt=f"{CORRECTNESS_SYSTEM_PROMPT}\n\n{prompt}",
@@ -121,7 +125,8 @@ def _test_vertex_connection(data, model=None):
     validate_model(GEMINI_VERTEX_PROVIDER, selected_model)
 
     provider_adapter = GeminiProvider(
-        create_gemini_client(build_vertex_config(_get_vertex_location(data)))
+        create_gemini_client(build_vertex_config(_get_vertex_location(data))),
+        max_attempts=1,
     )
     response_text = provider_adapter.generate(
         model=selected_model,

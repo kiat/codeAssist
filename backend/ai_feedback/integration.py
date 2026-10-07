@@ -24,7 +24,10 @@ from ai_feedback.memory import (
     record_submission_insight,
 )
 from ai_feedback.providers.gemini import (
+    GEMINI_MAX_ATTEMPTS,
     GEMINI_PROVIDER,
+    GEMINI_RETRY_BACKOFF_SECONDS,
+    GEMINI_TRANSIENT_STATUS_CODES,
     GEMINI_VERTEX_PROVIDER,
     VERTEX_AUTH_API_KEY,
     GeminiProvider,
@@ -49,9 +52,6 @@ from ai_feedback.source_extraction import (
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_TEMPERATURE = 0.5
 GEMINI_MAX_OUTPUT_TOKENS = 1600
-GEMINI_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
-GEMINI_MAX_ATTEMPTS = 3
-GEMINI_RETRY_BACKOFF_SECONDS = 1
 GEMINI_TRANSIENT_EXCEPTIONS = (
     requests.ConnectionError,
     requests.Timeout,
