@@ -109,9 +109,17 @@ def create_gemini_client(config: GeminiClientConfig):
                 "api_key": config.api_key,
                 "http_options": http_options,
             }
+            location = config.location or DEFAULT_VERTEX_LOCATION
             if config.project:
                 client_kwargs["project"] = config.project
-                client_kwargs["location"] = config.location or DEFAULT_VERTEX_LOCATION
+                client_kwargs["location"] = location
+            elif location != DEFAULT_VERTEX_LOCATION:
+                raise ProviderConfigurationError(
+                    "Vertex AI location override requires GOOGLE_CLOUD_PROJECT "
+                    "in API-key mode.",
+                    "A Vertex AI location other than global requires "
+                    "GOOGLE_CLOUD_PROJECT in the server configuration.",
+                )
 
             return genai.Client(**client_kwargs)
 

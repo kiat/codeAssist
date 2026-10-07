@@ -18,7 +18,10 @@ GOOGLE_CLOUD_LOCATION=global
 ```
 
 `GOOGLE_CLOUD_PROJECT` is optional in API-key mode. If it is set, CodeAssist
-passes both project and location to the Vertex client.
+passes both project and location to the Vertex client. Without it, only the
+`global` location is available: a regional location (from
+`GOOGLE_CLOUD_LOCATION` or an assignment override) is rejected with a
+configuration error instead of being silently ignored.
 
 ### Standard Vertex AI / ADC
 

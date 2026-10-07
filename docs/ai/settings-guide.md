@@ -129,7 +129,9 @@ The description is separate from AI feedback prompts:
 
 `ai_feedback_vertex_location` only applies when an assignment customizes its
 provider to Gemini over Vertex AI. When it is blank, CodeAssist uses
-`GOOGLE_CLOUD_LOCATION` or `global`.
+`GOOGLE_CLOUD_LOCATION` or `global`. In API-key mode, a location other than
+`global` requires `GOOGLE_CLOUD_PROJECT` on the server; otherwise feedback and
+model tests fail with a configuration error.
 
 ## AI Feedback Usage Limits
 

@@ -96,7 +96,7 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     GOOGLE_CLOUD_LOCATION=global
     ```
 
-    `GOOGLE_CLOUD_PROJECT` is optional in API-key mode. If it is set, CodeAssist passes both project and location to the Vertex client.
+    `GOOGLE_CLOUD_PROJECT` is optional in API-key mode. If it is set, CodeAssist passes both project and location to the Vertex client. Without it, only the `global` location is available; a regional location (from `GOOGLE_CLOUD_LOCATION` or an assignment override) is rejected with a configuration error.
 
     For standard Vertex AI with Application Default Credentials:
 

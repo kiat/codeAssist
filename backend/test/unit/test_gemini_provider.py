@@ -132,6 +132,48 @@ def test_create_gemini_vertex_api_key_mode_uses_project_location_when_present(mo
     assert client["client_kwargs"]["http_options"].api_version == "v1"
 
 
+def test_create_gemini_vertex_api_key_mode_rejects_region_without_project(monkeypatch):
+    fake_genai = FakeGenAI()
+    monkeypatch.setattr(
+        "ai_feedback.providers.gemini._load_genai_modules",
+        lambda: (fake_genai, FakeTypes),
+    )
+
+    with pytest.raises(ProviderConfigurationError) as exc_info:
+        create_gemini_client(
+            GeminiClientConfig(
+                provider=GEMINI_VERTEX_PROVIDER,
+                api_key="vertex-key",
+                location="us-central1",
+                vertex_auth_mode=VERTEX_AUTH_API_KEY,
+            )
+        )
+
+    assert "GOOGLE_CLOUD_PROJECT" in exc_info.value.public_message
+    assert fake_genai.calls == []
+
+
+def test_create_gemini_vertex_api_key_mode_allows_global_without_project(monkeypatch):
+    fake_genai = FakeGenAI()
+    monkeypatch.setattr(
+        "ai_feedback.providers.gemini._load_genai_modules",
+        lambda: (fake_genai, FakeTypes),
+    )
+
+    client = create_gemini_client(
+        GeminiClientConfig(
+            provider=GEMINI_VERTEX_PROVIDER,
+            api_key="vertex-key",
+            location="global",
+            vertex_auth_mode=VERTEX_AUTH_API_KEY,
+        )
+    )
+
+    assert client["client_kwargs"]["api_key"] == "vertex-key"
+    assert "project" not in client["client_kwargs"]
+    assert "location" not in client["client_kwargs"]
+
+
 def test_create_gemini_client_rejects_unknown_provider(monkeypatch):
     monkeypatch.setattr(
         "ai_feedback.providers.gemini._load_genai_modules",
