@@ -457,23 +457,6 @@ def parse_feedback_json(raw_response, provider_name, past_insights):
         }, past_insights
 
 
-def get_gemini_generation_config(model, temperature):
-    """Builds Gemini generation settings for complete JSON feedback."""
-    config = {
-        "temperature": temperature,
-        "maxOutputTokens": GEMINI_MAX_OUTPUT_TOKENS,
-        "responseMimeType": "application/json",
-    }
-
-    model_id = (model or "").lower()
-    if "gemini-2.5-flash" in model_id:
-        config["thinkingConfig"] = {"thinkingBudget": 0}
-    elif "gemini-2.5-pro" in model_id:
-        config["thinkingConfig"] = {"thinkingBudget": 128}
-
-    return config
-
-
 def get_structured_feedback_from_openai(client, prompt, model, temperature, past_insights):
     """Sends request to OpenAI and parses JSON feedback."""
     response = client.chat.completions.create(
@@ -694,11 +677,7 @@ def get_assignment_provider_credential(assignment):
 
 def get_assignment_vertex_location(assignment):
     """Returns an assignment-specific Vertex AI location override, if configured."""
-    location = (
-        getattr(assignment, "ai_feedback_vertex_location", None)
-        or getattr(assignment, "vertex_location", None)
-        or ""
-    )
+    location = getattr(assignment, "ai_feedback_vertex_location", None) or ""
     location = str(location).strip()
     return location or None
 

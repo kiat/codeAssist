@@ -24,6 +24,7 @@ from ai_feedback.integration import (
     parse_feedback_json,
 )
 from ai_feedback.providers.errors import AIProviderError
+from ai_feedback.settings import normalize_vertex_location
 from ai_feedback.providers.gemini import (
     GEMINI_PROVIDER,
     GEMINI_VERTEX_PROVIDER,
@@ -96,10 +97,11 @@ def _get_vertex_location(data):
     location = (
         (data or {}).get("location")
         or (data or {}).get("ai_feedback_vertex_location")
-        or ""
     )
-    location = str(location).strip()
-    return location or None
+    try:
+        return normalize_vertex_location(location)
+    except ValueError as e:
+        raise BadRequestError(str(e))
 
 
 def _generate_gemini_model_test(provider, api_key, model, prompt, location=None):

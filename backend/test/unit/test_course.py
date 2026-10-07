@@ -2392,3 +2392,24 @@ def test_update_ai_settings_accepts_supported_vertex_model(client, mocker, login
     assert response.status_code == 200
     assert mock_course.default_ai_model == "gemini-2.5-pro"
     mock_commit.assert_called_once()
+
+
+@pytest.mark.parametrize("endpoint", ["/test_ai_model", "/test_ai_api_key"])
+def test_vertex_test_endpoints_reject_invalid_location(client, mocker, login_as, endpoint):
+    mock_client = mocker.patch("routes.course.create_gemini_client")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+
+    response = client.post(
+        endpoint,
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+            "location": "../../evil",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Invalid Vertex AI location" in response.json["message"]
+    mock_client.assert_not_called()
