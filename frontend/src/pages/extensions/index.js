@@ -274,7 +274,7 @@ export default () => {
       <ExtensionModal
         open={extensionModalOpen}
         onCancel={toggleExtensionModalOpen}
-        students={courseStudents}
+        students={(Array.isArray(courseStudents) ? courseStudents : []).filter((s) => (s.role || "student").toLowerCase() === "student")}
         assignmentInfo={assignmentInfo}
         onFinish={finishForm}
         form={form}
