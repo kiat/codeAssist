@@ -2303,3 +2303,22 @@ def test_test_ai_api_key_gemini_vertex_student_forbidden(client, mocker, login_a
 
     assert response.status_code == 403
     mock_test.assert_not_called()
+
+
+def test_gemini_model_test_leaves_room_for_thinking_tokens(mocker):
+    from routes.course import (
+        GEMINI_TEST_MAX_OUTPUT_TOKENS,
+        _generate_gemini_model_test,
+        _test_vertex_connection,
+    )
+
+    mocker.patch("routes.course.create_gemini_client", return_value=object())
+    mock_provider = mocker.patch("routes.course.GeminiProvider")
+    mock_provider.return_value.generate.return_value = "OK"
+
+    _generate_gemini_model_test("gemini", "key", "gemini-2.5-pro", "prompt")
+    _test_vertex_connection({}, model="gemini-2.5-pro")
+
+    assert GEMINI_TEST_MAX_OUTPUT_TOKENS >= 400
+    for call in mock_provider.return_value.generate.call_args_list:
+        assert call.kwargs["max_output_tokens"] == GEMINI_TEST_MAX_OUTPUT_TOKENS

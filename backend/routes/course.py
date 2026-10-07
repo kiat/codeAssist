@@ -48,6 +48,9 @@ SUPPORTED_AI_PROVIDERS = {
     "claude",
     "ollama",
 }
+# Gemini 2.5 Pro cannot disable thinking, and thinking tokens count toward the
+# output limit, so the model test needs room beyond the short JSON reply.
+GEMINI_TEST_MAX_OUTPUT_TOKENS = 512
 
 
 def _provider_error_status(error):
@@ -107,7 +110,7 @@ def _generate_gemini_model_test(provider, api_key, model, prompt, location=None)
         model=model,
         prompt=f"{CORRECTNESS_SYSTEM_PROMPT}\n\n{prompt}",
         temperature=0,
-        max_output_tokens=80,
+        max_output_tokens=GEMINI_TEST_MAX_OUTPUT_TOKENS,
         response_mime_type="application/json",
     )
 
@@ -124,7 +127,7 @@ def _test_vertex_connection(data, model=None):
         model=selected_model,
         prompt=prompt,
         temperature=0,
-        max_output_tokens=10,
+        max_output_tokens=GEMINI_TEST_MAX_OUTPUT_TOKENS,
     )
 
     return response_text
