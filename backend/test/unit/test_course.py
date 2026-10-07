@@ -1274,7 +1274,9 @@ def test_fetch_ai_models_gemini_vertex_returns_supported_models(client):
     assert response.json["models"] == ["gemini-2.5-flash", "gemini-2.5-pro"]
 
 
-def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker):
+def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
     mock_test = mocker.patch(
         "routes.course._test_vertex_connection",
         return_value="OK",
@@ -1283,6 +1285,7 @@ def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker)
     response = client.post(
         "/test_ai_api_key",
         json={
+            "course_id": "course-123",
             "provider": "gemini_vertex",
             "model": "gemini-2.5-flash",
             "location": "us-central1",
@@ -1296,7 +1299,9 @@ def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker)
     mock_test.assert_called_once()
 
 
-def test_test_ai_model_gemini_vertex_success(client, mocker):
+def test_test_ai_model_gemini_vertex_success(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
     mock_generate = mocker.patch(
         "routes.course._generate_gemini_model_test",
         return_value='{"insights":["Model test passed."],"annotations":[]}',
@@ -1305,6 +1310,7 @@ def test_test_ai_model_gemini_vertex_success(client, mocker):
     response = client.post(
         "/test_ai_model",
         json={
+            "course_id": "course-123",
             "provider": "gemini_vertex",
             "model": "gemini-2.5-flash",
             "location": "us-central1",
@@ -1323,7 +1329,9 @@ def test_test_ai_model_gemini_vertex_success(client, mocker):
     assert mock_generate.call_args.kwargs["location"] == "us-central1"
 
 
-def test_test_ai_model_gemini_vertex_sanitizes_provider_errors(client, mocker):
+def test_test_ai_model_gemini_vertex_sanitizes_provider_errors(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
     mocker.patch(
         "routes.course._generate_gemini_model_test",
         side_effect=ProviderPermissionError(
@@ -1334,6 +1342,7 @@ def test_test_ai_model_gemini_vertex_sanitizes_provider_errors(client, mocker):
     response = client.post(
         "/test_ai_model",
         json={
+            "course_id": "course-123",
             "provider": "gemini_vertex",
             "model": "gemini-2.5-flash",
         },
@@ -2190,3 +2199,107 @@ def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocke
 
     assert response.status_code == 400
     assert "Ollama host is not permitted" in response.json["message"]
+
+
+def test_test_ai_model_gemini_vertex_unauthenticated(client, mocker):
+    mock_generate = mocker.patch("routes.course._generate_gemini_model_test")
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+        },
+    )
+
+    assert response.status_code == 401
+    mock_generate.assert_not_called()
+
+
+def test_test_ai_model_gemini_vertex_requires_course_id(client, mocker, login_as):
+    mock_generate = mocker.patch("routes.course._generate_gemini_model_test")
+    login_as("instructor-uuid")
+
+    response = client.post(
+        "/test_ai_model",
+        json={"provider": "gemini_vertex", "model": "gemini-2.5-flash"},
+    )
+
+    assert response.status_code == 400
+    mock_generate.assert_not_called()
+
+
+def test_test_ai_model_gemini_vertex_student_forbidden(client, mocker, login_as):
+    mock_generate = mocker.patch("routes.course._generate_gemini_model_test")
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+        },
+    )
+
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.json["message"]
+    mock_generate.assert_not_called()
+
+
+def test_test_ai_model_gemini_vertex_allows_ta(client, mocker, login_as):
+    mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value='{"insights":["Model test passed."],"annotations":[]}',
+    )
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+    login_as("ta-uuid")
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_test_ai_api_key_gemini_vertex_unauthenticated(client, mocker):
+    mock_test = mocker.patch("routes.course._test_vertex_connection")
+
+    response = client.post(
+        "/test_ai_api_key",
+        json={"course_id": "course-123", "provider": "gemini_vertex"},
+    )
+
+    assert response.status_code == 401
+    mock_test.assert_not_called()
+
+
+def test_test_ai_api_key_gemini_vertex_requires_course_id(client, mocker, login_as):
+    mock_test = mocker.patch("routes.course._test_vertex_connection")
+    login_as("instructor-uuid")
+
+    response = client.post("/test_ai_api_key", json={"provider": "gemini_vertex"})
+
+    assert response.status_code == 400
+    mock_test.assert_not_called()
+
+
+def test_test_ai_api_key_gemini_vertex_student_forbidden(client, mocker, login_as):
+    mock_test = mocker.patch("routes.course._test_vertex_connection")
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.post(
+        "/test_ai_api_key",
+        json={"course_id": "course-123", "provider": "gemini_vertex"},
+    )
+
+    assert response.status_code == 403
+    mock_test.assert_not_called()

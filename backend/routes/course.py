@@ -73,6 +73,18 @@ def _provider_error_response(error):
     }), _provider_error_status(error)
 
 
+def _require_vertex_test_access(course_id):
+    """Vertex credentials belong to the server, so only course staff may spend them."""
+    if not course_id:
+        raise BadRequestError("Missing course_id")
+
+    require_course_role(
+        course_id,
+        {"instructor", "ta"},
+        "Only instructors or TAs can test Vertex AI",
+    )
+
+
 def _get_vertex_location(data):
     location = (
         (data or {}).get("location")
@@ -1138,6 +1150,7 @@ def test_ai_api_key():
         raise BadRequestError("Unsupported AI provider")
 
     if provider == GEMINI_VERTEX_PROVIDER:
+        _require_vertex_test_access(course_id)
         try:
             _test_vertex_connection(data, model=data.get("model"))
             return jsonify({
@@ -1265,6 +1278,7 @@ def test_ai_model():
 
     try:
         if provider == GEMINI_VERTEX_PROVIDER:
+            _require_vertex_test_access(course_id)
             test_prompt = (
                 "Return only this JSON object: "
                 "{\"insights\":[\"Model test passed.\"],\"annotations\":[]}"
