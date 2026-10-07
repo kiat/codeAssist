@@ -12,7 +12,7 @@ export default function AdminCourseAdd() {
     try {
       // Get instructor_id from EID
       const eid = values.instructor_eid;
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/get_instructor_by_eid?eid=${eid}`);
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/get_instructor_by_eid?eid=${eid}`, { credentials: "include" });
       if (!res.ok) throw new Error("Instructor not found");
       const instructor = await res.json();
   
@@ -24,6 +24,7 @@ export default function AdminCourseAdd() {
   
       const createRes = await fetch(`${process.env.REACT_APP_API_URL}/create_course`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });

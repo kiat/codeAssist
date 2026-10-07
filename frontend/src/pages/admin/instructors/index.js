@@ -17,7 +17,7 @@ export default function AdminInstructors() {
     setLoading(true);
     setSearched(true);
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/get_all_instructors`);
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/get_all_instructors`, { credentials: "include" });
       const data = await res.json();
       setInstructors(
         data.filter(i =>

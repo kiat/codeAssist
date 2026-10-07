@@ -37,7 +37,8 @@ export default function AdminCourseManage() {
 
         // Fetch course info
         const res = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_course_info?course_id=${courseId}`
+          `${process.env.REACT_APP_API_URL}/get_course_info?course_id=${courseId}`,
+          { credentials: "include" }
         );
         const data = await res.json();
         const courseObj = data[0];
@@ -47,7 +48,8 @@ export default function AdminCourseManage() {
 
         // Fetch instructor EID using instructor_id
         const eidRes = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_user_by_id?id=${courseObj.instructor_id}`
+          `${process.env.REACT_APP_API_URL}/get_user_by_id?id=${courseObj.instructor_id}`,
+          { credentials: "include" }
         );
         if (!eidRes.ok) throw new Error("Failed to fetch instructor EID");
         const eidData = await eidRes.json();
@@ -63,14 +65,16 @@ export default function AdminCourseManage() {
         });
 
         const instRes = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_all_instructors`
+          `${process.env.REACT_APP_API_URL}/get_all_instructors`,
+          { credentials: "include" }
         );
         const instructorsData = await instRes.json();
         setInstructors(instructorsData);
 
         // Fetch students enrolled in this course
         const studentsRes = await fetch(
-          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseId}`
+          `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseId}`,
+          { credentials: "include" }
         );
         if (studentsRes.ok) {
           const studentsData = await studentsRes.json();
@@ -96,7 +100,8 @@ export default function AdminCourseManage() {
       // Get instructor ID from EID
       const eid = values.instructor_eid;
       const res = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_instructor_by_eid?eid=${eid}`
+        `${process.env.REACT_APP_API_URL}/get_instructor_by_eid?eid=${eid}`,
+        { credentials: "include" }
       );
       if (!res.ok) throw new Error("Instructor not found");
       const instructor = await res.json();
@@ -115,6 +120,7 @@ export default function AdminCourseManage() {
         `${process.env.REACT_APP_API_URL}/update_course`,
         {
           method: "PUT",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
@@ -139,7 +145,7 @@ export default function AdminCourseManage() {
     try {
       const res = await fetch(
         `${process.env.REACT_APP_API_URL}/delete_course?course_id=${courseId}`,
-        { method: "DELETE" }
+        { method: "DELETE", credentials: "include" }
       );
       if (!res.ok) throw new Error("Failed to delete course");
 
@@ -159,6 +165,7 @@ export default function AdminCourseManage() {
         `${process.env.REACT_APP_API_URL}/leave_course`,
         {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: studentId, course_id: courseId }),
         }
@@ -167,7 +174,8 @@ export default function AdminCourseManage() {
       message.success("Student removed from course!");
       // Refresh enrolled students
       const studentsRes = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseId}`
+        `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseId}`,
+        { credentials: "include" }
       );
       if (studentsRes.ok) {
         const studentsData = await studentsRes.json();
@@ -184,7 +192,8 @@ export default function AdminCourseManage() {
       // You need the student's ID, so you may want to search by EID or email
       // For this example, let's assume you enroll by EID:
       const res = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_user_by_eid?eid=${values.eid}`
+        `${process.env.REACT_APP_API_URL}/get_user_by_eid?eid=${values.eid}`,
+        { credentials: "include" }
       );
       if (!res.ok) throw new Error("Student not found");
       const student = await res.json();
@@ -194,6 +203,7 @@ export default function AdminCourseManage() {
         `${process.env.REACT_APP_API_URL}/create_enrollment`,
         {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             student_id: student.id,
@@ -208,7 +218,8 @@ export default function AdminCourseManage() {
 
       // Refresh enrolled students
       const studentsRes = await fetch(
-        `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseId}`
+        `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseId}`,
+        { credentials: "include" }
       );
       if (studentsRes.ok) {
         const studentsData = await studentsRes.json();

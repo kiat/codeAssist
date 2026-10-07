@@ -17,14 +17,14 @@ export default function AdminCourses() {
     setLoading(true);
     setSearched(true);
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/get_all_courses`);
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/get_all_courses`, { credentials: "include" });
       const data = await res.json();
       console.log("Fetched courses:", data);
 
       const withInstructorNames = await Promise.all(
         data.map(async course => {
           try {
-            const res = await fetch(`${process.env.REACT_APP_API_URL}/get_user_by_id?id=${course.instructor_id}`);
+            const res = await fetch(`${process.env.REACT_APP_API_URL}/get_user_by_id?id=${course.instructor_id}`, { credentials: "include" });
             const userData = await res.json();
             return { ...course, instructor_name: userData.name || course.instructor_id };
           } catch {

@@ -17,7 +17,7 @@ export default function AdminStudents() {
     setLoading(true);
     setSearched(true);
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/get_all_students`);
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/get_all_students`, { credentials: "include" });
       const data = await res.json();
       setStudents(
         data.filter(s =>
