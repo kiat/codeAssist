@@ -85,7 +85,6 @@ export default function AdminCourses() {
             onSearch={setSearch}
           />
           <Button type="default" onClick={() => navigate("/admin/courses/create")}>Add Course</Button>
-          <Button type="primary" onClick={() => navigate("/admin/courses/all")}>View All Courses</Button>
         </Space>
         <Table rowKey="id" columns={columns} dataSource={filtered} loading={loading} />
       </Space>

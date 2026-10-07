@@ -33,7 +33,6 @@ import AdminStudents from "./pages/admin/students";
 import AdminInstructors from "./pages/admin/instructors";
 import AdminInstructorAdd from "./pages/admin/instructors/add";
 import AdminInstructorManage from "./pages/admin/instructors/manage"; // <-- Add this import
-import AdminAllCourses from "./pages/admin/courses/all";
 import AdminStudentManage from "./pages/admin/students/manage";
 import AdminStudentAdd from "./pages/admin/students/add";
 import AdminCourseManage from "./pages/admin/courses/manage";
@@ -163,7 +162,6 @@ function App() {
               <Route path='/admin/instructors' element={<AdminInstructors />} />
               <Route path='/admin/instructors/add' element={<AdminInstructorAdd />} />
               <Route path='/admin/instructors/manage/:instructorId' element={<AdminInstructorManage />} /> {/* <-- Add this route */}
-              <Route path='/admin/courses/all' element={<AdminAllCourses />} />
               <Route path='/admin/courses/create' element={<AdminCourseAdd />} />
               <Route path='/assignments/:courseId' element={<Assignments />} />
               <Route

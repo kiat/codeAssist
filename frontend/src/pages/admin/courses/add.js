@@ -39,7 +39,7 @@ export default function AdminCourseAdd() {
       }
   
       message.success("Course created successfully");
-      navigate("/admin/courses/all");
+      navigate("/admin/courses");
     } catch (err) {
       console.error(err);
       message.error("Failed to create course");
