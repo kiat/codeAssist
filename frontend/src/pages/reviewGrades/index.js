@@ -217,8 +217,8 @@ export default () => {
           throw new Error("Failed to load students list.");
         }
         const allRes = await students.json();
-        // Getting rid of the instructor from the enrolled list
-        const allStudents = allRes.filter(s => s.id !== userInfo.id);
+        // Only students get graded; drop the instructor and TAs
+        const allStudents = allRes.filter(s => (s.role || "student").toLowerCase() === "student");
 
         // Group the submissions by student (matching students and their submissions)
         const subsByStudent = allSubs.reduce((acc, sub) => {
