@@ -638,6 +638,47 @@ def test_get_user_enrollments_success(client, mocker, login_as):
     assert response.status_code == 200
     assert response.json == [{"id": "course-123", "name": "CS101", "enrollment_role": "student"}]
 
+def test_get_user_enrollments_own_id_param_allowed(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = []
+    mock_query.return_value.filter.return_value = []
+    mocker.patch("routes.course.CourseSchema").return_value.dump.return_value = []
+    role_lookup = mocker.patch("util.auth.get_user_global_role")
+
+    login_as("user-123")
+
+    response = client.get("/get_user_enrollments?user_id=user-123")
+
+    assert response.status_code == 200
+    role_lookup.assert_not_called()
+    mock_query.return_value.filter_by.assert_called_with(student_id="user-123")
+
+def test_get_user_enrollments_other_user_forbidden_for_non_admin(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_global_role", return_value="student")
+
+    login_as("user-123")
+
+    response = client.get("/get_user_enrollments?user_id=other-user")
+
+    assert response.status_code == 403
+    mock_query.assert_not_called()
+
+def test_get_user_enrollments_admin_can_view_other_user(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(course_id="course-9", role="student")]
+    mock_query.return_value.filter.return_value = []
+    mocker.patch("routes.course.CourseSchema").return_value.dump.return_value = [{"id": "course-9", "name": "CS429"}]
+    mocker.patch("util.auth.get_user_global_role", return_value="admin")
+
+    login_as("admin-1")
+
+    response = client.get("/get_user_enrollments?user_id=student-7")
+
+    assert response.status_code == 200
+    mock_query.return_value.filter_by.assert_called_with(student_id="student-7")
+    assert response.json == [{"id": "course-9", "name": "CS429", "enrollment_role": "student"}]
+
 def test_get_user_enrollments_unauthenticated(client):
     response = client.get("/get_user_enrollments")
     assert response.status_code == 401

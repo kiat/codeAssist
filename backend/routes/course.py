@@ -649,6 +649,13 @@ def get_my_enrollment_role():
 def get_user_enrollments():
     user_id = require_authenticated()
 
+    # Admins can look up another user's enrollments (admin student page);
+    # everyone else only ever sees their own.
+    target_id = request.args.get("user_id")
+    if target_id and target_id != user_id:
+        require_admin("Only admins can view another user's enrollments")
+        user_id = target_id
+
     enrollments = db.session.query(Enrollment).filter_by(student_id=user_id).all()
     enrollment_role_by_course = {e.course_id: e.role for e in enrollments}
     course_ids = list(enrollment_role_by_course.keys())
