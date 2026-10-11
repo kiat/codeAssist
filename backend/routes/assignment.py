@@ -75,7 +75,7 @@ def update_assignment():
     del data["assignment_id"]
     # hold_grades is fixed at creation time; grades_published/grades_published_at are
     # only ever set via /publish_grades (which also stamps the timestamp correctly).
-    for locked_field in ("hold_grades", "grades_published", "grades_published_at"):
+    for locked_field in ("hold_grades", "grades_published", "grades_published_at", "container_id", "autograder_image_name"):
         data.pop(locked_field, None)
     assignment_data, ai_settings_data = split_ai_settings_payload(data)
 

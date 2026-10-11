@@ -131,6 +131,35 @@ def test_update_assignment_cannot_change_hold_grades(client, mocker, login_as):
     assert mock_assignment.grades_published_at is None
 
 
+def test_update_assignment_cannot_change_container_fields(client, mocker, login_as):
+    mock_assignment = Assignment(
+        id="some-uuid",
+        name="Old",
+        course_id="course-uuid",
+        container_id="real-container-id",
+        autograder_image_name="autograder-some-uuid",
+    )
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query.return_value.filter.return_value.first.return_value = None
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_assignment
+    mocker.patch("routes.assignment.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+
+    resp = client.put("/update_assignment", json={
+        "assignment_id": "some-uuid",
+        "name": "Updated",
+        "course_id": "course-uuid",
+        "container_id": "postgres_container",
+        "autograder_image_name": "postgres:15.3",
+    })
+
+    assert resp.status_code == 200
+    assert mock_assignment.name == "Updated"
+    assert mock_assignment.container_id == "real-container-id"
+    assert mock_assignment.autograder_image_name == "autograder-some-uuid"
+
+
 def test_update_assignment_duplicate_name(client, mocker, login_as):
     mock_query = mocker.patch("routes.assignment.db.session.query")
     mock_query.return_value.filter.return_value.first.return_value = mocker.Mock()
