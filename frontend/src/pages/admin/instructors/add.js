@@ -12,6 +12,7 @@ export default function AdminInstructorAdd() {
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL}/create_user`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: values.name,

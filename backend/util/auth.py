@@ -1,7 +1,7 @@
 from flask import g, session
 
 from api import db
-from api.models import Course, Enrollment
+from api.models import Course, Enrollment, User
 from util.errors import ForbiddenError, NotFoundError, UnauthorizedError
 
 
@@ -27,9 +27,9 @@ def require_authenticated():
     A session for a deleted user is nearly always caught downstream
     anyway: cascade-delete removes the user's enrollments with them, so
     any require_course_role() call for that user_id finds no enrollment
-    and 403s. A route that only calls require_authenticated() with no
-    follow-up role check would not get that safety net; none currently
-    do.
+    and 403s, and require_admin() finds no user and 403s. A route that
+    only calls require_authenticated() with no follow-up role check
+    would not get that safety net.
     """
     user_id = session.get("user_id")
     if not user_id:
@@ -45,3 +45,31 @@ def require_course_role(course_id, allowed_roles, message):
         raise ForbiddenError(message)
 
     return user_id, role
+
+
+def get_user_global_role(user_id):
+    """Returns users.role (admin/instructor/student) lowercased, or None if the user doesn't exist."""
+    cache = g.setdefault("_global_role_cache", {})
+    if user_id in cache:
+        return cache[user_id]
+
+    user = db.session.query(User).filter_by(id=user_id).first()
+    role = user.role.lower() if user and user.role else None
+    cache[user_id] = role
+    return role
+
+
+def require_admin(message="Admin access required"):
+    """401 if not logged in, 403 unless the session user has the global admin role."""
+    user_id = require_authenticated()
+    if get_user_global_role(user_id) != "admin":
+        raise ForbiddenError(message)
+    return user_id
+
+
+def require_self_or_admin(target_user_id, message="You can only access your own account"):
+    """Lets a user act on their own account without a DB lookup; anyone else must be an admin."""
+    user_id = require_authenticated()
+    if str(user_id) == str(target_user_id):
+        return user_id
+    return require_admin(message)
