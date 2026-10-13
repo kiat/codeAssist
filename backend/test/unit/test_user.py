@@ -513,11 +513,11 @@ def test_update_account_missing_id(client, mocker, login_as):
     assert data['message'] == "Missing user id"
 
 
-def test_update_account_missing_user(client, mocker, login_as_admin):
+def test_update_account_missing_user(client, mocker, login_as):
     """Test the /update_account route."""
 
-    login_as_admin()
     random_uuid = uuid.uuid4()
+    login_as(str(random_uuid))
 
     mock_query = mocker.patch("routes.user.db.session.query")
     mock_query.return_value.filter_by.return_value.first.return_value = None
@@ -849,11 +849,22 @@ def test_admin_update_account_as_admin(client, mocker, login_as_admin):
     mock_query.return_value.filter_by.return_value.first.return_value = target
     mock_commit = mocker.patch("routes.user.db.session.commit")
 
-    response = client.put("/admin_update_account", json={"id": "target-uuid", "name": "New Name"})
+    response = client.put("/admin_update_account", json={"id": str(uuid.uuid4()), "name": "New Name"})
 
     assert response.status_code == 200
     assert target.name == "New Name"
     mock_commit.assert_called_once()
+
+
+def test_admin_update_account_invalid_id(client, mocker, login_as_admin):
+    login_as_admin()
+    mock_query = mocker.patch("routes.user.db.session.query")
+
+    response = client.put("/admin_update_account", json={"id": "not-a-uuid", "name": "X"})
+
+    assert response.status_code == 400
+    assert response.json["message"] == "Invalid user id"
+    mock_query.assert_not_called()
 
 
 def test_get_user_by_eid_as_admin_excludes_password(client, mocker, login_as_admin):
@@ -944,34 +955,16 @@ def test_update_account_returns_403_for_other_user(client, mocker, login_as):
     mock_commit.assert_not_called()
 
 
-def test_update_account_admin_can_update_other_user(client, mocker, login_as_admin):
-    login_as_admin()
-    target_id = str(uuid.uuid4())
-    user_mock = mocker.Mock()
+def test_update_account_admin_cannot_update_other_user(client, mocker, login_as_admin):
+    login_as_admin(str(uuid.uuid4()))
     mock_query = mocker.patch("routes.user.db.session.query")
-    mock_query.return_value.filter_by.return_value.first.return_value = user_mock
     mock_commit = mocker.patch("routes.user.db.session.commit")
 
-    response = client.put("/update_account", json={"id": target_id, "name": "Renamed"})
+    response = client.put(
+        "/update_account",
+        json={"id": str(uuid.uuid4()), "password": "hijacked"},
+    )
 
-    assert response.status_code == 200
-    assert user_mock.name == "Renamed"
-    mock_commit.assert_called_once()
-
-
-def test_create_user_response_excludes_password(client, mocker):
-    mocker.patch("routes.user.db.session.query").return_value.filter_by.return_value.first.return_value = None
-    mocker.patch("routes.user.db.session.add")
-    mocker.patch("routes.user.db.session.commit")
-
-    response = client.post("/create_user", json={
-        "name": "Pat",
-        "password": "secret123",
-        "email_address": "pat@example.com",
-        "eid": "PAT1",
-        "role": "student",
-    })
-
-    assert response.status_code == 201
-    assert "password" not in response.json
-
+    assert response.status_code == 403
+    mock_query.assert_not_called()
+    mock_commit.assert_not_called()

@@ -351,7 +351,7 @@ def update_account():
     @param name      the name for the user (optional)
     @param password  the password for the user (optional)
     '''
-    require_authenticated()
+    session_user_id = require_authenticated()
 
     # Extract required and optional data from the request
     user_id = request.json.get('id')
@@ -363,7 +363,10 @@ def update_account():
     except(ValueError, TypeError):
         raise BadRequestError("Invalid  user id") 
 
-    require_self_or_admin(user_id, "You can only update your own account")
+    # Self only, admins included: admins edit other accounts through
+    # /admin_update_account, which cannot change passwords.
+    if str(session_user_id) != user_id:
+        raise ForbiddenError("You can only update your own account")
 
     new_name = request.json.get('name')
     new_password = request.json.get('password')
@@ -431,6 +434,11 @@ def admin_update_account():
 
     if not user_id:
         raise BadRequestError("Missing user id")
+
+    try:
+        user_id = str(uuid.UUID(user_id))
+    except (ValueError, TypeError):
+        raise BadRequestError("Invalid user id")
 
     user = db.session.query(User).filter_by(id=user_id).first()
     if not user:

@@ -838,6 +838,55 @@ def test_get_course_info_success(client, mocker, login_as):
     assert "gemini_api_key_value" not in response.json[0]
     assert "claude_api_key_value" not in response.json[0]
 
+COURSE_SECRET_FIELDS = ("openai_api_key", "gemini_api_key", "claude_api_key", "ollama_base_url")
+
+
+def _course_with_keys():
+    from api.models import Course
+    return Course(
+        id="course-123",
+        name="CS101",
+        instructor_id="instructor-uuid",
+        semester="Fall",
+        year="2026",
+        entryCode="ABC123",
+        openai_api_key="encrypted-openai",
+        gemini_api_key="encrypted-gemini",
+        claude_api_key="encrypted-claude",
+        ollama_base_url="http://10.0.0.5:11434",
+    )
+
+
+def test_get_course_info_does_not_return_api_keys_to_student(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = _course_with_keys()
+
+    response = client.get("/get_course_info", query_string={"course_id": "course-123"})
+
+    assert response.status_code == 200
+    course_data = response.json[0]
+    for field in COURSE_SECRET_FIELDS:
+        assert field not in course_data
+    assert course_data["has_openai_api_key"] is True
+    assert course_data["has_ollama_api_key"] is True
+
+
+def test_get_user_enrollments_does_not_return_api_keys(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(course_id="course-123", role="student")]
+    mock_query.return_value.filter.return_value = [_course_with_keys()]
+    login_as("student-uuid")
+
+    response = client.get("/get_user_enrollments")
+
+    assert response.status_code == 200
+    assert response.json[0]["name"] == "CS101"
+    for field in COURSE_SECRET_FIELDS:
+        assert field not in response.json[0]
+
+
 def test_get_course_info_missing_course_id(client):
     response = client.get("/get_course_info")
     assert response.status_code == 400

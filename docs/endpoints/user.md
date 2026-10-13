@@ -119,8 +119,9 @@ Example Output:
 <p>Updates account details in the database based on what fields are inputted to
 change. Only name and password can be changed for any user.</p>
 
-**Auth:** must be logged in. Callers can only update their own account unless
-they are an admin (401 if not logged in, 403 otherwise).
+**Auth:** must be logged in, and callers can only update their own account,
+admins included (401 if not logged in, 403 otherwise). Admins edit other users
+through `/admin_update_account`, which cannot change passwords.
 
 Example input:
 
