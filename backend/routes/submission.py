@@ -20,6 +20,7 @@ from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, Enrollme
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
 from util.csv_utils import csv_safe_cell
+from util.timing import StepTimer
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -690,6 +691,7 @@ def get_submissions():
     
 @submission.route('/upload_submission', methods=["POST"])
 def upload_submission():
+    timer = StepTimer()
     if "file" not in request.files:
         raise BadRequestError("No file part")
     file = request.files["file"]
@@ -743,6 +745,7 @@ def upload_submission():
             raise BadRequestError("Submission period has ended (past due date).")
 
 
+    timer.lap("validate")
     filename = secure_filename(file.filename)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
@@ -751,6 +754,7 @@ def upload_submission():
     results_dir = os.path.join(assignment_dir, student_id, 'results')
 
     file_path = stage_submission(submissions_dir, file, filename)
+    timer.lap("stage")
     try:
         #get autograder if it exists
         assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
@@ -792,13 +796,17 @@ def upload_submission():
 
         lock_id = assignment.id
         db.session.rollback()
+        timer.lap("prepare")
         with assignment_container_lock(lock_id):
+            timer.lap("lock_wait")
             # Reuse (or create, on first submission) a persistent container for this assignment
             container = get_or_create_assignment_container(assignment)
             container_name = container.name
+            timer.lap("container")
 
             try:
                 reset_container_workspace(container)
+                timer.lap("reset")
 
                 # Copy the submission into /autograder/submission/
                 tar_stream = io.BytesIO()
@@ -806,6 +814,7 @@ def upload_submission():
                     tar.add(file_path, arcname=filename)
                 tar_stream.seek(0)
                 container.put_archive("/autograder/submission/", tar_stream)
+                timer.lap("copy_in")
 
                 # Run the autograder inside the container
                 exec_proc = subprocess.run(
@@ -817,6 +826,7 @@ def upload_submission():
                     capture_output=True,
                     timeout=assignment.autograder_timeout
                 )
+                timer.lap("autograder")
 
             except ContainerExecTimeout:
                 reset_assignment_container(assignment)
@@ -910,6 +920,7 @@ def upload_submission():
                 )
                 archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise InternalProcessingError("Failed to grade submission")
+            timer.lap("read_results")
 
         results_json_content = cat_result.output.decode()
 
@@ -973,7 +984,9 @@ def upload_submission():
             submission_id, assignment_id,
             raise_message="Failed to record submission"
         )
+        timer.lap("record")
         archived = archive_staged_files(assignment_id, submission_id, submissions_dir, host_results_json_path)
+        timer.lap("archive")
 
         # Capture the app object and launch a background thread to get AI feedback asynchronously.
         app_obj = current_app._get_current_object()
@@ -986,10 +999,15 @@ def upload_submission():
         return jsonify({
             "message": "Submission uploaded and autograded successfully",
             "results_path": os.path.join(archived, os.path.basename(host_results_json_path)),
-            "submissionID": str(new_submission.id)
+            "submissionID": str(new_submission.id),
+            "timings": timer.as_dict()
         }), 200
     finally:
         shutil.rmtree(submissions_dir, ignore_errors=True)
+        logger.info(
+            "grading_timing assignment=%s submission=%s %s",
+            assignment_id, submission_id, json.dumps(timer.as_dict())
+        )
 
 
 @submission.route('/upload_assignment_autograder', methods=["POST"])

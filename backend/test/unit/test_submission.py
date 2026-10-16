@@ -819,6 +819,61 @@ def test_upload_submission_success_archives_submission_and_results(client, mocke
         _cleanup_submission_dirs(assignment_id)
 
 
+def test_upload_submission_success_reports_step_timings(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = "autograder-test"
+    fake_assignment.autograder_timeout = 30
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    fake_container = mocker.Mock()
+    fake_container.name = "assignment_container_test"
+    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
+
+    def fake_subprocess_run(args, **kwargs):
+        proc = mocker.Mock()
+        proc.returncode = 0
+        proc.stderr = b""
+        command = args[-1] if isinstance(args, (list, tuple)) else ""
+        proc.stdout = b'{"score": 100}' if command.startswith("cat ") else b""
+        return proc
+
+    mocker.patch("routes.submission.subprocess.run", side_effect=fake_subprocess_run)
+    mocker.patch("routes.submission.threading.Thread")
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 200
+        timings = response.get_json()["timings"]
+        expected_steps = {
+            "validate", "stage", "prepare", "lock_wait", "container", "reset",
+            "copy_in", "autograder", "read_results", "record", "archive", "total",
+        }
+        assert set(timings) == expected_steps
+        assert all(value >= 0 for value in timings.values())
+        steps_sum = sum(value for name, value in timings.items() if name != "total")
+        assert steps_sum <= timings["total"] + 0.001
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
 def test_delete_submission_not_found(client, mocker):
     """Test /delete_submission returns 404 when the submission is not found."""
     # Patch the get method to return None.
