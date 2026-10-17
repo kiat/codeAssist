@@ -1,20 +1,8 @@
 """
-Burst test: a whole class submits to one assignment at the same moment.
+Stress test: N students submit to one assignment at the same time.
 
 Usage:
-    python test_submission_burst.py <course_id> --students 20 \
-        --instructor-email instructor1@test.com --instructor-password <password>
-
-- Logs in as an instructor of <course_id>, creates a published assignment and
-  uploads the A1 autograder (or reuses --assignment-id).
-- Creates or logs in N students (burst-student-0000@stress.test, ...) before the
-  clock starts, so account setup is not counted.
-- Releases all N submissions together behind a barrier and measures each one
-  from the client side, plus the server's per-step `timings` when present.
-- Prints p50/p95/max latency, errors, throughput and where server time went,
-  and saves the raw numbers under results/.
-
-Credentials can also come from STRESS_INSTRUCTOR_EMAIL / STRESS_INSTRUCTOR_PASSWORD.
+    python test_submission_burst.py <course_id> --students 20 --instructor-email <email> --instructor-password <password>
 """
 
 import argparse
