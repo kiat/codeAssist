@@ -78,6 +78,26 @@ report, record the load level, worker count, and endpoint. For local debugging,
 reduce `--max_workers` first, then inspect backend session cleanup and SQLAlchemy
 pool settings.
 
+## Submission Burst
+
+`test_submission_burst.py` simulates a whole class submitting to one assignment
+at the same moment. Student accounts are prepared before the clock starts, then
+all submissions are released together. It reports p50/p95/max latency, errors,
+throughput, and the server's per-step `timings` (where grading time went).
+
+```bash
+cd backend/test/stress
+export STRESS_INSTRUCTOR_EMAIL=instructor@example.com
+export STRESS_INSTRUCTOR_PASSWORD=your-password
+python test_submission_burst.py "$COURSE_ID" --students 20 --cleanup
+python test_submission_burst.py "$COURSE_ID" --students 100 --request-timeout 300 --cleanup
+```
+
+The instructor must teach `$COURSE_ID`. Use `--assignment-id` to reuse an
+assignment that already has an autograder. `--request-timeout 300` matches the
+production nginx `proxy_read_timeout`, so a submission that would get a 504 in
+production is counted as an error here.
+
 ## Manual Scripts
 
 For individual scripts, run from this folder so fixture paths resolve correctly:

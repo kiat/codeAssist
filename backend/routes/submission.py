@@ -20,6 +20,7 @@ from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, Enrollme
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
 from util.csv_utils import csv_safe_cell
+from util.timing import StepTimer
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -323,30 +324,59 @@ def _snapshot_autograder_source(container, assignment):
         )
 
 
-_RESET_WORKSPACE_SCRIPT = f"""
-set -e
-kill -9 -1 2>/dev/null || true
-find / /dev/shm -xdev -depth -user {AUTOGRADER_UID} -not -path '/autograder/*' -delete
+GRADE_EXIT_RESET_FAILED = 90
+GRADE_EXIT_COPY_FAILED = 91
+GRADE_EXIT_TIMED_OUT = 92
+GRADE_EXIT_AUTOGRADER_FAILED = 93
+GRADE_EXIT_NO_RESULTS = 94
+GRADE_OVERHEAD_TIMEOUT = 60
+AUTOGRADER_LOG_PATH = "/autograder/.run_autograder.log"
+
+_GRADE_SCRIPT = f"""
+kill -9 -1 2>/dev/null
+find / /dev/shm -xdev -depth -user {AUTOGRADER_UID} -not -path '/autograder/*' -delete >&2 || exit {GRADE_EXIT_RESET_FAILED}
 if [ -d {SOURCE_BASELINE_PATH} ]; then
-    rm -rf /autograder/source
-    cp -a {SOURCE_BASELINE_PATH} /autograder/source
+    rm -rf /autograder/source >&2 || exit {GRADE_EXIT_RESET_FAILED}
+    cp -a {SOURCE_BASELINE_PATH} /autograder/source >&2 || exit {GRADE_EXIT_RESET_FAILED}
 fi
-mkdir -p /autograder/submission /autograder/results
-find /autograder/submission -mindepth 1 -delete
-find /autograder/results -mindepth 1 -delete
-chown -R {AUTOGRADER_USER} /autograder/source /autograder/submission /autograder/results
+mkdir -p /autograder/submission /autograder/results >&2 || exit {GRADE_EXIT_RESET_FAILED}
+find /autograder/submission /autograder/results -mindepth 1 -delete >&2 || exit {GRADE_EXIT_RESET_FAILED}
+chown -R {AUTOGRADER_USER} /autograder/source /autograder/submission /autograder/results >&2 || exit {GRADE_EXIT_RESET_FAILED}
+
+tar -x --no-same-owner -C /autograder/submission -f - >&2 || exit {GRADE_EXIT_COPY_FAILED}
+: > {AUTOGRADER_LOG_PATH} && chmod 600 {AUTOGRADER_LOG_PATH} || exit {GRADE_EXIT_RESET_FAILED}
+
+HOME=/tmp timeout -s KILL "$1" setpriv --reuid={AUTOGRADER_UID} --regid={AUTOGRADER_UID} --clear-groups \
+    /bin/bash /autograder/source/run_autograder >{AUTOGRADER_LOG_PATH} 2>&1 </dev/null
+rc=$?
+kill -9 -1 2>/dev/null
+if [ "$rc" -eq 137 ]; then
+    exit {GRADE_EXIT_TIMED_OUT}
+fi
+if [ "$rc" -ne 0 ]; then
+    cat {AUTOGRADER_LOG_PATH} >&2
+    exit {GRADE_EXIT_AUTOGRADER_FAILED}
+fi
+cat /autograder/results/results.json || exit {GRADE_EXIT_NO_RESULTS}
 """
 
 
-def reset_container_workspace(container):
-    '''Return the shared container to a pristine state before the next run.'''
-    result = exec_run_with_timeout(container, _RESET_WORKSPACE_SCRIPT)
-    if result.exit_code != 0:
-        logger.warning(
-            "Failed to reset container workspace, details: %s",
-            result.output.decode(errors="replace")
+def run_grading(container, file_path, filename, autograder_timeout):
+    '''Reset, copy in, run autograder and read results in one docker exec.'''
+    tar_stream = io.BytesIO()
+    with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+        tar.add(file_path, arcname=filename)
+    try:
+        return subprocess.run(
+            ["docker", "exec", "-i", container.name, "sh", "-c", _GRADE_SCRIPT, "grade", str(autograder_timeout)],
+            input=tar_stream.getvalue(),
+            capture_output=True,
+            timeout=autograder_timeout + GRADE_OVERHEAD_TIMEOUT,
         )
-        raise InternalProcessingError("Failed to cleanup container")
+    except subprocess.TimeoutExpired as exc:
+        raise ContainerExecTimeout(
+            f"grading exec timed out after {autograder_timeout + GRADE_OVERHEAD_TIMEOUT}s"
+        ) from exc
 
 
 def _run_assignment_container(assignment, container_name):
@@ -690,6 +720,7 @@ def get_submissions():
     
 @submission.route('/upload_submission', methods=["POST"])
 def upload_submission():
+    timer = StepTimer()
     if "file" not in request.files:
         raise BadRequestError("No file part")
     file = request.files["file"]
@@ -743,6 +774,7 @@ def upload_submission():
             raise BadRequestError("Submission period has ended (past due date).")
 
 
+    timer.lap("validate")
     filename = secure_filename(file.filename)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
@@ -751,6 +783,7 @@ def upload_submission():
     results_dir = os.path.join(assignment_dir, student_id, 'results')
 
     file_path = stage_submission(submissions_dir, file, filename)
+    timer.lap("stage")
     try:
         #get autograder if it exists
         assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
@@ -792,41 +825,23 @@ def upload_submission():
 
         lock_id = assignment.id
         db.session.rollback()
+        timer.lap("prepare")
         with assignment_container_lock(lock_id):
+            timer.lap("lock_wait")
             # Reuse (or create, on first submission) a persistent container for this assignment
             container = get_or_create_assignment_container(assignment)
-            container_name = container.name
+            timer.lap("container")
 
             try:
-                reset_container_workspace(container)
-
-                # Copy the submission into /autograder/submission/
-                tar_stream = io.BytesIO()
-                with tarfile.open(fileobj=tar_stream, mode="w") as tar:
-                    tar.add(file_path, arcname=filename)
-                tar_stream.seek(0)
-                container.put_archive("/autograder/submission/", tar_stream)
-
-                # Run the autograder inside the container
-                exec_proc = subprocess.run(
-                    [
-                        "docker", "exec", "-u", AUTOGRADER_USER, "-e", "HOME=/tmp",
-                        container_name, "sh", "-c",
-                        "/bin/bash /autograder/source/run_autograder"
-                    ],
-                    capture_output=True,
-                    timeout=assignment.autograder_timeout
-                )
-
+                grade_proc = run_grading(container, file_path, filename, assignment.autograder_timeout)
             except ContainerExecTimeout:
                 reset_assignment_container(assignment)
-                raise InternalProcessingError("Timed out cleaning up container")
+                raise InternalProcessingError("Timed out grading submission")
+            timer.lap("grade")
 
-            except InternalProcessingError:
-                reset_assignment_container(assignment)
-                raise
+            grade_stderr = (grade_proc.stderr or b"").decode(errors="replace")
 
-            except subprocess.TimeoutExpired:
+            if grade_proc.returncode == GRADE_EXIT_TIMED_OUT:
                 # clean up container
                 reset_assignment_container(assignment)
 
@@ -859,12 +874,11 @@ def upload_submission():
                 archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise SubmissionTimeoutError("Submitted program took too long to run", failed_submission.id)
 
-            if exec_proc.returncode != 0:
+            if grade_proc.returncode == GRADE_EXIT_AUTOGRADER_FAILED:
                 reset_assignment_container(assignment)
-                stderr = getattr(exec_proc, "stderr", b"") or b""
                 logger.warning(
                     "Autograder failed for assignment %s, details: %s",
-                    assignment_id, stderr.decode(errors='replace')
+                    assignment_id, grade_stderr
                 )
                 _record_failed_submission(
                     submission_id=submission_id,
@@ -878,26 +892,10 @@ def upload_submission():
                 archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise InternalProcessingError("Failed to grade submission")
 
-            # get results
-            try:
-                cat_result = exec_run_with_timeout(container, "cat /autograder/results/results.json")
-            except ContainerExecTimeout:
-                reset_assignment_container(assignment)
-                _record_failed_submission(
-                    submission_id=submission_id,
-                    filename=filename,
-                    file_path=file_path,
-                    student_id=student_id,
-                    assignment_id=assignment_id,
-                    results=_malformed_results_payload(""),
-                    execution_time=0.0,
-                )
-                archive_staged_files(assignment_id, submission_id, submissions_dir)
-                raise InternalProcessingError("Timed out retrieving submission results")
-            if cat_result.exit_code != 0:
+            if grade_proc.returncode == GRADE_EXIT_NO_RESULTS:
                 logger.warning(
                     "Failed to retrieve results.json for assignment %s, details: %s",
-                    assignment_id, cat_result.output.decode(errors='replace')
+                    assignment_id, grade_stderr
                 )
                 _record_failed_submission(
                     submission_id=submission_id,
@@ -911,7 +909,15 @@ def upload_submission():
                 archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise InternalProcessingError("Failed to grade submission")
 
-        results_json_content = cat_result.output.decode()
+            if grade_proc.returncode != 0:
+                logger.warning(
+                    "Failed to prepare container for assignment %s (exit %s), details: %s",
+                    assignment_id, grade_proc.returncode, grade_stderr
+                )
+                reset_assignment_container(assignment)
+                raise InternalProcessingError("Failed to cleanup container")
+
+        results_json_content = grade_proc.stdout.decode()
 
         try:
             results_payload = json.loads(results_json_content)
@@ -973,7 +979,9 @@ def upload_submission():
             submission_id, assignment_id,
             raise_message="Failed to record submission"
         )
+        timer.lap("record")
         archived = archive_staged_files(assignment_id, submission_id, submissions_dir, host_results_json_path)
+        timer.lap("archive")
 
         # Capture the app object and launch a background thread to get AI feedback asynchronously.
         app_obj = current_app._get_current_object()
@@ -986,10 +994,15 @@ def upload_submission():
         return jsonify({
             "message": "Submission uploaded and autograded successfully",
             "results_path": os.path.join(archived, os.path.basename(host_results_json_path)),
-            "submissionID": str(new_submission.id)
+            "submissionID": str(new_submission.id),
+            "timings": timer.as_dict()
         }), 200
     finally:
         shutil.rmtree(submissions_dir, ignore_errors=True)
+        logger.info(
+            "grading_timing assignment=%s submission=%s %s",
+            assignment_id, submission_id, json.dumps(timer.as_dict())
+        )
 
 
 @submission.route('/upload_assignment_autograder', methods=["POST"])
