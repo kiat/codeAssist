@@ -1,7 +1,7 @@
 """Add assignment Vertex AI location override.
 
 Revision ID: a7b8c9d0e1f2
-Revises: a3b4c5d6e7f8
+Revises: 51f7b0498833
 Create Date: 2026-08-04 00:00:00.000000
 
 """
@@ -9,7 +9,7 @@ from alembic import op
 
 
 revision = "a7b8c9d0e1f2"
-down_revision = "a3b4c5d6e7f8"
+down_revision = "51f7b0498833"
 branch_labels = None
 depends_on = None
 
