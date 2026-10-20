@@ -73,6 +73,7 @@ export default function Home() {
       role: role,
       isAdmin: role === "admin",
       isStudent: role === "student",
+      authMethod: "google",
     };
     localStorage.setItem("userInfo", JSON.stringify(userInfo));
     updateUserInfo(userInfo);
