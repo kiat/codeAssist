@@ -638,6 +638,47 @@ def test_get_user_enrollments_success(client, mocker, login_as):
     assert response.status_code == 200
     assert response.json == [{"id": "course-123", "name": "CS101", "enrollment_role": "student"}]
 
+def test_get_user_enrollments_own_id_param_allowed(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = []
+    mock_query.return_value.filter.return_value = []
+    mocker.patch("routes.course.CourseSchema").return_value.dump.return_value = []
+    role_lookup = mocker.patch("util.auth.get_user_global_role")
+
+    login_as("user-123")
+
+    response = client.get("/get_user_enrollments?user_id=user-123")
+
+    assert response.status_code == 200
+    role_lookup.assert_not_called()
+    mock_query.return_value.filter_by.assert_called_with(student_id="user-123")
+
+def test_get_user_enrollments_other_user_forbidden_for_non_admin(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_global_role", return_value="student")
+
+    login_as("user-123")
+
+    response = client.get("/get_user_enrollments?user_id=other-user")
+
+    assert response.status_code == 403
+    mock_query.assert_not_called()
+
+def test_get_user_enrollments_admin_can_view_other_user(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(course_id="course-9", role="student")]
+    mock_query.return_value.filter.return_value = []
+    mocker.patch("routes.course.CourseSchema").return_value.dump.return_value = [{"id": "course-9", "name": "CS429"}]
+    mocker.patch("util.auth.get_user_global_role", return_value="admin")
+
+    login_as("admin-1")
+
+    response = client.get("/get_user_enrollments?user_id=student-7")
+
+    assert response.status_code == 200
+    mock_query.return_value.filter_by.assert_called_with(student_id="student-7")
+    assert response.json == [{"id": "course-9", "name": "CS429", "enrollment_role": "student"}]
+
 def test_get_user_enrollments_unauthenticated(client):
     response = client.get("/get_user_enrollments")
     assert response.status_code == 401
@@ -796,6 +837,55 @@ def test_get_course_info_success(client, mocker, login_as):
     assert "openai_api_key_value" not in response.json[0]
     assert "gemini_api_key_value" not in response.json[0]
     assert "claude_api_key_value" not in response.json[0]
+
+COURSE_SECRET_FIELDS = ("openai_api_key", "gemini_api_key", "claude_api_key", "ollama_base_url")
+
+
+def _course_with_keys():
+    from api.models import Course
+    return Course(
+        id="course-123",
+        name="CS101",
+        instructor_id="instructor-uuid",
+        semester="Fall",
+        year="2026",
+        entryCode="ABC123",
+        openai_api_key="encrypted-openai",
+        gemini_api_key="encrypted-gemini",
+        claude_api_key="encrypted-claude",
+        ollama_base_url="http://10.0.0.5:11434",
+    )
+
+
+def test_get_course_info_does_not_return_api_keys_to_student(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = _course_with_keys()
+
+    response = client.get("/get_course_info", query_string={"course_id": "course-123"})
+
+    assert response.status_code == 200
+    course_data = response.json[0]
+    for field in COURSE_SECRET_FIELDS:
+        assert field not in course_data
+    assert course_data["has_openai_api_key"] is True
+    assert course_data["has_ollama_api_key"] is True
+
+
+def test_get_user_enrollments_does_not_return_api_keys(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(course_id="course-123", role="student")]
+    mock_query.return_value.filter.return_value = [_course_with_keys()]
+    login_as("student-uuid")
+
+    response = client.get("/get_user_enrollments")
+
+    assert response.status_code == 200
+    assert response.json[0]["name"] == "CS101"
+    for field in COURSE_SECRET_FIELDS:
+        assert field not in response.json[0]
+
 
 def test_get_course_info_missing_course_id(client):
     response = client.get("/get_course_info")
@@ -2083,6 +2173,39 @@ def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocke
 
     assert response.status_code == 400
     assert "Ollama host is not permitted" in response.json["message"]
+
+
+def test_get_courses_by_instructor_returns_401_when_logged_out(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+
+    response = client.get("/get_courses_by_instructor", query_string={"instructor_id": "inst-1"})
+
+    assert response.status_code == 401
+    mock_query.assert_not_called()
+
+
+@pytest.mark.parametrize("role", ["student", "instructor"])
+def test_get_courses_by_instructor_returns_403_for_non_admin(client, mocker, login_as, role):
+    login_as("inst-1")
+    mocker.patch("util.auth.get_user_global_role", return_value=role)
+    mock_query = mocker.patch("routes.course.db.session.query")
+
+    response = client.get("/get_courses_by_instructor", query_string={"instructor_id": "inst-1"})
+
+    assert response.status_code == 403
+    mock_query.assert_not_called()
+
+
+def test_get_courses_by_instructor_as_admin(client, mocker, login_as):
+    login_as("admin-1")
+    mocker.patch("util.auth.get_user_global_role", return_value="admin")
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = []
+
+    response = client.get("/get_courses_by_instructor", query_string={"instructor_id": "inst-1"})
+
+    assert response.status_code == 200
+    assert response.json == []
 
 
 def test_delete_all_assignments_defers_teardown_until_after_commit(client, mocker, login_as):

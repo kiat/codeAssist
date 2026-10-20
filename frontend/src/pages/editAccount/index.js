@@ -35,7 +35,7 @@ export default () => {
 
     const fetchData = async (id) => {
         try {
-            const response =  await fetch(`${process.env.REACT_APP_API_URL}/get_user_by_id?id=${id}`);
+            const response =  await fetch(`${process.env.REACT_APP_API_URL}/get_user_by_id?id=${id}`, { credentials: "include" });
             if (!response.ok) {
                 throw new Error("Network response was not ok");
             }
@@ -54,6 +54,7 @@ export default () => {
         };
         fetch(process.env.REACT_APP_API_URL + "/update_account", {
             method: "POST",
+            credentials: "include",
             headers: {
                 "Content-Type": "application/json"
             },
@@ -101,11 +102,11 @@ export default () => {
                     <Form.Item label='EMAIL ADDRESS' name='email_address'>
                         <Input placeholder={placeholders.email_address || "Enter Email Address"} disabled />
                     </Form.Item>
-                    {/* make sure password is only visible when click eye icon */}
+                    {/* the eye icon only reveals what the user types; the stored password is never sent to the client */}
                     <Form.Item label='PASSWORD' name="password">
                         <Input
                             type={passwordVisible ? 'text' : 'password'}
-                            placeholder={passwordVisible ? placeholders.password : '********'}
+                            placeholder="Enter new password"
                             addonAfter={
                                 <Button
                                     type="link"

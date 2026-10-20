@@ -62,7 +62,7 @@ function ExpandedSidebar({ courseInfo, userInfo, pathname, toggleCollapsed, hand
               size='small'
             >
               <Space direction='vertical' className={styles.iconText}>
-                <Link to={isStudent ? `/assignments/${courseInfo.id}` : `/instructorDashboard/${courseInfo.id}`} className={/instructorDashboard/i.test(pathname) || /assignments/i.test(pathname) ? "" : styles.linkText}>
+                <Link to={isStudent ? `/assignments/${courseInfo.id}` : `/instructorDashboard/${courseInfo.id}`} className={/instructorDashboard/i.test(pathname) || /^\/assignments\//i.test(pathname) ? "" : styles.linkText}>
                   <TableOutlined />
                   <span> Dashboard</span>
                 </Link>
