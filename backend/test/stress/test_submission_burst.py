@@ -8,7 +8,6 @@ Usage:
 import argparse
 import json
 import os
-import statistics
 import sys
 import threading
 import time
@@ -88,11 +87,6 @@ def submit(http, student_id, assignment_id, submission_bytes, filename, request_
             timeout=request_timeout,
         )
         result["status"] = response.status_code
-        try:
-            body = response.json()
-        except ValueError:
-            body = {}
-        result["timings"] = body.get("timings")
         if response.status_code != 200:
             result["error"] = response.text[:300]
     except requests.RequestException as error:
@@ -143,11 +137,6 @@ def summarize(results):
     for r in results:
         statuses[str(r["status"])] = statuses.get(str(r["status"]), 0) + 1
 
-    steps = {}
-    for r in ok:
-        for name, value in (r.get("timings") or {}).items():
-            steps.setdefault(name, []).append(value)
-
     return {
         "submissions": len(results),
         "succeeded": len(ok),
@@ -160,14 +149,6 @@ def summarize(results):
             "p95": round(percentile(latencies, 0.95), 3) if latencies else None,
             "max": round(max(latencies), 3) if latencies else None,
         },
-        "server_steps_seconds": {
-            name: {
-                "mean": round(statistics.mean(values), 4),
-                "p50": round(percentile(values, 0.5), 4),
-                "max": round(max(values), 4),
-            }
-            for name, values in steps.items()
-        },
         "sample_errors": [r["error"] for r in results if r.get("error")][:5],
     }
 
@@ -178,13 +159,6 @@ def print_summary(summary):
     print(f"Submissions: {summary['submissions']}  succeeded: {summary['succeeded']}  statuses: {summary['statuses']}")
     print(f"Wall time: {summary['wall_seconds']}s  throughput: {summary['throughput_per_second']} submissions/s")
     print(f"Latency (successes): min {latency['min']}s  p50 {latency['p50']}s  p95 {latency['p95']}s  max {latency['max']}s")
-    if summary["server_steps_seconds"]:
-        print()
-        print(f"{'server step':<14}{'mean':>10}{'p50':>10}{'max':>10}")
-        for name, values in sorted(summary["server_steps_seconds"].items(), key=lambda item: -item[1]["mean"]):
-            print(f"{name:<14}{values['mean']:>10.4f}{values['p50']:>10.4f}{values['max']:>10.4f}")
-    else:
-        print("No server timings in responses (backend without the timing change?).")
     for error in summary["sample_errors"]:
         print(f"  error: {error}")
 
@@ -207,15 +181,14 @@ def main():
     if args.students < 1:
         print("--students must be at least 1")
         return 1
-    if not args.assignment_id and not (args.instructor_email and args.instructor_password):
-        print("Need --instructor-email and --instructor-password (or --assignment-id)")
+    if not (args.instructor_email and args.instructor_password):
+        print("Need --instructor-email and --instructor-password")
         return 1
 
     instructor = None
     created_assignment = False
     try:
-        if args.instructor_email and args.instructor_password:
-            instructor, _ = login(args.instructor_email, args.instructor_password)
+        instructor, _ = login(args.instructor_email, args.instructor_password)
 
         assignment_id = args.assignment_id
         if not assignment_id:
@@ -226,10 +199,17 @@ def main():
 
         print(f"Preparing {args.students} student sessions...")
         sessions = [student_session(index) for index in range(args.students)]
+        for _, student_id in sessions:
+            response = instructor.post(
+                f"{BASE_URL}/create_enrollment",
+                json={"student_id": student_id, "course_id": args.course_id},
+            )
+            if response.status_code not in (201, 409):
+                raise_for_status_with_body(response, "Enroll student")
 
         if not args.no_warmup:
             warmup = run_burst(sessions[:1], assignment_id, args.submission, args.request_timeout)[0]
-            print(f"Warm-up submission: status {warmup['status']}, {warmup['latency']:.3f}s, timings {warmup.get('timings')}")
+            print(f"Warm-up submission: status {warmup['status']}, {warmup['latency']:.3f}s")
 
         print(f"Releasing {args.students} submissions at once...")
         results = run_burst(sessions, assignment_id, args.submission, args.request_timeout)

@@ -346,17 +346,19 @@ chown -R {AUTOGRADER_USER} /autograder/source /autograder/submission /autograder
 tar -x --no-same-owner -C /autograder/submission -f - >&2 || exit {GRADE_EXIT_COPY_FAILED}
 : > {AUTOGRADER_LOG_PATH} && chmod 600 {AUTOGRADER_LOG_PATH} || exit {GRADE_EXIT_RESET_FAILED}
 
+start=$(date +%s)
 HOME=/tmp timeout -s KILL "$1" setpriv --reuid={AUTOGRADER_UID} --regid={AUTOGRADER_UID} --clear-groups \
     /bin/bash /autograder/source/run_autograder >{AUTOGRADER_LOG_PATH} 2>&1 </dev/null
 rc=$?
 kill -9 -1 2>/dev/null
-if [ "$rc" -eq 137 ]; then
+if [ "$rc" -eq 137 ] && [ $(( $(date +%s) - start )) -ge "$1" ]; then
     exit {GRADE_EXIT_TIMED_OUT}
 fi
 if [ "$rc" -ne 0 ]; then
     cat {AUTOGRADER_LOG_PATH} >&2
     exit {GRADE_EXIT_AUTOGRADER_FAILED}
 fi
+[ -f /autograder/results/results.json ] && [ ! -L /autograder/results/results.json ] || exit {GRADE_EXIT_NO_RESULTS}
 cat /autograder/results/results.json || exit {GRADE_EXIT_NO_RESULTS}
 """
 
@@ -832,16 +834,18 @@ def upload_submission():
             container = get_or_create_assignment_container(assignment)
             timer.lap("container")
 
+            autograder_timeout = assignment.autograder_timeout or 300
             try:
-                grade_proc = run_grading(container, file_path, filename, assignment.autograder_timeout)
+                grade_proc = run_grading(container, file_path, filename, autograder_timeout)
+                returncode = grade_proc.returncode
+                grade_stderr = (grade_proc.stderr or b"").decode(errors="replace")
             except ContainerExecTimeout:
-                reset_assignment_container(assignment)
-                raise InternalProcessingError("Timed out grading submission")
+                grade_proc = None
+                returncode = GRADE_EXIT_TIMED_OUT
+                grade_stderr = ""
             timer.lap("grade")
 
-            grade_stderr = (grade_proc.stderr or b"").decode(errors="replace")
-
-            if grade_proc.returncode == GRADE_EXIT_TIMED_OUT:
+            if returncode == GRADE_EXIT_TIMED_OUT:
                 # clean up container
                 reset_assignment_container(assignment)
 
@@ -858,7 +862,7 @@ def upload_submission():
                     ],
                     "leaderboard": [],
                     "visibility": "visible",
-                    "execution_time": f"{assignment.autograder_timeout:.2f}",
+                    "execution_time": f"{autograder_timeout:.2f}",
                     "score": 0
                 }
 
@@ -869,30 +873,20 @@ def upload_submission():
                     student_id=student_id,
                     assignment_id=assignment_id,
                     results=timeout_result,
-                    execution_time=float(assignment.autograder_timeout),
+                    execution_time=float(autograder_timeout),
                 )
                 archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise SubmissionTimeoutError("Submitted program took too long to run", failed_submission.id)
 
-            if grade_proc.returncode == GRADE_EXIT_AUTOGRADER_FAILED:
-                reset_assignment_container(assignment)
+            if returncode in (GRADE_EXIT_RESET_FAILED, GRADE_EXIT_COPY_FAILED):
                 logger.warning(
-                    "Autograder failed for assignment %s, details: %s",
-                    assignment_id, grade_stderr
+                    "Failed to prepare container for assignment %s (exit %s), details: %s",
+                    assignment_id, returncode, grade_stderr
                 )
-                _record_failed_submission(
-                    submission_id=submission_id,
-                    filename=filename,
-                    file_path=file_path,
-                    student_id=student_id,
-                    assignment_id=assignment_id,
-                    results=_autograder_crash_payload(),
-                    execution_time=0.0,
-                )
-                archive_staged_files(assignment_id, submission_id, submissions_dir)
-                raise InternalProcessingError("Failed to grade submission")
+                reset_assignment_container(assignment)
+                raise InternalProcessingError("Failed to cleanup container")
 
-            if grade_proc.returncode == GRADE_EXIT_NO_RESULTS:
+            if returncode == GRADE_EXIT_NO_RESULTS:
                 logger.warning(
                     "Failed to retrieve results.json for assignment %s, details: %s",
                     assignment_id, grade_stderr
@@ -909,15 +903,25 @@ def upload_submission():
                 archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise InternalProcessingError("Failed to grade submission")
 
-            if grade_proc.returncode != 0:
-                logger.warning(
-                    "Failed to prepare container for assignment %s (exit %s), details: %s",
-                    assignment_id, grade_proc.returncode, grade_stderr
-                )
+            if returncode != 0:
                 reset_assignment_container(assignment)
-                raise InternalProcessingError("Failed to cleanup container")
+                logger.warning(
+                    "Autograder failed for assignment %s (exit %s), details: %s",
+                    assignment_id, returncode, grade_stderr
+                )
+                _record_failed_submission(
+                    submission_id=submission_id,
+                    filename=filename,
+                    file_path=file_path,
+                    student_id=student_id,
+                    assignment_id=assignment_id,
+                    results=_autograder_crash_payload(),
+                    execution_time=0.0,
+                )
+                archive_staged_files(assignment_id, submission_id, submissions_dir)
+                raise InternalProcessingError("Failed to grade submission")
 
-        results_json_content = grade_proc.stdout.decode()
+        results_json_content = grade_proc.stdout.decode(errors="replace")
 
         try:
             results_payload = json.loads(results_json_content)
@@ -994,8 +998,7 @@ def upload_submission():
         return jsonify({
             "message": "Submission uploaded and autograded successfully",
             "results_path": os.path.join(archived, os.path.basename(host_results_json_path)),
-            "submissionID": str(new_submission.id),
-            "timings": timer.as_dict()
+            "submissionID": str(new_submission.id)
         }), 200
     finally:
         shutil.rmtree(submissions_dir, ignore_errors=True)
@@ -1022,6 +1025,14 @@ def upload_assignment_autograder():
         raise NotFoundError("Assignment not found")
 
     require_course_role(assignment_for_auth.course_id, {"instructor", "ta"}, "Only instructors or TAs can upload an autograder")
+
+    if autograder_timeout is not None:
+        try:
+            autograder_timeout = int(autograder_timeout)
+        except ValueError:
+            raise BadRequestError("autograder_timeout must be a whole number of seconds")
+        if autograder_timeout < 1:
+            raise BadRequestError("autograder_timeout must be at least 1 second")
 
     # Set up paths
     current_dir = os.path.dirname(os.path.abspath(__file__))

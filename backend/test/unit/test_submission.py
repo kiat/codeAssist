@@ -813,7 +813,8 @@ def test_upload_submission_success_archives_submission_and_results(client, mocke
         _cleanup_submission_dirs(assignment_id)
 
 
-def test_upload_submission_success_reports_step_timings(client, mocker):
+def test_upload_submission_logs_step_timings_without_returning_them(client, mocker, caplog):
+    caplog.set_level("INFO", logger="routes.submission")
     assignment_id = str(uuid.uuid4())
     student_id = str(uuid.uuid4())
 
@@ -847,7 +848,10 @@ def test_upload_submission_success_reports_step_timings(client, mocker):
         )
 
         assert response.status_code == 200
-        timings = response.get_json()["timings"]
+        assert "timings" not in response.get_json()
+        logged = [r.getMessage() for r in caplog.records if r.getMessage().startswith("grading_timing")]
+        assert len(logged) == 1
+        timings = json.loads(logged[0].split(" ", 3)[3])
         expected_steps = {
             "validate", "stage", "prepare", "lock_wait", "container",
             "grade", "record", "archive", "total",
@@ -2648,6 +2652,29 @@ def test_grade_script_keeps_student_output_off_stdout_and_private(app):
     )
 
 
+def test_grade_script_refuses_a_symlinked_results_file(app):
+    """results.json is read as root, so a symlink could print a hidden test."""
+    lines = _grade_script_lines()
+    leftover_kill = max(i for i, line in enumerate(lines) if line == "kill -9 -1 2>/dev/null")
+    check = _line_index(lines, "[ ! -L /autograder/results/results.json ]")
+    read = _line_index(lines, "cat /autograder/results/results.json")
+
+    assert leftover_kill < check < read
+    assert "[ -f /autograder/results/results.json ]" in lines[check]
+    assert lines[check].endswith(f"|| exit {submission_module.GRADE_EXIT_NO_RESULTS}")
+
+
+def test_grade_script_reports_timeout_only_after_the_limit(app):
+    """A SIGKILL before the limit (e.g. out of memory) is a crash, not a timeout."""
+    lines = _grade_script_lines()
+    start = _line_index(lines, "start=$(date +%s)")
+    run = _line_index(lines, "/autograder/source/run_autograder")
+    timed_out = _line_index(lines, '"$rc" -eq 137')
+
+    assert start < run < timed_out
+    assert '$(( $(date +%s) - start )) -ge "$1"' in lines[timed_out]
+
+
 def test_grade_script_kills_leftover_student_processes_before_reading_results(app):
     """Kill leftover student processes before reading results (python:3.9-slim has no /usr/bin/kill)."""
     lines = _grade_script_lines()
@@ -2757,12 +2784,19 @@ def test_upload_submission_records_timeout_when_autograder_runs_too_long(client,
         _cleanup_submission_dirs(assignment_id)
 
 
-def test_upload_submission_discards_container_on_autograder_failure(client, mocker):
+@pytest.mark.parametrize("returncode", [
+    submission_module.GRADE_EXIT_AUTOGRADER_FAILED,
+    125,  # docker failed to run the exec
+    126,
+    127,
+    137,  # killed, e.g. out of memory
+])
+def test_upload_submission_discards_container_on_autograder_failure(client, mocker, returncode):
     """A non-zero autograder exit must tear the shared container down."""
     assignment_id = str(uuid.uuid4())
     student_id = str(uuid.uuid4())
     setup = _graded_upload_setup(mocker)
-    _fake_grading(mocker, submission_module.GRADE_EXIT_AUTOGRADER_FAILED, stderr=b"Traceback ...")
+    _fake_grading(mocker, returncode, stderr=b"Traceback ...")
 
     try:
         response = _post_submission(client, assignment_id, student_id)
@@ -2812,7 +2846,6 @@ def test_upload_submission_records_attempt_when_results_json_missing(client, moc
 @pytest.mark.parametrize("returncode", [
     submission_module.GRADE_EXIT_RESET_FAILED,
     submission_module.GRADE_EXIT_COPY_FAILED,
-    125,  # docker failed to run the exec
 ])
 def test_upload_submission_discards_container_when_setup_fails(client, mocker, returncode):
     """Setup failed before student code ran: discard container, no record."""
@@ -2831,10 +2864,11 @@ def test_upload_submission_discards_container_when_setup_fails(client, mocker, r
         _cleanup_submission_dirs(assignment_id)
 
 
-def test_upload_submission_discards_container_when_grading_exec_hangs(client, mocker):
+def test_upload_submission_records_timeout_when_grading_exec_hangs(client, mocker):
     assignment_id = str(uuid.uuid4())
     student_id = str(uuid.uuid4())
     setup = _graded_upload_setup(mocker)
+    setup.recorded.return_value = SimpleNamespace(id=uuid.uuid4())
     mocker.patch(
         "routes.submission.run_grading",
         side_effect=submission_module.ContainerExecTimeout("stuck"),
@@ -2843,8 +2877,70 @@ def test_upload_submission_discards_container_when_grading_exec_hangs(client, mo
     try:
         response = _post_submission(client, assignment_id, student_id)
 
-        assert response.status_code == 500
+        assert response.status_code == 504
         setup.reset.assert_called_once_with(setup.assignment)
-        setup.recorded.assert_not_called()
+        kwargs = setup.recorded.call_args.kwargs
+        assert kwargs["results"]["tests"][0]["name"] == "Submission Timeout"
+        setup.archived.assert_called_once()
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+@pytest.mark.parametrize("stored_timeout", [None, 0])
+def test_upload_submission_defaults_missing_timeout_to_300(client, mocker, stored_timeout):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    setup = _graded_upload_setup(mocker)
+    setup.assignment.autograder_timeout = stored_timeout
+    setup.recorded.return_value = SimpleNamespace(id=uuid.uuid4())
+    grading = _fake_grading(mocker, submission_module.GRADE_EXIT_TIMED_OUT)
+
+    try:
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 504
+        assert grading.call_args.args[3] == 300
+        assert setup.recorded.call_args.kwargs["execution_time"] == 300.0
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_records_attempt_when_results_are_not_utf8(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    setup = _graded_upload_setup(mocker)
+    _fake_grading(mocker, 0, stdout=b'\xff\xfe{"score": 1}')
+
+    try:
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 500
+        setup.recorded.assert_called_once()
+        setup.archived.assert_called_once()
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+@pytest.mark.parametrize("timeout_value", ["0", "-5", "abc", "2.5"])
+def test_upload_autograder_rejects_invalid_timeout(client, mocker, timeout_value):
+    assignment_id = _real_assignment()
+    mocker.patch("routes.submission.require_authenticated")
+    mocker.patch("routes.submission.require_course_role")
+    docker_client = mocker.patch("routes.submission.get_docker_client")
+
+    try:
+        response = client.post(
+            "/upload_assignment_autograder",
+            data={
+                "assignment_id": assignment_id,
+                "autograder_timeout": timeout_value,
+                "file": (io.BytesIO(b"zip-bytes"), "autograder.zip"),
+            },
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 400
+        assert db.session.get(Assignment, assignment_id).autograder_timeout == 30
+        docker_client.assert_not_called()
     finally:
         _cleanup_submission_dirs(assignment_id)
