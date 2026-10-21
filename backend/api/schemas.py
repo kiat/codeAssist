@@ -11,11 +11,13 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = User
         include_fk = True
+        exclude = ("password",)
     
 class CourseSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Course
         include_fk = True
+        exclude = ("openai_api_key", "gemini_api_key", "claude_api_key", "ollama_base_url")
 
 class EnrollmentSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
