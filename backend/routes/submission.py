@@ -2029,6 +2029,23 @@ def test_autograder_submission():
     if not submission_file.filename or not autograder_zip.filename:
         raise BadRequestError("Invalid filenames")
 
+    # The dry run builds and executes the uploaded autograder, so it is staff-only.
+    # The configure page sends assignment_id; the create-assignment page has no
+    # assignment yet and sends course_id.
+    require_authenticated()
+
+    assignment_id = request.form.get("assignment_id")
+    course_id = request.form.get("course_id")
+    if assignment_id:
+        assignment_for_auth = db.session.query(Assignment).filter_by(id=assignment_id).first()
+        if not assignment_for_auth:
+            raise NotFoundError("Assignment not found")
+        course_id = assignment_for_auth.course_id
+    elif not course_id:
+        raise BadRequestError("Missing assignment_id or course_id")
+
+    require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can test an autograder")
+
     temp_id = str(uuid.uuid4())
     current_dir = os.path.dirname(os.path.abspath(__file__))
     temp_dir = os.path.join(current_dir, 'temp_autograder', temp_id)
