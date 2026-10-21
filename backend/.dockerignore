@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+
+.coverage
+.mypy_cache/
+.pytest_cache/
+.pytest_tmp_root/
+.ruff_cache/
+htmlcov/
+
+.env
+*.log
+
+routes/upload_autograder/runs/
+
+# Google Cloud service account keys (mounted at runtime, never baked into the image)
+secrets/
+*service-account*.json

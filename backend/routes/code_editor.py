@@ -18,10 +18,19 @@ from util.url_utils import validate_ollama_url
 from ai_feedback.integration import (
     async_get_ai_feedback,
     build_claude_messages_payload,
+    get_assignment_vertex_location,
     get_provider_and_model,
     get_provider_credentials,
     get_temperature,
     post_gemini_with_retry,
+)
+from ai_feedback.providers.errors import AIProviderError
+from ai_feedback.providers.gemini import (
+    GEMINI_VERTEX_PROVIDER,
+    GeminiProvider,
+    build_vertex_config,
+    create_gemini_client,
+    validate_model,
 )
 from ai_feedback.memory import get_recent_submission_history_text
 from ai_feedback.settings import (
@@ -653,7 +662,15 @@ def _run_autograder_in_container(image, content, file_name, assignment_id, timeo
                 pass
 
 
-def _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperature):
+def _get_ai_chat_reply(
+    provider,
+    api_key,
+    client,
+    user_prompt,
+    model,
+    temperature,
+    vertex_location=None,
+):
     if provider == "openai":
         response = client.chat.completions.create(
             messages=[
@@ -666,6 +683,18 @@ def _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperatur
             timeout=30,
         )
         return response.choices[0].message.content.strip()
+
+    if provider == GEMINI_VERTEX_PROVIDER:
+        validate_model(provider, model)
+        vertex_provider = GeminiProvider(
+            create_gemini_client(build_vertex_config(vertex_location))
+        )
+        return vertex_provider.generate(
+            model=model,
+            prompt=f"{AI_CHAT_SYSTEM_PROMPT}\n\n{user_prompt}",
+            temperature=float(temperature),
+            max_output_tokens=700,
+        )
 
     if provider == "gemini":
         response = post_gemini_with_retry(
@@ -990,11 +1019,23 @@ def ai_chat():
         if error_message.startswith("Missing "):
             raise BadRequestError("AI is not configured for this course or assignment. Please ask your instructor to set up an API key.")
         raise BadRequestError(error_message)
+    except AIProviderError as e:
+        raise BadRequestError(e.public_message)
     except Exception:
         raise InternalProcessingError("Failed to initialize AI client")
   
     try:
-        reply = _get_ai_chat_reply(provider, api_key, client, user_prompt, model, temperature)
+        reply = _get_ai_chat_reply(
+            provider,
+            api_key,
+            client,
+            user_prompt,
+            model,
+            temperature,
+            vertex_location=get_assignment_vertex_location(assignment),
+        )
+    except AIProviderError as e:
+        raise BadRequestError(e.public_message)
     except Exception as e:
         error_msg = str(e)
         logger.error(f"AI_CHAT error: {e}", exc_info=True)

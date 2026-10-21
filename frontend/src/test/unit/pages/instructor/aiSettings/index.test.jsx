@@ -93,6 +93,48 @@ describe("AISettings model testing", () => {
     });
   });
 
+  it("shows Vertex AI as server-managed configuration", async () => {
+    const user = userEvent.setup();
+    getCourseInfo.mockResolvedValueOnce({
+      data: [
+        {
+          default_ai_provider: "gemini_vertex",
+          default_ai_model: "gemini-2.5-flash",
+          default_feedback_style: "balanced",
+          default_ai_temperature: 0.5,
+          has_gemini_vertex_config: true,
+        },
+      ],
+    });
+    fetchAiModels.mockResolvedValueOnce({
+      data: { models: ["gemini-2.5-flash", "gemini-2.5-pro"] },
+    });
+
+    renderAISettings();
+
+    expect(
+      await screen.findByText("Vertex AI Server Configuration")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Gemini over Vertex AI uses the Google Cloud project and credentials configured for the CodeAssist deployment."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText(/paste a new api key/i)
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /refresh models/i }));
+
+    await waitFor(() => {
+      expect(fetchAiModels).toHaveBeenCalledWith({
+        course_id: "course-1",
+        provider: "gemini_vertex",
+        api_key: undefined,
+      });
+    });
+  });
+
   it("does not redirect an instructor away from AI settings", async () => {
     renderAISettings("instructor");
 
