@@ -5,6 +5,7 @@ import subprocess
 import uuid
 import csv
 import uuid
+import tarfile
 import zipfile
 import docker
 import pytest
@@ -693,6 +694,13 @@ def _cleanup_submission_dirs(assignment_id):
         shutil.rmtree(path, ignore_errors=True)
 
 
+def _fake_grading(mocker, returncode, stdout=b"", stderr=b""):
+    return mocker.patch(
+        "routes.submission.run_grading",
+        return_value=SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr),
+    )
+
+
 def _mock_assignment_lookups(mocker, fake_assignment):
     """Mock the Assignment/AssignmentExtension/Submission queries upload_submission makes."""
     def fake_query(model):
@@ -774,21 +782,7 @@ def test_upload_submission_success_archives_submission_and_results(client, mocke
     fake_container.name = "assignment_container_test"
     mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
 
-    # Container cleanup, the autograder run and the results read all go through
-    # `docker exec` subprocesses now, so dispatch on the shell command.
-    def fake_subprocess_run(args, **kwargs):
-        proc = mocker.Mock()
-        proc.returncode = 0
-        proc.stderr = b""
-        command = args[-1] if isinstance(args, (list, tuple)) else ""
-        proc.stdout = (
-            b'{"score": 100, "execution_time": 1.5}'
-            if command.startswith("cat ")
-            else b""
-        )
-        return proc
-
-    mocker.patch("routes.submission.subprocess.run", side_effect=fake_subprocess_run)
+    _fake_grading(mocker, 0, stdout=b'{"score": 100, "execution_time": 1.5}')
     # Without this the route spawns a real async_get_ai_feedback thread against
     # the test database after the response returns. It happens to pass today,
     # but it is a background thread racing test teardown - exactly the shape of
@@ -815,6 +809,57 @@ def test_upload_submission_success_archives_submission_and_results(client, mocke
         assert "solution.py" in archived_files
         assert f"results_{submission_id}.json" in archived_files
         assert body["results_path"] == os.path.join(archived_path, f"results_{submission_id}.json")
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_logs_step_timings_without_returning_them(client, mocker, caplog):
+    caplog.set_level("INFO", logger="routes.submission")
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = "autograder-test"
+    fake_assignment.autograder_timeout = 30
+
+    _mock_assignment_lookups(mocker, fake_assignment)
+
+    fake_container = mocker.Mock()
+    fake_container.name = "assignment_container_test"
+    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
+
+    _fake_grading(mocker, 0, stdout=b'{"score": 100}')
+    mocker.patch("routes.submission.threading.Thread")
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+            },
+        )
+
+        assert response.status_code == 200
+        assert "timings" not in response.get_json()
+        logged = [r.getMessage() for r in caplog.records if r.getMessage().startswith("grading_timing")]
+        assert len(logged) == 1
+        timings = json.loads(logged[0].split(" ", 3)[3])
+        expected_steps = {
+            "validate", "stage", "prepare", "lock_wait", "container",
+            "grade", "record", "archive", "total",
+        }
+        assert set(timings) == expected_steps
+        assert all(value >= 0 for value in timings.values())
+        steps_sum = sum(value for name, value in timings.items() if name != "total")
+        assert steps_sum <= timings["total"] + 0.001
     finally:
         _cleanup_submission_dirs(assignment_id)
 
@@ -2318,43 +2363,6 @@ def test_get_or_create_fails_when_leftover_cannot_be_removed(app, mocker):
     assert client_mock.containers.run.call_count == 1
 
 
-def test_reset_workspace_removes_dotfiles_and_restores_source(app, mocker):
-    """The between-students reset has to cover more than `rm -rf dir/*`.
-
-    A glob skips dotfiles, so a dropped .pth, sitecustomize.py, conftest.py or
-    .pytest_cache used to survive into the next student's run. rm -rf also does
-    not kill processes, and nothing restored /autograder/source, so a
-    submission that wrote to run_autograder or the test files could influence
-    every student graded after it on that container.
-    """
-    container = mocker.Mock()
-    exec_mock = mocker.patch(
-        "routes.submission.exec_run_with_timeout",
-        return_value=submission_module.ExecResult(0, b""),
-    )
-
-    submission_module.reset_container_workspace(container)
-
-    script = exec_mock.call_args[0][1]
-    assert "find /autograder/submission -mindepth 1 -delete" in script
-    assert "find /autograder/results -mindepth 1 -delete" in script
-    assert "kill -9 -1" in script
-    assert submission_module.SOURCE_BASELINE_PATH in script
-    assert "rm -rf /autograder/source" in script
-
-
-def test_reset_workspace_refuses_to_grade_on_a_dirty_container(app, mocker):
-    """A failed reset must fail the request, not grade against leftovers."""
-    container = mocker.Mock()
-    mocker.patch(
-        "routes.submission.exec_run_with_timeout",
-        return_value=submission_module.ExecResult(1, b"permission denied"),
-    )
-
-    with pytest.raises(InternalProcessingError):
-        submission_module.reset_container_workspace(container)
-
-
 def test_source_baseline_snapshot_is_idempotent(app, mocker):
     """Never re-snapshot: the baseline must come from the pristine image only."""
     container = mocker.Mock()
@@ -2487,16 +2495,8 @@ def test_upload_submission_records_row_for_malformed_results(client, mocker):
     mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
     mocker.patch("routes.submission.threading.Thread")
 
-    def fake_subprocess_run(args, **kwargs):
-        proc = mocker.Mock()
-        proc.returncode = 0
-        proc.stderr = b""
-        command = args[-1] if isinstance(args, (list, tuple)) else ""
-        # Valid JSON, but no `score` key - the KeyError half of the finding.
-        proc.stdout = b'{"tests": []}' if command.startswith("cat ") else b""
-        return proc
-
-    mocker.patch("routes.submission.subprocess.run", side_effect=fake_subprocess_run)
+    # Valid JSON, but no `score` key - the KeyError half of the finding.
+    _fake_grading(mocker, 0, stdout=b'{"tests": []}')
     recorded = mocker.patch("routes.submission._record_failed_submission")
 
     try:
@@ -2515,198 +2515,6 @@ def test_upload_submission_records_row_for_malformed_results(client, mocker):
         kwargs = recorded.call_args.kwargs
         assert kwargs["assignment_id"] == assignment_id
         assert kwargs["results"]["score"] == 0
-    finally:
-        _cleanup_submission_dirs(assignment_id)
-
-
-def test_upload_submission_discards_container_on_autograder_failure(client, mocker):
-    """A non-zero autograder exit must tear the shared container down.
-
-    The run went off the rails somewhere we cannot see, and anything the
-    submission spawned is still alive in there. The old per-submission
-    container was destroyed on every exit path; leaving this one running hands
-    the next student someone else's processes.
-    """
-    assignment_id = str(uuid.uuid4())
-    student_id = str(uuid.uuid4())
-
-    fake_assignment = mocker.Mock()
-    fake_assignment.allow_file_upload = True
-    fake_assignment.published = True
-    fake_assignment.published_date = None
-    fake_assignment.due_date = None
-    fake_assignment.late_due_date = None
-    fake_assignment.late_submission = False
-    fake_assignment.autograder_image_name = "autograder-test"
-    fake_assignment.autograder_timeout = 30
-
-    _mock_assignment_lookups(mocker, fake_assignment)
-
-    fake_container = mocker.Mock()
-    fake_container.name = "assignment_container_test"
-    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
-
-    def fake_subprocess_run(args, **kwargs):
-        proc = mocker.Mock()
-        command = args[-1] if isinstance(args, (list, tuple)) else ""
-        proc.returncode = 0 if command.startswith(("test ", "\n", "kill")) else 1
-        proc.stdout = b""
-        proc.stderr = b"Traceback ..."
-        return proc
-
-    mocker.patch("routes.submission.subprocess.run", side_effect=fake_subprocess_run)
-    mocker.patch("routes.submission.reset_container_workspace")
-    reset = mocker.patch("routes.submission.reset_assignment_container")
-    recorded = mocker.patch("routes.submission._record_failed_submission")
-    archived = mocker.patch("routes.submission.archive_staged_files")
-
-    try:
-        response = client.post(
-            "/upload_submission",
-            data={
-                "assignment_id": assignment_id,
-                "student_id": student_id,
-                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
-            },
-        )
-
-        assert response.status_code == 500
-        reset.assert_called_once()
-
-        # The attempt is recorded and archived rather than vanishing.
-        recorded.assert_called_once()
-        kwargs = recorded.call_args.kwargs
-        assert kwargs["assignment_id"] == assignment_id
-        assert kwargs["student_id"] == student_id
-        assert kwargs["filename"] == "solution.py"
-        assert kwargs["results"]["score"] == 0
-        assert kwargs["results"]["tests"][0]["name"] == "Autograder Error"
-        # stderr stays in the server log, never in what the student sees.
-        assert "Traceback" not in json.dumps(kwargs["results"])
-        archived.assert_called_once()
-        assert archived.call_args.args[0] == assignment_id
-    finally:
-        _cleanup_submission_dirs(assignment_id)
-
-
-def test_upload_submission_discards_container_when_workspace_reset_fails(client, mocker):
-    assignment_id = str(uuid.uuid4())
-    student_id = str(uuid.uuid4())
-
-    fake_assignment = mocker.Mock()
-    fake_assignment.allow_file_upload = True
-    fake_assignment.published = True
-    fake_assignment.published_date = None
-    fake_assignment.due_date = None
-    fake_assignment.late_due_date = None
-    fake_assignment.late_submission = False
-    fake_assignment.autograder_image_name = "autograder-test"
-    fake_assignment.autograder_timeout = 30
-
-    _mock_assignment_lookups(mocker, fake_assignment)
-
-    fake_container = mocker.Mock()
-    fake_container.name = "assignment_container_test"
-    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
-    mocker.patch(
-        "routes.submission.reset_container_workspace",
-        side_effect=InternalProcessingError("Failed to cleanup container"),
-    )
-    run = mocker.patch("routes.submission.subprocess.run")
-    reset = mocker.patch("routes.submission.reset_assignment_container")
-
-    try:
-        response = client.post(
-            "/upload_submission",
-            data={
-                "assignment_id": assignment_id,
-                "student_id": student_id,
-                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
-            },
-        )
-
-        assert response.status_code == 500
-        reset.assert_called_once_with(fake_assignment)
-        run.assert_not_called()
-        fake_container.put_archive.assert_not_called()
-    finally:
-        _cleanup_submission_dirs(assignment_id)
-
-
-@pytest.mark.parametrize("cat_outcome", ["missing", "timeout"])
-def test_upload_submission_records_attempt_when_results_json_unreadable(client, mocker, cat_outcome):
-    """The autograder exited cleanly but results.json could not be read.
-
-    The student's code has already run, so the attempt must be recorded and
-    archived like the crash and malformed-results paths, not dropped by the
-    `finally` that deletes the staged file.
-    """
-    assignment_id = str(uuid.uuid4())
-    student_id = str(uuid.uuid4())
-
-    fake_assignment = mocker.Mock()
-    fake_assignment.allow_file_upload = True
-    fake_assignment.published = True
-    fake_assignment.published_date = None
-    fake_assignment.due_date = None
-    fake_assignment.late_due_date = None
-    fake_assignment.late_submission = False
-    fake_assignment.autograder_image_name = "autograder-test"
-    fake_assignment.autograder_timeout = 30
-
-    _mock_assignment_lookups(mocker, fake_assignment)
-
-    fake_container = mocker.Mock()
-    fake_container.name = "assignment_container_test"
-    mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
-    mocker.patch("routes.submission.reset_container_workspace")
-    mocker.patch(
-        "routes.submission.subprocess.run",
-        return_value=SimpleNamespace(returncode=0, stdout=b"", stderr=b""),
-    )
-    if cat_outcome == "missing":
-        mocker.patch(
-            "routes.submission.exec_run_with_timeout",
-            return_value=submission_module.ExecResult(
-                1, b"cat: /autograder/results/results.json: No such file or directory"
-            ),
-        )
-    else:
-        mocker.patch(
-            "routes.submission.exec_run_with_timeout",
-            side_effect=submission_module.ContainerExecTimeout(),
-        )
-    reset = mocker.patch("routes.submission.reset_assignment_container")
-    recorded = mocker.patch("routes.submission._record_failed_submission")
-    archived = mocker.patch("routes.submission.archive_staged_files")
-
-    try:
-        response = client.post(
-            "/upload_submission",
-            data={
-                "assignment_id": assignment_id,
-                "student_id": student_id,
-                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
-            },
-        )
-
-        assert response.status_code == 500
-        recorded.assert_called_once()
-        kwargs = recorded.call_args.kwargs
-        assert kwargs["assignment_id"] == assignment_id
-        assert kwargs["student_id"] == student_id
-        assert kwargs["filename"] == "solution.py"
-        assert kwargs["results"]["score"] == 0
-        assert kwargs["results"]["tests"][0]["name"] == "Autograder Error"
-        # The container path from cat's error is not shown to the student.
-        assert "/autograder/results" not in json.dumps(kwargs["results"])
-        archived.assert_called_once()
-        assert archived.call_args.args[0] == assignment_id
-        # Only a hung exec means the container is suspect; a missing file does not.
-        if cat_outcome == "timeout":
-            reset.assert_called_once_with(fake_assignment)
-        else:
-            reset.assert_not_called()
     finally:
         _cleanup_submission_dirs(assignment_id)
 
@@ -2786,30 +2594,142 @@ def test_upload_autograder_releases_db_connection_before_waiting_for_lock(client
         _cleanup_submission_dirs(assignment_id)
 
 
-def test_reset_workspace_hands_student_dirs_to_unprivileged_user_and_clears_its_files(app, mocker):
-    """Student code runs as uid 65534, so anything it left outside /autograder is owned by it."""
-    container = mocker.Mock()
-    exec_mock = mocker.patch(
-        "routes.submission.exec_run_with_timeout",
-        return_value=submission_module.ExecResult(0, b""),
+def _grade_script_lines():
+    return [line.strip() for line in submission_module._GRADE_SCRIPT.splitlines() if line.strip()]
+
+
+def _line_index(lines, fragment):
+    matches = [i for i, line in enumerate(lines) if fragment in line]
+    assert len(matches) == 1, (fragment, matches)
+    return matches[0]
+
+
+def test_grade_script_resets_workspace_before_the_submission_arrives(app):
+    """Reset must finish before the submission is unpacked."""
+    lines = _grade_script_lines()
+    unpack = _line_index(lines, "tar -x")
+    reset_steps = [
+        "kill -9 -1",
+        "find / /dev/shm -xdev -depth -user 65534 -not -path '/autograder/*' -delete",
+        "rm -rf /autograder/source",
+        f"cp -a {submission_module.SOURCE_BASELINE_PATH} /autograder/source",
+        "find /autograder/submission /autograder/results -mindepth 1 -delete",
+        "chown -R 65534:65534 /autograder/source /autograder/submission /autograder/results",
+    ]
+    positions = [lines.index(next(l for l in lines if l.startswith(step))) for step in reset_steps]
+    assert positions == sorted(positions)
+    assert positions[-1] < unpack
+    for step in reset_steps[1:]:
+        line = next(l for l in lines if l.startswith(step))
+        assert line.endswith(f"|| exit {submission_module.GRADE_EXIT_RESET_FAILED}")
+
+
+def test_grade_script_runs_autograder_as_unprivileged_user_under_time_limit(app):
+    """Running as root let a submission edit the saved grader copy and installed packages."""
+    lines = _grade_script_lines()
+    run = lines[_line_index(lines, "/autograder/source/run_autograder")]
+    run_cmd = run + " " + lines[_line_index(lines, "/autograder/source/run_autograder") - 1]
+
+    assert "HOME=/tmp" in run_cmd
+    assert 'timeout -s KILL "$1"' in run_cmd
+    assert "setpriv --reuid=65534 --regid=65534 --clear-groups" in run_cmd
+    # only the student's run goes through setpriv
+    assert sum("setpriv" in line for line in lines) == 1
+
+
+def test_grade_script_keeps_student_output_off_stdout_and_private(app):
+    """stdout only has results.json and the run log is root only."""
+    lines = _grade_script_lines()
+    log = submission_module.AUTOGRADER_LOG_PATH
+    lock_down = _line_index(lines, f"chmod 600 {log}")
+    run = _line_index(lines, "/autograder/source/run_autograder")
+
+    assert lock_down < run
+    assert f">{log} 2>&1" in lines[run]
+    assert f"cat {log} >&2" in lines
+    assert lines[-1] == (
+        f"cat /autograder/results/results.json || exit {submission_module.GRADE_EXIT_NO_RESULTS}"
     )
 
-    submission_module.reset_container_workspace(container)
 
-    lines = [line.strip() for line in exec_mock.call_args[0][1].splitlines() if line.strip()]
-    clear = "find / /dev/shm -xdev -depth -user 65534 -not -path '/autograder/*' -delete"
-    chown = "chown -R 65534:65534 /autograder/source /autograder/submission /autograder/results"
-    assert clear in lines
-    assert chown in lines
-    assert lines.index("kill -9 -1 2>/dev/null || true") < lines.index(clear)
-    assert lines.index(chown) == len(lines) - 1
+def test_grade_script_refuses_a_symlinked_results_file(app):
+    """results.json is read as root, so a symlink could print a hidden test."""
+    lines = _grade_script_lines()
+    leftover_kill = max(i for i, line in enumerate(lines) if line == "kill -9 -1 2>/dev/null")
+    check = _line_index(lines, "[ ! -L /autograder/results/results.json ]")
+    read = _line_index(lines, "cat /autograder/results/results.json")
+
+    assert leftover_kill < check < read
+    assert "[ -f /autograder/results/results.json ]" in lines[check]
+    assert lines[check].endswith(f"|| exit {submission_module.GRADE_EXIT_NO_RESULTS}")
 
 
-def test_upload_submission_runs_autograder_as_unprivileged_user(client, mocker):
-    """Running as root let a submission edit the saved grader copy and installed packages."""
-    assignment_id = str(uuid.uuid4())
-    student_id = str(uuid.uuid4())
+def test_grade_script_reports_timeout_only_after_the_limit(app):
+    """A SIGKILL before the limit (e.g. out of memory) is a crash, not a timeout."""
+    lines = _grade_script_lines()
+    start = _line_index(lines, "start=$(date +%s)")
+    run = _line_index(lines, "/autograder/source/run_autograder")
+    timed_out = _line_index(lines, '"$rc" -eq 137')
 
+    assert start < run < timed_out
+    assert '$(( $(date +%s) - start )) -ge "$1"' in lines[timed_out]
+
+
+def test_grade_script_kills_leftover_student_processes_before_reading_results(app):
+    """Kill leftover student processes before reading results (python:3.9-slim has no /usr/bin/kill)."""
+    lines = _grade_script_lines()
+    run = _line_index(lines, "/autograder/source/run_autograder")
+    read = _line_index(lines, "cat /autograder/results/results.json")
+    kills = [i for i, line in enumerate(lines) if line == "kill -9 -1 2>/dev/null"]
+
+    assert kills[0] == 0
+    assert any(run < i < read for i in kills)
+
+
+def test_run_grading_sends_submission_on_stdin_in_one_root_exec(app, mocker, tmp_path):
+    submission_file = tmp_path / "solution.py"
+    submission_file.write_bytes(b"print('hello')")
+    container = mocker.Mock()
+    container.name = "assignment_container_test"
+    run = mocker.patch(
+        "routes.submission.subprocess.run",
+        return_value=SimpleNamespace(returncode=0, stdout=b"{}", stderr=b""),
+    )
+
+    submission_module.run_grading(container, str(submission_file), "solution.py", 30)
+
+    run.assert_called_once()
+    args = run.call_args.args[0]
+    assert args[:4] == ["docker", "exec", "-i", "assignment_container_test"]
+    assert "-u" not in args
+    assert args[4:7] == ["sh", "-c", submission_module._GRADE_SCRIPT]
+    # timeout is passed as $1, not formatted into the script
+    assert args[7:] == ["grade", "30"]
+    assert run.call_args.kwargs["timeout"] == 30 + submission_module.GRADE_OVERHEAD_TIMEOUT
+
+    with tarfile.open(
+        fileobj=io.BytesIO(run.call_args.kwargs["input"])
+    ) as tar:
+        assert tar.getnames() == ["solution.py"]
+        assert tar.extractfile("solution.py").read() == b"print('hello')"
+
+
+def test_run_grading_reports_a_hung_exec_as_container_timeout(app, mocker, tmp_path):
+    """Outer timeout means the container is stuck."""
+    submission_file = tmp_path / "solution.py"
+    submission_file.write_bytes(b"print('hello')")
+    container = mocker.Mock()
+    container.name = "assignment_container_test"
+    mocker.patch(
+        "routes.submission.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd="docker exec", timeout=90),
+    )
+
+    with pytest.raises(submission_module.ContainerExecTimeout):
+        submission_module.run_grading(container, str(submission_file), "solution.py", 30)
+
+
+def _graded_upload_setup(mocker):
     fake_assignment = mocker.Mock()
     fake_assignment.allow_file_upload = True
     fake_assignment.published = True
@@ -2819,37 +2739,210 @@ def test_upload_submission_runs_autograder_as_unprivileged_user(client, mocker):
     fake_assignment.late_submission = False
     fake_assignment.autograder_image_name = "autograder-test"
     fake_assignment.autograder_timeout = 30
-
     _mock_assignment_lookups(mocker, fake_assignment)
 
     fake_container = mocker.Mock()
     fake_container.name = "assignment_container_test"
     mocker.patch("routes.submission.get_or_create_assignment_container", return_value=fake_container)
-    mocker.patch("routes.submission.reset_container_workspace")
-    run = mocker.patch(
-        "routes.submission.subprocess.run",
-        return_value=SimpleNamespace(returncode=0, stdout=b"", stderr=b""),
+    mocker.patch("routes.submission.threading.Thread")
+    return SimpleNamespace(
+        assignment=fake_assignment,
+        reset=mocker.patch("routes.submission.reset_assignment_container"),
+        recorded=mocker.patch("routes.submission._record_failed_submission"),
+        archived=mocker.patch("routes.submission.archive_staged_files"),
     )
-    mocker.patch(
-        "routes.submission.exec_run_with_timeout",
-        return_value=submission_module.ExecResult(0, b"not json"),
+
+
+def _post_submission(client, assignment_id, student_id):
+    return client.post(
+        "/upload_submission",
+        data={
+            "assignment_id": assignment_id,
+            "student_id": student_id,
+            "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+        },
     )
-    mocker.patch("routes.submission._record_failed_submission")
-    mocker.patch("routes.submission.archive_staged_files")
+
+
+def test_upload_submission_records_timeout_when_autograder_runs_too_long(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    setup = _graded_upload_setup(mocker)
+    _fake_grading(mocker, submission_module.GRADE_EXIT_TIMED_OUT)
+    setup.recorded.return_value = SimpleNamespace(id=uuid.uuid4())
 
     try:
-        client.post(
-            "/upload_submission",
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 504
+        setup.reset.assert_called_once_with(setup.assignment)
+        kwargs = setup.recorded.call_args.kwargs
+        assert kwargs["results"]["tests"][0]["name"] == "Submission Timeout"
+        assert kwargs["execution_time"] == 30.0
+        setup.archived.assert_called_once()
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+@pytest.mark.parametrize("returncode", [
+    submission_module.GRADE_EXIT_AUTOGRADER_FAILED,
+    137,  # killed, e.g. out of memory
+])
+def test_upload_submission_discards_container_on_autograder_failure(client, mocker, returncode):
+    """A non-zero autograder exit must tear the shared container down."""
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    setup = _graded_upload_setup(mocker)
+    _fake_grading(mocker, returncode, stderr=b"Traceback ...")
+
+    try:
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 500
+        setup.reset.assert_called_once_with(setup.assignment)
+
+        # The attempt is recorded and archived rather than vanishing.
+        kwargs = setup.recorded.call_args.kwargs
+        assert kwargs["assignment_id"] == assignment_id
+        assert kwargs["student_id"] == student_id
+        assert kwargs["filename"] == "solution.py"
+        assert kwargs["results"]["tests"][0]["name"] == "Autograder Error"
+        # stderr stays in the server log, never in what the student sees.
+        assert "Traceback" not in json.dumps(kwargs["results"])
+        setup.archived.assert_called_once()
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_records_attempt_when_results_json_missing(client, mocker):
+    """Missing results.json is recorded but keeps the container."""
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    setup = _graded_upload_setup(mocker)
+    _fake_grading(
+        mocker,
+        submission_module.GRADE_EXIT_NO_RESULTS,
+        stderr=b"cat: /autograder/results/results.json: No such file or directory",
+    )
+
+    try:
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 500
+        # Only a hung exec means the container is suspect; a missing file does not.
+        setup.reset.assert_not_called()
+        kwargs = setup.recorded.call_args.kwargs
+        assert kwargs["results"]["score"] == 0
+        # The container path from cat's error is not shown to the student.
+        assert "/autograder/results" not in json.dumps(kwargs["results"])
+        setup.archived.assert_called_once()
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+@pytest.mark.parametrize("returncode", [
+    submission_module.GRADE_EXIT_RESET_FAILED,
+    submission_module.GRADE_EXIT_COPY_FAILED,
+    125,  # docker failed to run the exec
+    126,
+    127,
+    2,
+])
+def test_upload_submission_discards_container_when_setup_fails(client, mocker, returncode):
+    """Setup failed before student code ran: discard container, no record."""
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    setup = _graded_upload_setup(mocker)
+    _fake_grading(mocker, returncode, stderr=b"permission denied")
+
+    try:
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 500
+        setup.reset.assert_called_once_with(setup.assignment)
+        setup.recorded.assert_not_called()
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_records_timeout_when_grading_exec_hangs(client, mocker, caplog):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    setup = _graded_upload_setup(mocker)
+    setup.recorded.return_value = SimpleNamespace(id=uuid.uuid4())
+    mocker.patch(
+        "routes.submission.run_grading",
+        side_effect=submission_module.ContainerExecTimeout("stuck"),
+    )
+
+    try:
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 504
+        setup.reset.assert_called_once_with(setup.assignment)
+        kwargs = setup.recorded.call_args.kwargs
+        assert kwargs["results"]["tests"][0]["name"] == "Submission Timeout"
+        setup.archived.assert_called_once()
+        assert any("safety timeout" in r.getMessage() for r in caplog.records if r.levelname == "WARNING")
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+@pytest.mark.parametrize("stored_timeout", [None, 0])
+def test_upload_submission_defaults_missing_timeout_to_300(client, mocker, stored_timeout):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    setup = _graded_upload_setup(mocker)
+    setup.assignment.autograder_timeout = stored_timeout
+    setup.recorded.return_value = SimpleNamespace(id=uuid.uuid4())
+    grading = _fake_grading(mocker, submission_module.GRADE_EXIT_TIMED_OUT)
+
+    try:
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 504
+        assert grading.call_args.args[3] == 300
+        assert setup.recorded.call_args.kwargs["execution_time"] == 300.0
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_records_attempt_when_results_are_not_utf8(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    setup = _graded_upload_setup(mocker)
+    _fake_grading(mocker, 0, stdout=b'\xff\xfe{"score": 1}')
+
+    try:
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 500
+        setup.recorded.assert_called_once()
+        setup.archived.assert_called_once()
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+@pytest.mark.parametrize("timeout_value", ["0", "-5", "abc", "2.5"])
+def test_upload_autograder_rejects_invalid_timeout(client, mocker, timeout_value):
+    assignment_id = _real_assignment()
+    mocker.patch("routes.submission.require_authenticated")
+    mocker.patch("routes.submission.require_course_role")
+    docker_client = mocker.patch("routes.submission.get_docker_client")
+
+    try:
+        response = client.post(
+            "/upload_assignment_autograder",
             data={
                 "assignment_id": assignment_id,
-                "student_id": student_id,
-                "file": (io.BytesIO(b"print('hello')"), "solution.py"),
+                "autograder_timeout": timeout_value,
+                "file": (io.BytesIO(b"zip-bytes"), "autograder.zip"),
             },
+            content_type="multipart/form-data",
         )
 
-        args = run.call_args.args[0]
-        assert args[:3] == ["docker", "exec", "-u"]
-        assert args[3] == "65534:65534"
-        assert "HOME=/tmp" in args
+        assert response.status_code == 400
+        assert db.session.get(Assignment, assignment_id).autograder_timeout == 30
+        docker_client.assert_not_called()
     finally:
         _cleanup_submission_dirs(assignment_id)
