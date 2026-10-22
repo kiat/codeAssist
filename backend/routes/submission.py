@@ -330,6 +330,7 @@ GRADE_EXIT_TIMED_OUT = 92
 GRADE_EXIT_AUTOGRADER_FAILED = 93
 GRADE_EXIT_NO_RESULTS = 94
 GRADE_OVERHEAD_TIMEOUT = 60
+KILLED_EXIT_CODE = 137
 AUTOGRADER_LOG_PATH = "/autograder/.run_autograder.log"
 
 _GRADE_SCRIPT = f"""
@@ -840,6 +841,10 @@ def upload_submission():
                 returncode = grade_proc.returncode
                 grade_stderr = (grade_proc.stderr or b"").decode(errors="replace")
             except ContainerExecTimeout:
+                logger.warning(
+                    "Grading exec for assignment %s hit the %ss safety timeout; recording it as a timeout",
+                    assignment_id, autograder_timeout + GRADE_OVERHEAD_TIMEOUT
+                )
                 grade_proc = None
                 returncode = GRADE_EXIT_TIMED_OUT
                 grade_stderr = ""
@@ -878,7 +883,10 @@ def upload_submission():
                 archive_staged_files(assignment_id, submission_id, submissions_dir)
                 raise SubmissionTimeoutError("Submitted program took too long to run", failed_submission.id)
 
-            if returncode in (GRADE_EXIT_RESET_FAILED, GRADE_EXIT_COPY_FAILED):
+            student_code_ran = returncode in (
+                GRADE_EXIT_TIMED_OUT, GRADE_EXIT_AUTOGRADER_FAILED, GRADE_EXIT_NO_RESULTS, KILLED_EXIT_CODE
+            )
+            if returncode != 0 and not student_code_ran:
                 logger.warning(
                     "Failed to prepare container for assignment %s (exit %s), details: %s",
                     assignment_id, returncode, grade_stderr

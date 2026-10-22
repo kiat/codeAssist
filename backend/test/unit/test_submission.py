@@ -2786,9 +2786,6 @@ def test_upload_submission_records_timeout_when_autograder_runs_too_long(client,
 
 @pytest.mark.parametrize("returncode", [
     submission_module.GRADE_EXIT_AUTOGRADER_FAILED,
-    125,  # docker failed to run the exec
-    126,
-    127,
     137,  # killed, e.g. out of memory
 ])
 def test_upload_submission_discards_container_on_autograder_failure(client, mocker, returncode):
@@ -2846,6 +2843,10 @@ def test_upload_submission_records_attempt_when_results_json_missing(client, moc
 @pytest.mark.parametrize("returncode", [
     submission_module.GRADE_EXIT_RESET_FAILED,
     submission_module.GRADE_EXIT_COPY_FAILED,
+    125,  # docker failed to run the exec
+    126,
+    127,
+    2,
 ])
 def test_upload_submission_discards_container_when_setup_fails(client, mocker, returncode):
     """Setup failed before student code ran: discard container, no record."""
@@ -2864,7 +2865,7 @@ def test_upload_submission_discards_container_when_setup_fails(client, mocker, r
         _cleanup_submission_dirs(assignment_id)
 
 
-def test_upload_submission_records_timeout_when_grading_exec_hangs(client, mocker):
+def test_upload_submission_records_timeout_when_grading_exec_hangs(client, mocker, caplog):
     assignment_id = str(uuid.uuid4())
     student_id = str(uuid.uuid4())
     setup = _graded_upload_setup(mocker)
@@ -2882,6 +2883,7 @@ def test_upload_submission_records_timeout_when_grading_exec_hangs(client, mocke
         kwargs = setup.recorded.call_args.kwargs
         assert kwargs["results"]["tests"][0]["name"] == "Submission Timeout"
         setup.archived.assert_called_once()
+        assert any("safety timeout" in r.getMessage() for r in caplog.records if r.levelname == "WARNING")
     finally:
         _cleanup_submission_dirs(assignment_id)
 
