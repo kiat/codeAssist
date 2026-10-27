@@ -122,6 +122,8 @@ Example Output:
 
 ## GET /get_assignment
 
+**Auth:** logged in and enrolled in the assignment's course (instructor, TA or student).
+
 **Accepts Query String**
 
 **Description:**
@@ -175,6 +177,8 @@ Example Output:
 
 ## GET /get_extension
 
+**Auth:** logged in as the student in `student_id`, or as an instructor or TA of the assignment's course.
+
 **Accepts Query String**
 
 **Description**
@@ -200,6 +204,8 @@ Example Output:
 
 
 ## GET /get_assignment_extensions
+
+**Auth:** instructor or TA of the assignment's course.
 
 **Accepts Query String**
 
@@ -254,3 +260,7 @@ Example Output:
     }
 
 ---
+
+## GET /courses
+
+**Auth:** logged in. Returns the courses where the caller is an instructor or TA, for the Duplicate Assignment dialog. The `instructor_id` parameter is ignored, except that an admin who sends no `instructor_id` gets every course.

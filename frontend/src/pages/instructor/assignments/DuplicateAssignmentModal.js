@@ -14,7 +14,8 @@ export default function DuplicateAssignmentModal({ open, toggleCreateAssignmentM
   const getCourses = useCallback(async () => {
     try {
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/courses?instructor_id=${courseInfo.instructor_id}`
+        `${process.env.REACT_APP_API_URL}/courses?instructor_id=${courseInfo.instructor_id}`,
+        { withCredentials: true }
       );
       setCourses(response.data);
       if (response.data.length > 0) {

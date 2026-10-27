@@ -9,7 +9,7 @@ from api.models import User, Course, AdminEmail
 from api.schemas import UserSchema, CourseSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, ConflictError, ForbiddenError
 from util.encryption_utils import hash_password, verify_password, needs_rehash, is_hashed
-from util.auth import require_admin, require_authenticated, require_self_or_admin, get_user_global_role
+from util.auth import require_admin, require_authenticated, require_self_or_admin, get_user_global_role, require_course_role
 
 
 user = Blueprint('user', __name__)
@@ -251,8 +251,14 @@ def google_login():
 @user.route('/get_user_by_email', methods = ["GET"])
 def get_user():
     email = request.args.get("email")
+    course_id = request.args.get("course_id")
     if not email or email == "":
         raise BadRequestError("Missing email argument")
+    if not course_id:
+        raise BadRequestError("Missing course_id argument")
+
+    # Used by course staff to look up a user before enrolling them.
+    require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can look up users")
 
     res = db.session.query(User).with_entities(User.id, User.name, User.email_address, User.role).filter_by(email_address=email).first()
     if not res:
