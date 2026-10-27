@@ -21,7 +21,7 @@ from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSc
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, UnauthorizedError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
 from util.url_utils import validate_ollama_url
-from util.auth import require_admin, require_authenticated, require_course_role
+from util.auth import require_admin, require_authenticated, require_course_role, get_user_global_role
 from ai_feedback.integration import (
     CORRECTNESS_SYSTEM_PROMPT,
     get_gemini_generation_config,
@@ -177,12 +177,21 @@ def create_course():
     @param year             year of the course
     @param entryCode        entryCode of the course
     """
-    data = request.json
+    user_id = require_authenticated()
+    global_role = get_user_global_role(user_id)
+    if global_role not in ("instructor", "admin"):
+        raise ForbiddenError("Only instructors can create courses")
+
+    data = request.json or {}
     required_fields = ["name", "instructor_id", "semester", "year", "entryCode"]
 
     # validate request
     if not all(field in data and data[field] for field in required_fields):
         raise BadRequestError("Missing required fields")
+
+    # Instructors create courses for themselves; the admin panel creates them for others.
+    if str(data["instructor_id"]) != str(user_id) and global_role != "admin":
+        raise ForbiddenError("You can only create courses for yourself")
     
     # set default value for allowEntryCode if not provided
     data["allowEntryCode"] = data.get("allowEntryCode", True)
@@ -221,12 +230,17 @@ def enroll_course():
     @param entryCode        entryCode of the course
     @param user_id       id of the student
     """
-    data = request.json
+    user_id = require_authenticated()
+
+    data = request.json or {}
     required_fields = ["user_id", "entryCode"]
 
     # validate request
     if not all(field in data for field in required_fields):
         raise BadRequestError("Missing required fields")
+
+    if str(data["user_id"]) != str(user_id):
+        raise ForbiddenError("You can only enroll yourself")
 
     course = db.session.query(Course).filter_by(entryCode=data["entryCode"]).first()
     
@@ -256,12 +270,18 @@ def enroll_course():
     
 @course.route("/leave_course", methods=["POST"])
 def leave_course():
-    data = request.json
+    session_user_id = require_authenticated()
+
+    data = request.json or {}
     user_id = data.get("user_id")
     course_id = data.get("course_id")
 
     if not user_id or not course_id:
         raise BadRequestError("Missing user_id or course_id")
+
+    # Removing other students goes through the staff enrollment routes.
+    if str(user_id) != str(session_user_id):
+        raise ForbiddenError("You can only leave a course yourself")
 
     enrollment = db.session.query(Enrollment).filter_by(
         student_id=user_id,
