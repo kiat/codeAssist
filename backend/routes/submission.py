@@ -20,6 +20,7 @@ from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, Enrollme
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
 from util.csv_utils import csv_safe_cell
+from util.submission_files import required_submission_files
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -744,6 +745,14 @@ def upload_submission():
 
 
     filename = secure_filename(file.filename)
+    # With one required file name, save the upload under it so the autograder
+    # finds it. Several required names means a zip; that is left as uploaded.
+    required_files = required_submission_files(assignment)
+    if len(required_files) == 1:
+        required_name = required_files[0]
+        if os.path.splitext(filename)[1].lower() != os.path.splitext(required_name)[1].lower():
+            raise BadRequestError(f"This assignment requires a file named {required_name}")
+        filename = required_name
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
     submission_id = uuid.uuid4()

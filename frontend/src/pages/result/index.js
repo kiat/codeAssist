@@ -23,6 +23,7 @@ export default function AssignmentResult() {
   const [formattingModalOpen, setFormattingOpen] = useState(false);
   const [autoGraderPoints, setAutograderPoints] = useState(0);
   const [assignmentName, setAssignmentName] = useState(""); // Placeholder value
+  const [requiredFileName, setRequiredFileName] = useState(null);
   // changing the whole file to use the submisison id in the params instead of teh assingment id and submission id passed in
   const { submissionId } = useParams();
   const [assignmentId, setAssignmentId] = useState("");
@@ -135,6 +136,8 @@ export default function AssignmentResult() {
           setAiFeedbackEnabled(res.data.ai_feedback_enabled);
           setAllowFileUpload(res.data.allow_file_upload !== false);
           setEnableCodeEditor(!!res.data.enable_code_editor);
+          const requiredFiles = res.data.submission_files || [];
+          setRequiredFileName(requiredFiles.length === 1 ? requiredFiles[0] : null);
           if (extension?.data.due_date_extension) {
             setDueDate(moment(extension.data.due_date_extension).valueOf());
           }
@@ -325,6 +328,7 @@ export default function AssignmentResult() {
         onCancel={() => toggleModal("upload")}
         assignmentID={assignmentId}
         assignmentTitle={assignmentName}
+        requiredFileName={requiredFileName}
         extra={() => Reload()}
       />
       <SubmissionHistoryModal
