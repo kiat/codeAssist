@@ -75,6 +75,8 @@ Example Output:
 
 <p>Uploads a submission by a student for an assignment into the database. A id for the submission is generated.</p>
 
+<p>If the assignment has exactly one required file name (<code>submission_files</code>), the upload is saved under that name when its extension matches (for example <code>my_calc.py</code> becomes <code>calculator.py</code>), and rejected with 400 "This assignment requires a file named calculator.py" otherwise. With several required names (a zip), the upload keeps its own name.</p>
+
 Example Input:
 
     {

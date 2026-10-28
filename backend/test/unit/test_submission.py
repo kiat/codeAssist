@@ -2946,3 +2946,80 @@ def test_upload_autograder_rejects_invalid_timeout(client, mocker, timeout_value
         docker_client.assert_not_called()
     finally:
         _cleanup_submission_dirs(assignment_id)
+
+
+def _open_upload_assignment(mocker, submission_files):
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = ""
+    fake_assignment.submission_files = submission_files
+    return fake_assignment
+
+
+def test_upload_submission_renames_to_required_file_name(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    _mock_assignment_lookups(mocker, _open_upload_assignment(mocker, ["calculator.py"]))
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "My Calc.PY"),
+            },
+        )
+
+        assert response.status_code == 200
+        submission_id = response.get_json()["submissionID"]
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        assert set(os.listdir(archived_path)) == {"calculator.py"}
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_rejects_wrong_extension_for_required_file(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    _mock_assignment_lookups(mocker, _open_upload_assignment(mocker, ["calculator.py"]))
+    stage = mocker.patch("routes.submission.stage_submission")
+
+    response = client.post(
+        "/upload_submission",
+        data={
+            "assignment_id": assignment_id,
+            "student_id": str(uuid.uuid4()),
+            "file": (io.BytesIO(b"hello"), "calculator.txt"),
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "This assignment requires a file named calculator.py"
+    stage.assert_not_called()
+
+
+def test_upload_submission_keeps_name_with_several_required_files(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    _mock_assignment_lookups(mocker, _open_upload_assignment(mocker, ["Main.java", "Helper.java"]))
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": str(uuid.uuid4()),
+                "file": (io.BytesIO(b"PK"), "submission.zip"),
+            },
+        )
+
+        assert response.status_code == 200
+        submission_id = response.get_json()["submissionID"]
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        assert set(os.listdir(archived_path)) == {"submission.zip"}
+    finally:
+        _cleanup_submission_dirs(assignment_id)

@@ -98,6 +98,7 @@ export default () => {
         late_due_date,
         allow_file_upload,
         enable_code_editor,
+        submission_files,
         ai_feedback_enabled,
         use_course_ai_default,
         ai_feedback_provider,
@@ -130,6 +131,7 @@ export default () => {
         lateDueDate: late_due_date ? moment.utc(late_due_date).local() : null,
         allow_file_upload: allow_file_upload !== false,
         enable_code_editor: !!enable_code_editor,
+        submission_files: submission_files || [],
         enableAiFeedback: !!ai_feedback_enabled,
         use_course_ai_default: use_course_ai_default !== false,
         ai_feedback_provider: ai_feedback_provider || "openai",
@@ -264,6 +266,7 @@ export default () => {
       late_due_date: values.allowLateSubmissions ? values.lateDueDate : null,
       allow_file_upload: values.allow_file_upload !== false,
       enable_code_editor: !!values.enable_code_editor,
+      submission_files: values.submission_files || [],
       enable_group: values.groupSubmission,
       group_size: values.limitGroupSize,
       leaderboard: values.leaderBoard,
@@ -361,6 +364,20 @@ export default () => {
             tooltip="Allow students to write and submit code directly in the browser"
           >
             <Switch />
+          </Form.Item>
+
+          <Form.Item
+            label="Required File Name(s)"
+            name="submission_files"
+            tooltip="The exact name your autograder copies from /autograder/submission/, e.g. calculator.py. Students cannot change it. Leave empty to let students choose."
+          >
+            <Select
+              mode="tags"
+              tokenSeparators={[",", " "]}
+              open={false}
+              placeholder="e.g. calculator.py"
+              aria-label="Required file names"
+            />
           </Form.Item>
 
           <Form.Item label="PUBLISHED" name="published">

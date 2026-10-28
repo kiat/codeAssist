@@ -14,6 +14,7 @@ from routes.submission import discard_container_lock, assignment_container_lock
 from api.schemas import AssignmentSchema, CourseSchema, AssignmentExtensionSchema
 from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError
 from util.auth import require_authenticated, require_course_role
+from util.submission_files import normalize_submission_files
 from ai_feedback.settings import (
     serialize_assignment_ai_settings,
     split_ai_settings_payload,
@@ -82,6 +83,9 @@ def update_assignment():
     assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment_obj:
         raise NotFoundError("Assignment not found")
+
+    if "submission_files" in assignment_data:
+        assignment_data["submission_files"] = normalize_submission_files(assignment_data["submission_files"])
 
     # Validate that at least one submission method is enabled
     allow_upload = data.get("allow_file_upload")
@@ -175,6 +179,7 @@ def create_assignment():
             raise BadRequestError("At least one submission method (file upload or code editor) must be enabled")
 
         assignment_data, ai_settings_data = split_ai_settings_payload(assignment_data)
+        assignment_data["submission_files"] = normalize_submission_files(assignment_data.get("submission_files"))
 
         valid_assignment_data = {k: v for k, v in assignment_data.items() if v is not None or isinstance(v, bool)}
 

@@ -24,6 +24,8 @@ export default function CodeEditorPage() {
   // Code state
   const [code, setCode] = useState("# Write your solution here\n");
   const [fileName, setFileName] = useState("solution.py");
+  // Set when the instructor requires a file name; the editor then locks it.
+  const [requiredFileName, setRequiredFileName] = useState(null);
   const [assignmentName, setAssignmentName] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -76,6 +78,7 @@ export default function CodeEditorPage() {
       if (!userInfo?.id || !assignmentId) return;
       setLoading(true);
       try {
+        let required = null;
         // Fetch assignment info
         const [assignRes, extRes] = await Promise.all([
           getAssignment({ assignment_id: assignmentId }),
@@ -84,8 +87,10 @@ export default function CodeEditorPage() {
 
         if (assignRes?.data) {
           setAssignmentName(assignRes.data.name);
+          required = assignRes.data.submission_files?.[0] || null;
+          setRequiredFileName(required);
           const nameLower = assignRes.data.name?.toLowerCase().replace(/\s+/g, "_");
-          setFileName(nameLower ? `${nameLower}.py` : "solution.py");
+          setFileName(required || (nameLower ? `${nameLower}.py` : "solution.py"));
 
           if (assignRes.data.due_date) {
             setDueDate(moment(assignRes.data.due_date).valueOf());
@@ -112,6 +117,10 @@ export default function CodeEditorPage() {
           setCode(draftRes.data.content);
           draftIdRef.current = draftRes.data.id;
           lastSavedCodeRef.current = draftRes.data.content;
+          // Keep the student's chosen name across reloads and resubmits.
+          if (!required && draftRes.data.file_name) {
+            setFileName(draftRes.data.file_name);
+          }
         }
       } catch (err) {
         console.error("Failed to load assignment:", err);
@@ -333,8 +342,11 @@ export default function CodeEditorPage() {
             onOpenHistory={() => setHistoryOpen(true)}
             autoSaveStatus={autoSaveStatus}
             fileName={fileName}
+            fileNameLocked={!!requiredFileName}
             onFileNameChange={(name) => {
               setFileName(name);
+              // saveDraft reads the ref, which only updates on the next render.
+              fileNameRef.current = name;
               saveDraftRef.current(false);
             }}
             language="python"

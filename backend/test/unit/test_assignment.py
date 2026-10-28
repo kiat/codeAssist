@@ -1099,3 +1099,86 @@ def test_cleanup_assignment_container_removes_once_when_id_and_name_agree(mocker
     models_module.cleanup_assignment_container("container-real", "assign-1")
 
     container.remove.assert_called_once()
+
+
+def test_create_assignment_saves_submission_files(client, mocker, login_as):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query.return_value.filter_by.return_value.one_or_none.return_value = None
+    mock_add = mocker.patch("routes.assignment.db.session.add")
+    mocker.patch("routes.assignment.db.session.commit")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+    mock_query.return_value.filter_by.return_value.first.return_value = Assignment(
+        id="123", name="A1", course_id="course-uuid", submission_files=["calculator.py"],
+    )
+
+    resp = client.post("/create_assignment", json={
+        "name": "A1",
+        "course_id": "course-uuid",
+        "submission_files": [" calculator.py "],
+    })
+
+    assert resp.status_code == 200
+    assert mock_add.call_args.args[0].submission_files == ["calculator.py"]
+    assert resp.get_json()["submission_files"] == ["calculator.py"]
+
+
+def test_create_assignment_rejects_invalid_submission_file(client, mocker, login_as):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query.return_value.filter_by.return_value.one_or_none.return_value = None
+    mock_add = mocker.patch("routes.assignment.db.session.add")
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+
+    resp = client.post("/create_assignment", json={
+        "name": "A1",
+        "course_id": "course-uuid",
+        "submission_files": ["calculator"],
+    })
+
+    assert resp.status_code == 400
+    assert resp.get_json()["message"] == "File name needs an extension: calculator"
+    mock_add.assert_not_called()
+
+
+def _mock_update_lookup(mocker, assignment):
+    mock_query = mocker.patch("routes.assignment.db.session.query")
+    mock_query.return_value.filter.return_value.first.return_value = None
+    mock_query.return_value.filter_by.return_value.first.return_value = assignment
+    return mocker.patch("routes.assignment.db.session.commit")
+
+
+def test_update_assignment_sets_and_clears_submission_files(client, mocker, login_as):
+    assignment = Assignment(id="some-uuid", name="A1", course_id="course-uuid")
+    _mock_update_lookup(mocker, assignment)
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+    base = {"assignment_id": "some-uuid", "name": "A1", "course_id": "course-uuid"}
+
+    resp = client.put("/update_assignment", json={**base, "submission_files": ["spiral.py"]})
+    assert resp.status_code == 200
+    assert assignment.submission_files == ["spiral.py"]
+
+    resp = client.put("/update_assignment", json=base)
+    assert resp.status_code == 200
+    assert assignment.submission_files == ["spiral.py"]
+
+    resp = client.put("/update_assignment", json={**base, "submission_files": []})
+    assert resp.status_code == 200
+    assert assignment.submission_files is None
+
+
+def test_update_assignment_rejects_unsafe_submission_file(client, mocker, login_as):
+    assignment = Assignment(id="some-uuid", name="A1", course_id="course-uuid")
+    commit = _mock_update_lookup(mocker, assignment)
+    _mock_course_role(mocker)
+    login_as("instructor-uuid")
+
+    resp = client.put("/update_assignment", json={
+        "assignment_id": "some-uuid", "name": "A1", "course_id": "course-uuid",
+        "submission_files": ["../evil.py"],
+    })
+
+    assert resp.status_code == 400
+    assert resp.get_json()["message"] == "Invalid file name: ../evil.py. Try evil.py."
+    commit.assert_not_called()

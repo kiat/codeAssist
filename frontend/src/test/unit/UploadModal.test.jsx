@@ -84,4 +84,17 @@ describe('<UploadModal />', () => {
     });
     expect(screen.getByRole('button', { name: /submit/i })).toBeInTheDocument();
   });
+
+  it('tells the student the required file name', () => {
+    const { container } = renderWithContext(
+      <UploadModal {...defaultProps} requiredFileName="calculator.py" />
+    );
+    expect(screen.getByText('Your file will be submitted as calculator.py')).toBeInTheDocument();
+    expect(container.ownerDocument.querySelector('input[type="file"]')).toHaveAttribute('accept', '.py');
+  });
+
+  it('shows no file name note when none is required', () => {
+    renderWithContext(<UploadModal {...defaultProps} />);
+    expect(screen.queryByText(/will be submitted as/)).not.toBeInTheDocument();
+  });
 });
