@@ -9,7 +9,7 @@ CodeAssist provides AI-powered feedback to students on their programming submiss
 1. **Submission feedback** — automatic, structured JSON feedback (`insights` + line `annotations`) generated after a code-editor or file-upload submission is graded.
 2. **Controlled AI prompt panel** — students select instructor-enabled prompts in the code editor's AI panel; the backend route is still `/ai_chat`, and recent turns are remembered.
 
-The system integrates with four LLM providers today: OpenAI, Gemini Developer API, Claude, and Ollama (self-hosted/local). Gemini over Google Cloud Vertex AI is requested but is not implemented on `main` yet.
+The system integrates with five LLM provider modes today: OpenAI, Gemini Developer API, Gemini over Vertex AI, Claude, and Ollama (self-hosted/local).
 
 ## Key Features
 
@@ -42,7 +42,7 @@ Background thread: async_get_ai_feedback(app, submission_id, file_path, results_
     6. build_allowed_feedback_context(assignment, code_text, autograder_results)
        → filters by assignment.ai_allowed_inputs
     7. build_feedback_prompt(...) → full prompt string
-    8. Call provider (OpenAI / Gemini / Claude / Ollama) → parse JSON
+    8. Call provider (OpenAI / Gemini Developer API / Gemini over Vertex AI / Claude / Ollama) → parse JSON
     9. update_submission_feedback(): saves submission.ai_feedback and creates a
        StudentSubmissionInsight history record
 ```
@@ -72,8 +72,8 @@ Student Code Editor → AIChatPanel preset prompt → POST /ai_chat
 | Table | Purpose |
 |-------|---------|
 | `users` | Includes legacy `coding_insights` for compatibility with older submission feedback history. |
-| `assignments` | Stores assignment information and AI configuration. Important fields include `description`, `ai_feedback_enabled`, `ai_allowed_inputs`, `ai_feedback_prompts`, and provider/model configuration. |
-| `courses` | Course-level AI defaults: provider, model, encrypted API keys, default style/temperature. Also has its own `description` column (unrelated to assignment description — do not confuse the two). |
+| `assignments` | Stores assignment information and AI configuration. Important fields include `description`, `ai_feedback_enabled`, `ai_allowed_inputs`, `ai_feedback_prompts`, `ai_feedback_vertex_location`, and provider/model configuration. |
+| `courses` | Course-level AI defaults: provider, model, encrypted provider-managed API keys, default style/temperature. Vertex credentials stay in server environment variables. Also has its own `description` column (unrelated to assignment description — do not confuse the two). |
 | `ai_feedback_requests` | Per-student request log used for limit/cooldown enforcement |
 | `ai_chat_messages` | Student-AI conversation history (`student_id`, `assignment_id`, `role`, `content`, `prompt_id`, `created_at`) |
 | `submissions` | `ai_feedback` column stores the JSON feedback for that submission |
@@ -85,7 +85,8 @@ Student Code Editor → AIChatPanel preset prompt → POST /ai_chat
 |--------|---------------|
 | `ai_feedback/settings.py` | Prompt normalization, allowed-input normalization/filtering, usage-limit checks, chat history read/write, request tracking |
 | `ai_feedback/source_extraction.py` | Safe source extraction for AI feedback from normal source files and ZIP archives |
-| `ai_feedback/integration.py` | Provider calls (OpenAI/Gemini/Claude/Ollama), prompt construction, JSON response parsing/repair, async submission-feedback orchestration |
+| `ai_feedback/integration.py` | Provider calls (OpenAI/Gemini Developer API/Gemini over Vertex AI/Claude/Ollama), prompt construction, JSON response parsing/repair, async submission-feedback orchestration |
+| `ai_feedback/providers/` | Shared provider abstractions, Gemini/Vertex client construction, model validation, and provider-error classification |
 | `routes/code_editor.py` | Student-facing: `/save_code_draft`, `/get_code_drafts`, `/get_latest_draft`, `/submit_code`, `/run_code`, `/ai_chat`, `/ai_feedback_status` |
 | `routes/submission.py` | `/upload_submission` and other file-upload/grading endpoints, also triggers `async_get_ai_feedback` |
 | `routes/ai_feedback.py` | `GET/PUT /assignments/<id>/ai-settings`, `GET /assignments/<id>/prompts` |
