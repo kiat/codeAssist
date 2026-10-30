@@ -895,6 +895,105 @@ def test_upload_assignment_autograder_missing_file(client):
     assert "No file part" in error_message
 
 
+def _test_autograder_form(**fields):
+    return {
+        "submission_file": (io.BytesIO(b"print('hi')"), "calculator.py"),
+        "autograder_zip": (io.BytesIO(b"PK"), "autograder.zip"),
+        **fields,
+    }
+
+
+def test_test_autograder_submission_unauthenticated(client, mocker):
+    build = mocker.patch("routes.submission.get_docker_client")
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(course_id="course1"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 401
+    build.assert_not_called()
+
+
+def test_test_autograder_submission_forbidden_for_student(client, mocker, login_as):
+    login_as("stu1")
+    fake_assignment = mocker.Mock(id="assgn1", course_id="course1")
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = fake_assignment
+    role = mocker.patch("util.auth.get_user_course_role", return_value="student")
+    build = mocker.patch("routes.submission.get_docker_client")
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(assignment_id="assgn1"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 403
+    role.assert_called_once_with("stu1", "course1")
+    build.assert_not_called()
+
+
+def test_test_autograder_submission_forbidden_on_other_course(client, mocker, login_as):
+    login_as("instructor1")
+    mocker.patch("util.auth.get_user_course_role", return_value=None)
+    build = mocker.patch("routes.submission.get_docker_client")
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(course_id="someone_elses_course"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 403
+    build.assert_not_called()
+
+
+def test_test_autograder_submission_assignment_not_found(client, mocker, login_as):
+    login_as("instructor1")
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(assignment_id="missing"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 404
+
+
+def test_test_autograder_submission_requires_course_or_assignment(client, login_as):
+    login_as("instructor1")
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing assignment_id or course_id"
+
+
+@pytest.mark.parametrize("role", ["instructor", "ta"])
+def test_test_autograder_submission_allows_staff(client, mocker, login_as, role):
+    login_as("staff1")
+    mocker.patch("util.auth.get_user_course_role", return_value=role)
+    docker_client = mocker.patch("routes.submission.get_docker_client").return_value
+    container = docker_client.containers.run.return_value
+    container.exec_run.side_effect = [
+        SimpleNamespace(exit_code=0, output=b""),
+        SimpleNamespace(exit_code=0, output=b'{"score": 10, "tests": []}'),
+    ]
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(course_id="course1"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    assert response.get_json()["score"] == 10
+    docker_client.images.build.assert_called_once()
+    container.remove.assert_called_once()
+
+
 def test_delete_submission_success(client, mocker):
     """Test /delete_submission successfully deletes a submission."""
     fake_submission = mocker.Mock(assignment_id="assign-1")

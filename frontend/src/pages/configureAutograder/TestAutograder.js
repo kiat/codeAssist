@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, Form, Modal, Radio, Select, Typography, Upload, message } from "antd";
 import { useNavigate } from "react-router-dom";
 
-export default ({ open, onCancel, autograderFile, onSuccess }) => {
+export default ({ open, onCancel, autograderFile, onSuccess, assignmentId, courseId }) => {
   const [uploadedSubmission, setUploadedSubmission] = useState(null);
   const [uploadedAutograder, setUploadedAutograder] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -22,6 +22,10 @@ export default ({ open, onCancel, autograderFile, onSuccess }) => {
     const formData = new FormData();
     formData.append("submission_file", uploadedSubmission);
     formData.append("autograder_zip", autograderFile);
+    // The backend checks staff role on the assignment's course, or on course_id
+    // when the assignment has not been created yet.
+    if (assignmentId) formData.append("assignment_id", assignmentId);
+    if (courseId) formData.append("course_id", courseId);
 
     setLoading(true);
     try {
@@ -40,7 +44,7 @@ export default ({ open, onCancel, autograderFile, onSuccess }) => {
         }
         localStorage.setItem("testAutograderResults", JSON.stringify(data.results));
       } else {
-        message.error(data?.error || "Autograder test failed.");
+        message.error(data?.message || data?.error || "Autograder test failed.");
       }
     } catch (err) {
       console.error(err);
