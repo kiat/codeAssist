@@ -18,7 +18,7 @@ import moment from "moment";
 
 const GRADING_STATUSES = ["pending", "running"];
 const STATUS_POLL_INTERVAL_MS = 2000;
-const STATUS_POLL_LIMIT_MS = 20 * 60 * 1000;
+const STATUS_POLL_LIMIT_MS = 10 * 60 * 1000;
 
 export default function AssignmentResult() {
   const [viewMode, setViewMode] = useState("Results");
