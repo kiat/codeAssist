@@ -151,6 +151,12 @@ def cleanup_assignment_directories(assignment_id):
     for subtree in ("runs", "archive"):
         shutil.rmtree(os.path.join(base_dir, subtree, str(assignment_id)), ignore_errors=True)
 
+SUBMISSION_PENDING = "pending"
+SUBMISSION_RUNNING = "running"
+SUBMISSION_GRADED = "graded"
+SUBMISSION_FAILED = "failed"
+
+
 class Submission(db.Model):
     __tablename__ = "submissions"
     id = db.Column(UUID(as_uuid=False), primary_key=True, nullable=False)
@@ -165,6 +171,11 @@ class Submission(db.Model):
     execution_time = db.Column(db.Float, nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=False)
     completed = db.Column(db.Boolean, nullable=False)
+    status = db.Column(
+        db.String(16), nullable=False,
+        default=SUBMISSION_GRADED, server_default=SUBMISSION_GRADED,
+    )
+    grading_started_at = db.Column(TIMESTAMP(timezone=True), nullable=True)
 
     # -- AI Integration Settings -- 
     ai_feedback = db.Column(db.Text, nullable=True)
