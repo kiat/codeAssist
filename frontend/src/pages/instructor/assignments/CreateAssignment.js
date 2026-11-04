@@ -782,6 +782,7 @@ export default ({
         onCancel={closeTest}
         autograderFile={autograderFile}
         onSuccess={handleAutograderSuccess}
+        courseId={courseId}
       />
 
       {resultsModalOpen && (
