@@ -4,6 +4,8 @@ These endpoints are used for retrieving and manipulating course data. This is mo
 
 ## POST /create_course
 
+**Auth:** logged in with the global role instructor or admin. `instructor_id` must be the caller, unless the caller is an admin (the admin panel creates courses for other instructors).
+
 **Accepts JSON data**
 
 **Description:**
@@ -33,6 +35,8 @@ Example output:
     }
 
 ## POST /enroll_course
+
+**Auth:** logged in. `user_id` must be the caller; you can only enroll yourself.
 
 **Accepts JSON data**
 
@@ -112,3 +116,16 @@ Example input:
     
 
 ---
+
+## POST /leave_course
+
+**Auth:** logged in. `user_id` must be the caller; staff remove students through the enrollment routes instead.
+
+**Accepts JSON data**
+
+    {
+      "user_id": "a6888457-475a-47ab-8455-441cdd8b9744",
+      "course_id": "fc8beca8-48b5-41ce-b89c-9b2b31103b72"
+    }
+
+Returns `{"message": "Left course successfully"}`. Instructors cannot leave their own course (403).
