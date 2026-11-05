@@ -177,7 +177,7 @@ export default () => {
           <RightOutlined />
         </Button>
       </PageBottom>
-      <TestAutograder open={modalOpen} onCancel={toggleModalOpen} autograderFile={autograder} onSuccess={handleAutograderSuccess} />
+      <TestAutograder open={modalOpen} onCancel={toggleModalOpen} autograderFile={autograder} onSuccess={handleAutograderSuccess} assignmentId={assignmentId} />
       {resultsModalOpen && (
         <TestResultsDisplay viewMode="Results" assignmentName="Assignment 1" studentName="John Doe" score={testResultsData?.score} totalPoints={100} data={testResultsData} aiFeedbackEnabled={true} isModal={true} submissionId="dummy-id-12345" onCancel={handleCloseResultsModal} />
       )}

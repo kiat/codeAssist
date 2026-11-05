@@ -60,6 +60,16 @@ Students get AI feedback on their work through **two different surfaces**, both 
 4. **Without autograder:** runs in a default `python:3.11-slim` container, stdout/stderr only, `passed` based on exit code, `score: 0`, `tests: []`.
 5. Run does **not** create a submission or trigger AI feedback — only `/submit_code` and `/upload_submission` do that.
 
+## Where the File Name Comes From
+
+The name the code is saved and graded under (`file_name` in drafts and submissions) is resolved on the server by `util/submission_files.py::resolve_submission_name`:
+
+1. If the instructor set **Required File Name(s)** (`Assignment.submission_files`), the first entry is always used. The editor shows it with a lock and students cannot rename it.
+2. Otherwise the client's name is used after `secure_filename`, so it can never point outside the submission folder.
+3. Otherwise `solution.py`.
+
+On the frontend, with no required name, the editor restores the latest draft's `file_name`, so reloading and resubmitting keeps the student's chosen name. Only a first visit with no draft falls back to the assignment name (lowercased, spaces to `_`, plus `.py`).
+
 ## How Auto-Save Works
 
 - `setInterval`, 30s, only fires if code changed since the last save.
@@ -82,6 +92,7 @@ In `CreateAssignment.js`:
 | Setting | Description |
 |---|---|
 | **Enable Code Editor** | Allows students to write code in-browser (`allow_file_upload` and `enable_code_editor` — at least one must stay on) |
+| **Required File Name(s)** | The exact name(s) the autograder copies from `/autograder/submission/` (`submission_files`). Locks the editor's file name and renames single-file uploads |
 | **Configure Autograder** | Enables Docker-based execution for Run and Submit |
 | **Enable AI Feedback** | Enables both submission feedback generation and the controlled AI prompt panel |
 

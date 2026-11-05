@@ -81,6 +81,9 @@ class Assignment(db.Model):
     container_id = db.Column(db.String)
     autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
+    # File names the autograder copies from /autograder/submission/, set by the
+    # instructor. Null means the student picks the name.
+    submission_files = db.Column(db.JSON, nullable=True)
 
     # -- Submission Method Settings --
     allow_file_upload = db.Column(db.Boolean, default=True)

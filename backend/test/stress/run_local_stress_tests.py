@@ -95,6 +95,17 @@ TEST_CASES = (
         full_args=("--num_threads", "5", "--cleanup"),
     ),
     StressCase(
+        name="submission_burst",
+        script="test_submission_burst.py",
+        description="Release N submissions to one assignment at the same moment and report latency.",
+        status="safe",
+        reason="Needs STRESS_INSTRUCTOR_EMAIL and STRESS_INSTRUCTOR_PASSWORD for an instructor of the course.",
+        command_shape="course_first",
+        quick_args=("--students", "5", "--cleanup"),
+        full_args=("--students", "50", "--cleanup"),
+        timeout_seconds=1800,
+    ),
+    StressCase(
         name="assignment_creation",
         script="create_assignments.py",
         description="Create assignments and upload autograders from multiple threads.",
