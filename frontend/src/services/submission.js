@@ -37,6 +37,12 @@ export async function runCode(params) {
   return service("run_code", params, "post");
 }
 
+export async function getSubmissionStatus(params) {
+  return service("get_submission_status", params, "get", {
+    skipGlobalErrorMessage: true,
+  });
+}
+
 export async function rerunSubmissionAutograder(params) {
   return service("rerun_submission_autograder", params, "post");
 }

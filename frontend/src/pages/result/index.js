@@ -1,6 +1,6 @@
 import React, { useContext, useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, PageHeader, Radio, message } from "antd";
+import { Alert, Card, PageHeader, Radio, Spin, message } from "antd";
 
 import { GlobalContext } from "../../App";
 import PageContent from "../../components/layout/pageContent";
@@ -13,8 +13,12 @@ import SubmissionHistoryModal from "./submissionHistoryModal";
 import FormattingModal from "./FormattingModal";
 
 import { getAssignment, getExtension } from "../../services/assignment";
-import { rerunSubmissionAutograder } from "../../services/submission";
+import { getSubmissionStatus, rerunSubmissionAutograder } from "../../services/submission";
 import moment from "moment";
+
+const GRADING_STATUSES = ["pending", "running"];
+const STATUS_POLL_INTERVAL_MS = 2000;
+const STATUS_POLL_LIMIT_MS = 10 * 60 * 1000;
 
 export default function AssignmentResult() {
   const [viewMode, setViewMode] = useState("Results");
@@ -45,6 +49,9 @@ export default function AssignmentResult() {
   const [allowFileUpload, setAllowFileUpload] = useState(false);
   const [enableCodeEditor, setEnableCodeEditor] = useState(false);
   const [rerunLoading, setRerunLoading] = useState(false);
+  const [gradingStatus, setGradingStatus] = useState(null);
+  const [statusPollTimedOut, setStatusPollTimedOut] = useState(false);
+  const isGrading = GRADING_STATUSES.includes(gradingStatus);
   
   useEffect(() => {
     // Fetching student and assignment IDs based on this submission ID
@@ -58,6 +65,7 @@ export default function AssignmentResult() {
         const data = await details.json();
         if (data) {
           setToSend(data);
+          setGradingStatus(data.status);
           console.log("Fetched IDs:", data.assignment_id, data.student_id);
           setAssignmentId(data.assignment_id);
           setStudentId(data.student_id);
@@ -70,6 +78,41 @@ export default function AssignmentResult() {
     };
     fetchIds();
   }, [submissionId]);
+
+  useEffect(() => {
+    if (!isGrading) return;
+
+    const startedAt = Date.now();
+    const interval = setInterval(async () => {
+      if (Date.now() - startedAt > STATUS_POLL_LIMIT_MS) {
+        clearInterval(interval);
+        setStatusPollTimedOut(true);
+        return;
+      }
+      try {
+        const response = await getSubmissionStatus({ submission_id: submissionId });
+        const status = response?.data?.status;
+        if (!status) return;
+
+        if (GRADING_STATUSES.includes(status)) {
+          setGradingStatus(status);
+          return;
+        }
+
+        clearInterval(interval);
+        const details = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`,
+          { credentials: "include" }
+        );
+        setToSend(await details.json());
+        setGradingStatus(status);
+      } catch (err) {
+        console.error("Polling submission status failed:", err);
+      }
+    }, STATUS_POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [isGrading, submissionId]);
 
 
 
@@ -87,6 +130,7 @@ export default function AssignmentResult() {
     }
 
     if (!toSend || !toSend.id || toSend.ai_feedback) return;
+    if (toSend.status && toSend.status !== "graded") return;
   
     const interval = setInterval(async () => {
       try {
@@ -274,7 +318,28 @@ export default function AssignmentResult() {
               ]}
             />
             <Card bordered={false}>
-              {toSend && (
+              {toSend && isGrading && (
+                <Alert
+                  type="info"
+                  showIcon
+                  icon={<Spin size="small" />}
+                  message={gradingStatus === "pending" ? "Queued for grading" : "Grading"}
+                  description={
+                    statusPollTimedOut
+                      ? "This is taking longer than usual. Refresh this page later to see your results."
+                      : "Your submission is saved. Feel free to leave this page and check back later for your results."
+                  }
+                />
+              )}
+              {toSend && gradingStatus === "failed" && (
+                <Alert
+                  type="error"
+                  showIcon
+                  message="Grading failed"
+                  description="Something went wrong on our side while grading this submission. It doesn't count toward your grade. Please resubmit."
+                />
+              )}
+              {toSend && !isGrading && gradingStatus !== "failed" && (
                 <TestResultsDisplay
                   viewMode={viewMode}
                   assignmentName={assignmentName}
