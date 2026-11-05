@@ -785,6 +785,105 @@ def test_upload_assignment_autograder_missing_file(client):
     assert "No file part" in error_message
 
 
+def _test_autograder_form(**fields):
+    return {
+        "submission_file": (io.BytesIO(b"print('hi')"), "calculator.py"),
+        "autograder_zip": (io.BytesIO(b"PK"), "autograder.zip"),
+        **fields,
+    }
+
+
+def test_test_autograder_submission_unauthenticated(client, mocker):
+    build = mocker.patch("routes.submission.get_docker_client")
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(course_id="course1"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 401
+    build.assert_not_called()
+
+
+def test_test_autograder_submission_forbidden_for_student(client, mocker, login_as):
+    login_as("stu1")
+    fake_assignment = mocker.Mock(id="assgn1", course_id="course1")
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = fake_assignment
+    role = mocker.patch("util.auth.get_user_course_role", return_value="student")
+    build = mocker.patch("routes.submission.get_docker_client")
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(assignment_id="assgn1"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 403
+    role.assert_called_once_with("stu1", "course1")
+    build.assert_not_called()
+
+
+def test_test_autograder_submission_forbidden_on_other_course(client, mocker, login_as):
+    login_as("instructor1")
+    mocker.patch("util.auth.get_user_course_role", return_value=None)
+    build = mocker.patch("routes.submission.get_docker_client")
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(course_id="someone_elses_course"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 403
+    build.assert_not_called()
+
+
+def test_test_autograder_submission_assignment_not_found(client, mocker, login_as):
+    login_as("instructor1")
+    mock_query = mocker.patch("routes.submission.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = None
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(assignment_id="missing"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 404
+
+
+def test_test_autograder_submission_requires_course_or_assignment(client, login_as):
+    login_as("instructor1")
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Missing assignment_id or course_id"
+
+
+@pytest.mark.parametrize("role", ["instructor", "ta"])
+def test_test_autograder_submission_allows_staff(client, mocker, login_as, role):
+    login_as("staff1")
+    mocker.patch("util.auth.get_user_course_role", return_value=role)
+    docker_client = mocker.patch("routes.submission.get_docker_client").return_value
+    container = docker_client.containers.run.return_value
+    container.exec_run.side_effect = [
+        SimpleNamespace(exit_code=0, output=b""),
+        SimpleNamespace(exit_code=0, output=b'{"score": 10, "tests": []}'),
+    ]
+
+    response = client.post(
+        "/test_autograder_submission",
+        data=_test_autograder_form(course_id="course1"),
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    assert response.get_json()["score"] == 10
+    docker_client.images.build.assert_called_once()
+    container.remove.assert_called_once()
+
+
 def test_delete_submission_success(client, mocker):
     """Test /delete_submission successfully deletes a submission."""
     fake_submission = mocker.Mock(assignment_id="assign-1")
@@ -2844,3 +2943,80 @@ def test_lock_student_submissions_takes_transaction_lock_on_postgres(app, mocker
     statement, params = execute.call_args.args
     assert "pg_advisory_xact_lock" in str(statement)
     assert params == {"key": submission_module._advisory_lock_key("student:assignment")}
+
+
+def _open_upload_assignment(mocker, submission_files):
+    fake_assignment = mocker.Mock()
+    fake_assignment.allow_file_upload = True
+    fake_assignment.published = True
+    fake_assignment.published_date = None
+    fake_assignment.due_date = None
+    fake_assignment.late_due_date = None
+    fake_assignment.late_submission = False
+    fake_assignment.autograder_image_name = ""
+    fake_assignment.submission_files = submission_files
+    return fake_assignment
+
+
+def test_upload_submission_renames_to_required_file_name(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    _mock_assignment_lookups(mocker, _open_upload_assignment(mocker, ["calculator.py"]))
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": student_id,
+                "file": (io.BytesIO(b"print('hello')"), "My Calc.PY"),
+            },
+        )
+
+        assert response.status_code == 200
+        submission_id = response.get_json()["submissionID"]
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        assert set(os.listdir(archived_path)) == {"calculator.py"}
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_upload_submission_rejects_wrong_extension_for_required_file(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    _mock_assignment_lookups(mocker, _open_upload_assignment(mocker, ["calculator.py"]))
+    stage = mocker.patch("routes.submission.stage_submission")
+
+    response = client.post(
+        "/upload_submission",
+        data={
+            "assignment_id": assignment_id,
+            "student_id": str(uuid.uuid4()),
+            "file": (io.BytesIO(b"hello"), "calculator.txt"),
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "This assignment requires a file named calculator.py"
+    stage.assert_not_called()
+
+
+def test_upload_submission_keeps_name_with_several_required_files(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    _mock_assignment_lookups(mocker, _open_upload_assignment(mocker, ["Main.java", "Helper.java"]))
+
+    try:
+        response = client.post(
+            "/upload_submission",
+            data={
+                "assignment_id": assignment_id,
+                "student_id": str(uuid.uuid4()),
+                "file": (io.BytesIO(b"PK"), "submission.zip"),
+            },
+        )
+
+        assert response.status_code == 200
+        submission_id = response.get_json()["submissionID"]
+        archived_path = submission_module.archive_dir(assignment_id, submission_id)
+        assert set(os.listdir(archived_path)) == {"submission.zip"}
+    finally:
+        _cleanup_submission_dirs(assignment_id)

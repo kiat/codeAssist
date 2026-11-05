@@ -15,6 +15,7 @@ from api.models import CodeDraft, Assignment, Submission, User, AssignmentExtens
 from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError, ForbiddenError, TooManyRequestsError
 from util.url_utils import validate_ollama_url
+from util.submission_files import resolve_submission_name
 from ai_feedback.integration import (
     async_get_ai_feedback,
     build_claude_messages_payload,
@@ -131,6 +132,8 @@ def save_code_draft():
         raise NotFoundError("Assignment not found")
     if not assignment.enable_code_editor:
         raise BadRequestError("Code editor is not enabled for this assignment.")
+
+    file_name = resolve_submission_name(assignment, file_name)
 
     # Find the latest version number for this student/assignment
     latest = (
@@ -273,6 +276,8 @@ def submit_code():
     # Enforce enable_code_editor server-side
     if not assignment.enable_code_editor:
         raise BadRequestError("Code editor is not enabled for this assignment.")
+
+    file_name = resolve_submission_name(assignment, file_name)
 
     # Verify student is enrolled in the course
     _verify_enrollment(student_id, assignment.course_id)
@@ -787,6 +792,8 @@ def run_code():
     # Enforce submission method restriction
     if not assignment.enable_code_editor:
         raise BadRequestError("Code editor submissions are not allowed for this assignment.")
+
+    file_name = resolve_submission_name(assignment, file_name)
 
     if not assignment.published:
         raise BadRequestError("Assignment is not published yet.")

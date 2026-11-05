@@ -204,6 +204,7 @@ export default ({
           : null,
         allow_file_upload: values.allow_file_upload !== false,
         enable_code_editor: !!values.enable_code_editor,
+        submission_files: values.submission_files || [],
         ai_feedback_enabled: !!values.ai_feedback_enabled,
         use_course_ai_default: values.use_course_ai_default !== false,
         ai_feedback_provider:
@@ -564,6 +565,20 @@ export default ({
                     )}
 
                     <Form.Item
+                      label="Required File Name(s)"
+                      name="submission_files"
+                      tooltip="The exact name your autograder copies from /autograder/submission/, e.g. calculator.py. Students cannot change it. Leave empty to let students choose."
+                    >
+                      <Select
+                        mode="tags"
+                        tokenSeparators={[",", " "]}
+                        open={false}
+                        placeholder="e.g. calculator.py"
+                        aria-label="Required file names"
+                      />
+                    </Form.Item>
+
+                    <Form.Item
                       label="ENABLE AI FEEDBACK"
                       name="ai_feedback_enabled"
                       valuePropName="checked"
@@ -782,6 +797,7 @@ export default ({
         onCancel={closeTest}
         autograderFile={autograderFile}
         onSuccess={handleAutograderSuccess}
+        courseId={courseId}
       />
 
       {resultsModalOpen && (

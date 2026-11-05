@@ -1,7 +1,7 @@
 """Add submission grading status for async grading (#148).
 
 Revision ID: 4e1c7a9d2b60
-Revises: 51f7b0498833
+Revises: b8c9d0e1f2a3
 Create Date: 2026-10-26 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 
 revision = "4e1c7a9d2b60"
-down_revision = "51f7b0498833"
+down_revision = "b8c9d0e1f2a3"
 branch_labels = None
 depends_on = None
 

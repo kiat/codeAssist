@@ -20,6 +20,7 @@ from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, Enrollme
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
 from util.csv_utils import csv_safe_cell
+from util.submission_files import required_submission_files
 from util.timing import StepTimer
 from datetime import datetime, timezone
 from sqlalchemy import desc, func, text
@@ -937,6 +938,14 @@ def upload_submission():
 
     timer.lap("validate")
     filename = secure_filename(file.filename)
+    # With one required file name, save the upload under it so the autograder
+    # finds it. Several required names means a zip; that is left as uploaded.
+    required_files = required_submission_files(assignment)
+    if len(required_files) == 1:
+        required_name = required_files[0]
+        if os.path.splitext(filename)[1].lower() != os.path.splitext(required_name)[1].lower():
+            raise BadRequestError(f"This assignment requires a file named {required_name}")
+        filename = required_name
     submission_id = uuid.uuid4()
     submissions_dir = staging_dir(assignment_id, submission_id)
 
@@ -2077,6 +2086,23 @@ def test_autograder_submission():
 
     if not submission_file.filename or not autograder_zip.filename:
         raise BadRequestError("Invalid filenames")
+
+    # The dry run builds and executes the uploaded autograder, so it is staff-only.
+    # The configure page sends assignment_id; the create-assignment page has no
+    # assignment yet and sends course_id.
+    require_authenticated()
+
+    assignment_id = request.form.get("assignment_id")
+    course_id = request.form.get("course_id")
+    if assignment_id:
+        assignment_for_auth = db.session.query(Assignment).filter_by(id=assignment_id).first()
+        if not assignment_for_auth:
+            raise NotFoundError("Assignment not found")
+        course_id = assignment_for_auth.course_id
+    elif not course_id:
+        raise BadRequestError("Missing assignment_id or course_id")
+
+    require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can test an autograder")
 
     temp_id = str(uuid.uuid4())
     current_dir = os.path.dirname(os.path.abspath(__file__))

@@ -226,6 +226,7 @@ export default function Assignments() {
         assignmentTitle={assignmentTitle}
         allowFileUpload={selectedAssignment?.allow_file_upload}
         enableCodeEditor={selectedAssignment?.enable_code_editor}
+        requiredFileName={selectedAssignment?.submission_files?.length === 1 ? selectedAssignment.submission_files[0] : null}
       />
     </>
   );
