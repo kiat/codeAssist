@@ -2808,6 +2808,8 @@ def test_get_submission_status_returns_status_without_score(app, client):
     )
     db.session.add(sub)
     db.session.commit()
+    with client.session_transaction() as sess:
+        sess["user_id"] = sub.student_id
 
     response = client.get(f"/get_submission_status?submission_id={sub.id}")
 
@@ -3018,5 +3020,216 @@ def test_upload_submission_keeps_name_with_several_required_files(client, mocker
         submission_id = response.get_json()["submissionID"]
         archived_path = submission_module.archive_dir(assignment_id, submission_id)
         assert set(os.listdir(archived_path)) == {"submission.zip"}
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def _status_row(student_id=None):
+    assignment_id = _real_assignment()
+    sub = Submission(
+        id=str(uuid.uuid4()), file_name="solution.py", student_id=student_id or str(uuid.uuid4()),
+        assignment_id=assignment_id, student_code_file=b"code", execution_time=0.0,
+        submitted_at=datetime.now(timezone.utc), active=False, completed=False,
+        status="pending", submission_number=1,
+    )
+    db.session.add(sub)
+    db.session.commit()
+    return sub.id
+
+
+def test_get_submission_status_requires_login(app, client):
+    sub_id = _status_row()
+
+    response = client.get(f"/get_submission_status?submission_id={sub_id}")
+
+    assert response.status_code == 401
+
+
+def test_get_submission_status_forbids_other_students(app, client):
+    sub_id = _status_row()
+    with client.session_transaction() as sess:
+        sess["user_id"] = str(uuid.uuid4())
+
+    response = client.get(f"/get_submission_status?submission_id={sub_id}")
+
+    assert response.status_code == 403
+
+
+def test_get_submission_status_allows_course_staff(app, client, mocker):
+    sub_id = _status_row()
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    with client.session_transaction() as sess:
+        sess["user_id"] = str(uuid.uuid4())
+
+    response = client.get(f"/get_submission_status?submission_id={sub_id}")
+
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "pending"
+
+
+def test_get_latest_submission_skips_ungraded_rows(app, client):
+    assignment_id, student_id = _real_assignment(), str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    graded_id = _graded_row(assignment_id, student_id, now - timedelta(minutes=5))
+    db.session.add(Submission(
+        id=str(uuid.uuid4()), file_name="solution.py", student_id=student_id,
+        assignment_id=assignment_id, student_code_file=b"code", execution_time=0.0,
+        submitted_at=now, active=False, completed=False, status="pending", submission_number=2,
+    ))
+    db.session.commit()
+
+    response = client.get(f"/get_latest_submission?student_id={student_id}&assignment_id={assignment_id}")
+
+    assert response.status_code == 200
+    assert response.get_json()["id"] == graded_id
+
+
+def test_get_latest_submission_with_only_pending_rows_finds_nothing(app, client):
+    assignment_id, student_id = _real_assignment(), str(uuid.uuid4())
+    db.session.add(Submission(
+        id=str(uuid.uuid4()), file_name="solution.py", student_id=student_id,
+        assignment_id=assignment_id, student_code_file=b"code", execution_time=0.0,
+        submitted_at=datetime.now(timezone.utc), active=False, completed=False,
+        status="pending", submission_number=1,
+    ))
+    db.session.commit()
+
+    response = client.get(f"/get_latest_submission?student_id={student_id}&assignment_id={assignment_id}")
+
+    assert response.get_json()["message"] == "No submissions found"
+
+
+def test_upload_submission_timestamps_pending_row_in_utc(client, mocker):
+    assignment_id = _real_assignment()
+    import routes.grading_tasks as grading_tasks
+    mocker.patch.object(grading_tasks.grade_submission, "delay")
+    seen = _capture_submitted_at(mocker)
+
+    try:
+        response = _post_submission(client, assignment_id, str(uuid.uuid4()))
+
+        assert response.status_code == 202
+        assert seen[-1].tzinfo is not None
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def _capture_submitted_at(mocker):
+    seen = []
+    real_add = db.session.add
+
+    def capture(obj):
+        if isinstance(obj, Submission):
+            seen.append(obj.submitted_at)
+        return real_add(obj)
+
+    mocker.patch("routes.submission.db.session.add", side_effect=capture)
+    return seen
+
+
+def test_upload_submission_without_autograder_takes_student_lock(client, mocker):
+    assignment_id = str(uuid.uuid4())
+    student_id = str(uuid.uuid4())
+    _mock_assignment_lookups(mocker, _open_upload_assignment(mocker, None))
+    lock = mocker.patch("routes.submission.lock_student_submissions")
+
+    try:
+        response = _post_submission(client, assignment_id, student_id)
+
+        assert response.status_code == 200
+        lock.assert_called_once_with(student_id, assignment_id)
+        saved = submission_module.db.session.add.call_args.args[0]
+        assert saved.submitted_at.tzinfo is not None
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def _rerun_setup(mocker, student_id, stdout=b'{"score": 9}', timeout=False):
+    container = mocker.Mock()
+    container.exec_run.return_value = SimpleNamespace(exit_code=0, output=stdout)
+    docker_client = mocker.Mock()
+    docker_client.containers.run.return_value = container
+    mocker.patch("routes.submission.get_docker_client", return_value=docker_client)
+    if timeout:
+        mocker.patch("routes.submission.subprocess.run",
+                     side_effect=subprocess.TimeoutExpired(cmd="docker exec", timeout=30))
+    else:
+        mocker.patch("routes.submission.subprocess.run",
+                     return_value=SimpleNamespace(returncode=0, stdout=b"", stderr=b""))
+
+
+def _rerun(client, student_id, submission_id):
+    with client.session_transaction() as sess:
+        sess["user_id"] = student_id
+    return client.post("/rerun_submission_autograder", json={"submission_id": submission_id})
+
+
+def _failed_row(assignment_id, student_id, submitted_at):
+    sub = Submission(
+        id=str(uuid.uuid4()), file_name="solution.py", student_id=student_id,
+        assignment_id=assignment_id, student_code_file=b"print('hi')", execution_time=0.0,
+        submitted_at=submitted_at, active=False, completed=False, status="failed",
+        submission_number=1,
+    )
+    db.session.add(sub)
+    db.session.commit()
+    return sub.id
+
+
+def test_rerun_of_failed_submission_marks_it_graded_and_active(client, mocker):
+    assignment_id, student_id = _real_assignment(), str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    previous_id = _graded_row(assignment_id, student_id, now - timedelta(hours=1), active=True)
+    failed_id = _failed_row(assignment_id, student_id, now)
+    _rerun_setup(mocker, student_id)
+
+    try:
+        response = _rerun(client, student_id, failed_id)
+
+        assert response.status_code == 200
+        db.session.expire_all()
+        rerun = db.session.get(Submission, failed_id)
+        assert rerun.status == "graded"
+        assert rerun.completed is True
+        assert rerun.score == 9
+        assert rerun.active is True
+        assert db.session.get(Submission, previous_id).active is False
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_rerun_of_older_failed_submission_keeps_newer_one_active(client, mocker):
+    assignment_id, student_id = _real_assignment(), str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    newer_id = _graded_row(assignment_id, student_id, now, active=True)
+    failed_id = _failed_row(assignment_id, student_id, now - timedelta(hours=1))
+    _rerun_setup(mocker, student_id)
+
+    try:
+        response = _rerun(client, student_id, failed_id)
+
+        assert response.status_code == 200
+        db.session.expire_all()
+        assert db.session.get(Submission, failed_id).status == "graded"
+        assert db.session.get(Submission, failed_id).active is False
+        assert db.session.get(Submission, newer_id).active is True
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_rerun_timeout_records_graded_timeout_payload(client, mocker):
+    assignment_id, student_id = _real_assignment(), str(uuid.uuid4())
+    failed_id = _failed_row(assignment_id, student_id, datetime.now(timezone.utc))
+    _rerun_setup(mocker, student_id, timeout=True)
+
+    try:
+        response = _rerun(client, student_id, failed_id)
+
+        assert response.status_code == 504
+        db.session.expire_all()
+        rerun = db.session.get(Submission, failed_id)
+        assert rerun.status == "graded"
+        assert rerun.score == 0
+        assert json.loads(rerun.results) == submission_module._timeout_payload(30)
     finally:
         _cleanup_submission_dirs(assignment_id)

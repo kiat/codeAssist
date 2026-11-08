@@ -103,11 +103,15 @@ def _record_outcome(submission_id, assignment_id, outcome, submissions_dir):
     submission.status = SUBMISSION_GRADED
 
     activated = activate_if_newest(submission)
-    commit_or_rollback(
-        "Failed to record submission %s for assignment %s",
-        submission_id, assignment_id,
-        raise_message="Failed to record submission"
-    )
+    try:
+        commit_or_rollback(
+            "Failed to record submission %s for assignment %s",
+            submission_id, assignment_id,
+            raise_message="Failed to record submission"
+        )
+    except Exception:
+        archive_staged_files(assignment_id, submission_id, submissions_dir, results_file_path)
+        raise
     if not activated:
         logger.info(
             "Submission %s finished after a newer submission was already active; left inactive",

@@ -359,6 +359,26 @@ def test_grade_submission_handles_submission_deleted_during_grading(assignment_i
     assert not grading.thread.called
 
 
+def test_grade_submission_archives_files_when_final_commit_fails(assignment_id, grading, mocker):
+    submission_id = _submission(assignment_id)
+    grading.set_exit(0, stdout=b'{"score": 1}')
+    real_commit_or_rollback = grading_tasks.commit_or_rollback
+
+    def fail_final_commit(reason, *args, raise_message=None):
+        if reason.startswith("Failed to record submission"):
+            raise InternalProcessingError(raise_message)
+        return real_commit_or_rollback(reason, *args, raise_message=raise_message)
+
+    mocker.patch("routes.grading_tasks.commit_or_rollback", side_effect=fail_final_commit)
+
+    sub = _run(submission_id)
+
+    assert sub.status == SUBMISSION_FAILED
+    archived = os.listdir(submission_module.archive_dir(assignment_id, submission_id))
+    assert "solution.py" in archived
+    assert not os.path.exists(submission_module.staging_dir(assignment_id, submission_id))
+
+
 def test_grade_submission_leaves_late_finisher_inactive(assignment_id, grading):
     student_id = str(uuid.uuid4())
     now = datetime.now()

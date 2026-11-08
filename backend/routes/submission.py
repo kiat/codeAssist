@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 from functools import reduce
 from flask import Blueprint, request, jsonify, current_app, session, send_file
 from api import db
-from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase, SubmissionSubmitter, SUBMISSION_PENDING, SUBMISSION_RUNNING, SUBMISSION_GRADED
+from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase, SubmissionSubmitter, SUBMISSION_PENDING, SUBMISSION_RUNNING, SUBMISSION_GRADED, SUBMISSION_FAILED
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
@@ -809,7 +809,7 @@ def _create_pending_submission(submission_id, filename, file_path, student_id, a
         results=None,
         score=None,
         execution_time=0.0,
-        submitted_at=datetime.now(),
+        submitted_at=datetime.now(timezone.utc),
         active=False,
         completed=False,
         status=SUBMISSION_PENDING,
@@ -958,6 +958,7 @@ def upload_submission():
 
 
         if not assignment or not assignment.autograder_image_name or assignment.autograder_image_name.strip() == "":
+            lock_student_submissions(student_id, assignment_id)
             submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
             old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
             if old:
@@ -972,7 +973,7 @@ def upload_submission():
                 results=None,
                 score=None,
                 execution_time=0.0,
-                submitted_at=datetime.now(),
+                submitted_at=datetime.now(timezone.utc),
                 active=True,
                 completed=True,
                 submission_number=submission_count + 1,
@@ -1161,7 +1162,8 @@ def get_latest_submission():
     # Query for the latest submission based on the submitted time
     latest_submission = Submission.query.filter_by(
         student_id=student_id,
-        assignment_id=assignment_id
+        assignment_id=assignment_id,
+        status=SUBMISSION_GRADED,
     ).order_by(Submission.submitted_at.desc()).first()
 
     # Serialize the submission data
@@ -1766,7 +1768,11 @@ def get_submission_status():
     if not row:
         raise NotFoundError("No submission found")
 
-    _verify_student_owner(str(row.student_id), str(row.assignment_id))
+    requester_id = require_authenticated()
+    if str(requester_id) != str(row.student_id):
+        assignment = db.session.get(Assignment, row.assignment_id)
+        require_course_role(assignment.course_id, {"instructor", "ta"},
+                            "Not authorized to view this submission")
 
     return jsonify({"submissionID": submission_id, "status": row.status}), 200
 
@@ -1889,25 +1895,11 @@ def rerun_submission_autograder():
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        timeout_result = {
-            "tests": [
-                {
-                    "name": "Submission Timeout",
-                    "score": 0,
-                    "max_score": 0,
-                    "status": "failed",
-                    "output": "The submission did not complete within the time limit.",
-                }
-            ],
-            "leaderboard": [],
-            "visibility": "visible",
-            "execution_time": f"{timeout:.2f}",
-            "score": 0,
-        }
-        submission_to_rerun.results = json.dumps(timeout_result).encode()
+        submission_to_rerun.results = json.dumps(_timeout_payload(timeout)).encode()
         submission_to_rerun.score = 0
         submission_to_rerun.execution_time = float(timeout)
         submission_to_rerun.completed = False
+        submission_to_rerun.status = SUBMISSION_GRADED
         submission_to_rerun.ai_feedback = None
         db.session.commit()
         if container:
@@ -1971,6 +1963,8 @@ def rerun_submission_autograder():
     with open(host_results_json_path, 'w') as file:
         file.write(results_json_content)
 
+    was_failed = submission_to_rerun.status == SUBMISSION_FAILED
+
     submission_to_rerun.results = results_json_content.encode()
     submission_to_rerun.score = parsed_results.get("score")
     try:
@@ -1980,7 +1974,10 @@ def rerun_submission_autograder():
     except (TypeError, ValueError):
         submission_to_rerun.execution_time = 0
     submission_to_rerun.completed = True
+    submission_to_rerun.status = SUBMISSION_GRADED
     submission_to_rerun.ai_feedback = None
+    if was_failed:
+        activate_if_newest(submission_to_rerun)
     db.session.commit()
 
     if getattr(assignment, "ai_feedback_enabled", False):

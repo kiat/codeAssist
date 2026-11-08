@@ -55,6 +55,8 @@ export default function AssignmentResult() {
   
   useEffect(() => {
     // Fetching student and assignment IDs based on this submission ID
+    setGradingStatus(null);
+    setStatusPollTimedOut(false);
     const fetchIds = async () => {
       console.log("Fetching IDs based on submission ID:", submissionId);
       try {
