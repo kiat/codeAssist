@@ -18,7 +18,19 @@ class Config:
     else:
         SESSION_COOKIE_SECURE = _secure_env.lower() == 'true'
 
+    CELERY = {
+        "broker_url": os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),
+        "imports": ("routes.grading_tasks",),
+        "task_ignore_result": True,
+        "task_acks_late": True,
+        "task_reject_on_worker_lost": True,
+        "worker_prefetch_multiplier": 1,
+        "broker_transport_options": {"visibility_timeout": 7200},
+        "broker_connection_retry_on_startup": True,
+    }
+
 class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     TESTING = True
     SECRET_KEY = 'test-secret-key-for-testing'
+    CELERY = {**Config.CELERY, "broker_url": "memory://"}

@@ -1,10 +1,13 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AssignmentResult from "../../../../pages/result";
 import { GlobalContext } from "../../../../App";
 import { getAssignment, getExtension } from "../../../../services/assignment";
-import { rerunSubmissionAutograder } from "../../../../services/submission";
+import {
+  getSubmissionStatus,
+  rerunSubmissionAutograder,
+} from "../../../../services/submission";
 
 const mockNavigate = jest.fn();
 
@@ -20,6 +23,7 @@ jest.mock("../../../../services/assignment", () => ({
 }));
 
 jest.mock("../../../../services/submission", () => ({
+  getSubmissionStatus: jest.fn(),
   rerunSubmissionAutograder: jest.fn(),
 }));
 
@@ -120,5 +124,93 @@ describe("AssignmentResult rerun autograder", () => {
       });
     });
     expect(await screen.findByTestId("result-score")).toHaveTextContent("9");
+  });
+});
+
+describe("AssignmentResult grading status", () => {
+  const baseSubmission = {
+    id: "submission-1",
+    assignment_id: "assignment-1",
+    student_id: "student-1",
+    name: "Ada",
+    student_code_file: "print('hello')",
+    file_name: "solution.py",
+    results: { tests: [] },
+  };
+
+  const detailsResponse = (overrides) => ({
+    json: () => Promise.resolve({ ...baseSubmission, ...overrides }),
+  });
+
+  beforeEach(() => {
+    getAssignment.mockResolvedValue({
+      data: {
+        id: "assignment-1",
+        name: "Homework 1",
+        autograder_points: 10,
+        due_date: "2099-01-01T00:00:00Z",
+        late_due_date: "2099-01-02T00:00:00Z",
+        late_submission: true,
+        ai_feedback_enabled: false,
+        allow_file_upload: true,
+        enable_code_editor: true,
+      },
+    });
+    getExtension.mockResolvedValue({ data: {} });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
+  });
+
+  it("shows a queued message instead of results while pending", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(detailsResponse({ status: "pending", score: null }));
+    getSubmissionStatus.mockResolvedValue({ data: { status: "pending" } });
+
+    renderAssignmentResult();
+
+    expect(await screen.findByText("Queued for grading")).toBeInTheDocument();
+    expect(screen.queryByTestId("result-score")).not.toBeInTheDocument();
+  });
+
+  it("polls until graded, then shows results", async () => {
+    jest.useFakeTimers();
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(detailsResponse({ status: "pending", score: null }))
+      .mockResolvedValue(detailsResponse({ status: "graded", score: 9 }));
+    getSubmissionStatus
+      .mockResolvedValueOnce({ data: { status: "running" } })
+      .mockResolvedValueOnce({ data: { status: "graded" } });
+
+    renderAssignmentResult();
+    expect(await screen.findByText("Queued for grading")).toBeInTheDocument();
+
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(await screen.findByText("Grading")).toBeInTheDocument();
+
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(await screen.findByTestId("result-score")).toHaveTextContent("9");
+    expect(screen.queryByText("Grading")).not.toBeInTheDocument();
+    expect(getSubmissionStatus).toHaveBeenCalledWith({ submission_id: "submission-1" });
+  });
+
+  it("shows a failure message and does not poll when grading failed", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(detailsResponse({ status: "failed", score: null }));
+
+    renderAssignmentResult();
+
+    expect(await screen.findByText("Grading failed")).toBeInTheDocument();
+    expect(screen.queryByTestId("result-score")).not.toBeInTheDocument();
+    expect(getSubmissionStatus).not.toHaveBeenCalled();
   });
 });

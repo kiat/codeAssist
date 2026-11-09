@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 from functools import reduce
 from flask import Blueprint, request, jsonify, current_app, session, send_file
 from api import db
-from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase, SubmissionSubmitter
+from api.models import Assignment, Submission, User, Course, Enrollment, TestCaseResult, TestCase, SubmissionSubmitter, SUBMISSION_PENDING, SUBMISSION_RUNNING, SUBMISSION_GRADED, SUBMISSION_FAILED
 from api.schemas import AssignmentSchema, SubmissionSchema, UserSchema, EnrollmentSchema
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, ServerTimeoutError, SubmissionTimeoutError
 from util.auth import get_user_course_role, require_authenticated, require_course_role
@@ -23,7 +23,7 @@ from util.csv_utils import csv_safe_cell
 from util.submission_files import required_submission_files
 from util.timing import StepTimer
 from datetime import datetime, timezone
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, text
 from ai_feedback.integration import async_get_ai_feedback
 from collections import namedtuple
 from contextlib import contextmanager
@@ -131,6 +131,35 @@ def assignment_container_lock(assignment_id):
                 )
             finally:
                 conn.close()
+
+
+def lock_student_submissions(student_id, assignment_id):
+    if _get_engine().dialect.name != "postgresql":
+        return
+    key = _advisory_lock_key(f"{student_id}:{assignment_id}")
+    db.session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+
+
+def activate_if_newest(submission):
+    lock_student_submissions(submission.student_id, submission.assignment_id)
+    newer_is_active = db.session.query(Submission.id).filter(
+        Submission.student_id == submission.student_id,
+        Submission.assignment_id == submission.assignment_id,
+        Submission.active.is_(True),
+        Submission.id != submission.id,
+        Submission.submitted_at > submission.submitted_at,
+    ).first() is not None
+    if newer_is_active:
+        return False
+
+    db.session.query(Submission).filter(
+        Submission.student_id == submission.student_id,
+        Submission.assignment_id == submission.assignment_id,
+        Submission.active.is_(True),
+        Submission.id != submission.id,
+    ).update({"active": False}, synchronize_session=False)
+    submission.active = True
+    return True
 
 def exec_run_with_timeout(container, cmd, timeout=30):
     '''Run `cmd` inside `container` via `docker exec`, enforcing a hard timeout.'''
@@ -383,6 +412,100 @@ def run_grading(container, file_path, filename, autograder_timeout):
         ) from exc
 
 
+GRADE_OUTCOME_GRADED = "graded"
+GRADE_OUTCOME_TIMED_OUT = "timed_out"
+GRADE_OUTCOME_NO_RESULTS = "no_results"
+GRADE_OUTCOME_CRASHED = "crashed"
+GRADE_OUTCOME_INVALID_RESULTS = "invalid_results"
+GRADE_OUTCOME_INFRA_ERROR = "infra_error"
+
+GradeOutcome = namedtuple(
+    "GradeOutcome",
+    ["kind", "results_json_content", "score", "execution_time", "autograder_timeout"],
+    defaults=("", None, 0.0, None),
+)
+
+
+def grade_staged_submission(assignment, file_path, filename, timer):
+    assignment_id = assignment.id
+    db.session.rollback()
+    timer.lap("prepare")
+    with assignment_container_lock(assignment_id):
+        timer.lap("lock_wait")
+        container = get_or_create_assignment_container(assignment)
+        timer.lap("container")
+
+        autograder_timeout = assignment.autograder_timeout or 300
+        try:
+            grade_proc = run_grading(container, file_path, filename, autograder_timeout)
+            returncode = grade_proc.returncode
+            grade_stderr = (grade_proc.stderr or b"").decode(errors="replace")
+        except ContainerExecTimeout:
+            logger.warning(
+                "Grading exec for assignment %s hit the %ss safety timeout; recording it as a timeout",
+                assignment_id, autograder_timeout + GRADE_OVERHEAD_TIMEOUT
+            )
+            grade_proc = None
+            returncode = GRADE_EXIT_TIMED_OUT
+            grade_stderr = ""
+        timer.lap("grade")
+
+        if returncode == GRADE_EXIT_TIMED_OUT:
+            reset_assignment_container(assignment)
+            return GradeOutcome(GRADE_OUTCOME_TIMED_OUT, autograder_timeout=autograder_timeout)
+
+        student_code_ran = returncode in (
+            GRADE_EXIT_TIMED_OUT, GRADE_EXIT_AUTOGRADER_FAILED, GRADE_EXIT_NO_RESULTS, KILLED_EXIT_CODE
+        )
+        if returncode != 0 and not student_code_ran:
+            logger.warning(
+                "Failed to prepare container for assignment %s (exit %s), details: %s",
+                assignment_id, returncode, grade_stderr
+            )
+            reset_assignment_container(assignment)
+            return GradeOutcome(GRADE_OUTCOME_INFRA_ERROR)
+
+        if returncode == GRADE_EXIT_NO_RESULTS:
+            logger.warning(
+                "Failed to retrieve results.json for assignment %s, details: %s",
+                assignment_id, grade_stderr
+            )
+            return GradeOutcome(GRADE_OUTCOME_NO_RESULTS)
+
+        if returncode != 0:
+            reset_assignment_container(assignment)
+            logger.warning(
+                "Autograder failed for assignment %s (exit %s), details: %s",
+                assignment_id, returncode, grade_stderr
+            )
+            return GradeOutcome(GRADE_OUTCOME_CRASHED)
+
+    results_json_content = grade_proc.stdout.decode(errors="replace")
+    try:
+        results_payload = json.loads(results_json_content)
+        if not isinstance(results_payload, dict):
+            raise ValueError("results.json is not a JSON object")
+        score = results_payload["score"]
+    except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
+        logger.warning(
+            "Autograder returned unusable results for assignment %s: %s",
+            assignment_id, exc
+        )
+        return GradeOutcome(GRADE_OUTCOME_INVALID_RESULTS, results_json_content=results_json_content)
+
+    try:
+        execution_time = float(results_payload.get('execution_time', 0) or 0)
+    except (TypeError, ValueError):
+        execution_time = 0.0
+
+    return GradeOutcome(
+        GRADE_OUTCOME_GRADED,
+        results_json_content=results_json_content,
+        score=score,
+        execution_time=execution_time,
+    )
+
+
 def _run_assignment_container(assignment, container_name):
     return get_docker_client().containers.run(
         image=assignment.autograder_image_name,
@@ -553,6 +676,14 @@ def archive_dir(assignment_id, submission_id):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(current_dir, 'upload_autograder', 'archive', str(assignment_id), str(submission_id))
 
+def staging_dir(assignment_id, submission_id):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(current_dir, 'upload_autograder', 'runs', str(assignment_id), 'submission', str(submission_id))
+
+def results_staging_path(assignment_id, student_id, submission_id):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(current_dir, 'upload_autograder', 'runs', str(assignment_id), str(student_id), 'results', f"results_{submission_id}.json")
+
 def _remove_empty_dirs(*paths):
     '''Remove each path if it is an empty directory. '''
     for path in paths:
@@ -635,36 +766,63 @@ def _autograder_crash_payload():
     }
 
 
-def _record_failed_submission(submission_id, filename, file_path, student_id,
-                              assignment_id, results, execution_time):
-    '''Write a score-zero, completed=False Submission row for a run that failed.'''
+def _timeout_payload(autograder_timeout):
+    return {
+        "tests": [
+            {
+                "name": "Submission Timeout",
+                "score": 0,
+                "max_score": 0,
+                "status": "failed",
+                "output": "The submission did not complete within the time limit."
+            }
+        ],
+        "leaderboard": [],
+        "visibility": "visible",
+        "execution_time": f"{autograder_timeout:.2f}",
+        "score": 0
+    }
+
+
+def _failed_outcome_payload(outcome):
+    if outcome.kind == GRADE_OUTCOME_TIMED_OUT:
+        return _timeout_payload(outcome.autograder_timeout), float(outcome.autograder_timeout)
+    if outcome.kind == GRADE_OUTCOME_NO_RESULTS:
+        return _malformed_results_payload(""), 0.0
+    if outcome.kind == GRADE_OUTCOME_CRASHED:
+        return _autograder_crash_payload(), 0.0
+    return _malformed_results_payload(outcome.results_json_content), 0.0
+
+
+def _create_pending_submission(submission_id, filename, file_path, student_id, assignment_id):
+    lock_student_submissions(student_id, assignment_id)
     submission_count = db.session.query(Submission).filter_by(
         student_id=student_id, assignment_id=assignment_id
     ).count()
-    old = db.session.query(Submission).filter_by(
-        student_id=student_id, assignment_id=assignment_id, active=True
-    )
-    if old:
-        old.update({'active': False})
 
-    failed_submission = Submission(
-        id=submission_id,
+    new_submission = Submission(
+        id=str(submission_id),
         file_name=filename,
-        student_id=uuid.UUID(student_id),
-        assignment_id=uuid.UUID(assignment_id),
+        student_id=str(uuid.UUID(student_id)),
+        assignment_id=str(uuid.UUID(assignment_id)),
         student_code_file=open(file_path, 'rb').read(),
-        results=json.dumps(results).encode(),
-        score=0,
-        execution_time=float(execution_time),
-        submitted_at=datetime.now(),
-        active=True,
+        results=None,
+        score=None,
+        execution_time=0.0,
+        submitted_at=datetime.now(timezone.utc),
+        active=False,
         completed=False,
+        status=SUBMISSION_PENDING,
         submission_number=submission_count + 1,
-        ai_feedback=None
+        ai_feedback=None,
     )
-    db.session.add(failed_submission)
-    db.session.commit()
-    return failed_submission
+    db.session.add(new_submission)
+    commit_or_rollback(
+        "Failed to record pending submission %s for assignment %s",
+        submission_id, assignment_id,
+        raise_message="Failed to record submission"
+    )
+    return new_submission
 
 
 def _apply_grade_visibility(submission_dict, assignment, requester_id):
@@ -788,20 +946,19 @@ def upload_submission():
         if os.path.splitext(filename)[1].lower() != os.path.splitext(required_name)[1].lower():
             raise BadRequestError(f"This assignment requires a file named {required_name}")
         filename = required_name
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    assignment_dir = os.path.join(current_dir, 'upload_autograder', 'runs', assignment_id)
     submission_id = uuid.uuid4()
-    submissions_dir = os.path.join(assignment_dir, "submission", str(submission_id))
-    results_dir = os.path.join(assignment_dir, student_id, 'results')
+    submissions_dir = staging_dir(assignment_id, submission_id)
 
     file_path = stage_submission(submissions_dir, file, filename)
     timer.lap("stage")
+    handed_to_worker = False
     try:
         #get autograder if it exists
         assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
 
 
         if not assignment or not assignment.autograder_image_name or assignment.autograder_image_name.strip() == "":
+            lock_student_submissions(student_id, assignment_id)
             submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
             old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
             if old:
@@ -816,7 +973,7 @@ def upload_submission():
                 results=None,
                 score=None,
                 execution_time=0.0,
-                submitted_at=datetime.now(),
+                submitted_at=datetime.now(timezone.utc),
                 active=True,
                 completed=True,
                 submission_number=submission_count + 1,
@@ -832,195 +989,32 @@ def upload_submission():
                 "submissionID": str(new_submission.id)
             }), 200
 
-        os.makedirs(results_dir, exist_ok=True)
-        results_json_name = f"results_{submission_id}.json"
-
-        lock_id = assignment.id
-        db.session.rollback()
-        timer.lap("prepare")
-        with assignment_container_lock(lock_id):
-            timer.lap("lock_wait")
-            # Reuse (or create, on first submission) a persistent container for this assignment
-            container = get_or_create_assignment_container(assignment)
-            timer.lap("container")
-
-            autograder_timeout = assignment.autograder_timeout or 300
-            try:
-                grade_proc = run_grading(container, file_path, filename, autograder_timeout)
-                returncode = grade_proc.returncode
-                grade_stderr = (grade_proc.stderr or b"").decode(errors="replace")
-            except ContainerExecTimeout:
-                logger.warning(
-                    "Grading exec for assignment %s hit the %ss safety timeout; recording it as a timeout",
-                    assignment_id, autograder_timeout + GRADE_OVERHEAD_TIMEOUT
-                )
-                grade_proc = None
-                returncode = GRADE_EXIT_TIMED_OUT
-                grade_stderr = ""
-            timer.lap("grade")
-
-            if returncode == GRADE_EXIT_TIMED_OUT:
-                # clean up container
-                reset_assignment_container(assignment)
-
-                # upload failed submission to db
-                timeout_result = {
-                    "tests": [
-                        {
-                            "name": "Submission Timeout",
-                            "score": 0,
-                            "max_score": 0,
-                            "status": "failed",
-                            "output": "The submission did not complete within the time limit."
-                        }
-                    ],
-                    "leaderboard": [],
-                    "visibility": "visible",
-                    "execution_time": f"{autograder_timeout:.2f}",
-                    "score": 0
-                }
-
-                failed_submission = _record_failed_submission(
-                    submission_id=submission_id,
-                    filename=filename,
-                    file_path=file_path,
-                    student_id=student_id,
-                    assignment_id=assignment_id,
-                    results=timeout_result,
-                    execution_time=float(autograder_timeout),
-                )
-                archive_staged_files(assignment_id, submission_id, submissions_dir)
-                raise SubmissionTimeoutError("Submitted program took too long to run", failed_submission.id)
-
-            student_code_ran = returncode in (
-                GRADE_EXIT_TIMED_OUT, GRADE_EXIT_AUTOGRADER_FAILED, GRADE_EXIT_NO_RESULTS, KILLED_EXIT_CODE
-            )
-            if returncode != 0 and not student_code_ran:
-                logger.warning(
-                    "Failed to prepare container for assignment %s (exit %s), details: %s",
-                    assignment_id, returncode, grade_stderr
-                )
-                reset_assignment_container(assignment)
-                raise InternalProcessingError("Failed to cleanup container")
-
-            if returncode == GRADE_EXIT_NO_RESULTS:
-                logger.warning(
-                    "Failed to retrieve results.json for assignment %s, details: %s",
-                    assignment_id, grade_stderr
-                )
-                _record_failed_submission(
-                    submission_id=submission_id,
-                    filename=filename,
-                    file_path=file_path,
-                    student_id=student_id,
-                    assignment_id=assignment_id,
-                    results=_malformed_results_payload(""),
-                    execution_time=0.0,
-                )
-                archive_staged_files(assignment_id, submission_id, submissions_dir)
-                raise InternalProcessingError("Failed to grade submission")
-
-            if returncode != 0:
-                reset_assignment_container(assignment)
-                logger.warning(
-                    "Autograder failed for assignment %s (exit %s), details: %s",
-                    assignment_id, returncode, grade_stderr
-                )
-                _record_failed_submission(
-                    submission_id=submission_id,
-                    filename=filename,
-                    file_path=file_path,
-                    student_id=student_id,
-                    assignment_id=assignment_id,
-                    results=_autograder_crash_payload(),
-                    execution_time=0.0,
-                )
-                archive_staged_files(assignment_id, submission_id, submissions_dir)
-                raise InternalProcessingError("Failed to grade submission")
-
-        results_json_content = grade_proc.stdout.decode(errors="replace")
-
-        try:
-            results_payload = json.loads(results_json_content)
-            if not isinstance(results_payload, dict):
-                raise ValueError("results.json is not a JSON object")
-            score = results_payload["score"]
-        except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
-            logger.warning(
-                "Autograder returned unusable results for assignment %s: %s",
-                assignment_id, exc
-            )
-            _record_failed_submission(
-                submission_id=submission_id,
-                filename=filename,
-                file_path=file_path,
-                student_id=student_id,
-                assignment_id=assignment_id,
-                results=_malformed_results_payload(results_json_content),
-                execution_time=0.0,
-            )
-            archive_staged_files(assignment_id, submission_id, submissions_dir)
-            raise InternalProcessingError("Autograder returned invalid results JSON")
-
-        try:
-            execution_time = float(results_payload.get('execution_time', 0) or 0)
-        except (TypeError, ValueError):
-            execution_time = 0.0
-
-        host_results_json_path = os.path.join(results_dir, results_json_name)
-        with open(host_results_json_path, 'w') as file:
-            file.write(results_json_content)
-
-        # Update active submission in db
-        submission_count = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id).count()
-        old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
-        if old:
-            old.update({'active': False})
-
-        # Create a new submission record. Note that we add an initial value (e.g. None) for ai_feedback.
-        new_submission = Submission(
-            id=submission_id,
-            file_name=filename,
-            student_id=uuid.UUID(student_id),
-            assignment_id=uuid.UUID(assignment_id),
-            student_code_file=open(file_path, 'rb').read(),
-            results=results_json_content.encode(),
-            score=score,
-            execution_time=execution_time,
-            submitted_at=datetime.now(),
-            #set the active to true for a newly submitted submission
-            active=True,
-            completed=True,
-            submission_number=submission_count + 1,
-            ai_feedback=None  # Initially no AI feedback
-        )
-        db.session.add(new_submission)
-        commit_or_rollback(
-            "Failed to record submission %s for assignment %s",
-            submission_id, assignment_id,
-            raise_message="Failed to record submission"
+        new_submission = _create_pending_submission(
+            submission_id, filename, file_path, student_id, assignment_id
         )
         timer.lap("record")
-        archived = archive_staged_files(assignment_id, submission_id, submissions_dir, host_results_json_path)
-        timer.lap("archive")
 
-        # Capture the app object and launch a background thread to get AI feedback asynchronously.
-        app_obj = current_app._get_current_object()
-        threading.Thread(
-            target=async_get_ai_feedback, 
-            args=(app_obj, new_submission.id, os.path.join(archived, filename), results_json_content)
-        ).start()
+        from routes.grading_tasks import grade_submission
+        try:
+            grade_submission.delay(str(submission_id))
+        except Exception:
+            logger.exception("Failed to enqueue grading for submission %s", submission_id)
+            db.session.delete(new_submission)
+            commit_or_rollback("Failed to remove unqueued submission %s", submission_id)
+            raise InternalProcessingError("Grading is temporarily unavailable, please try again")
+        handed_to_worker = True
+        timer.lap("enqueue")
 
-        # Return the response. Note that ai_feedback might not be available immediately.
         return jsonify({
-            "message": "Submission uploaded and autograded successfully",
-            "results_path": os.path.join(archived, os.path.basename(host_results_json_path)),
-            "submissionID": str(new_submission.id)
-        }), 200
+            "message": "Submission received and queued for grading",
+            "submissionID": str(submission_id),
+            "status": SUBMISSION_PENDING,
+        }), 202
     finally:
-        shutil.rmtree(submissions_dir, ignore_errors=True)
+        if not handed_to_worker:
+            shutil.rmtree(submissions_dir, ignore_errors=True)
         logger.info(
-            "grading_timing assignment=%s submission=%s %s",
+            "upload_timing assignment=%s submission=%s %s",
             assignment_id, submission_id, json.dumps(timer.as_dict())
         )
 
@@ -1168,7 +1162,8 @@ def get_latest_submission():
     # Query for the latest submission based on the submitted time
     latest_submission = Submission.query.filter_by(
         student_id=student_id,
-        assignment_id=assignment_id
+        assignment_id=assignment_id,
+        status=SUBMISSION_GRADED,
     ).order_by(Submission.submitted_at.desc()).first()
 
     # Serialize the submission data
@@ -1761,6 +1756,27 @@ def delete_submission():
 
     return jsonify({"message": "Submission successfully deleted"}), 200
 
+@submission.route('/get_submission_status', methods=["GET"])
+def get_submission_status():
+    submission_id = request.args.get("submission_id")
+    if not submission_id:
+        raise BadRequestError("Missing submission_id")
+
+    row = db.session.query(
+        Submission.student_id, Submission.assignment_id, Submission.status
+    ).filter_by(id=submission_id).first()
+    if not row:
+        raise NotFoundError("No submission found")
+
+    requester_id = require_authenticated()
+    if str(requester_id) != str(row.student_id):
+        assignment = db.session.get(Assignment, row.assignment_id)
+        require_course_role(assignment.course_id, {"instructor", "ta"},
+                            "Not authorized to view this submission")
+
+    return jsonify({"submissionID": submission_id, "status": row.status}), 200
+
+
 @submission.route('/get_submission_details', methods=["GET"])
 def get_submission_details():
     '''
@@ -1812,6 +1828,9 @@ def rerun_submission_autograder():
     is_staff = get_user_course_role(requester_id, assignment.course_id) in {"instructor", "ta"}
     if not (is_owner or is_staff):
         raise ForbiddenError("Not authorized to rerun this submission")
+
+    if submission_to_rerun.status in (SUBMISSION_PENDING, SUBMISSION_RUNNING):
+        raise ConflictError("This submission is still being graded")
 
     if (
         not assignment.autograder_image_name
@@ -1876,25 +1895,11 @@ def rerun_submission_autograder():
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        timeout_result = {
-            "tests": [
-                {
-                    "name": "Submission Timeout",
-                    "score": 0,
-                    "max_score": 0,
-                    "status": "failed",
-                    "output": "The submission did not complete within the time limit.",
-                }
-            ],
-            "leaderboard": [],
-            "visibility": "visible",
-            "execution_time": f"{timeout:.2f}",
-            "score": 0,
-        }
-        submission_to_rerun.results = json.dumps(timeout_result).encode()
+        submission_to_rerun.results = json.dumps(_timeout_payload(timeout)).encode()
         submission_to_rerun.score = 0
         submission_to_rerun.execution_time = float(timeout)
         submission_to_rerun.completed = False
+        submission_to_rerun.status = SUBMISSION_GRADED
         submission_to_rerun.ai_feedback = None
         db.session.commit()
         if container:
@@ -1958,6 +1963,8 @@ def rerun_submission_autograder():
     with open(host_results_json_path, 'w') as file:
         file.write(results_json_content)
 
+    was_failed = submission_to_rerun.status == SUBMISSION_FAILED
+
     submission_to_rerun.results = results_json_content.encode()
     submission_to_rerun.score = parsed_results.get("score")
     try:
@@ -1967,7 +1974,10 @@ def rerun_submission_autograder():
     except (TypeError, ValueError):
         submission_to_rerun.execution_time = 0
     submission_to_rerun.completed = True
+    submission_to_rerun.status = SUBMISSION_GRADED
     submission_to_rerun.ai_feedback = None
+    if was_failed:
+        activate_if_newest(submission_to_rerun)
     db.session.commit()
 
     if getattr(assignment, "ai_feedback_enabled", False):
@@ -2042,8 +2052,12 @@ def activate_submission():
         or str(submission_to_activate.assignment_id) != str(assignment_id)
     ):
         raise ForbiddenError("Submission does not belong to the given student and assignment")
+    if submission_to_activate.status != SUBMISSION_GRADED:
+        raise ConflictError("Only graded submissions can be activated")
 
     try:
+        lock_student_submissions(student_id, assignment_id)
+
         # Deactivate the current active submission for the same assignment and student
         old = db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id, active=True)
         if old:

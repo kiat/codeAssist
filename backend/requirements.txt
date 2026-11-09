@@ -18,3 +18,4 @@ psycopg2-binary
 dotenv
 requests
 psutil
+celery[redis]>=5.4,<6
