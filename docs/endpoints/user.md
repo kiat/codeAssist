@@ -153,3 +153,18 @@ They return 401 if not logged in and 403 for any other role.
 User objects returned by any endpoint never include the password hash.
 
 ---
+
+## GET /get_user_by_email
+
+**Auth:** instructor or TA of `course_id`. Used by the enrollment page to look up a user before adding them.
+
+Example input: `/get_user_by_email?email=john@example.com&course_id=fc8beca8-48b5-41ce-b89c-9b2b31103b72`
+
+Example output:
+
+    {
+      "id": "a6888457-475a-47ab-8455-441cdd8b9744",
+      "name": "John Doe",
+      "email_address": "john@example.com",
+      "role": "student"
+    }

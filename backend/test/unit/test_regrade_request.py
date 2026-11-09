@@ -21,18 +21,38 @@ def client(app):
 def _mock_course_role(mocker, role="instructor"):
     return mocker.patch("util.auth.get_user_course_role", return_value=role)
 
+
+def _mock_submission_lookup(mocker, student_id="stu1", regrade=None):
+    """Mock db.session.query for the owner/staff check and the route body."""
+    submission = SimpleNamespace(id="sub1", assignment_id="assign1", student_id=student_id)
+    assignment = SimpleNamespace(id="assign1", name="A1", course_id="course1")
+
+    def query_side_effect(model):
+        q = mocker.Mock()
+        name = getattr(model, "__name__", "")
+        if name == "Submission":
+            q.filter_by.return_value.first.return_value = submission
+        elif name == "Assignment":
+            q.filter_by.return_value.first.return_value = assignment
+        elif name == "RegradeRequest":
+            q.filter_by.return_value.first.return_value = regrade
+            q.filter_by.return_value.__iter__ = lambda self: iter(["dummy-row"])
+        return q
+
+    return mocker.patch("routes.regrade_request.db.session.query", side_effect=query_side_effect)
+
 # Test cases
 
 # Test cases for send_regrade_request
 
 
-def test_send_regrade_request_success(client, mocker):
+def test_send_regrade_request_success(client, mocker, login_as):
     payload = {"submission_id": "sub1", "justification": "Please re‑check."}
 
     mocker.patch("routes.regrade_request.db.session.add")
     mocker.patch("routes.regrade_request.db.session.commit")
-    mock_query = mocker.patch("routes.regrade_request.db.session.query")
-    mock_query.return_value.filter_by.return_value = ["dummy-row"]
+    _mock_submission_lookup(mocker, student_id="stu1")
+    login_as("stu1")
 
     mock_schema = mocker.patch("routes.regrade_request.UserSchema")
     mock_schema.return_value.dump.return_value = [{"id": "req‑123"}]
@@ -42,6 +62,25 @@ def test_send_regrade_request_success(client, mocker):
     res = client.post("/send_regrade_request", json=payload)
     assert res.status_code == 200
     assert res.get_json() == {"id": "req‑123"}
+
+
+def test_send_regrade_request_unauthenticated(client, mocker):
+    add = mocker.patch("routes.regrade_request.db.session.add")
+    res = client.post("/send_regrade_request", json={"submission_id": "sub1", "justification": "x"})
+    assert res.status_code == 401
+    add.assert_not_called()
+
+
+@pytest.mark.parametrize("caller, role", [("other-student", "student"), ("instructor1", "instructor")])
+def test_send_regrade_request_only_owner(client, mocker, login_as, caller, role):
+    add = mocker.patch("routes.regrade_request.db.session.add")
+    _mock_submission_lookup(mocker, student_id="stu1")
+    _mock_course_role(mocker, role)
+    login_as(caller)
+
+    res = client.post("/send_regrade_request", json={"submission_id": "sub1", "justification": "x"})
+    assert res.status_code == 403
+    add.assert_not_called()
 
 
 # Test cases for get_regrade_request
@@ -136,29 +175,65 @@ def test_get_regrade_request_success(client, mocker, login_as):
 # Test cases for check_regrade_request
 
 
-def test_check_regrade_request_false(client, mocker):
-    mocker.patch("routes.regrade_request.db.session.query").return_value.filter_by.return_value.first.return_value = None
+def test_check_regrade_request_false(client, mocker, login_as):
+    _mock_submission_lookup(mocker, student_id="stu1", regrade=None)
+    login_as("stu1")
     res = client.post("/check_regrade_request", json={"submission_id": "subX"})
     assert res.status_code == 200
     assert res.get_json() == {"has_request": False}
 
 
-def test_check_regrade_request_true(client, mocker):
-    mocker.patch("routes.regrade_request.db.session.query").return_value.filter_by.return_value.first.return_value = object()
+def test_check_regrade_request_true(client, mocker, login_as):
+    _mock_submission_lookup(mocker, student_id="stu1", regrade=object())
+    _mock_course_role(mocker, "ta")
+    login_as("ta1")
     res = client.post("/check_regrade_request", json={"submission_id": "sub1"})
     assert res.status_code == 200
     assert res.get_json() == {"has_request": True}
 
 
+def test_check_regrade_request_other_student_forbidden(client, mocker, login_as):
+    _mock_submission_lookup(mocker, student_id="stu1", regrade=object())
+    _mock_course_role(mocker, "student")
+    login_as("other-student")
+    res = client.post("/check_regrade_request", json={"submission_id": "sub1"})
+    assert res.status_code == 403
+
+
+def test_check_regrade_request_unauthenticated(client):
+    res = client.post("/check_regrade_request", json={"submission_id": "sub1"})
+    assert res.status_code == 401
+
+
 # Test cases for delete_regrade_request
 
 
-def test_delete_regrade_request(client, mocker):
-    mocker.patch("routes.regrade_request.RegradeRequest.query.filter_by")
-    mocker.patch("routes.regrade_request.db.session.commit")
+def test_delete_regrade_request(client, mocker, login_as):
+    commit = mocker.patch("routes.regrade_request.db.session.commit")
+    _mock_submission_lookup(mocker, student_id="stu1")
+    login_as("stu1")
     res = client.post("/delete_regrade_request", json={"submission_id": "sub1"})
     assert res.status_code == 200
     assert res.get_json()["message"] == "Regrade request deleted"
+    commit.assert_called_once()
+
+
+@pytest.mark.parametrize("role, expected", [("instructor", 200), ("ta", 403), ("student", 403)])
+def test_delete_regrade_request_staff_roles(client, mocker, login_as, role, expected):
+    commit = mocker.patch("routes.regrade_request.db.session.commit")
+    _mock_submission_lookup(mocker, student_id="stu1")
+    _mock_course_role(mocker, role)
+    login_as("someone-else")
+    res = client.post("/delete_regrade_request", json={"submission_id": "sub1"})
+    assert res.status_code == expected
+    assert commit.called == (expected == 200)
+
+
+def test_delete_regrade_request_unauthenticated(client, mocker):
+    commit = mocker.patch("routes.regrade_request.db.session.commit")
+    res = client.post("/delete_regrade_request", json={"submission_id": "sub1"})
+    assert res.status_code == 401
+    commit.assert_not_called()
 
 
 # Test cases for set_reviewed
@@ -224,7 +299,7 @@ def test_get_student_regrade_requests_missing_course(client):
     assert res.get_json()["message"] == "Missing course_id"
 
 
-def test_get_student_regrade_requests_success(client, mocker):
+def test_get_student_regrade_requests_success(client, mocker, login_as):
     req = SimpleNamespace(id="req1", submission_id="sub1",
                           justification="Fix", reviewed=False)
     submission = SimpleNamespace(id="sub1", assignment_id="assign1", student_id="stu1")
@@ -254,6 +329,7 @@ def test_get_student_regrade_requests_success(client, mocker):
         return mocker.Mock()
 
     mocker.patch("routes.regrade_request.db.session.query", side_effect=query_side_effect)
+    login_as("stu1")
 
     res = client.get("/get_student_regrade_requests?student_id=stu1&course_id=course1")
     assert res.status_code == 200
@@ -266,6 +342,18 @@ def test_get_student_regrade_requests_success(client, mocker):
         "studentId": "stu1",
         "reviewed": False,
     }]
+
+
+def test_get_student_regrade_requests_unauthenticated(client):
+    res = client.get("/get_student_regrade_requests?student_id=stu1&course_id=course1")
+    assert res.status_code == 401
+
+
+def test_get_student_regrade_requests_other_student_forbidden(client, mocker, login_as):
+    _mock_course_role(mocker, "student")
+    login_as("other-student")
+    res = client.get("/get_student_regrade_requests?student_id=stu1&course_id=course1")
+    assert res.status_code == 403
 
 
 # Test cases for get_instructor_regrade_requests

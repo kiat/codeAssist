@@ -3,12 +3,32 @@ from flask import Blueprint, request, jsonify, session
 from api import db
 from api.models import Assignment, Submission, User, RegradeRequest
 from api.schemas import SubmissionSchema, UserSchema
-from util.errors import NotFoundError, BadRequestError
+from util.errors import NotFoundError, BadRequestError, ForbiddenError
 from util.auth import require_authenticated, require_course_role
 from routes.submission import _verify_student_owner, _apply_grade_visibility
 
 
 regrade_request = Blueprint('regrade_request', __name__)
+
+
+def _require_owner_or_staff(submission_id, staff_roles, message):
+    """Load the submission and allow its owner, or course staff with one of staff_roles."""
+    user_id = require_authenticated()
+    if not submission_id:
+        raise BadRequestError("Missing submission_id")
+
+    submission = db.session.query(Submission).filter_by(id=submission_id).first()
+    if not submission:
+        raise NotFoundError("No such submission")
+    if str(submission.student_id) == str(user_id):
+        return submission
+
+    if staff_roles:
+        assignment = db.session.query(Assignment).filter_by(id=submission.assignment_id).first()
+        if assignment:
+            require_course_role(assignment.course_id, staff_roles, message)
+            return submission
+    raise ForbiddenError(message)
 
 @regrade_request.route('/send_regrade_request', methods=["POST"])
 def send_regrade_request():
@@ -19,9 +39,16 @@ def send_regrade_request():
     @param justification     justification for the request
     '''
 
+    data = request.json or {}
+    submission_id = data.get('submission_id')
+    justification = data.get('justification')
+
+    # Only the student who owns the submission can ask for a regrade.
+    _require_owner_or_staff(submission_id, None, "You can only request a regrade of your own submission")
+    if not justification:
+        raise BadRequestError("Missing justification")
+
     request_id = str(uuid.uuid4())
-    submission_id = request.json['submission_id']
-    justification = request.json['justification']
 
     request_data = {
         "id": request_id,
@@ -119,6 +146,10 @@ def get_student_regrade_requests():
     if not course_id:
         raise BadRequestError("Missing course_id")
 
+    user_id = require_authenticated()
+    if str(user_id) != str(student_id):
+        require_course_role(course_id, {"instructor", "ta"}, "You can only view your own regrade requests")
+
     regrade_requests = db.session.query(RegradeRequest).join(Submission).join(Assignment).filter(
         Submission.student_id == student_id,
         Assignment.course_id == course_id
@@ -194,7 +225,8 @@ def set_reviewed():
 
 @regrade_request.route('/check_regrade_request', methods=["POST"])
 def check_regrade_request():
-    submission_id = request.json["submission_id"]
+    submission_id = (request.json or {}).get("submission_id")
+    _require_owner_or_staff(submission_id, {"instructor", "ta"}, "You can only check your own regrade requests")
     regrade_request = db.session.query(RegradeRequest).filter_by(submission_id=submission_id).first()
     if not regrade_request:
         return jsonify({"has_request": False}), 200
@@ -202,7 +234,9 @@ def check_regrade_request():
 
 @regrade_request.route('/delete_regrade_request', methods=["POST"])
 def delete_regrade_request():
-    submission_id = request.json["submission_id"]
+    submission_id = (request.json or {}).get("submission_id")
+    # Students withdraw their own request; TAs can't delete, like elsewhere.
+    _require_owner_or_staff(submission_id, {"instructor"}, "You can only delete your own regrade requests")
     RegradeRequest.query.filter_by(submission_id=submission_id).delete()
     db.session.commit()
     return jsonify({"message": "Regrade request deleted"}), 200

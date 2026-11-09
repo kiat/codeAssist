@@ -27,7 +27,9 @@ def mock_course_query(mocker):
     return mock_query, mock_schema
 
 
-def test_create_course_success(client, mocker, mock_course_query):
+def test_create_course_success(client, login_as, mocker, mock_course_query):
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     mock_query, mock_schema = mock_course_query
 
     mock_instructor = mocker.Mock()
@@ -59,7 +61,9 @@ def test_create_course_success(client, mocker, mock_course_query):
     assert mock_add.call_count == 2
 
 
-def test_create_course_missing_instructor_returns_not_found(client, mocker, mock_course_query):
+def test_create_course_missing_instructor_returns_not_found(client, login_as, mocker, mock_course_query):
+    login_as("missing-user")
+    mocker.patch("routes.course.get_user_global_role", return_value="admin")
     mock_query, _ = mock_course_query
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         None,
@@ -82,7 +86,9 @@ def test_create_course_missing_instructor_returns_not_found(client, mocker, mock
     mock_add.assert_not_called()
 
 
-def test_create_course_duplicate_entry_code(client, mock_course_query):
+def test_create_course_duplicate_entry_code(client, login_as, mocker, mock_course_query):
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     mock_query, _ = mock_course_query
     mock_query.return_value.filter_by.return_value.first.return_value = True
 
@@ -100,7 +106,9 @@ def test_create_course_duplicate_entry_code(client, mock_course_query):
     assert response.json["message"] == "Course with the provided entry code already exists"
 
 
-def test_create_course_missing_fields(client):
+def test_create_course_missing_fields(client, login_as, mocker):
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     payload = {
         "name": "CS101",
         "semester": "Fall",
@@ -114,7 +122,8 @@ def test_create_course_missing_fields(client):
     assert response.json["message"] == "Missing required fields"
 
 
-def test_enroll_course_success(client, mocker):
+def test_enroll_course_success(client, mocker, login_as):
+    login_as("student-456")
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
     mock_add = mocker.patch("routes.course.db.session.add")
@@ -141,7 +150,8 @@ def test_enroll_course_success(client, mocker):
     mock_commit.assert_called_once()
 
 
-def test_enroll_course_already_enrolled(client, mocker):
+def test_enroll_course_already_enrolled(client, mocker, login_as):
+    login_as("student-456")
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_course = mocker.Mock()
     mock_course.id = "course-123"
@@ -163,7 +173,8 @@ def test_enroll_course_already_enrolled(client, mocker):
     assert response.json["message"] == "User is already enrolled in this course"
 
 
-def test_enroll_course_invalid_code(client, mocker):
+def test_enroll_course_invalid_code(client, mocker, login_as):
+    login_as("student-456")
     mock_query = mocker.patch("routes.course.db.session.query")
 
     # course does not exist
@@ -954,11 +965,15 @@ def test_create_enrollment_bulk_rejects_invalid_role(mocker):
     with pytest.raises(BadRequestError):
         create_enrollment_bulk(data)
 
-def test_create_course_get_not_allowed(client):
+def test_create_course_get_not_allowed(client, login_as, mocker):
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     response = client.get("/create_course")
     assert response.status_code == 415
 
-def test_create_course_db_error(client, mocker):
+def test_create_course_db_error(client, login_as, mocker):
+    login_as("inst-1")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         None,
@@ -1014,7 +1029,8 @@ def test_delete_course_db_error(client, mocker, login_as):
     assert response.status_code == 409
     assert response.json["message"] == "Cannot delete course with assignments"
 
-def test_enroll_course_db_error(client, mocker):
+def test_enroll_course_db_error(client, mocker, login_as):
+    login_as("student-123")
     mocker.patch("routes.course.db.session.query")
     mocker.patch("routes.course.db.session.add")
     mocker.patch("routes.course.db.session.commit", side_effect=Exception("fail"))
@@ -2264,3 +2280,111 @@ def test_delete_all_assignments_commit_failure_preserves_archives(client, mocker
     mock_rollback.assert_called()
     cleanup_container.assert_not_called()
     cleanup_dirs.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# create_course / enroll_course / leave_course auth (#379)
+# ---------------------------------------------------------------------------
+
+_COURSE_PAYLOAD = {
+    "name": "CS101",
+    "instructor_id": "user-123",
+    "semester": "Fall",
+    "year": "2025",
+    "entryCode": "ABCD1234",
+}
+
+
+def test_create_course_unauthenticated(client, mocker):
+    add = mocker.patch("routes.course.db.session.add")
+    response = client.post("/create_course", json=_COURSE_PAYLOAD)
+    assert response.status_code == 401
+    add.assert_not_called()
+
+
+def test_create_course_forbidden_for_student(client, mocker, login_as):
+    add = mocker.patch("routes.course.db.session.add")
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="student")
+
+    response = client.post("/create_course", json=_COURSE_PAYLOAD)
+
+    assert response.status_code == 403
+    add.assert_not_called()
+
+
+def test_create_course_instructor_cannot_create_for_someone_else(client, mocker, login_as):
+    add = mocker.patch("routes.course.db.session.add")
+    login_as("other-instructor")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
+
+    response = client.post("/create_course", json=_COURSE_PAYLOAD)
+
+    assert response.status_code == 403
+    assert response.json["message"] == "You can only create courses for yourself"
+    add.assert_not_called()
+
+
+def test_create_course_admin_can_create_for_instructor(client, mocker, login_as, mock_course_query):
+    mock_query, mock_schema = mock_course_query
+    mock_query.return_value.filter_by.return_value.first.side_effect = [None, mocker.Mock()]
+    mock_add = mocker.patch("routes.course.db.session.add")
+    mocker.patch("routes.course.db.session.commit")
+    mock_schema.return_value.dump.return_value = {"id": "course-id", "name": "CS101"}
+    login_as("admin-uuid")
+    mocker.patch("routes.course.get_user_global_role", return_value="admin")
+
+    response = client.post("/create_course", json=_COURSE_PAYLOAD)
+
+    assert response.status_code == 201
+    enrollment = mock_add.call_args_list[1].args[0]
+    assert enrollment.student_id == "user-123"
+    assert enrollment.role == "instructor"
+
+
+def test_enroll_course_unauthenticated(client, mocker):
+    add = mocker.patch("routes.course.db.session.add")
+    response = client.post("/enroll_course", json={"user_id": "student-456", "entryCode": "JOIN123"})
+    assert response.status_code == 401
+    add.assert_not_called()
+
+
+def test_enroll_course_cannot_enroll_someone_else(client, mocker, login_as):
+    add = mocker.patch("routes.course.db.session.add")
+    login_as("attacker")
+
+    response = client.post("/enroll_course", json={"user_id": "student-456", "entryCode": "JOIN123"})
+
+    assert response.status_code == 403
+    add.assert_not_called()
+
+
+def test_leave_course_unauthenticated(client, mocker):
+    delete = mocker.patch("routes.course.db.session.delete")
+    response = client.post("/leave_course", json={"user_id": "student-456", "course_id": "course-123"})
+    assert response.status_code == 401
+    delete.assert_not_called()
+
+
+def test_leave_course_cannot_remove_someone_else(client, mocker, login_as):
+    delete = mocker.patch("routes.course.db.session.delete")
+    login_as("attacker")
+
+    response = client.post("/leave_course", json={"user_id": "student-456", "course_id": "course-123"})
+
+    assert response.status_code == 403
+    delete.assert_not_called()
+
+
+def test_leave_course_self(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    enrollment = mocker.Mock(role="student")
+    mock_query.return_value.filter_by.return_value.first.return_value = enrollment
+    delete = mocker.patch("routes.course.db.session.delete")
+    mocker.patch("routes.course.db.session.commit")
+    login_as("student-456")
+
+    response = client.post("/leave_course", json={"user_id": "student-456", "course_id": "course-123"})
+
+    assert response.status_code == 200
+    delete.assert_called_once_with(enrollment)
