@@ -521,3 +521,75 @@ def test_update_assignment_ai_settings_rejects_invalid_wait_seconds(value):
 def test_normalize_non_negative_int_allows_zero_and_positive_values():
     assert normalize_non_negative_int(0, "field") == 0
     assert normalize_non_negative_int(10, "field") == 10
+
+
+def _custom_ai_assignment(**overrides):
+    values = {
+        "use_course_ai_default": False,
+        "ai_feedback_provider": "openai",
+        "ai_feedback_model": "gpt-4o-mini",
+        "ai_feedback_api_key": "",
+        "ai_feedback_vertex_location": None,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def test_update_assignment_ai_settings_rejects_unsupported_vertex_model(monkeypatch):
+    monkeypatch.delenv("VERTEX_AI_MODELS", raising=False)
+    assignment = _custom_ai_assignment()
+
+    with pytest.raises(ValueError, match="not supported"):
+        update_assignment_ai_settings(
+            assignment,
+            {
+                "use_course_ai_default": False,
+                "ai_feedback_provider": "gemini_vertex",
+                "ai_feedback_model": "gemini-1.5-pro",
+            },
+        )
+
+
+def test_update_assignment_ai_settings_accepts_supported_vertex_model(monkeypatch):
+    monkeypatch.delenv("VERTEX_AI_MODELS", raising=False)
+    assignment = _custom_ai_assignment()
+
+    update_assignment_ai_settings(
+        assignment,
+        {
+            "use_course_ai_default": False,
+            "ai_feedback_provider": "gemini_vertex",
+            "ai_feedback_model": "gemini-2.5-flash-lite",
+        },
+    )
+
+    assert assignment.ai_feedback_provider == "gemini_vertex"
+    assert assignment.ai_feedback_model == "gemini-2.5-flash-lite"
+
+
+def test_update_assignment_ai_settings_rejects_blocked_gemini_model():
+    assignment = _custom_ai_assignment()
+
+    with pytest.raises(ValueError, match="not supported"):
+        update_assignment_ai_settings(
+            assignment,
+            {
+                "use_course_ai_default": False,
+                "ai_feedback_provider": "gemini",
+                "ai_feedback_model": "gemini-2.0-flash",
+            },
+        )
+
+
+def test_update_assignment_ai_settings_skips_model_check_when_model_untouched():
+    assignment = _custom_ai_assignment(
+        ai_feedback_provider="gemini_vertex",
+        ai_feedback_model="gemini-1.5-pro",
+    )
+
+    update_assignment_ai_settings(
+        assignment,
+        {"use_course_ai_default": False, "ai_feedback_wait_seconds": 60},
+    )
+
+    assert assignment.ai_feedback_model == "gemini-1.5-pro"

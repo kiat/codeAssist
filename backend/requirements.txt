@@ -10,6 +10,7 @@ flask-marshmallow
 marshmallow-sqlalchemy
 Flask-Migrate
 openai
+google-genai
 pytest
 pytest-mock
 pytest-cov

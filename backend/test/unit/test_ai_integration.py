@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 
 import pytest
-import requests
 
 from ai_feedback.integration import (
     DEFAULT_FEEDBACK_PROMPT,
@@ -13,6 +12,7 @@ from ai_feedback.integration import (
     get_structured_feedback_from_gemini,
     parse_feedback_json,
 )
+from ai_feedback.providers.errors import ProviderConfigurationError
 
 
 def test_default_feedback_prompt_asks_for_professional_feedback_even_when_tests_pass():
@@ -131,34 +131,24 @@ issues that should be fixed."
 
 def test_gemini_feedback_request_reserves_tokens_for_json(monkeypatch):
     captured_request = {}
+    fake_client = object()
 
-    class FakeGeminiResponse:
-        status_code = 200
-        text = ""
+    class FakeGeminiProvider:
+        def __init__(self, client):
+            captured_request["client"] = client
 
-        def json(self):
-            return {
-                "candidates": [
-                    {
-                        "content": {
-                            "parts": [
-                                {
-                                    "text": (
-                                        '{"insights":["Overall Summary: Feedback is ready."],'
-                                        '"annotations":[]}'
-                                    )
-                                }
-                            ]
-                        }
-                    }
-                ]
-            }
+        def generate(self, **kwargs):
+            captured_request.update(kwargs)
+            return (
+                '{"insights":["Overall Summary: Feedback is ready."],'
+                '"annotations":[]}'
+            )
 
-    def fake_post(url, params, json, timeout):
-        captured_request["json"] = json
-        return FakeGeminiResponse()
-
-    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
+    monkeypatch.setattr(
+        "ai_feedback.integration.create_gemini_client",
+        lambda config: fake_client,
+    )
+    monkeypatch.setattr("ai_feedback.integration.GeminiProvider", FakeGeminiProvider)
 
     parsed, new_insights = get_structured_feedback_from_gemini(
         api_key="gemini-key",
@@ -167,64 +157,38 @@ def test_gemini_feedback_request_reserves_tokens_for_json(monkeypatch):
         temperature=0.5,
         past_insights=[],
     )
-
-    generation_config = captured_request["json"]["generationConfig"]
 
     assert "error" not in parsed
     assert new_insights == ["Overall Summary: Feedback is ready."]
-    assert generation_config["maxOutputTokens"] >= 1400
-    assert generation_config["thinkingConfig"]["thinkingBudget"] == 0
+    assert captured_request["client"] is fake_client
+    assert captured_request["model"] == "gemini-2.5-flash"
+    assert captured_request["temperature"] == 0.5
+    assert captured_request["max_output_tokens"] >= 1400
+    assert captured_request["response_mime_type"] == "application/json"
+    assert "Return JSON feedback." in captured_request["prompt"]
 
 
-def test_gemini_feedback_retries_transient_unavailable(monkeypatch, capsys):
-    calls = []
-    sleeps = []
+def test_gemini_feedback_uses_developer_api_client_config(monkeypatch):
+    captured_config = {}
 
-    class FakeGeminiResponse:
-        def __init__(self, status_code, text, payload):
-            self.status_code = status_code
-            self.text = text
-            self._payload = payload
+    class FakeGeminiProvider:
+        def __init__(self, client):
+            pass
 
-        def json(self):
-            return self._payload
-
-    def fake_post(url, params, json, timeout):
-        calls.append({"url": url, "params": params, "json": json, "timeout": timeout})
-        if len(calls) == 1:
-            return FakeGeminiResponse(
-                503,
-                '{"error":{"status":"UNAVAILABLE"}}',
-                {"error": {"status": "UNAVAILABLE"}},
+        def generate(self, **kwargs):
+            return (
+                '{"insights":["Overall Summary: Configured."],'
+                '"annotations":[]}'
             )
-        return FakeGeminiResponse(
-            200,
-            "",
-            {
-                "candidates": [
-                    {
-                        "content": {
-                            "parts": [
-                                {
-                                    "text": (
-                                        '{"insights":["Overall Summary: Feedback recovered."],'
-                                        '"annotations":[]}'
-                                    )
-                                }
-                            ]
-                        }
-                    }
-                ]
-            },
-        )
 
-    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
-    monkeypatch.setattr(
-        "ai_feedback.integration.time.sleep",
-        lambda seconds: sleeps.append(seconds),
-    )
+    def fake_create_client(config):
+        captured_config["config"] = config
+        return object()
 
-    parsed, new_insights = get_structured_feedback_from_gemini(
+    monkeypatch.setattr("ai_feedback.integration.create_gemini_client", fake_create_client)
+    monkeypatch.setattr("ai_feedback.integration.GeminiProvider", FakeGeminiProvider)
+
+    parsed, _ = get_structured_feedback_from_gemini(
         api_key="gemini-key",
         prompt="Return JSON feedback.",
         model="gemini-2.5-flash",
@@ -232,63 +196,9 @@ def test_gemini_feedback_retries_transient_unavailable(monkeypatch, capsys):
         past_insights=[],
     )
 
-    assert len(calls) == 2
     assert "error" not in parsed
-    assert new_insights == ["Overall Summary: Feedback recovered."]
-    assert sleeps == [1]
-    assert "GEMINI_RETRY: status 503" in capsys.readouterr().out
-
-
-def test_gemini_feedback_retries_transient_network_error(monkeypatch):
-    calls = []
-    sleeps = []
-
-    class FakeGeminiResponse:
-        status_code = 200
-        text = ""
-
-        def json(self):
-            return {
-                "candidates": [
-                    {
-                        "content": {
-                            "parts": [
-                                {
-                                    "text": (
-                                        '{"insights":["Overall Summary: Feedback recovered after timeout."],'
-                                        '"annotations":[]}'
-                                    )
-                                }
-                            ]
-                        }
-                    }
-                ]
-            }
-
-    def fake_post(url, params, json, timeout):
-        calls.append({"url": url, "params": params, "json": json, "timeout": timeout})
-        if len(calls) == 1:
-            raise requests.Timeout("temporary timeout")
-        return FakeGeminiResponse()
-
-    monkeypatch.setattr("ai_feedback.integration.requests.post", fake_post)
-    monkeypatch.setattr(
-        "ai_feedback.integration.time.sleep",
-        lambda seconds: sleeps.append(seconds),
-    )
-
-    parsed, new_insights = get_structured_feedback_from_gemini(
-        api_key="gemini-key",
-        prompt="Return JSON feedback.",
-        model="gemini-2.5-flash",
-        temperature=0.5,
-        past_insights=[],
-    )
-
-    assert len(calls) == 2
-    assert sleeps == [1]
-    assert "error" not in parsed
-    assert new_insights == ["Overall Summary: Feedback recovered after timeout."]
+    assert captured_config["config"].provider == "gemini"
+    assert captured_config["config"].api_key == "gemini-key"
 
 
 def test_claude_messages_payload_omits_temperature():
@@ -513,3 +423,40 @@ def test_get_provider_credentials_requires_saved_provider_key(
 
     with pytest.raises(ValueError, match=f"Missing {provider_label} API key"):
         get_provider_credentials(provider, course, assignment)
+
+
+def test_get_provider_credentials_gemini_vertex_uses_server_configuration(
+    monkeypatch,
+):
+    course = SimpleNamespace()
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_api_key="encrypted-stale-assignment-key",
+        ai_feedback_vertex_location="us-central1",
+    )
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "codeassist-project")
+    monkeypatch.delenv("VERTEX_AI_AUTH_MODE", raising=False)
+    decrypt_calls = []
+    monkeypatch.setattr(
+        "ai_feedback.integration.decrypt_api_key",
+        lambda encrypted_key: decrypt_calls.append(encrypted_key),
+    )
+
+    api_key, client = get_provider_credentials("gemini_vertex", course, assignment)
+
+    assert api_key is None
+    assert client is None
+    assert decrypt_calls == []
+
+
+def test_get_provider_credentials_gemini_vertex_requires_project(monkeypatch):
+    course = SimpleNamespace()
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_vertex_location="global",
+    )
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    monkeypatch.delenv("VERTEX_AI_AUTH_MODE", raising=False)
+
+    with pytest.raises(ProviderConfigurationError):
+        get_provider_credentials("gemini_vertex", course, assignment)

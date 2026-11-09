@@ -10,12 +10,9 @@ Supported providers:
 
 * OpenAI / ChatGPT
 * Google Gemini Developer API
+* Gemini over Vertex AI
 * Anthropic Claude
 * Ollama (self-hosted/local models)
-
-Gemini over Google Cloud Vertex AI was requested on 2026-08-02, but it is not
-implemented on `main` yet. Current Gemini support uses the regular Gemini
-Developer API key stored in `gemini_api_key`.
 
 AI feedback should focus on **correctness and debugging**, not style, formatting, readability, or refactoring.
 
@@ -55,10 +52,21 @@ Course-level settings are the default AI settings for a course — this is where
 Instructors can configure:
 
 * Provider
-* API key (stored encrypted — see `docs/encryption.md`)
+* API key (stored encrypted for provider-managed keys — see `docs/encryption.md`)
 * Default model
 * Feedback style
 * Temperature
+
+For Gemini over Vertex AI, credentials are configured on the CodeAssist server
+instead of being pasted by instructors. Standard Vertex AI uses
+`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` (defaults to `global`), and
+Application Default Credentials in the deployment environment. Vertex AI
+Express Mode uses `VERTEX_AI_AUTH_MODE=api_key` and `VERTEX_AI_API_KEY`.
+
+The configured Google Cloud identity or Express key project must be able to call
+Vertex AI prediction APIs. In IAM terms, it needs `aiplatform.endpoints.predict`,
+for example through the Vertex AI User or Vertex AI Express User role, and the
+Vertex AI API must be enabled for the project.
 
 Saved course fields:
 
@@ -72,6 +80,10 @@ ollama_base_url
 default_feedback_style
 default_ai_temperature
 ```
+
+Gemini over Vertex AI does not add a course key column. The course default can
+select `default_ai_provider = "gemini_vertex"` and a Gemini model, while cloud
+credentials remain deployment-managed.
 
 Course-level settings do **not** own instructor prompt lists or input-permission
 toggles. Per the latest instructor direction, prompt customization and
@@ -98,6 +110,7 @@ ai_feedback_enabled
 use_course_ai_default
 ai_feedback_provider
 ai_feedback_model
+ai_feedback_vertex_location # optional Vertex location override
 ai_feedback_prompt          # legacy single-prompt field, kept for backwards compatibility
 ai_feedback_prompts         # current: list of {id, title, prompt, enabled}
 ai_allowed_inputs           # {assignment_description, student_code, test_results, test_cases, student_output, submission_history}
@@ -113,6 +126,12 @@ The description is separate from AI feedback prompts:
 
 - Assignment description: explains the programming task.
 - AI feedback prompts: instruct the model how to evaluate the submission.
+
+`ai_feedback_vertex_location` only applies when an assignment customizes its
+provider to Gemini over Vertex AI. When it is blank, CodeAssist uses
+`GOOGLE_CLOUD_LOCATION` or `global`. In API-key mode, a location other than
+`global` requires `GOOGLE_CLOUD_PROJECT` on the server; otherwise feedback and
+model tests fail with a configuration error.
 
 ## AI Feedback Usage Limits
 
@@ -158,12 +177,15 @@ Some provider APIs return models that appear available but can't actually be use
 - Avoid: `o3-mini`, `o4-mini` (may reject `max_tokens`, require `max_completion_tokens`)
 
 ### Gemini
-- Recommended: `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-2.5-flash`, `gemini-2.5-pro`
-- Avoid: `gemini-2.0-flash`, deep-research models, antigravity models, embedding/audio/image/video models (may not support standard `generateContent`)
-- Current implementation uses the Gemini Developer API. Vertex AI will need a
-  separate provider mode or credential path because it uses Google Cloud
-  project/location configuration rather than the existing `gemini_api_key`
-  request path.
+- Recommended: `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro`
+- Any `gemini-*` model returned by the Developer API model list is accepted unless it is blocked.
+- Blocked: `gemini-2.0-flash`, preview/experimental models, deep-research models, antigravity models, embedding/audio/image/video models (may not support standard `generateContent`)
+
+### Gemini over Vertex AI
+- Default list: `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro`
+- Model listing uses CodeAssist's curated list. Set `VERTEX_AI_MODELS` (comma-separated) on the server to replace it.
+- The selected model is still tested through the real Vertex AI client before use.
+- Avoid: automatic fallback to regular Gemini, course-level Vertex API key storage, assignment-level Vertex credentials.
 
 ### Claude
 - Recommended: `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`, `claude-3-opus-20240229`
@@ -219,7 +241,7 @@ WHERE default_ai_provider = 'openai'
   AND default_ai_model IN ('o3-mini', 'o4-mini');
 
 UPDATE courses
-SET default_ai_model = 'gemini-1.5-flash'
+SET default_ai_model = 'gemini-2.5-flash'
 WHERE default_ai_provider = 'gemini'
   AND (
     default_ai_model = 'gemini-2.0-flash'
@@ -253,5 +275,7 @@ WHERE ai_feedback_provider = 'gemini'
 **OpenAI max_tokens error** — filter out `o3-mini`/`o4-mini`, or update backend to use `max_completion_tokens`.
 
 **Gemini generateContent or JSON error** — filter out deep-research/antigravity/embedding/audio/image/video models.
+
+**Vertex AI permission error** — CodeAssist reached Google Cloud, but the project/key lacks `aiplatform.endpoints.predict`. Enable the Vertex AI API and grant Vertex AI Express User or Vertex AI User on the Google Cloud project.
 
 **Claude temperature error** — remove `temperature` from the Claude request body (already done in `integration.py`'s `build_claude_messages_payload`).
