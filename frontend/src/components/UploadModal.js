@@ -21,6 +21,7 @@ export default function UploadModal({
   data,
   assignmentID,
   assignmentTitle,
+  requiredFileName,
   extra
 }) {
   const [file, setFile] = useState(null);
@@ -199,6 +200,7 @@ export default function UploadModal({
           <Upload.Dragger
             name="file"
             multiple={false}
+            accept={requiredFileName ? requiredFileName.slice(requiredFileName.lastIndexOf(".")) : undefined}
             fileList={fileList}
             onChange={handleFileChange}
             beforeUpload={file => {
@@ -212,6 +214,9 @@ export default function UploadModal({
               <InboxOutlined />
             </p>
             <p className="ant-upload-text">Click or drag file to this area to upload</p>
+            {requiredFileName && (
+              <p className="ant-upload-hint">Your file will be submitted as {requiredFileName}</p>
+            )}
           </Upload.Dragger>
         </Form.Item>
         <Form.Item>

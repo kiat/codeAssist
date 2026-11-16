@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { uploadSubmission } from "../../services/submission";
 import LoadingOverlay from "../../components/LoadingOverlay";
 
-export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle, allowFileUpload = true, enableCodeEditor }) {
+export default function AssignmentModal({ open, onCancel, assignmentID, assignmentTitle, allowFileUpload = true, enableCodeEditor, requiredFileName }) {
   const [file, setFile] = useState(null);
   const [fileList, setFileList] = useState([]);
   const { userInfo } = useContext(GlobalContext);
@@ -112,6 +112,7 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
                     <Upload.Dragger
                       name="file"
                       multiple={false}
+                      accept={requiredFileName ? requiredFileName.slice(requiredFileName.lastIndexOf(".")) : undefined}
                       onChange={handleFileChange}
                       beforeUpload={file => {
                         setFile(file);
@@ -123,6 +124,9 @@ export default function AssignmentModal({ open, onCancel, assignmentID, assignme
                         <InboxOutlined />
                       </p>
                       <p className="ant-upload-text">{enableCodeEditor ? "Upload a file instead" : "Click or drag file to upload"}</p>
+                      {requiredFileName && (
+                        <p className="ant-upload-hint">Your file will be submitted as {requiredFileName}</p>
+                      )}
                     </Upload.Dragger>
                   </Form.Item>
                   <Form.Item style={{ marginBottom: 0 }}>
