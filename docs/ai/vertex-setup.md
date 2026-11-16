@@ -102,13 +102,21 @@ Confirm the Google Gen AI SDK is installed inside the backend image:
 docker compose exec backend python -c "from google import genai; print('google-genai import ok')"
 ```
 
+## Enabling Vertex for a Course
+
+Vertex is off for every course until an admin turns it on, since it spends the
+deployment's Google Cloud credits. Sign in as an admin, open the admin Courses
+page, and switch on `Vertex AI` for the course. Only instructors of an enabled
+course can select Vertex for the course default or an assignment.
+
 ## Manual UI Test
 
-1. Open Course AI Settings.
-2. Select `Gemini over Vertex AI`.
-3. Click `Refresh Models`.
-4. Select `gemini-2.5-flash`.
-5. Click `Test Selected Model`.
+1. As an admin, enable Vertex AI for the course (see above).
+2. Open Course AI Settings.
+3. Select `Gemini over Vertex AI`.
+4. Click `Refresh Models`.
+5. Select `gemini-2.5-flash`.
+6. Click `Test Selected Model`.
 
 If the test returns `PROVIDER_PERMISSION_ERROR`, CodeAssist reached Google Cloud
 but the project or key does not have `aiplatform.endpoints.predict`.

@@ -4,10 +4,11 @@ from ai_feedback.settings import (
     get_enabled_feedback_prompt,
     normalize_feedback_prompts,
     serialize_assignment_ai_settings,
+    enforce_assignment_vertex_access,
     update_assignment_ai_settings,
 )
 from api import db
-from api.models import Assignment
+from api.models import Assignment, Course
 from util.auth import require_course_role
 from util.errors import (
     BadRequestError,
@@ -68,12 +69,16 @@ def update_assignment_ai_settings_route(assignment_id):
     if not assignment_obj:
         raise NotFoundError("Assignment not found")
 
-    require_course_role(
+    user_id, _ = require_course_role(
         assignment_obj.course_id, {"instructor", "ta"}, "Only instructors or TAs can access assignment AI settings"
     )
 
+    data = request.json or {}
+    course_obj = db.session.query(Course).filter_by(id=assignment_obj.course_id).first()
+    enforce_assignment_vertex_access(assignment_obj, course_obj, data, user_id)
+
     try:
-        update_assignment_ai_settings(assignment_obj, request.json or {})
+        update_assignment_ai_settings(assignment_obj, data)
         db.session.commit()
     except ValueError as e:
         db.session.rollback()

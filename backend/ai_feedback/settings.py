@@ -2,7 +2,9 @@ import copy
 import json
 import re
 
+from util.auth import get_user_course_role
 from util.encryption_utils import encrypt_api_key
+from util.errors import ForbiddenError
 from ai_feedback.providers.gemini import (
     GEMINI_PROVIDER,
     GEMINI_VERTEX_PROVIDER,
@@ -317,6 +319,72 @@ def normalize_vertex_location(value):
         raise ValueError("Invalid Vertex AI location")
 
     return location
+
+
+VERTEX_NOT_ENABLED_MESSAGE = (
+    "Gemini over Vertex AI is not enabled for this course. "
+    "Ask an administrator to enable it."
+)
+VERTEX_INSTRUCTOR_ONLY_MESSAGE = (
+    "Only instructors can set an assignment to use Gemini over Vertex AI"
+)
+
+
+def course_vertex_enabled(course):
+    return bool(getattr(course, "vertex_enabled", False))
+
+
+def _requests_vertex_override_change(assignment, data):
+    """True if `data` would newly set, or change, a Vertex override on the assignment."""
+    if "use_course_ai_default" in data:
+        uses_default = data["use_course_ai_default"] is not False
+    else:
+        uses_default = getattr(assignment, "use_course_ai_default", True) is not False
+    if uses_default:
+        return False
+
+    current_provider = getattr(assignment, "ai_feedback_provider", None)
+    new_provider = data.get("ai_feedback_provider", current_provider)
+    if new_provider != GEMINI_VERTEX_PROVIDER:
+        return False
+
+    had_vertex_override = (
+        getattr(assignment, "use_course_ai_default", True) is False
+        and current_provider == GEMINI_VERTEX_PROVIDER
+    )
+    if not had_vertex_override:
+        return True
+
+    if (
+        "ai_feedback_model" in data
+        and data["ai_feedback_model"] != getattr(assignment, "ai_feedback_model", None)
+    ):
+        return True
+
+    if "ai_feedback_vertex_location" in data:
+        try:
+            new_location = normalize_vertex_location(data["ai_feedback_vertex_location"])
+        except ValueError:
+            # Let update_assignment_ai_settings report the invalid value.
+            return False
+        if new_location != getattr(assignment, "ai_feedback_vertex_location", None):
+            return True
+
+    return False
+
+
+def enforce_assignment_vertex_access(assignment, course, data, user_id):
+    """Vertex spends the server's credits, so only instructors of a course an
+    admin has enabled may point an assignment at it. Call before applying `data`.
+    Re-saving an existing Vertex override unchanged is allowed for TAs."""
+    if not _requests_vertex_override_change(assignment, data):
+        return
+
+    if not course_vertex_enabled(course):
+        raise ForbiddenError(VERTEX_NOT_ENABLED_MESSAGE)
+
+    if get_user_course_role(user_id, course.id) != "instructor":
+        raise ForbiddenError(VERTEX_INSTRUCTOR_ONLY_MESSAGE)
 
 
 def serialize_assignment_ai_settings(assignment):

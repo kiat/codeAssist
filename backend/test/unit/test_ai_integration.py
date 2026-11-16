@@ -428,7 +428,7 @@ def test_get_provider_credentials_requires_saved_provider_key(
 def test_get_provider_credentials_gemini_vertex_uses_server_configuration(
     monkeypatch,
 ):
-    course = SimpleNamespace()
+    course = SimpleNamespace(vertex_enabled=True)
     assignment = SimpleNamespace(
         use_course_ai_default=False,
         ai_feedback_api_key="encrypted-stale-assignment-key",
@@ -449,8 +449,21 @@ def test_get_provider_credentials_gemini_vertex_uses_server_configuration(
     assert decrypt_calls == []
 
 
+def test_get_provider_credentials_gemini_vertex_requires_course_enabled(monkeypatch):
+    course = SimpleNamespace(vertex_enabled=False)
+    assignment = SimpleNamespace(
+        use_course_ai_default=False,
+        ai_feedback_vertex_location="global",
+    )
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "codeassist-project")
+    monkeypatch.delenv("VERTEX_AI_AUTH_MODE", raising=False)
+
+    with pytest.raises(ProviderConfigurationError, match="not enabled for this course"):
+        get_provider_credentials("gemini_vertex", course, assignment)
+
+
 def test_get_provider_credentials_gemini_vertex_requires_project(monkeypatch):
-    course = SimpleNamespace()
+    course = SimpleNamespace(vertex_enabled=True)
     assignment = SimpleNamespace(
         use_course_ai_default=False,
         ai_feedback_vertex_location="global",

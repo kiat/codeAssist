@@ -73,6 +73,9 @@ export default function AISettings() {
   const isOllama = provider === AI_PROVIDER_KEYS.OLLAMA;
   const isVertex = isVertexProvider(provider);
   const hasSavedKey = hasProviderConfiguration(courseAiInfo, provider);
+  // Vertex bills the deployment's Google Cloud project, so an admin has to
+  // enable it per course.
+  const vertexNotEnabled = isVertex && courseAiInfo?.vertex_enabled === false;
   const providerStatusPrefix = isVertex
     ? "Server config: "
     : isOllama
@@ -80,6 +83,8 @@ export default function AISettings() {
     : "API key: ";
   const providerStatusText = hasSavedKey
     ? "Connected"
+    : vertexNotEnabled
+    ? "Not enabled for this course"
     : isVertex
     ? "Not configured"
     : isOllama
@@ -96,6 +101,8 @@ export default function AISettings() {
       : isOllama
       ? "Ollama connection URL is configured"
       : `${selectedProvider?.label} API key is saved`
+    : vertexNotEnabled
+    ? "Gemini over Vertex AI is not enabled for this course"
     : isVertex
     ? "Vertex AI server configuration is incomplete"
     : isOllama
@@ -107,6 +114,8 @@ export default function AISettings() {
       : isOllama
       ? "A connection URL is configured. Enter a new URL only if you want to replace it."
       : "A saved key exists. Paste a new key only if you want to replace it."
+    : vertexNotEnabled
+    ? "Vertex AI uses the CodeAssist deployment's Google Cloud credits, so an administrator has to enable it for each course. Ask an administrator to turn it on."
     : isVertex
     ? "Set GOOGLE_CLOUD_PROJECT and Application Default Credentials on the server before using this provider."
     : isOllama

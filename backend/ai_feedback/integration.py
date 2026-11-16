@@ -38,7 +38,9 @@ from ai_feedback.providers.gemini import (
 )
 from ai_feedback.providers.errors import ProviderConfigurationError
 from ai_feedback.settings import (
+    VERTEX_NOT_ENABLED_MESSAGE,
     build_allowed_feedback_context,
+    course_vertex_enabled,
     get_enabled_feedback_prompt,
     normalize_allowed_inputs,
     render_feedback_context,
@@ -748,6 +750,8 @@ def get_provider_credentials(provider, course, assignment=None):
             api_key = decrypt_api_key(course.gemini_api_key)
 
     elif provider == GEMINI_VERTEX_PROVIDER:
+        if not course_vertex_enabled(course):
+            raise ProviderConfigurationError(VERTEX_NOT_ENABLED_MESSAGE)
         vertex_config = build_vertex_config(get_assignment_vertex_location(assignment))
         if vertex_config.vertex_auth_mode == VERTEX_AUTH_API_KEY:
             if not vertex_config.api_key:

@@ -85,6 +85,16 @@ Gemini over Vertex AI does not add a course key column. The course default can
 select `default_ai_provider = "gemini_vertex"` and a Gemini model, while cloud
 credentials remain deployment-managed.
 
+Because Vertex calls are billed to the deployment's Google Cloud project, each
+course has a `vertex_enabled` flag (default off) that only a global admin can
+change, from the admin Courses page or `PUT /admin_set_course_vertex`. While it
+is off, the course cannot select Vertex as its default, assignments cannot be
+set to it, the Vertex model list and test endpoints return 403, and feedback or
+chat for an assignment still pointing at Vertex fails with a configuration
+error. Within an enabled course, only instructors can set an assignment to
+Vertex or change its Vertex model or location. TAs can still save other
+settings on such an assignment, or switch it to another provider.
+
 Course-level settings do **not** own instructor prompt lists or input-permission
 toggles. Per the latest instructor direction, prompt customization and
 AI-feedback controls should stay at the assignment level so each assignment can

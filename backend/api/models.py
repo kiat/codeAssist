@@ -44,6 +44,10 @@ class Course(db.Model):
     default_feedback_style = db.Column(db.String, default="hint-based")
     default_ai_temperature = db.Column(db.Float, default=0.5)
 
+    # Gemini over Vertex AI bills the deployment's Google Cloud project, so
+    # only an admin can turn it on for a course.
+    vertex_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+
 @dataclass
 class Enrollment(db.Model):
     __tablename__ = "enrollments"

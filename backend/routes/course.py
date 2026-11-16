@@ -27,7 +27,11 @@ from ai_feedback.integration import (
     parse_feedback_json,
 )
 from ai_feedback.providers.errors import AIProviderError
-from ai_feedback.settings import normalize_vertex_location
+from ai_feedback.settings import (
+    VERTEX_NOT_ENABLED_MESSAGE,
+    course_vertex_enabled,
+    normalize_vertex_location,
+)
 from ai_feedback.providers.gemini import (
     GEMINI_PROVIDER,
     GEMINI_VERTEX_PROVIDER,
@@ -94,6 +98,10 @@ def _require_vertex_test_access(course_id):
         {"instructor", "ta"},
         "Only instructors or TAs can test Vertex AI",
     )
+
+    course_obj = db.session.query(Course).filter_by(id=course_id).first()
+    if not course_vertex_enabled(course_obj):
+        raise ForbiddenError(VERTEX_NOT_ENABLED_MESSAGE)
 
 
 def _get_vertex_location(data):
@@ -281,6 +289,10 @@ def create_course():
     # set default value for allowEntryCode if not provided
     data["allowEntryCode"] = data.get("allowEntryCode", True)
 
+    # Vertex access spends server credits and is granted by an admin.
+    if global_role != "admin":
+        data.pop("vertex_enabled", None)
+
     # check for duplicate entryCode
     if db.session.query(Course).filter_by(entryCode=data["entryCode"]).first():
         raise ConflictError("Course with the provided entry code already exists")
@@ -415,6 +427,8 @@ def update_course():
     
     course_id = data["course_id"]    
     del data["course_id"]
+    # Only admins grant Vertex access, through /admin_set_course_vertex.
+    data.pop("vertex_enabled", None)
 
     updated_course_info = {getattr(Course, name): val for name, val in data.items()}
 
@@ -863,7 +877,9 @@ def get_course_info():
 
         "has_openai_api_key": bool(course_obj.openai_api_key),
         "has_gemini_api_key": bool(course_obj.gemini_api_key),
-        "has_gemini_vertex_config": has_vertex_configuration(),
+        "has_gemini_vertex_config": has_vertex_configuration() and course_vertex_enabled(course_obj),
+        "vertex_enabled": course_vertex_enabled(course_obj),
+        "has_vertex_server_config": has_vertex_configuration(),
         "has_claude_api_key": bool(course_obj.claude_api_key),
         "has_ollama_api_key": bool(course_obj.ollama_base_url),
     })
@@ -926,6 +942,9 @@ def update_ai_settings():
 
     if provider and provider not in SUPPORTED_AI_PROVIDERS:
         raise BadRequestError("Unsupported AI provider")
+
+    if provider == GEMINI_VERTEX_PROVIDER and not course_vertex_enabled(course_obj):
+        raise ForbiddenError(VERTEX_NOT_ENABLED_MESSAGE)
 
     if provider:
         course_obj.default_ai_provider = provider
@@ -1003,6 +1022,11 @@ def fetch_ai_models():
         raise BadRequestError("Unsupported AI provider")
 
     if provider == GEMINI_VERTEX_PROVIDER:
+        # The list is static and costs nothing, but keep the same access rule
+        # as the other Vertex endpoints.
+        _require_vertex_test_access(course_id)
+        if not has_vertex_configuration():
+            raise BadRequestError("Vertex AI is not configured on this server")
         return jsonify({"models": get_supported_models(GEMINI_VERTEX_PROVIDER)}), 200
 
     try:

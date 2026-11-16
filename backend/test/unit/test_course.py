@@ -819,6 +819,7 @@ def test_get_course_info_success(client, mocker, login_as):
         gemini_api_key="",
         claude_api_key="",
         ollama_base_url="",
+        vertex_enabled=False,
     )
 
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -843,6 +844,8 @@ def test_get_course_info_success(client, mocker, login_as):
             "has_openai_api_key": True,
             "has_gemini_api_key": False,
             "has_gemini_vertex_config": False,
+            "vertex_enabled": False,
+            "has_vertex_server_config": False,
             "has_claude_api_key": False,
             "has_ollama_api_key": False,
         }
@@ -1368,11 +1371,29 @@ def test_test_ai_model_gemini_unavailable_returns_error(client, mocker):
     assert response.json["error"] == "AI provider request timed out."
 
 
-def test_fetch_ai_models_gemini_vertex_returns_supported_models(client):
+@pytest.fixture
+def vertex_configured(monkeypatch):
+    monkeypatch.setenv("VERTEX_AI_AUTH_MODE", "api_key")
+    monkeypatch.setenv("VERTEX_AI_API_KEY", "test-vertex-key")
+
+
+@pytest.fixture
+def vertex_course_enabled(mocker):
+    """These tests mock the course role without creating a course row, so
+    stand in for an admin having enabled Vertex on the course."""
+    return mocker.patch("routes.course.course_vertex_enabled", return_value=True)
+
+
+def test_fetch_ai_models_gemini_vertex_returns_supported_models(
+    client, mocker, login_as, vertex_configured, vertex_course_enabled):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+
     response = client.post(
         "/fetch_ai_models",
         json={
             "provider": "gemini_vertex",
+            "course_id": "course-1",
         },
     )
 
@@ -1384,13 +1405,69 @@ def test_fetch_ai_models_gemini_vertex_returns_supported_models(client):
     ]
 
 
-def test_fetch_ai_models_gemini_vertex_uses_env_override(client, monkeypatch):
+def test_fetch_ai_models_gemini_vertex_requires_login(client, vertex_configured):
+    response = client.post(
+        "/fetch_ai_models",
+        json={"provider": "gemini_vertex", "course_id": "course-1"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_fetch_ai_models_gemini_vertex_requires_course_id(
+    client, login_as, vertex_configured
+):
+    login_as("instructor-uuid")
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={"provider": "gemini_vertex"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_fetch_ai_models_gemini_vertex_rejects_student(
+    client, mocker, login_as, vertex_configured
+):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={"provider": "gemini_vertex", "course_id": "course-1"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_fetch_ai_models_gemini_vertex_not_configured(
+    client, mocker, login_as, monkeypatch, vertex_course_enabled):
+    monkeypatch.setenv("VERTEX_AI_AUTH_MODE", "api_key")
+    monkeypatch.delenv("VERTEX_AI_API_KEY", raising=False)
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={"provider": "gemini_vertex", "course_id": "course-1"},
+    )
+
+    assert response.status_code == 400
+    assert "not configured" in response.json["message"]
+
+
+def test_fetch_ai_models_gemini_vertex_uses_env_override(
+    client, mocker, login_as, monkeypatch, vertex_configured, vertex_course_enabled):
     monkeypatch.setenv("VERTEX_AI_MODELS", " gemini-2.5-pro, gemini-next-flash ,")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
 
     response = client.post(
         "/fetch_ai_models",
         json={
             "provider": "gemini_vertex",
+            "course_id": "course-1",
         },
     )
 
@@ -1398,7 +1475,7 @@ def test_fetch_ai_models_gemini_vertex_uses_env_override(client, monkeypatch):
     assert response.json["models"] == ["gemini-2.5-pro", "gemini-next-flash"]
 
 
-def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker, login_as):
+def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker, login_as, vertex_course_enabled):
     mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     login_as("instructor-uuid")
     mock_test = mocker.patch(
@@ -1423,7 +1500,7 @@ def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker,
     mock_test.assert_called_once()
 
 
-def test_test_ai_model_gemini_vertex_success(client, mocker, login_as):
+def test_test_ai_model_gemini_vertex_success(client, mocker, login_as, vertex_course_enabled):
     mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     login_as("instructor-uuid")
     mock_generate = mocker.patch(
@@ -1453,7 +1530,7 @@ def test_test_ai_model_gemini_vertex_success(client, mocker, login_as):
     assert mock_generate.call_args.kwargs["location"] == "us-central1"
 
 
-def test_test_ai_model_gemini_vertex_sanitizes_provider_errors(client, mocker, login_as):
+def test_test_ai_model_gemini_vertex_sanitizes_provider_errors(client, mocker, login_as, vertex_course_enabled):
     mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     login_as("instructor-uuid")
     mocker.patch(
@@ -2379,7 +2456,7 @@ def test_test_ai_model_gemini_vertex_student_forbidden(client, mocker, login_as)
     mock_generate.assert_not_called()
 
 
-def test_test_ai_model_gemini_vertex_allows_ta(client, mocker, login_as):
+def test_test_ai_model_gemini_vertex_allows_ta(client, mocker, login_as, vertex_course_enabled):
     mocker.patch(
         "routes.course._generate_gemini_model_test",
         return_value='{"insights":["Model test passed."],"annotations":[]}',
@@ -2501,7 +2578,7 @@ def test_update_ai_settings_accepts_supported_vertex_model(client, mocker, login
 
 
 @pytest.mark.parametrize("endpoint", ["/test_ai_model", "/test_ai_api_key"])
-def test_vertex_test_endpoints_reject_invalid_location(client, mocker, login_as, endpoint):
+def test_vertex_test_endpoints_reject_invalid_location(client, mocker, login_as, endpoint, vertex_course_enabled):
     mock_client = mocker.patch("routes.course.create_gemini_client")
     mocker.patch("util.auth.get_user_course_role", return_value="instructor")
     login_as("instructor-uuid")
