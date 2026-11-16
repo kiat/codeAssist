@@ -14,6 +14,20 @@ from util.auth import require_admin, require_authenticated, require_self_or_admi
 
 user = Blueprint('user', __name__)
 
+# Roles an admin can switch an account between. Admin accounts come from the
+# admin_emails table (Google login) or from another admin, never a role edit.
+ASSIGNABLE_ROLES = {"student", "instructor"}
+
+
+def _require_admin_for_role(role):
+    session_user_id = session.get("user_id")
+    if not session_user_id or get_user_global_role(session_user_id) != "admin":
+        message = f"Only administrators can create {role} accounts."
+        if role == "instructor":
+            message += " Instructors: ask an administrator to create your account."
+        raise ForbiddenError(message)
+
+
 @user.route('/create_user', methods=["POST"])
 def create_user():
     '''
@@ -48,14 +62,11 @@ def create_user():
     if role not in valid_roles:
         raise BadRequestError("Invalid role. Must be one of: admin, instructor, student")
 
-    # Security: Only admins can create admin accounts. Public signup allows
-    # students and instructors because this app currently has no admin bootstrap UI.
-    if role == "admin":
-        session_user_id = session.get("user_id")
-        if not session_user_id:
-            raise ForbiddenError("Not authenticated. Please log in.")
-        if get_user_global_role(session_user_id) != "admin":
-            raise ForbiddenError("Only administrators can create admin accounts")
+    # Security: public signup creates students only. Instructor and admin
+    # accounts are created by an admin (admin panel), or promoted later with
+    # /admin_update_account.
+    if role != "student":
+        _require_admin_for_role(role)
 
     eid_check = db.session.query(User).filter_by(sis_user_id=sis_user_id).first()
     if eid_check:
@@ -175,6 +186,8 @@ def create_google_user():
     role = role.lower()
     if role not in ["student", "instructor"]:
         raise BadRequestError("Invalid role. Must be one of: instructor, student")
+    if role != "student":
+        _require_admin_for_role(role)
 
     user_data = {
         "id": user_id,
@@ -430,13 +443,15 @@ def admin_update_account():
     @param name            the name for the user (optional)
     @param email_address   the email for the user (optional)
     @param sis_user_id     the EID for the user (optional)
+    @param role            "student" or "instructor" (optional)
     '''
-    require_admin("Only administrators can update other accounts")
+    admin_id = require_admin("Only administrators can update other accounts")
 
     user_id = request.json.get('id')
     new_name = request.json.get('name')
     new_email = request.json.get('email_address')
     new_sis_user_id = request.json.get('sis_user_id')
+    new_role = request.json.get('role')
 
     if not user_id:
         raise BadRequestError("Missing user id")
@@ -459,6 +474,15 @@ def admin_update_account():
         existing_user = db.session.query(User).filter_by(sis_user_id=new_sis_user_id).first()
         if existing_user:
             raise ConflictError("EID already in use")
+
+    if new_role is not None and new_role != user.role:
+        if not isinstance(new_role, str) or new_role.lower() not in ASSIGNABLE_ROLES:
+            raise BadRequestError("Role must be student or instructor")
+        if str(user.id) == str(admin_id):
+            raise BadRequestError("You cannot change your own role")
+        if user.role == "admin":
+            raise BadRequestError("Admin accounts cannot be changed to another role here")
+        user.role = new_role.lower()
 
     if new_name:
         user.name = new_name

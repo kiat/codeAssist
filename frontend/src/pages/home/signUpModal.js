@@ -1,5 +1,5 @@
-import { Button, Form, Input, Modal, Radio } from "antd";
-import { useContext, useState } from "react";
+import { Button, Form, Input, Modal, Typography } from "antd";
+import { useContext } from "react";
 import { GlobalContext } from "../../App";
 import { createUser } from "../../services/user";
 
@@ -10,11 +10,10 @@ import { createUser } from "../../services/user";
  */
 export default function SignUpModal({ open, onCancel }) {
   const { updateUserInfo } = useContext(GlobalContext);
-  const [selectedRole, setSelectedRole] = useState("student");
-
-  // action after successfully signup
+  // Public sign-up creates student accounts only. Instructor accounts are
+  // created by an admin (the backend enforces this too).
   const finishSignUp = async (values) => {
-    const role = selectedRole;
+    const role = "student";
 
     try {
       const res = await createUser({ ...values, role });
@@ -38,22 +37,9 @@ export default function SignUpModal({ open, onCancel }) {
   return (
     <Modal title="SIGN UP" open={open} footer={null} onCancel={onCancel}>
       <Form layout="vertical" onFinish={finishSignUp}>
-        <Form.Item name="role" initialValue="student">
-          <Radio.Group
-            optionType="button"
-            buttonStyle="solid"
-            value={selectedRole}
-            onChange={(event) => setSelectedRole(event.target.value)}
-            style={{ width: "100%" }}
-          >
-            <Radio.Button value="student" style={{ width: "50%", textAlign: "center" }}>
-              Student
-            </Radio.Button>
-            <Radio.Button value="instructor" style={{ width: "50%", textAlign: "center" }}>
-              Instructor
-            </Radio.Button>
-          </Radio.Group>
-        </Form.Item>
+        <Typography.Paragraph type="secondary">
+          Sign up as a student. Instructors: ask an administrator to create your account.
+        </Typography.Paragraph>
         <Form.Item label="EID" name="eid" rules={[{ required: true, message: "Please enter your eid" }]}>
           <Input placeholder="Your EID" />
         </Form.Item>

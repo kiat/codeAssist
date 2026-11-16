@@ -141,6 +141,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5001/    # 404 is fine
 - `init_db.py` **drops every table** before creating them. Run it only on a fresh install, never on a server with real data.
 - `flask db stamp heads` records that the schema matches the latest migration, so future updates can use `flask db upgrade`.
 - A `SESSION_COOKIE_SECURE is not set to true` warning in the logs is expected until HTTPS is set up.
+- Sign-up only creates student accounts. After the site is up, sign up with your own email, then make that account an admin with `docker compose exec backend flask set-role you@example.com admin`. Admins create instructor accounts in the admin panel.
 
 ## 8. Build the frontend
 
