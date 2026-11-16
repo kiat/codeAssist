@@ -22,6 +22,14 @@ from util.auth import get_user_course_role, require_authenticated, require_cours
 from util.csv_utils import csv_safe_cell
 from util.submission_files import required_submission_files
 from util.timing import StepTimer
+from util.sandbox import (
+    SANDBOX_UID,
+    SANDBOX_USER,
+    RUN_AUTOGRADER_AS_NOBODY,
+    container_run_kwargs,
+    container_sandbox_is_stale,
+    run_autograder_command,
+)
 from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from ai_feedback.integration import async_get_ai_feedback
@@ -282,8 +290,8 @@ def _normalize_tag(name):
 
 SOURCE_BASELINE_PATH = "/autograder/.source_baseline"
 # run autograder as nobody instead of root
-AUTOGRADER_UID = 65534
-AUTOGRADER_USER = f"{AUTOGRADER_UID}:{AUTOGRADER_UID}"
+AUTOGRADER_UID = SANDBOX_UID
+AUTOGRADER_USER = SANDBOX_USER
 
 
 def _container_image_is_stale(container, assignment):
@@ -389,7 +397,8 @@ def _run_assignment_container(assignment, container_name):
         name=container_name,
         detach=True,
         tty=True,
-        command="tail -f /dev/null"
+        command="tail -f /dev/null",
+        **container_run_kwargs(),
     )
 
 
@@ -435,7 +444,7 @@ def get_or_create_assignment_container(assignment):
     if container is not None:
         try:
             container.reload()
-            if _container_image_is_stale(container, assignment):
+            if _container_image_is_stale(container, assignment) or container_sandbox_is_stale(container):
                 discard_container(
                     container,
                     "Failed to stop/remove stale container %s for assignment %s",
@@ -1862,6 +1871,7 @@ def rerun_submission_autograder():
             detach=True,
             tty=True,
             command="tail -f /dev/null",
+            **container_run_kwargs(),
         )
 
         tar_stream = io.BytesIO()
@@ -1871,7 +1881,7 @@ def rerun_submission_autograder():
         container.put_archive("/autograder/submission/", tar_stream)
 
         exec_proc = subprocess.run(
-            f"docker exec {temp_container_name} /bin/bash /autograder/source/run_autograder".split(),
+            run_autograder_command(temp_container_name),
             capture_output=True,
             timeout=timeout,
         )
@@ -2121,7 +2131,8 @@ def test_autograder_submission():
 
         # Start container
         container = get_docker_client().containers.run(
-            image_tag, detach=True, tty=True, command="tail -f /dev/null"
+            image_tag, detach=True, tty=True, command="tail -f /dev/null",
+            **container_run_kwargs(),
         )
 
         # Copy submission
@@ -2132,7 +2143,7 @@ def test_autograder_submission():
         container.put_archive("/autograder/submission/", tar_stream)
 
         # Run grading
-        exec_proc = container.exec_run("/bin/bash /autograder/source/run_autograder")
+        exec_proc = container.exec_run(["sh", "-c", RUN_AUTOGRADER_AS_NOBODY])
 
         if exec_proc.exit_code != 0:
             raise InternalProcessingError("Autograder run failed")
