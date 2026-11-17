@@ -2,7 +2,7 @@ import json
 import os
 import shutil
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -305,14 +305,99 @@ def test_grade_submission_skips_finished_submission(assignment_id, grading, stat
     assert sub.status == status
 
 
-def test_grade_submission_reclaims_running_submission(assignment_id, grading):
+def test_grade_submission_skips_submission_already_running(assignment_id, grading):
+    # A redelivered message must not grade a row another worker has claimed.
     submission_id = _submission(assignment_id, status=SUBMISSION_RUNNING)
-    grading.set_exit(0, stdout=b'{"score": 5}')
+    run = grading.set_exit(0, stdout=b'{"score": 5}')
 
     sub = _run(submission_id)
 
-    assert sub.status == SUBMISSION_GRADED
-    assert sub.score == 5
+    run.assert_not_called()
+    grading.thread.assert_not_called()
+    assert sub.status == SUBMISSION_RUNNING
+    assert sub.score is None
+
+
+def test_grade_submission_leaves_row_pending_when_claim_commit_fails(assignment_id, grading, mocker):
+    submission_id = _submission(assignment_id)
+    run = grading.set_exit(0, stdout=b'{"score": 5}')
+    mocker.patch.object(db.session, "commit", side_effect=RuntimeError("db down"))
+
+    grading_tasks.grade_submission.run(submission_id)
+
+    mocker.stopall()
+    db.session.rollback()
+    run.assert_not_called()
+    assert db.session.get(Submission, submission_id).status == SUBMISSION_PENDING
+
+
+def _sweep(app, running_seconds=3600, pending_seconds=7200):
+    app.config["GRADING_STUCK_RUNNING_SECONDS"] = running_seconds
+    app.config["GRADING_STUCK_PENDING_SECONDS"] = pending_seconds
+    count = grading_tasks.sweep_stuck_submissions.run()
+    db.session.expire_all()
+    return count
+
+
+def _set(submission_id, **fields):
+    db.session.query(Submission).filter_by(id=submission_id).update(fields)
+    db.session.commit()
+
+
+def test_sweep_fails_old_running_and_pending_rows(app, assignment_id):
+    now = datetime.now(timezone.utc)
+    old_running = _submission(assignment_id, status=SUBMISSION_RUNNING, stage=False)
+    _set(old_running, grading_started_at=now - timedelta(hours=2))
+    old_pending = _submission(assignment_id, status=SUBMISSION_PENDING, stage=False,
+                              submitted_at=now - timedelta(hours=3))
+
+    assert _sweep(app) == 2
+
+    assert db.session.get(Submission, old_running).status == SUBMISSION_FAILED
+    assert db.session.get(Submission, old_pending).status == SUBMISSION_FAILED
+
+
+def test_sweep_leaves_recent_and_finished_rows_alone(app, assignment_id):
+    now = datetime.now(timezone.utc)
+    running = _submission(assignment_id, status=SUBMISSION_RUNNING, stage=False)
+    _set(running, grading_started_at=now - timedelta(minutes=10))
+    # Queued for over an hour, but under the pending limit (deadline burst).
+    pending = _submission(assignment_id, status=SUBMISSION_PENDING, stage=False,
+                          submitted_at=now - timedelta(minutes=90))
+    graded = _submission(assignment_id, status=SUBMISSION_GRADED, stage=False,
+                         submitted_at=now - timedelta(days=3))
+
+    assert _sweep(app) == 0
+
+    assert db.session.get(Submission, running).status == SUBMISSION_RUNNING
+    assert db.session.get(Submission, pending).status == SUBMISSION_PENDING
+    assert db.session.get(Submission, graded).status == SUBMISSION_GRADED
+
+
+def test_sweep_uses_submitted_at_for_running_row_without_start_time(app, assignment_id):
+    old = _submission(assignment_id, status=SUBMISSION_RUNNING, stage=False,
+                      submitted_at=datetime.now(timezone.utc) - timedelta(hours=2))
+
+    assert _sweep(app) == 1
+
+    assert db.session.get(Submission, old).status == SUBMISSION_FAILED
+
+
+def test_swept_submission_can_be_rerun_later_but_not_regraded_by_late_message(app, assignment_id, grading):
+    old = _submission(assignment_id, status=SUBMISSION_PENDING,
+                      submitted_at=datetime.now(timezone.utc) - timedelta(hours=3))
+    run = grading.set_exit(0, stdout=b'{"score": 5}')
+    _sweep(app)
+
+    sub = _run(old)
+
+    run.assert_not_called()
+    assert sub.status == SUBMISSION_FAILED
+
+
+def test_beat_schedules_the_sweep(app):
+    schedule = app.config["CELERY"]["beat_schedule"]
+    assert any(entry["task"] == "grading.sweep_stuck_submissions" for entry in schedule.values())
 
 
 def test_grade_submission_rebuilds_missing_staged_file_from_row(assignment_id, grading, mocker):

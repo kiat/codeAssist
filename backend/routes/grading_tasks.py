@@ -2,10 +2,11 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from celery import shared_task
 from flask import current_app
+from sqlalchemy import and_, func, or_
 
 from api import db
 from api.models import (
@@ -25,19 +26,28 @@ logger = logging.getLogger(__name__)
 
 @shared_task(name="grading.grade_submission")
 def grade_submission(submission_id):
+    # Claim the row in one UPDATE so a redelivered copy of this message can't
+    # also grade it. Only pending rows are claimed; a row left running by a
+    # crashed worker is failed by sweep_stuck_submissions instead.
+    try:
+        claimed = db.session.query(Submission).filter(
+            Submission.id == submission_id,
+            Submission.status == SUBMISSION_PENDING,
+        ).update(
+            {"status": SUBMISSION_RUNNING, "grading_started_at": datetime.now(timezone.utc)},
+            synchronize_session=False,
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.exception("Failed to claim submission %s; leaving it for the sweep", submission_id)
+        return
+
+    if not claimed:
+        logger.info("Submission %s is missing or not pending; skipping grading", submission_id)
+        return
+
     submission = db.session.get(Submission, submission_id)
-
-    if submission is None:
-        logger.info("Submission %s no longer exists; skipping grading", submission_id)
-        return
-
-    if submission.status not in (SUBMISSION_PENDING, SUBMISSION_RUNNING):
-        return
-
-    submission.status = SUBMISSION_RUNNING
-    submission.grading_started_at = datetime.now(timezone.utc)
-    commit_or_rollback("Failed to claim submission %s", submission_id, raise_message="Failed to claim submission")
-
     assignment_id = submission.assignment_id
     filename = submission.file_name
     submissions_dir = staging_dir(assignment_id, submission_id)
@@ -125,6 +135,41 @@ def _record_outcome(submission_id, assignment_id, outcome, submissions_dir):
             target=async_get_ai_feedback,
             args=(current_app._get_current_object(), submission_id, os.path.join(archived, filename), results_json_content)
         ).start()
+
+
+@shared_task(name="grading.sweep_stuck_submissions")
+def sweep_stuck_submissions():
+    """Mark submissions that have been pending or running for too long as failed,
+    so they can be rerun. Covers a failed claim commit, a failed `_mark_failed`
+    commit, a crashed worker, and a message lost from Redis. Run by Celery beat."""
+    now = datetime.now(timezone.utc)
+    running_cutoff = now - timedelta(seconds=current_app.config["GRADING_STUCK_RUNNING_SECONDS"])
+    pending_cutoff = now - timedelta(seconds=current_app.config["GRADING_STUCK_PENDING_SECONDS"])
+
+    stuck = db.session.query(Submission).filter(or_(
+        and_(
+            Submission.status == SUBMISSION_RUNNING,
+            func.coalesce(Submission.grading_started_at, Submission.submitted_at) < running_cutoff,
+        ),
+        and_(
+            Submission.status == SUBMISSION_PENDING,
+            Submission.submitted_at < pending_cutoff,
+        ),
+    ))
+    stuck_ids = [row.id for row in stuck.with_entities(Submission.id)]
+    if not stuck_ids:
+        return 0
+
+    try:
+        stuck.update({"status": SUBMISSION_FAILED}, synchronize_session=False)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.exception("Stuck-submission sweep failed to update %d rows", len(stuck_ids))
+        raise
+
+    logger.warning("Marked %d stuck submissions failed: %s", len(stuck_ids), stuck_ids)
+    return len(stuck_ids)
 
 
 def _mark_failed(submission_id):

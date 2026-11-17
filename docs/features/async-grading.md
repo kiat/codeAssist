@@ -38,27 +38,40 @@ follow-up.
    worker. Different assignments grade in parallel (concurrency 2); one
    assignment still grades one at a time.
 2. **Queue: Celery + Redis**, with `task_acks_late`, `task_reject_on_worker_lost`
-   and `worker_prefetch_multiplier=1` so a crashed worker's job is redelivered
-   instead of lost. The alternative was a Postgres queue (no new services, but a
+   and `worker_prefetch_multiplier=1` so a job whose worker crashes before
+   claiming it is redelivered instead of lost. The alternative was a Postgres queue (no new services, but a
    hand-written worker loop).
 3. **The submission row is the source of truth.** `status` is `pending`,
    `running`, `graded` (student code ran, including score-0 timeouts and
    crashes) or `failed` (our fault). The UI never reads Redis.
-4. **Jobs are safe to run twice.** The worker grades `pending` or `running` rows
-   and skips finished or deleted ones, so a redelivered job can't get stuck.
-5. **Only `graded` rows become active, and the newest upload wins**, decided
+4. **Jobs are safe to run twice.** The worker claims a row with one
+   `UPDATE ... SET status='running' WHERE id=:id AND status='pending'` and skips
+   the job if no row changed, so a redelivered copy can't grade the same
+   submission again or start a second AI feedback run.
+5. **A sweep fails rows that stay non-terminal.** Celery beat runs
+   `grading.sweep_stuck_submissions` every 5 minutes. It marks `running` rows
+   older than `GRADING_STUCK_RUNNING_SECONDS` (default 1 hour, measured from
+   `grading_started_at`) and `pending` rows older than
+   `GRADING_STUCK_PENDING_SECONDS` (default 2 hours, from `submitted_at`) as
+   `failed`, so they can be rerun. This covers a failed claim or
+   `_mark_failed` commit, a worker that crashed mid-grade (its redelivered job
+   finds the row `running` and skips it), and a message lost from Redis. The
+   pending limit is long on purpose: a deadline burst on one assignment
+   queues behind a single container. If a worker finishes a row after the
+   sweep failed it, the real result still overwrites `failed`.
+6. **Only `graded` rows become active, and the newest upload wins**, decided
    under an advisory lock on (student, assignment). The previous active
    submission keeps counting until then.
-6. **If enqueueing fails**, the pending row is deleted and the student is asked
+7. **If enqueueing fails**, the pending row is deleted and the student is asked
    to try again.
-7. **Rerun and activate return 409** for a submission that isn't graded yet.
+8. **Rerun and activate return 409** for a submission that isn't graded yet.
 
 ## Data Model
 
 ```text
 submissions
 + status              pending | running | graded | failed   (backfill: graded, CHECK constraint)
-+ grading_started_at  nullable; when grading started, for a future stuck-row sweeper
++ grading_started_at  nullable; when grading started, read by the stuck-row sweep
 ```
 
 ## Deployment
@@ -68,4 +81,7 @@ submissions
 - `worker`: backend image running `celery -A make_celery worker --concurrency=2`,
   with the same env, the same `docker.sock` mount, and the same `./backend/`
   volume, so it sees files Flask stages under `upload_autograder/runs/`.
-- The VM deployment needs the same two services before this can ship.
+- `beat`: backend image running `celery -A make_celery beat`, which schedules
+  the stuck-row sweep. Run exactly one. Its schedule file is written to `/tmp`,
+  not the bind mount.
+- The VM deployment needs the same three services before this can ship.

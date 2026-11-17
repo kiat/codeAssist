@@ -85,7 +85,9 @@ export default function AssignmentResult() {
     if (!isGrading) return;
 
     const startedAt = Date.now();
+    let finished = false;
     const interval = setInterval(async () => {
+      if (finished) return;
       if (Date.now() - startedAt > STATUS_POLL_LIMIT_MS) {
         clearInterval(interval);
         setStatusPollTimedOut(true);
@@ -101,12 +103,17 @@ export default function AssignmentResult() {
           return;
         }
 
-        clearInterval(interval);
         const details = await fetch(
           `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${submissionId}`,
           { credentials: "include" }
         );
-        setToSend(await details.json());
+        // Keep polling if the details request fails, so one bad response
+        // doesn't leave the page stuck on an error.
+        if (!details.ok) return;
+        const data = await details.json();
+        finished = true;
+        clearInterval(interval);
+        setToSend(data);
         setGradingStatus(status);
       } catch (err) {
         console.error("Polling submission status failed:", err);
@@ -384,6 +391,7 @@ export default function AssignmentResult() {
             allowFileUpload={allowFileUpload}
             enableCodeEditor={enableCodeEditor}
             rerunLoading={rerunLoading}
+            rerunDisabled={isGrading}
           />
         </PageBottom>
       ) : (

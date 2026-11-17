@@ -1758,9 +1758,15 @@ def delete_submission():
 
 @submission.route('/get_submission_status', methods=["GET"])
 def get_submission_status():
+    requester_id = require_authenticated()
+
     submission_id = request.args.get("submission_id")
     if not submission_id:
         raise BadRequestError("Missing submission_id")
+    try:
+        submission_id = str(uuid.UUID(submission_id))
+    except (ValueError, TypeError):
+        raise BadRequestError("Invalid submission_id")
 
     row = db.session.query(
         Submission.student_id, Submission.assignment_id, Submission.status
@@ -1768,7 +1774,6 @@ def get_submission_status():
     if not row:
         raise NotFoundError("No submission found")
 
-    requester_id = require_authenticated()
     if str(requester_id) != str(row.student_id):
         assignment = db.session.get(Assignment, row.assignment_id)
         require_course_role(assignment.course_id, {"instructor", "ta"},
@@ -1873,6 +1878,9 @@ def rerun_submission_autograder():
     container = None
     timeout = assignment.autograder_timeout or 300
     temp_container_name = f"rerun_submission_{uuid.uuid4().hex[:8]}"
+    # A failed submission never became active; once a rerun gives it a grade
+    # (including a timeout grade) it can count if it's the student's newest.
+    was_failed = submission_to_rerun.status == SUBMISSION_FAILED
 
     try:
         container = get_docker_client().containers.run(
@@ -1901,6 +1909,8 @@ def rerun_submission_autograder():
         submission_to_rerun.completed = False
         submission_to_rerun.status = SUBMISSION_GRADED
         submission_to_rerun.ai_feedback = None
+        if was_failed:
+            activate_if_newest(submission_to_rerun)
         db.session.commit()
         if container:
             try:
@@ -1962,8 +1972,6 @@ def rerun_submission_autograder():
     host_results_json_path = os.path.join(results_dir, f'results_{rerun_uuid}.json')
     with open(host_results_json_path, 'w') as file:
         file.write(results_json_content)
-
-    was_failed = submission_to_rerun.status == SUBMISSION_FAILED
 
     submission_to_rerun.results = results_json_content.encode()
     submission_to_rerun.score = parsed_results.get("score")

@@ -139,7 +139,12 @@ describe("AssignmentResult grading status", () => {
   };
 
   const detailsResponse = (overrides) => ({
+    ok: true,
     json: () => Promise.resolve({ ...baseSubmission, ...overrides }),
+  });
+  const failedResponse = () => ({
+    ok: false,
+    json: () => Promise.resolve({ message: "Server error" }),
   });
 
   beforeEach(() => {
@@ -200,6 +205,49 @@ describe("AssignmentResult grading status", () => {
     expect(await screen.findByTestId("result-score")).toHaveTextContent("9");
     expect(screen.queryByText("Grading")).not.toBeInTheDocument();
     expect(getSubmissionStatus).toHaveBeenCalledWith({ submission_id: "submission-1" });
+  });
+
+  it("keeps polling when fetching the graded details fails once", async () => {
+    jest.useFakeTimers();
+    // Page-load fetches see "running". After polling starts, the first details
+    // request fails and the next one succeeds.
+    let pollDetailsCalls = 0;
+    global.fetch = jest.fn(async () => {
+      if (getSubmissionStatus.mock.calls.length === 0) {
+        return detailsResponse({ status: "running", score: null });
+      }
+      pollDetailsCalls += 1;
+      return pollDetailsCalls === 1
+        ? failedResponse()
+        : detailsResponse({ status: "graded", score: 9 });
+    });
+    getSubmissionStatus.mockResolvedValue({ data: { status: "graded" } });
+
+    renderAssignmentResult();
+    expect(await screen.findByText("Grading")).toBeInTheDocument();
+
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(screen.queryByTestId("result-score")).not.toBeInTheDocument();
+    expect(screen.getByText("Grading")).toBeInTheDocument();
+
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(await screen.findByTestId("result-score")).toHaveTextContent("9");
+  });
+
+  it("disables Rerun Autograder while the submission is being graded", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(detailsResponse({ status: "pending", score: null }));
+    getSubmissionStatus.mockResolvedValue({ data: { status: "pending" } });
+
+    renderAssignmentResult();
+    await screen.findByText("Queued for grading");
+
+    expect(screen.getByRole("button", { name: /Rerun Autograder/ })).toBeDisabled();
   });
 
   it("shows a failure message and does not poll when grading failed", async () => {

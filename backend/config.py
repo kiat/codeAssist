@@ -27,7 +27,20 @@ class Config:
         "worker_prefetch_multiplier": 1,
         "broker_transport_options": {"visibility_timeout": 7200},
         "broker_connection_retry_on_startup": True,
+        # Run by the `beat` service in docker-compose.yml.
+        "beat_schedule": {
+            "sweep-stuck-submissions": {
+                "task": "grading.sweep_stuck_submissions",
+                "schedule": float(os.getenv("GRADING_SWEEP_INTERVAL_SECONDS", "300")),
+            },
+        },
     }
+
+    # How long a submission may stay running / pending before the sweep marks
+    # it failed. Running includes waiting for the assignment container lock
+    # behind another worker. Pending covers the queue during a deadline burst.
+    GRADING_STUCK_RUNNING_SECONDS = int(os.getenv("GRADING_STUCK_RUNNING_SECONDS", "3600"))
+    GRADING_STUCK_PENDING_SECONDS = int(os.getenv("GRADING_STUCK_PENDING_SECONDS", "7200"))
 
 class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'

@@ -68,6 +68,24 @@ services:
         depends_on:
             - redis
 
+    beat:
+        container_name: celery_beat_container
+        restart: unless-stopped
+        build:
+            context: "./backend/"
+            dockerfile: Dockerfile
+        env_file:
+            - ./backend/.env
+        environment:
+            PYTHONUNBUFFERED: 1
+        # Schedules the stuck-submission sweep. Run exactly one beat. The
+        # schedule file goes in /tmp so it isn't written into the bind mount.
+        command: ["celery", "-A", "make_celery", "beat", "--loglevel=INFO", "--schedule", "/tmp/celerybeat-schedule"]
+        volumes:
+            - ./backend/:/usr/src/app
+        depends_on:
+            - redis
+
     db:
         container_name: postgres_container
         image: postgres:15.3-alpine3.18

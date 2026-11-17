@@ -2789,14 +2789,33 @@ def test_upload_submission_logs_upload_timings(client, mocker, caplog):
         _cleanup_submission_dirs(assignment_id)
 
 
+def _login(client, user_id=None):
+    with client.session_transaction() as sess:
+        sess["user_id"] = user_id or str(uuid.uuid4())
+
+
 def test_get_submission_status_missing_id(client):
+    _login(client)
     response = client.get("/get_submission_status")
     assert response.status_code == 400
 
 
 def test_get_submission_status_not_found(app, client):
+    _login(client)
     response = client.get(f"/get_submission_status?submission_id={uuid.uuid4()}")
     assert response.status_code == 404
+
+
+def test_get_submission_status_checks_login_before_lookup(app, client):
+    # A logged-out caller gets 401 whether or not the id exists.
+    response = client.get(f"/get_submission_status?submission_id={uuid.uuid4()}")
+    assert response.status_code == 401
+
+
+def test_get_submission_status_rejects_malformed_id(app, client):
+    _login(client)
+    response = client.get("/get_submission_status?submission_id=not-a-uuid")
+    assert response.status_code == 400
 
 
 def test_get_submission_status_returns_status_without_score(app, client):
@@ -3213,6 +3232,24 @@ def test_rerun_of_older_failed_submission_keeps_newer_one_active(client, mocker)
         assert db.session.get(Submission, failed_id).status == "graded"
         assert db.session.get(Submission, failed_id).active is False
         assert db.session.get(Submission, newer_id).active is True
+    finally:
+        _cleanup_submission_dirs(assignment_id)
+
+
+def test_rerun_timeout_of_failed_submission_makes_it_active(client, mocker):
+    assignment_id, student_id = _real_assignment(), str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    previous_id = _graded_row(assignment_id, student_id, now - timedelta(hours=1), active=True)
+    failed_id = _failed_row(assignment_id, student_id, now)
+    _rerun_setup(mocker, student_id, timeout=True)
+
+    try:
+        response = _rerun(client, student_id, failed_id)
+
+        assert response.status_code == 504
+        db.session.expire_all()
+        assert db.session.get(Submission, failed_id).active is True
+        assert db.session.get(Submission, previous_id).active is False
     finally:
         _cleanup_submission_dirs(assignment_id)
 
