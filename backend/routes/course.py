@@ -399,6 +399,9 @@ def leave_course():
         db.session.rollback()
         raise InternalProcessingError("Failed to leave course")
 
+UPDATABLE_COURSE_FIELDS = ("description", "name", "semester", "year", "entryCode", "allowEntryCode")
+
+
 @course.route("/update_course", methods=["PUT"])
 def update_course():
     """
@@ -425,12 +428,15 @@ def update_course():
     if existing_class and existing_class.id != data["course_id"]:
         raise ConflictError("Course with the provided entry code already exists")
     
-    course_id = data["course_id"]    
-    del data["course_id"]
-    # Only admins grant Vertex access, through /admin_set_course_vertex.
-    data.pop("vertex_enabled", None)
+    course_id = data["course_id"]
 
-    updated_course_info = {getattr(Course, name): val for name, val in data.items()}
+    # Only the documented course fields. Everything else (owner, AI provider
+    # and keys, vertex_enabled) has its own route with its own checks.
+    updated_course_info = {
+        getattr(Course, name): data[name]
+        for name in UPDATABLE_COURSE_FIELDS
+        if name in data
+    }
 
     try:
         db.session.query(Course).filter_by(id=course_id).update(updated_course_info)

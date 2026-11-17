@@ -406,3 +406,37 @@ def test_instructor_cannot_enable_vertex_through_update_course(client, course, l
     assert response.status_code == 200
     db.session.expire_all()
     assert db.session.get(Course, COURSE_ID).vertex_enabled is False
+
+
+def test_update_course_only_changes_documented_fields(client, course, login_as):
+    login_as(INSTRUCTOR_ID)
+
+    response = client.put("/update_course", json={
+        "course_id": COURSE_ID,
+        "description": "New description",
+        "name": "CS 101 Renamed",
+        "semester": "Spring",
+        "year": "2027",
+        "entryCode": "ENTRY9",
+        "allowEntryCode": False,
+        # None of these belong to /update_course.
+        "default_ai_provider": "gemini_vertex",
+        "default_ai_model": "gemini-2.5-pro",
+        "instructor_id": ADMIN_ID,
+        "openai_api_key": "plaintext-key",
+        "defaultScoringMethod": "average",
+    })
+
+    assert response.status_code == 200
+    db.session.expire_all()
+    updated = db.session.get(Course, COURSE_ID)
+    assert updated.name == "CS 101 Renamed"
+    assert updated.description == "New description"
+    assert updated.semester == "Spring"
+    assert updated.year == "2027"
+    assert updated.entryCode == "ENTRY9"
+    assert updated.allowEntryCode is False
+    assert updated.default_ai_provider != "gemini_vertex"
+    assert updated.default_ai_model != "gemini-2.5-pro"
+    assert updated.instructor_id == INSTRUCTOR_ID
+    assert updated.openai_api_key in ("", None)
