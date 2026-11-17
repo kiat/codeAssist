@@ -342,8 +342,18 @@ GRADE_OVERHEAD_TIMEOUT = 60
 KILLED_EXIT_CODE = 137
 AUTOGRADER_LOG_PATH = "/autograder/.run_autograder.log"
 
+# Kills every process the sandbox user owns, as that user. Run as root,
+# `kill -9 -1` would also kill the container's main process, and with Docker's
+# init as PID 1 (util/sandbox.py) that stops the container mid-exec. Student
+# and autograder code only ever run as the sandbox user, so this still clears
+# everything a previous submission left behind; the init reaps them.
+_KILL_SANDBOX_PROCESSES = (
+    f"setpriv --reuid={AUTOGRADER_UID} --regid={AUTOGRADER_UID} --clear-groups "
+    "sh -c 'kill -9 -1' 2>/dev/null"
+)
+
 _GRADE_SCRIPT = f"""
-kill -9 -1 2>/dev/null
+{_KILL_SANDBOX_PROCESSES}
 find / /dev/shm -xdev -depth -user {AUTOGRADER_UID} -not -path '/autograder/*' -delete >&2 || exit {GRADE_EXIT_RESET_FAILED}
 if [ -d {SOURCE_BASELINE_PATH} ]; then
     rm -rf /autograder/source >&2 || exit {GRADE_EXIT_RESET_FAILED}
@@ -360,7 +370,7 @@ start=$(date +%s)
 HOME=/tmp timeout -s KILL "$1" setpriv --reuid={AUTOGRADER_UID} --regid={AUTOGRADER_UID} --clear-groups \
     /bin/bash /autograder/source/run_autograder >{AUTOGRADER_LOG_PATH} 2>&1 </dev/null
 rc=$?
-kill -9 -1 2>/dev/null
+{_KILL_SANDBOX_PROCESSES}
 if [ "$rc" -eq 137 ] && [ $(( $(date +%s) - start )) -ge "$1" ]; then
     exit {GRADE_EXIT_TIMED_OUT}
 fi

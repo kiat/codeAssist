@@ -11,7 +11,7 @@ SANDBOX_USER = f"{SANDBOX_UID}:{SANDBOX_UID}"
 
 # Bumped whenever the limits below change, so persistent assignment containers
 # created with older limits get recreated (see routes/submission.py).
-SANDBOX_VERSION = "1"
+SANDBOX_VERSION = "2"
 SANDBOX_LABEL = "codeassist.sandbox"
 
 DEFAULT_MEM_LIMIT = "512m"
@@ -56,6 +56,11 @@ def container_run_kwargs(language="python", supervisor=True):
         "cap_drop": ["ALL"],
         "security_opt": ["no-new-privileges"],
         "labels": {SANDBOX_LABEL: SANDBOX_VERSION},
+        # Docker's init (tini) as PID 1 reaps orphaned processes. Without it,
+        # PID 1 is `tail -f /dev/null`, which never reaps, so processes killed
+        # by the reset between submissions stay as zombies, still count
+        # toward pids_limit, and starve the next submissions.
+        "init": True,
     }
     if supervisor:
         kwargs["cap_add"] = list(SUPERVISOR_CAPS)

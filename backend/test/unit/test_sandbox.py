@@ -34,6 +34,9 @@ def test_defaults_without_app_context():
     assert kwargs["security_opt"] == ["no-new-privileges"]
     assert kwargs["cap_add"] == SUPERVISOR_CAPS
     assert kwargs["labels"] == {SANDBOX_LABEL: SANDBOX_VERSION}
+    # An init as PID 1 reaps processes the reset kills (zombies would count
+    # toward pids_limit and starve later submissions).
+    assert kwargs["init"] is True
 
 
 def test_java_gets_more_memory():

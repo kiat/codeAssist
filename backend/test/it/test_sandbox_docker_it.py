@@ -134,3 +134,62 @@ def test_editor_autograder_run_grades_as_nobody(app, a1_image):
     )
     assert results is not None
     assert results["score"] > 0
+
+
+FORK_TO_THE_LIMIT = """
+import os, time
+for _ in range(2000):
+    try:
+        if os.fork() == 0:
+            time.sleep(600)
+            os._exit(0)
+    except OSError:
+        break
+"""
+
+
+def _sandbox_process_count(container):
+    """Live (non-zombie) processes owned by the sandbox user."""
+    cmd = "for f in /proc/[0-9]*/status; do grep -q '^Uid:[[:space:]]*65534' $f && ! grep -q '^State:[[:space:]]*Z' $f && echo x; done 2>/dev/null | wc -l"
+    out = container.exec_run(["sh", "-c", cmd])
+    return int(out.output.decode().strip() or 0)
+
+
+def _zombie_count(container):
+    out = container.exec_run(["sh", "-c", "grep -l '^State:[[:space:]]*Z' /proc/[0-9]*/status 2>/dev/null | wc -l"])
+    return int(out.output.decode().strip() or 0)
+
+
+def test_forking_submission_does_not_starve_the_next_one(app, a1_image, tmp_path):
+    """A submission that forks to pids_limit must not leave zombies that eat
+    the next students' process budget (found in review of #401: the next A1
+    submissions scored 16/20 instead of 20/20)."""
+    from types import SimpleNamespace
+
+    from routes import submission
+
+    assignment = SimpleNamespace(autograder_image_name=a1_image, id="it")
+    container = submission._run_assignment_container(assignment, f"sandbox_it_{uuid.uuid4().hex[:8]}")
+    try:
+        good = tmp_path / "good" / "calculator.py"
+        good.parent.mkdir()
+        shutil.copy(os.path.join(EXAMPLES, "A1", "calculator.py"), good)
+        bad = tmp_path / "bad" / "calculator.py"
+        bad.parent.mkdir()
+        bad.write_text(FORK_TO_THE_LIMIT)
+
+        def grade(path):
+            proc = submission.run_grading(container, str(path), "calculator.py", 60)
+            assert proc.returncode == 0, proc.stderr.decode(errors="replace")
+            return json.loads(proc.stdout)["score"]
+
+        baseline = grade(good)
+        grade(bad)
+        assert _zombie_count(container) == 0
+        assert _sandbox_process_count(container) == 0
+        container.reload()
+        assert container.status == "running"
+        assert grade(good) == baseline
+        assert grade(good) == baseline
+    finally:
+        container.remove(force=True)
