@@ -271,7 +271,7 @@ def test_user_login_missing_password(client):
     assert response.status_code == 400
     assert response.json["message"] == "Missing email or password"
 
-def test_get_user_by_email_success(client, mocker, mock_user_query):
+def test_get_user_by_email_success(client, mocker, mock_user_query, login_as):
     """Test the /get_user_by_email route with a valid email."""
     mock_query, mock_user_schema = mock_user_query
 
@@ -282,7 +282,10 @@ def test_get_user_by_email_success(client, mocker, mock_user_query):
     user_mock.role = 2
     mock_query.return_value.with_entities.return_value.filter_by.return_value.first.return_value = user_mock
 
-    response = client.get("/get_user_by_email?email=john@example.com")
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+    login_as("ta-uuid")
+
+    response = client.get("/get_user_by_email?email=john@example.com&course_id=course-uuid")
 
     assert response.status_code == 200
     assert response.json == {
@@ -294,17 +297,44 @@ def test_get_user_by_email_success(client, mocker, mock_user_query):
     mock_query.assert_called_once()
 
 
-def test_get_user_by_email_not_found(client, mock_user_query):
+def test_get_user_by_email_not_found(client, mocker, mock_user_query, login_as):
     """Test the /get_user_by_email route with an invalid email."""
     mock_query, mock_user_schema = mock_user_query
     mock_query.return_value.with_entities.return_value.filter_by.return_value.first.return_value = None
 
-    response = client.get('/get_user_by_email?email=invalid@example.com')
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+
+    response = client.get('/get_user_by_email?email=invalid@example.com&course_id=course-uuid')
 
     assert response.status_code == 404
     assert b'User not found' in response.data
 
     mock_query.assert_called_once()
+
+
+def test_get_user_by_email_requires_course_staff(client, mocker, mock_user_query, login_as):
+    mock_query, _ = mock_user_query
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.get("/get_user_by_email?email=john@example.com&course_id=course-uuid")
+
+    assert response.status_code == 403
+    mock_query.assert_not_called()
+
+
+def test_get_user_by_email_unauthenticated(client, mock_user_query):
+    mock_query, _ = mock_user_query
+    response = client.get("/get_user_by_email?email=john@example.com&course_id=course-uuid")
+    assert response.status_code == 401
+    mock_query.assert_not_called()
+
+
+def test_get_user_by_email_requires_course_id(client, login_as):
+    login_as("instructor-uuid")
+    response = client.get("/get_user_by_email?email=john@example.com")
+    assert response.status_code == 400
 
 
 def test_delete_user(client, mocker):
