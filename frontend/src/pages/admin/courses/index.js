@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Input, Table, PageHeader, Card, Space, Button, message, } from "antd";
+import { Input, Table, PageHeader, Card, Space, Button, Switch, message, } from "antd";
 import { useNavigate } from "react-router-dom";
 
 export default function AdminCourses() {
   const [courses, setCourses] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [vertexSaving, setVertexSaving] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,12 +51,45 @@ export default function AdminCourses() {
     : courses;
 
 
+  const setVertexEnabled = async (courseId, enabled) => {
+    setVertexSaving(courseId);
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/admin_set_course_vertex`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ course_id: courseId, enabled }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setCourses(prev =>
+        prev.map(c => (c.id === courseId ? { ...c, vertex_enabled: enabled } : c))
+      );
+      message.success(enabled ? "Vertex AI enabled for this course" : "Vertex AI disabled for this course");
+    } catch (e) {
+      message.error("Failed to update Vertex AI access");
+    } finally {
+      setVertexSaving(null);
+    }
+  };
+
   const columns = [
     { title: "Course Name", dataIndex: "name", key: "name" },
     { title: "Course ID", dataIndex: "id", key: "id" },
     { title: "Semester", dataIndex: "semester", key: "semester" },
     { title: "Year", dataIndex: "year", key: "year" },
     { title: "Instructor", dataIndex: "instructor_name", key: "instructor" },
+    {
+      title: "Vertex AI",
+      key: "vertex_enabled",
+      render: (_, course) => (
+        <Switch
+          aria-label={`Vertex AI for ${course.name}`}
+          checked={!!course.vertex_enabled}
+          loading={vertexSaving === course.id}
+          onChange={checked => setVertexEnabled(course.id, checked)}
+        />
+      ),
+    },
   ];
   
 
