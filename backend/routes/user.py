@@ -407,6 +407,34 @@ def get_all_courses():
     courses = db.session.query(Course).all()
     return jsonify(CourseSchema().dump(courses, many=True)), 200
 
+@user.route('/admin_set_course_vertex', methods=["PUT"])
+def admin_set_course_vertex():
+    """Turn Gemini over Vertex AI on or off for a course. Vertex bills the
+    deployment's Google Cloud project, so only admins decide which courses use it.
+    Requires JSON: course_id, enabled (bool)."""
+    require_admin("Only administrators can change Vertex AI access")
+    data = request.json or {}
+    course_id = data.get("course_id")
+    enabled = data.get("enabled")
+
+    if not course_id:
+        raise BadRequestError("Missing course_id")
+    if not isinstance(enabled, bool):
+        raise BadRequestError("enabled must be true or false")
+
+    course_obj = db.session.query(Course).filter_by(id=course_id).first()
+    if not course_obj:
+        raise NotFoundError("Course not found")
+
+    course_obj.vertex_enabled = enabled
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise InternalProcessingError("Failed to update Vertex AI access")
+
+    return jsonify({"course_id": course_id, "vertex_enabled": enabled}), 200
+
 @user.route('/get_all_instructors', methods=["GET"])
 def get_all_instructors():
     """Get all instructors in the system."""
