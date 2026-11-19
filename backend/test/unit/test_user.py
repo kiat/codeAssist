@@ -70,8 +70,43 @@ def test_create_user_success(client, mocker, mock_user_query):
         assert sess["user_id"] == "11111111-1111-1111-1111-111111111111"
 
 
-def test_create_instructor_success(client, mocker, mock_user_query):
+def test_public_signup_cannot_create_instructor(client, mocker, mock_user_query):
+    mock_add = mocker.patch("routes.user.db.session.add")
+
+    response = client.post("/create_user", json={
+        "name": "Prof Test",
+        "password": "password123",
+        "email_address": "prof@example.com",
+        "eid": "PROF123",
+        "role": "instructor",
+    })
+
+    assert response.status_code == 403
+    assert "ask an administrator" in response.json["message"]
+    mock_add.assert_not_called()
+
+
+def test_non_admin_session_cannot_create_instructor(client, mocker, mock_user_query, login_as):
+    login_as("student-uuid")
+    mocker.patch("routes.user.get_user_global_role", return_value="student")
+    mock_add = mocker.patch("routes.user.db.session.add")
+
+    response = client.post("/create_user", json={
+        "name": "Prof Test",
+        "password": "password123",
+        "email_address": "prof@example.com",
+        "eid": "PROF123",
+        "role": "instructor",
+    })
+
+    assert response.status_code == 403
+    mock_add.assert_not_called()
+
+
+def test_admin_can_create_instructor(client, mocker, mock_user_query, login_as):
     mock_query, mock_user_schema = mock_user_query
+    login_as("admin-uuid")
+    mocker.patch("routes.user.get_user_global_role", return_value="admin")
     mock_commit = mocker.patch("routes.user.db.session.commit")
     mock_add = mocker.patch("routes.user.db.session.add")
     mock_query.return_value.filter_by.return_value.first.return_value = None
@@ -81,21 +116,21 @@ def test_create_instructor_success(client, mocker, mock_user_query):
         "role": "instructor",
     }
 
-    payload = {
+    response = client.post("/create_user", json={
         "name": "Prof Test",
         "password": "password123",
         "email_address": "prof@example.com",
         "eid": "PROF123",
         "role": "instructor",
-    }
-
-    response = client.post("/create_user", json=payload)
+    })
 
     assert response.status_code == 201
     assert response.json["role"] == "instructor"
-    mock_add.assert_called_once()
+    assert mock_add.call_args.args[0].role == "instructor"
     mock_commit.assert_called_once()
-    assert mock_query.return_value.filter_by.call_count == 2
+    # The admin stays logged in as themselves.
+    with client.session_transaction() as sess:
+        assert sess["user_id"] == "admin-uuid"
 
 
 def test_create_admin_requires_admin_session(client):
@@ -110,7 +145,7 @@ def test_create_admin_requires_admin_session(client):
     response = client.post("/create_user", json=payload)
 
     assert response.status_code == 403
-    assert response.json["message"] == "Not authenticated. Please log in."
+    assert response.json["message"].startswith("Only administrators can create admin accounts")
 
 
 def test_admin_can_create_admin(client, mocker, mock_user_query):
@@ -705,42 +740,53 @@ def test_create_google_user_invalid_token(client, mocker):
 
 def test_create_google_user_sets_session(client, mocker):
     mock_response = mocker.Mock()
-    mock_response.json.return_value = {"email": "prof@example.com"}
+    mock_response.json.return_value = {"email": "student@example.com"}
     mocker.patch("routes.user.requests.get", return_value=mock_response)
     mocker.patch("routes.user.uuid.uuid4", return_value=uuid.UUID("22222222-2222-2222-2222-222222222222"))
-    mocker.patch("routes.user.db.session.add")
+    mock_add = mocker.patch("routes.user.db.session.add")
     mocker.patch("routes.user.db.session.commit")
 
     mock_query = mocker.patch("routes.user.db.session.query")
     mock_query.return_value.filter_by.return_value = [
         {
             "id": "22222222-2222-2222-2222-222222222222",
-            "name": "Prof Test",
-            "email_address": "prof@example.com",
-            "role": "instructor",
+            "name": "Student Test",
+            "email_address": "student@example.com",
+            "role": "student",
         }
     ]
     mock_user_schema = mocker.patch("routes.user.UserSchema")
     mock_user_schema.return_value.dump.return_value = [{
         "id": "22222222-2222-2222-2222-222222222222",
-        "name": "Prof Test",
-        "role": "instructor",
+        "name": "Student Test",
+        "role": "student",
     }]
 
     response = client.post(
         "/create_google_user",
-        json={
-            "credential": "good_token",
-            "eid": "PROF123",
-            "name": "Prof Test",
-            "role": "instructor",
-        },
+        json={"credential": "good_token", "eid": "STU123", "name": "Student Test"},
     )
 
     assert response.status_code == 200
-    assert response.json["role"] == "instructor"
+    assert response.json["role"] == "student"
+    assert mock_add.call_args.args[0].role == "student"
     with client.session_transaction() as sess:
         assert sess["user_id"] == "22222222-2222-2222-2222-222222222222"
+
+
+def test_create_google_user_rejects_instructor_role(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {"email": "prof@example.com"}
+    mocker.patch("routes.user.requests.get", return_value=mock_response)
+    mock_add = mocker.patch("routes.user.db.session.add")
+
+    response = client.post(
+        "/create_google_user",
+        json={"credential": "good_token", "eid": "PROF123", "name": "Prof", "role": "instructor"},
+    )
+
+    assert response.status_code == 403
+    mock_add.assert_not_called()
 
 
 def test_create_google_user_rejects_admin_role(client, mocker):
@@ -998,3 +1044,60 @@ def test_update_account_admin_cannot_update_other_user(client, mocker, login_as_
     assert response.status_code == 403
     mock_query.assert_not_called()
     mock_commit.assert_not_called()
+
+
+def _target_user(mocker, mock_query, role="student", user_id="11111111-1111-1111-1111-111111111111"):
+    target = mocker.Mock()
+    target.id = user_id
+    target.role = role
+    target.email_address = "user@example.com"
+    target.sis_user_id = "EID1"
+    mock_query.return_value.filter_by.return_value.first.return_value = target
+    return target
+
+
+def test_admin_can_promote_student_to_instructor(client, mocker, mock_user_query, login_as_admin):
+    mock_query, _ = mock_user_query
+    login_as_admin()
+    mock_commit = mocker.patch("routes.user.db.session.commit")
+    target = _target_user(mocker, mock_query)
+
+    response = client.post("/admin_update_account", json={"id": target.id, "role": "instructor"})
+
+    assert response.status_code == 200
+    assert target.role == "instructor"
+    mock_commit.assert_called_once()
+
+
+def test_admin_role_change_rejects_unknown_role(client, mocker, mock_user_query, login_as_admin):
+    mock_query, _ = mock_user_query
+    login_as_admin()
+    target = _target_user(mocker, mock_query)
+
+    response = client.post("/admin_update_account", json={"id": target.id, "role": "admin"})
+
+    assert response.status_code == 400
+    assert target.role == "student"
+
+
+def test_admin_cannot_change_own_role(client, mocker, mock_user_query, login_as_admin):
+    mock_query, _ = mock_user_query
+    admin_id = "33333333-3333-3333-3333-333333333333"
+    login_as_admin(admin_id)
+    target = _target_user(mocker, mock_query, role="admin", user_id=admin_id)
+
+    response = client.post("/admin_update_account", json={"id": admin_id, "role": "student"})
+
+    assert response.status_code == 400
+    assert target.role == "admin"
+
+
+def test_admin_cannot_demote_another_admin(client, mocker, mock_user_query, login_as_admin):
+    mock_query, _ = mock_user_query
+    login_as_admin()
+    target = _target_user(mocker, mock_query, role="admin")
+
+    response = client.post("/admin_update_account", json={"id": target.id, "role": "student"})
+
+    assert response.status_code == 400
+    assert target.role == "admin"

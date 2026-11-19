@@ -2708,7 +2708,7 @@ def test_grade_script_resets_workspace_before_the_submission_arrives(app):
     lines = _grade_script_lines()
     unpack = _line_index(lines, "tar -x")
     reset_steps = [
-        "kill -9 -1",
+        submission_module._KILL_SANDBOX_PROCESSES,
         "find / /dev/shm -xdev -depth -user 65534 -not -path '/autograder/*' -delete",
         "rm -rf /autograder/source",
         f"cp -a {submission_module.SOURCE_BASELINE_PATH} /autograder/source",
@@ -2732,8 +2732,11 @@ def test_grade_script_runs_autograder_as_unprivileged_user_under_time_limit(app)
     assert "HOME=/tmp" in run_cmd
     assert 'timeout -s KILL "$1"' in run_cmd
     assert "setpriv --reuid=65534 --regid=65534 --clear-groups" in run_cmd
-    # only the student's run goes through setpriv
-    assert sum("setpriv" in line for line in lines) == 1
+    # Besides the student's run, only the process cleanup drops to the sandbox
+    # user; nothing else in the script runs as nobody.
+    allowed = {run, submission_module._KILL_SANDBOX_PROCESSES}
+    setpriv_lines = [line for line in lines if "setpriv" in line]
+    assert set(setpriv_lines) <= allowed, setpriv_lines
 
 
 def test_grade_script_keeps_student_output_off_stdout_and_private(app):
@@ -2754,7 +2757,7 @@ def test_grade_script_keeps_student_output_off_stdout_and_private(app):
 def test_grade_script_refuses_a_symlinked_results_file(app):
     """results.json is read as root, so a symlink could print a hidden test."""
     lines = _grade_script_lines()
-    leftover_kill = max(i for i, line in enumerate(lines) if line == "kill -9 -1 2>/dev/null")
+    leftover_kill = max(i for i, line in enumerate(lines) if line == submission_module._KILL_SANDBOX_PROCESSES)
     check = _line_index(lines, "[ ! -L /autograder/results/results.json ]")
     read = _line_index(lines, "cat /autograder/results/results.json")
 
@@ -2779,7 +2782,7 @@ def test_grade_script_kills_leftover_student_processes_before_reading_results(ap
     lines = _grade_script_lines()
     run = _line_index(lines, "/autograder/source/run_autograder")
     read = _line_index(lines, "cat /autograder/results/results.json")
-    kills = [i for i, line in enumerate(lines) if line == "kill -9 -1 2>/dev/null"]
+    kills = [i for i, line in enumerate(lines) if line == submission_module._KILL_SANDBOX_PROCESSES]
 
     assert kills[0] == 0
     assert any(run < i < read for i in kills)
@@ -3122,3 +3125,16 @@ def test_upload_submission_keeps_name_with_several_required_files(client, mocker
         assert set(os.listdir(archived_path)) == {"submission.zip"}
     finally:
         _cleanup_submission_dirs(assignment_id)
+
+
+def test_grade_script_kills_only_sandbox_user_processes(app):
+    """`kill -9 -1` as root would also kill the container's main process, and
+    with Docker's init as PID 1 that stops the container mid-exec. The cleanup
+    runs as the sandbox user, through the shell builtin (python:3.9-slim has no
+    /usr/bin/kill)."""
+    kill = submission_module._KILL_SANDBOX_PROCESSES
+    assert kill.startswith("setpriv --reuid=65534 --regid=65534 --clear-groups ")
+    assert "sh -c 'kill -9 -1'" in kill
+    lines = _grade_script_lines()
+    assert "kill -9 -1 2>/dev/null" not in lines
+    assert sum(line == kill for line in lines) == 2

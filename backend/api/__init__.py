@@ -60,7 +60,10 @@ def create_app(config_class='config.Config'):
     from routes import register_routes
     from util.errors import register_error_handlers
 
+    from util.cli import register_cli
+
     register_routes(app)
     register_error_handlers(app)
+    register_cli(app)
 
     return app
