@@ -125,6 +125,64 @@ describe("AssignmentResult rerun autograder", () => {
     });
     expect(await screen.findByTestId("result-score")).toHaveTextContent("9");
   });
+
+  const failedSubmission = {
+    id: "submission-1",
+    assignment_id: "assignment-1",
+    student_id: "student-1",
+    name: "Ada",
+    score: null,
+    status: "failed",
+    student_code_file: "print('hello')",
+    file_name: "solution.py",
+    results: null,
+  };
+
+  it("shows the results after rerunning a failed submission", async () => {
+    const user = userEvent.setup();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(failedSubmission),
+    });
+    rerunSubmissionAutograder.mockResolvedValue({
+      data: {
+        message: "Autograder rerun completed",
+        submission: { ...failedSubmission, status: "graded", score: 9, results: { tests: [] } },
+      },
+    });
+
+    renderAssignmentResult();
+    expect(await screen.findByText("Grading failed")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /rerun autograder/i }));
+
+    expect(await screen.findByTestId("result-score")).toHaveTextContent("9");
+    expect(screen.queryByText("Grading failed")).not.toBeInTheDocument();
+  });
+
+  it("reloads the submission when the rerun request fails", async () => {
+    const user = userEvent.setup();
+    // Before the rerun the row is failed. A timed-out rerun returns an error
+    // but still records a graded row, which the page should reload.
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: () =>
+        Promise.resolve(
+          rerunSubmissionAutograder.mock.calls.length === 0
+            ? failedSubmission
+            : { ...failedSubmission, status: "graded", score: 7, results: { tests: [] } }
+        ),
+    }));
+    rerunSubmissionAutograder.mockRejectedValue(new Error("504"));
+
+    renderAssignmentResult();
+    expect(await screen.findByText("Grading failed")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /rerun autograder/i }));
+
+    expect(await screen.findByTestId("result-score")).toHaveTextContent("7");
+    expect(screen.queryByText("Grading failed")).not.toBeInTheDocument();
+  });
 });
 
 describe("AssignmentResult grading status", () => {

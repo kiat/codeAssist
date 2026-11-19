@@ -1136,7 +1136,8 @@ def get_results():
     if not assignment:
         raise NotFoundError("Assignment not found")
 
-    submission = (db.session.query(Submission).filter_by(student_id=student_id, assignment_id=assignment_id)
+    submission = (db.session.query(Submission)
+                    .filter_by(student_id=student_id, assignment_id=assignment_id, status=SUBMISSION_GRADED)
                     .order_by(desc(Submission.submitted_at)).limit(1))
     submission = SubmissionSchema().dump(submission, many=True)
     requester_id = session.get("user_id")

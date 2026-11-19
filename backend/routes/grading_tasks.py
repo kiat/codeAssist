@@ -1,6 +1,8 @@
+import glob
 import json
 import logging
 import os
+import shutil
 import threading
 from datetime import datetime, timedelta, timezone
 
@@ -23,9 +25,20 @@ from routes.submission import (
 
 logger = logging.getLogger(__name__)
 
+# A claim fails when the database is unreachable, e.g. Postgres still starting.
+# Retrying puts a fresh copy of the message on the queue; acks_late alone would
+# ack the original as soon as the task returns or raises.
+CLAIM_RETRY_COUNTDOWN_SECONDS = 15
+CLAIM_MAX_RETRIES = 5
 
-@shared_task(name="grading.grade_submission")
-def grade_submission(submission_id):
+# Rows a finished worker may still write its result to. "failed" is included so
+# a job that outlived the sweep still records its real result, unless a rerun
+# has already replaced it with "graded".
+_RECORDABLE_STATUSES = (SUBMISSION_RUNNING, SUBMISSION_FAILED)
+
+
+@shared_task(bind=True, name="grading.grade_submission")
+def grade_submission(self, submission_id):
     # Claim the row in one UPDATE so a redelivered copy of this message can't
     # also grade it. Only pending rows are claimed; a row left running by a
     # crashed worker is failed by sweep_stuck_submissions instead.
@@ -38,13 +51,14 @@ def grade_submission(submission_id):
             synchronize_session=False,
         )
         db.session.commit()
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
-        logger.exception("Failed to claim submission %s; leaving it for the sweep", submission_id)
-        return
+        logger.warning("Failed to claim submission %s; retrying", submission_id, exc_info=True)
+        raise self.retry(exc=exc, countdown=CLAIM_RETRY_COUNTDOWN_SECONDS, max_retries=CLAIM_MAX_RETRIES)
 
     if not claimed:
         logger.info("Submission %s is missing or not pending; skipping grading", submission_id)
+        _clean_up_unclaimed(submission_id)
         return
 
     submission = db.session.get(Submission, submission_id)
@@ -75,10 +89,52 @@ def grade_submission(submission_id):
         )
 
 
+def _clean_up_unclaimed(submission_id):
+    """Remove the staged upload for a message that claimed nothing, unless
+    another worker is grading the row right now and still needs it."""
+    try:
+        row = db.session.query(Submission.assignment_id, Submission.status).filter_by(id=submission_id).first()
+    except Exception:
+        db.session.rollback()
+        logger.exception("Could not look up unclaimed submission %s; leaving its files", submission_id)
+        return
+
+    if row is None:
+        # Deleted: the row is gone, so drop the copy too.
+        for path in glob.glob(staging_dir("*", submission_id)):
+            shutil.rmtree(path, ignore_errors=True)
+        return
+    if row.status in (SUBMISSION_PENDING, SUBMISSION_RUNNING):
+        return
+    # Swept or already finished: keep the code with the submission's archive,
+    # like every other finished submission.
+    submissions_dir = staging_dir(row.assignment_id, submission_id)
+    if os.path.isdir(submissions_dir):
+        archive_staged_files(row.assignment_id, submission_id, submissions_dir)
+
+
 def _record_outcome(submission_id, assignment_id, outcome, submissions_dir):
-    submission = db.session.get(Submission, submission_id)
+    # Lock the row and re-check it: the sweep or a staff rerun may have changed
+    # it while this job was grading. Taking the row lock before
+    # activate_if_newest's student lock matches the rerun route's order.
+    submission = (
+        db.session.query(Submission)
+        .filter(Submission.id == submission_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if submission is None:
+        db.session.rollback()
         logger.info("Submission %s was deleted during grading; discarding result", submission_id)
+        archive_staged_files(assignment_id, submission_id, submissions_dir)
+        return
+    if submission.status not in _RECORDABLE_STATUSES:
+        db.session.rollback()
+        logger.warning(
+            "Submission %s is %s, likely rerun after the sweep; discarding this late result",
+            submission_id, submission.status,
+        )
         archive_staged_files(assignment_id, submission_id, submissions_dir)
         return
 

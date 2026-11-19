@@ -318,17 +318,89 @@ def test_grade_submission_skips_submission_already_running(assignment_id, gradin
     assert sub.score is None
 
 
-def test_grade_submission_leaves_row_pending_when_claim_commit_fails(assignment_id, grading, mocker):
+def test_grade_submission_retries_when_claim_commit_fails(assignment_id, grading, mocker):
+    from celery.exceptions import Retry
     submission_id = _submission(assignment_id)
     run = grading.set_exit(0, stdout=b'{"score": 5}')
+    retry = mocker.patch.object(grading_tasks.grade_submission, "retry", side_effect=Retry())
     mocker.patch.object(db.session, "commit", side_effect=RuntimeError("db down"))
 
-    grading_tasks.grade_submission.run(submission_id)
+    with pytest.raises(Retry):
+        grading_tasks.grade_submission.run(submission_id)
 
     mocker.stopall()
     db.session.rollback()
     run.assert_not_called()
+    assert retry.call_args.kwargs["countdown"] == grading_tasks.CLAIM_RETRY_COUNTDOWN_SECONDS
+    assert retry.call_args.kwargs["max_retries"] == grading_tasks.CLAIM_MAX_RETRIES
     assert db.session.get(Submission, submission_id).status == SUBMISSION_PENDING
+
+
+def _staged(assignment_id, submission_id):
+    return os.path.isdir(submission_module.staging_dir(assignment_id, submission_id))
+
+
+def test_unclaimed_message_keeps_files_another_worker_is_grading(assignment_id, grading):
+    submission_id = _submission(assignment_id, status=SUBMISSION_RUNNING)
+    grading.set_exit(0, stdout=b'{"score": 5}')
+
+    _run(submission_id)
+
+    assert _staged(assignment_id, submission_id)
+
+
+def test_unclaimed_message_archives_files_of_a_swept_submission(assignment_id, grading):
+    submission_id = _submission(assignment_id, status=SUBMISSION_FAILED)
+    grading.set_exit(0, stdout=b'{"score": 5}')
+
+    _run(submission_id)
+
+    assert not _staged(assignment_id, submission_id)
+    assert os.listdir(submission_module.archive_dir(assignment_id, submission_id)) == ["solution.py"]
+
+
+def test_unclaimed_message_removes_files_of_a_deleted_submission(assignment_id, grading):
+    submission_id = _submission(assignment_id)
+    db.session.query(Submission).filter_by(id=submission_id).delete()
+    db.session.commit()
+    grading.set_exit(0, stdout=b'{"score": 5}')
+
+    _run(submission_id)
+
+    assert not _staged(assignment_id, submission_id)
+    assert not os.path.exists(submission_module.archive_dir(assignment_id, submission_id))
+
+
+def _change_row_during_grading(mocker, submission_id, **fields):
+    """run_grading stub that changes the row mid-grade, as the sweep plus a
+    staff rerun would, then returns a score of 5."""
+    def grade(*args, **kwargs):
+        db.session.query(Submission).filter_by(id=submission_id).update(fields, synchronize_session=False)
+        db.session.commit()
+        return SimpleNamespace(returncode=0, stdout=b'{"score": 5}', stderr=b"")
+    return mocker.patch("routes.submission.run_grading", side_effect=grade)
+
+
+def test_late_result_does_not_overwrite_a_rerun(assignment_id, grading, mocker):
+    submission_id = _submission(assignment_id)
+    _change_row_during_grading(mocker, submission_id, status=SUBMISSION_GRADED, score=42)
+
+    sub = _run(submission_id)
+
+    assert sub.status == SUBMISSION_GRADED
+    assert sub.score == 42
+    grading.thread.assert_not_called()
+    assert not _staged(assignment_id, submission_id)
+
+
+def test_late_result_still_records_on_a_swept_row(assignment_id, grading, mocker):
+    submission_id = _submission(assignment_id)
+    _change_row_during_grading(mocker, submission_id, status=SUBMISSION_FAILED)
+
+    sub = _run(submission_id)
+
+    assert sub.status == SUBMISSION_GRADED
+    assert sub.score == 5
 
 
 def _sweep(app, running_seconds=3600, pending_seconds=7200):

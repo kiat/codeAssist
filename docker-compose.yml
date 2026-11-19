@@ -65,8 +65,13 @@ services:
         volumes:
             - ./backend/:/usr/src/app
             - /var/run/docker.sock:/var/run/docker.sock
+        # Wait until Postgres accepts connections, not just until its container
+        # starts, so the first grading jobs don't fail to claim their rows.
         depends_on:
-            - redis
+            redis:
+                condition: service_started
+            db:
+                condition: service_healthy
 
     beat:
         container_name: celery_beat_container
@@ -98,6 +103,11 @@ services:
             - "5432:5432"
         volumes: 
             - db:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d codeassist"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
 
     pgadmin:
       container_name: pgadmin4_container

@@ -297,10 +297,26 @@ export default function AssignmentResult() {
       });
       if (response?.data?.submission) {
         setToSend(response.data.submission);
+        setGradingStatus(response.data.submission.status);
       }
       message.success(response?.data?.message || "Autograder rerun completed");
     } catch (error) {
       console.error("Failed to rerun autograder:", error);
+      // A rerun that times out still records a graded row, so reload it
+      // instead of leaving the page on the old status.
+      try {
+        const details = await fetch(
+          `${process.env.REACT_APP_API_URL}/get_submission_details?submission_id=${toSend.id}`,
+          { credentials: "include" }
+        );
+        if (details.ok) {
+          const data = await details.json();
+          setToSend(data);
+          setGradingStatus(data.status);
+        }
+      } catch (refreshError) {
+        console.error("Failed to reload submission after rerun:", refreshError);
+      }
     } finally {
       setRerunLoading(false);
     }

@@ -3103,6 +3103,28 @@ def test_get_latest_submission_skips_ungraded_rows(app, client):
     assert response.get_json()["id"] == graded_id
 
 
+def test_get_results_skips_pending_and_failed_rows(app, client):
+    assignment_id, student_id = _real_assignment(), str(uuid.uuid4())
+    db.session.add(User(id=student_id, name="S", email_address=f"{student_id}@x.com",
+                        password="x", sis_user_id=student_id, role="student"))
+    db.session.commit()
+    now = datetime.now(timezone.utc)
+    graded_id = _graded_row(assignment_id, student_id, now - timedelta(hours=2))
+    _failed_row(assignment_id, student_id, now - timedelta(hours=1))
+    db.session.add(Submission(
+        id=str(uuid.uuid4()), file_name="solution.py", student_id=student_id,
+        assignment_id=assignment_id, student_code_file=b"code", execution_time=0.0,
+        submitted_at=now, active=False, completed=False, status="pending", submission_number=3,
+    ))
+    db.session.commit()
+    _login(client, student_id)
+
+    response = client.get(f"/get_results?email={student_id}@x.com&assignment_id={assignment_id}")
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.get_json()] == [graded_id]
+
+
 def test_get_latest_submission_with_only_pending_rows_finds_nothing(app, client):
     assignment_id, student_id = _real_assignment(), str(uuid.uuid4())
     db.session.add(Submission(
