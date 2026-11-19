@@ -19,7 +19,7 @@ export default function AdminInstructorAdd() {
           email_address: values.email,
           eid: values.eid,
           role: "instructor", 
-          password: "123456", // set initial password
+          password: values.password,
         }),
       });
       if (res.ok) {
@@ -27,7 +27,7 @@ export default function AdminInstructorAdd() {
         navigate("/admin/instructors"); 
       } else {
         const error = await res.json();
-        message.error(error.error || "Failed to create instructor");
+        message.error(error.message || error.error || "Failed to create instructor");
       }
     } catch (e) {
       message.error("Failed to create instructor");
@@ -40,8 +40,8 @@ export default function AdminInstructorAdd() {
     <Card>
       <Typography.Title level={3}>Add New Instructor</Typography.Title>
       <Alert
-        message="Initial Password"
-        description="The instructor's initial password will be set to: 123456"
+        message="Temporary password"
+        description="Share this password with the instructor privately and ask them to change it after their first login (Account settings)."
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
@@ -55,6 +55,16 @@ export default function AdminInstructorAdd() {
         </Form.Item>
         <Form.Item label="Email" name="email" rules={[{ required: true, message: "Email is required" }]}>
           <Input />
+        </Form.Item>
+        <Form.Item
+          label="Temporary Password"
+          name="password"
+          rules={[
+            { required: true, message: "Temporary password is required" },
+            { min: 8, message: "Use at least 8 characters" },
+          ]}
+        >
+          <Input.Password autoComplete="new-password" />
         </Form.Item>
         <Space>
           <Button type="primary" htmlType="submit" loading={loading}>

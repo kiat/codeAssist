@@ -397,6 +397,7 @@ def test_submit_code_without_autograder_saves_submission_and_final_draft(client,
     mocker.patch("routes.code_editor.os.makedirs")
     mocker.patch("builtins.open", mocker.mock_open())
     mock_save_final_draft = mocker.patch("routes.code_editor._save_final_draft")
+    lock = mocker.patch("routes.code_editor.lock_student_submissions")
 
     resp = client.post("/submit_code", json={
         "student_id": "stu-1",
@@ -407,6 +408,7 @@ def test_submit_code_without_autograder_saves_submission_and_final_draft(client,
 
     assert resp.status_code == 200
     assert resp.get_json()["message"] == "Code submitted. No autograder found."
+    lock.assert_called_once_with("stu-1", "asgn-1")
 
     saved_submission = mock_add.call_args.args[0]
     assert saved_submission.file_name == "answer.py"

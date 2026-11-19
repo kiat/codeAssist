@@ -1,5 +1,5 @@
-import React, { useContext, useState } from 'react'
-import { Button, Form, Input, Modal, Radio } from "antd";
+import React, { useContext } from 'react'
+import { Button, Form, Input, Modal, Typography } from "antd";
 // import axios from "axios";
 import { GlobalContext } from "../../App";
 // import service from "../../services";
@@ -7,11 +7,11 @@ import { googleSignUp } from "../../services/user";
 
 function GoogleSignUp({ open, onCancel, googleValues }) {
   const { updateUserInfo } = useContext(GlobalContext);
-  const [selectedRole, setSelectedRole] = useState("student");
 
   const finishSignUp = async (values) => {
     values["credential"] = googleValues.credential;
-    values["role"] = selectedRole;
+    // Instructor accounts are created by an admin, not through sign-up.
+    values["role"] = "student";
 
     let res;
     try {
@@ -43,28 +43,9 @@ function GoogleSignUp({ open, onCancel, googleValues }) {
     <div>
       <Modal title="Finish Sign Up" open={open} footer={null} onCancel={onCancel}>
         <Form layout="vertical" onFinish={finishSignUp}>
-          <Form.Item name="role" initialValue={"student"} style={{ width: "100%" }}>
-            <Radio.Group
-              optionType="button"
-              buttonStyle="solid"
-              value={selectedRole}
-              onChange={(event) => setSelectedRole(event.target.value)}
-              style={{ display: "flex", width: "100%" }}
-            >
-              <Radio.Button
-                value={"student"}
-                style={{ flex: 1, textAlign: "center" }}
-              >
-                Student
-              </Radio.Button>
-              <Radio.Button
-                value={"instructor"}
-                style={{ flex: 1, textAlign: "center" }}
-              >
-                Instructor
-              </Radio.Button>
-            </Radio.Group>
-          </Form.Item>
+          <Typography.Paragraph type="secondary">
+            Sign up as a student. Instructors: ask an administrator to create your account.
+          </Typography.Paragraph>
           <Form.Item label="EID" name="eid">
             <Input placeholder="Your EID" />
           </Form.Item>

@@ -8,9 +8,13 @@ These endpoints are used to interact with user data, particularly for login proc
 
 **Description:**
 
-<p>Creates a user, which can be a student or instructor based on input, and
-generates an id in the database. Currently this route isn't in use and in the
-future will be used instead of the create_student and create_instructor routes.</p>
+Creates an account and logs it in when nobody is logged in yet.
+
+- Public sign-up (no session, or a non-admin session) can only create `student` accounts. Asking for `instructor` or `admin` returns 403.
+- A logged-in admin can create `student`, `instructor` or `admin` accounts. The admin stays logged in as themselves. The admin panel's Add Instructor and Add Student pages use this.
+- `POST /create_google_user` follows the same rule: Google sign-up creates students only.
+
+On a new server, create the first admin by signing up normally and then running `flask set-role you@example.com admin` in the backend container (`docker compose exec backend flask set-role ...`).
 
 Example input:
 
@@ -19,7 +23,7 @@ Example input:
       email: "woodruffr@utexas.edu",
       password: "password",
       eid: "rick123",
-      role: "0"
+      role: "student"
     }
 
 Example Output(instructor):
@@ -151,7 +155,7 @@ They return 401 if not logged in and 403 for any other role.
 - `GET /get_all_courses`
 - `GET /get_all_instructors`
 - `GET /get_all_students`
-- `PUT, POST /admin_update_account`
+- `PUT, POST /admin_update_account`: also takes an optional `role` (`student` or `instructor`) to promote or demote an account. Admins cannot change their own role or another admin's role.
 - `GET /get_instructor_by_eid`
 - `GET /get_user_by_eid`
 - `DELETE /delete_user`
