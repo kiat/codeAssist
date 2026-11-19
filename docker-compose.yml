@@ -38,6 +38,58 @@ services:
         volumes:
             - ./backend/:/usr/src/app
             - /var/run/docker.sock:/var/run/docker.sock
+        depends_on:
+            - redis
+
+    redis:
+        container_name: redis_container
+        image: redis:7.4-alpine
+        restart: unless-stopped
+        command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
+        volumes:
+            - redis:/data
+
+    worker:
+        container_name: celery_worker_container
+        restart: unless-stopped
+        build:
+            context: "./backend/"
+            dockerfile: Dockerfile
+        env_file:
+            - ./backend/.env
+        environment:
+            PYTHONUNBUFFERED: 1
+        command: ["celery", "-A", "make_celery", "worker", "--loglevel=INFO", "--concurrency=2"]
+        extra_hosts:
+              - "host.docker.internal:host-gateway"
+        volumes:
+            - ./backend/:/usr/src/app
+            - /var/run/docker.sock:/var/run/docker.sock
+        # Wait until Postgres accepts connections, not just until its container
+        # starts, so the first grading jobs don't fail to claim their rows.
+        depends_on:
+            redis:
+                condition: service_started
+            db:
+                condition: service_healthy
+
+    beat:
+        container_name: celery_beat_container
+        restart: unless-stopped
+        build:
+            context: "./backend/"
+            dockerfile: Dockerfile
+        env_file:
+            - ./backend/.env
+        environment:
+            PYTHONUNBUFFERED: 1
+        # Schedules the stuck-submission sweep. Run exactly one beat. The
+        # schedule file goes in /tmp so it isn't written into the bind mount.
+        command: ["celery", "-A", "make_celery", "beat", "--loglevel=INFO", "--schedule", "/tmp/celerybeat-schedule"]
+        volumes:
+            - ./backend/:/usr/src/app
+        depends_on:
+            - redis
 
     db:
         container_name: postgres_container
@@ -51,6 +103,11 @@ services:
             - "5432:5432"
         volumes: 
             - db:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d codeassist"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
 
     pgadmin:
       container_name: pgadmin4_container
@@ -71,3 +128,6 @@ volumes:
   pgadmin:
     driver: local
     name: pgadmin_volume
+  redis:
+    driver: local
+    name: redis_volume

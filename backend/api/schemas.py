@@ -1,7 +1,7 @@
 from api.models import Course, Enrollment, Assignment, Submission, User, TestCaseResult, TestCase, RegradeRequest, AssignmentExtension, CodeDraft
 import io
 
-from marshmallow import fields
+from marshmallow import fields, missing
 
 from api import ma
 from ai_feedback.source_extraction import SourceExtractionError, extract_source_from_zip
@@ -58,6 +58,10 @@ class SubmissionSchema(ma.SQLAlchemyAutoSchema):
     student_code_file = fields.Method("get_student_code_file")
 
     def get_student_code_file(self, obj):
+        # dump(None) (e.g. /get_latest_submission with no graded rows) must
+        # still return {} rather than raising.
+        if obj is None:
+            return missing
         return submission_code_as_text(obj.student_code_file)
 
 

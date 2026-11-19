@@ -18,6 +18,30 @@ class Config:
     else:
         SESSION_COOKIE_SECURE = _secure_env.lower() == 'true'
 
+    CELERY = {
+        "broker_url": os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),
+        "imports": ("routes.grading_tasks",),
+        "task_ignore_result": True,
+        "task_acks_late": True,
+        "task_reject_on_worker_lost": True,
+        "worker_prefetch_multiplier": 1,
+        "broker_transport_options": {"visibility_timeout": 7200},
+        "broker_connection_retry_on_startup": True,
+        # Run by the `beat` service in docker-compose.yml.
+        "beat_schedule": {
+            "sweep-stuck-submissions": {
+                "task": "grading.sweep_stuck_submissions",
+                "schedule": float(os.getenv("GRADING_SWEEP_INTERVAL_SECONDS", "300")),
+            },
+        },
+    }
+
+    # How long a submission may stay running / pending before the sweep marks
+    # it failed. Running includes waiting for the assignment container lock
+    # behind another worker. Pending covers the queue during a deadline burst.
+    GRADING_STUCK_RUNNING_SECONDS = int(os.getenv("GRADING_STUCK_RUNNING_SECONDS", "3600"))
+    GRADING_STUCK_PENDING_SECONDS = int(os.getenv("GRADING_STUCK_PENDING_SECONDS", "7200"))
+
     # Limits for containers that run student code (see util/sandbox.py).
     # Network stays off unless an autograder really needs it at grading time;
     # setup.sh runs at image build time, which still has network.
@@ -31,3 +55,4 @@ class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     TESTING = True
     SECRET_KEY = 'test-secret-key-for-testing'
+    CELERY = {**Config.CELERY, "broker_url": "memory://"}

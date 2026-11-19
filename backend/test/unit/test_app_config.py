@@ -63,3 +63,16 @@ def test_session_cookie_secure_defaults_false_when_samesite_lax(reloaded_config)
 def test_session_cookie_secure_respects_explicit_env_override(reloaded_config):
     Config = reloaded_config(SESSION_COOKIE_SAMESITE="None", SESSION_COOKIE_SECURE="false")
     assert Config.SESSION_COOKIE_SECURE is False
+
+
+def test_celery_config_keeps_jobs_until_they_finish():
+    celery_config = config_module.Config.CELERY
+
+    assert celery_config["task_acks_late"] is True
+    assert celery_config["task_reject_on_worker_lost"] is True
+    assert celery_config["worker_prefetch_multiplier"] == 1
+    assert "routes.grading_tasks" in celery_config["imports"]
+
+
+def test_test_config_uses_in_memory_celery_broker():
+    assert config_module.TestConfig.CELERY["broker_url"] == "memory://"

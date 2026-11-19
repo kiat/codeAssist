@@ -16,6 +16,7 @@ from api.schemas import CodeDraftSchema, SubmissionSchema
 from util.errors import BadRequestError, NotFoundError, InternalProcessingError, SubmissionTimeoutError, ForbiddenError, TooManyRequestsError
 from util.url_utils import validate_ollama_url
 from util.submission_files import resolve_submission_name
+from routes.submission import lock_student_submissions
 from util.sandbox import SANDBOX_USER, container_run_kwargs, run_autograder_command
 from ai_feedback.integration import (
     async_get_ai_feedback,
@@ -330,6 +331,7 @@ def submit_code():
     # Check if autograder exists
     if not assignment.autograder_image_name or assignment.autograder_image_name.strip() == "":
         # No autograder — save submission directly
+        lock_student_submissions(student_id, assignment_id)
         submission_count = db.session.query(Submission).filter_by(
             student_id=student_id, assignment_id=assignment_id
         ).count()
@@ -410,6 +412,7 @@ def submit_code():
             "score": 0,
         }
 
+        lock_student_submissions(student_id, assignment_id)
         submission_count = db.session.query(Submission).filter_by(
             student_id=student_id, assignment_id=assignment_id
         ).count()
@@ -467,6 +470,7 @@ def submit_code():
         with open(host_results_json_path, 'w') as f:
             f.write(results_json_content)
 
+        lock_student_submissions(student_id, assignment_id)
         submission_count = db.session.query(Submission).filter_by(
             student_id=student_id, assignment_id=assignment_id
         ).count()

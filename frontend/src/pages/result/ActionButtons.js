@@ -11,10 +11,17 @@ export default function ActionButtons({
   allowFileUpload = true,
   enableCodeEditor,
   rerunLoading = false,
+  rerunDisabled = false,
 }) {
   return (
     <Space wrap>
-      <Button icon={<ReloadOutlined />} loading={rerunLoading} onClick={onRerun}>
+      <Button
+        icon={<ReloadOutlined />}
+        loading={rerunLoading}
+        disabled={rerunDisabled}
+        title={rerunDisabled ? "Available once grading finishes" : undefined}
+        onClick={onRerun}
+      >
         Rerun Autograder
       </Button>
       {!isStudent && (

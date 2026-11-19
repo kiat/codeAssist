@@ -118,6 +118,8 @@ Note: For macOS make sure to turn off Airplay as it uses localport:5000 as well 
     docker compose up
     ```
 
+    This also starts `redis`, a Celery `worker` that grades uploaded submissions, and `beat`, which marks submissions stuck in grading as failed. The default broker URL, `redis://redis:6379/0`, only resolves inside compose. If you run the backend outside Docker (for example `flask run` on your machine), set `CELERY_BROKER_URL="redis://localhost:6379/0"` in `backend/.env` and publish Redis's port, or uploads fail with "Grading is temporarily unavailable".
+
 7. Visit the pgadmin website via the url in the container. login with the default login:
     `user: admin@admin.com`  
     `password: 12345`

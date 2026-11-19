@@ -66,4 +66,7 @@ def create_app(config_class='config.Config'):
     register_error_handlers(app)
     register_cli(app)
 
+    from api.celery_setup import celery_init_app
+    celery_init_app(app)
+
     return app
