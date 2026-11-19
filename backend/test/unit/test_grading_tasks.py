@@ -336,6 +336,35 @@ def test_grade_submission_retries_when_claim_commit_fails(assignment_id, grading
     assert db.session.get(Submission, submission_id).status == SUBMISSION_PENDING
 
 
+
+def test_grade_submission_fails_row_when_claim_retries_run_out(assignment_id, grading, mocker):
+    submission_id = _submission(assignment_id)
+    run = grading.set_exit(0, stdout=b'{"score": 5}')
+    retry = mocker.patch.object(grading_tasks.grade_submission, "retry")
+    real_commit = db.session.commit
+    calls = {"n": 0}
+
+    def commit_fails_once():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("db down")
+        return real_commit()
+
+    mocker.patch.object(db.session, "commit", side_effect=commit_fails_once)
+
+    grading_tasks.grade_submission.push_request(retries=grading_tasks.CLAIM_MAX_RETRIES)
+    try:
+        grading_tasks.grade_submission.run(submission_id)
+    finally:
+        grading_tasks.grade_submission.pop_request()
+
+    mocker.stopall()
+    db.session.expire_all()
+    run.assert_not_called()
+    retry.assert_not_called()
+    assert db.session.get(Submission, submission_id).status == SUBMISSION_FAILED
+    assert not _staged(assignment_id, submission_id)
+
 def _staged(assignment_id, submission_id):
     return os.path.isdir(submission_module.staging_dir(assignment_id, submission_id))
 
@@ -549,3 +578,23 @@ def test_grade_submission_leaves_late_finisher_inactive(assignment_id, grading):
     assert older.status == SUBMISSION_GRADED
     assert older.active is False
     assert db.session.get(Submission, newer_id).active is True
+
+
+def test_submission_deleted_right_after_claim_is_skipped_and_cleaned_up(assignment_id, grading, mocker):
+    submission_id = _submission(assignment_id)
+    run = grading.set_exit(0, stdout=b'{"score": 5}')
+    real_get = db.session.get
+
+    def deleted_after_claim(model, ident, *args, **kwargs):
+        if model is Submission and str(ident) == str(submission_id):
+            db.session.query(Submission).filter_by(id=submission_id).delete()
+            db.session.commit()
+            return None
+        return real_get(model, ident, *args, **kwargs)
+
+    mocker.patch.object(db.session, "get", side_effect=deleted_after_claim)
+
+    grading_tasks.grade_submission.run(submission_id)
+
+    run.assert_not_called()
+    assert not _staged(assignment_id, submission_id)

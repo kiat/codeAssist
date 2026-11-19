@@ -53,6 +53,16 @@ def grade_submission(self, submission_id):
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
+        if self.request.retries >= CLAIM_MAX_RETRIES:
+            # Out of retries: fail the row now so the student can see it and
+            # rerun, instead of waiting for the pending sweep.
+            logger.exception(
+                "Failed to claim submission %s after %d retries; marking it failed",
+                submission_id, CLAIM_MAX_RETRIES,
+            )
+            _mark_failed(submission_id)
+            _clean_up_unclaimed(submission_id)
+            return
         logger.warning("Failed to claim submission %s; retrying", submission_id, exc_info=True)
         raise self.retry(exc=exc, countdown=CLAIM_RETRY_COUNTDOWN_SECONDS, max_retries=CLAIM_MAX_RETRIES)
 
@@ -62,6 +72,11 @@ def grade_submission(self, submission_id):
         return
 
     submission = db.session.get(Submission, submission_id)
+    if submission is None:
+        # Deleted between the claim and this read.
+        logger.info("Submission %s was deleted right after it was claimed; skipping grading", submission_id)
+        _clean_up_unclaimed(submission_id)
+        return
     assignment_id = submission.assignment_id
     filename = submission.file_name
     submissions_dir = staging_dir(assignment_id, submission_id)
