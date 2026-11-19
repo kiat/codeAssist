@@ -42,6 +42,15 @@ class Config:
     GRADING_STUCK_RUNNING_SECONDS = int(os.getenv("GRADING_STUCK_RUNNING_SECONDS", "3600"))
     GRADING_STUCK_PENDING_SECONDS = int(os.getenv("GRADING_STUCK_PENDING_SECONDS", "7200"))
 
+    # Limits for containers that run student code (see util/sandbox.py).
+    # Network stays off unless an autograder really needs it at grading time;
+    # setup.sh runs at image build time, which still has network.
+    SANDBOX_NETWORK_DISABLED = os.getenv('SANDBOX_NETWORK_DISABLED', 'true').lower() == 'true'
+    SANDBOX_MEM_LIMIT = os.getenv('SANDBOX_MEM_LIMIT', '512m')
+    SANDBOX_JAVA_MEM_LIMIT = os.getenv('SANDBOX_JAVA_MEM_LIMIT', '1g')
+    SANDBOX_CPUS = float(os.getenv('SANDBOX_CPUS', '1'))
+    SANDBOX_PIDS_LIMIT = int(os.getenv('SANDBOX_PIDS_LIMIT', '256'))
+
 class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     TESTING = True

@@ -111,9 +111,9 @@ describe('<SignUpModal />', () => {
     rerender(<Wrapped open={true} onCancel={() => {}} />);
     expect(screen.getByTestId('modal')).toBeInTheDocument();
 
-    expect(screen.getAllByRole('radio')).toHaveLength(2);
-    expect(screen.getByText(/student/i)).toBeInTheDocument();
-    expect(screen.getByText(/instructor/i)).toBeInTheDocument();
+    // Public sign-up is student-only; instructors are created by an admin.
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.getByText(/ask an administrator/i)).toBeInTheDocument();
 
     expect(screen.getByLabelText(/EID/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Name/i)).toBeInTheDocument();
@@ -170,13 +170,12 @@ describe('<SignUpModal />', () => {
     });
   });
 
-  it('submits form as an instructor when instructor is selected', async () => {
-    const fakeRes = { data: { name: 'Prof Alice', id: 8, role: 'instructor' } };
+  it('always signs up as a student', async () => {
+    const fakeRes = { data: { name: 'Prof Alice', id: 8, role: 'student' } };
     createUser.mockResolvedValueOnce(fakeRes);
 
     render(<Wrapped open={true} onCancel={() => {}} />);
 
-    await userEvent.click(screen.getAllByRole('radio')[1]);
     await userEvent.type(screen.getByLabelText(/EID/i), 'P123');
     await userEvent.type(screen.getByLabelText(/Name/i), 'Prof Alice');
     await userEvent.type(screen.getByLabelText(/Email/i), 'prof@example.com');
@@ -185,20 +184,7 @@ describe('<SignUpModal />', () => {
     fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
 
     await waitFor(() => {
-      expect(createUser).toHaveBeenCalledWith({
-        role: 'instructor',
-        eid: 'P123',
-        name: 'Prof Alice',
-        email_address: 'prof@example.com',
-        password: 'securepass'
-      });
-      expect(mockUpdate).toHaveBeenCalledWith({
-        name: 'Prof Alice',
-        id: 8,
-        isStudent: false,
-        role: 'instructor',
-        isAdmin: false,
-      });
+      expect(createUser).toHaveBeenCalledWith(expect.objectContaining({ role: 'student' }));
     });
   });
 });

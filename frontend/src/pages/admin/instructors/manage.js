@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, Form, Input, Button, Space, Typography, message, Popconfirm, Spin, Table } from "antd";
+import { Card, Form, Input, Button, Space, Typography, message, Popconfirm, Spin, Table, Select } from "antd";
 import { useParams, useNavigate } from "react-router-dom";
 
 export default function AdminInstructorManage() {
@@ -22,6 +22,7 @@ export default function AdminInstructorManage() {
           name: data.name,
           sis_user_id: data.sis_user_id,
           email_address: data.email_address,
+          role: data.role,
         });
 
         // Fetch courses taught by this instructor
@@ -49,14 +50,21 @@ export default function AdminInstructorManage() {
           name: values.name,
           email_address: values.email_address,
           sis_user_id: values.sis_user_id,
+          role: values.role,
         }),
       });
       if (res.ok) {
+        if (values.role && values.role !== "instructor") {
+          message.success(`${values.name} is now a student`);
+          // The account now belongs on the other list.
+          navigate("/admin/students");
+          return;
+        }
         message.success("Instructor updated successfully");
         setInstructor({ ...instructor, ...values });
       } else {
         const error = await res.json();
-        message.error(error.error || "Failed to update instructor");
+        message.error(error.message || error.error || "Failed to update instructor");
       }
     } catch (e) {
       message.error("Failed to update instructor");
@@ -106,6 +114,18 @@ export default function AdminInstructorManage() {
         </Form.Item>
         <Form.Item label="Email" name="email_address" rules={[{ required: true, message: "Email is required" }]}>
           <Input />
+        </Form.Item>
+        <Form.Item
+          label="Role"
+          name="role"
+          extra="Instructors can create courses. Changing the role does not change course enrollments."
+        >
+          <Select
+            options={[
+              { value: "student", label: "Student" },
+              { value: "instructor", label: "Instructor" },
+            ]}
+          />
         </Form.Item>
         <Space>
           <Button type="primary" htmlType="submit" loading={saving}>
