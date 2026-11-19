@@ -123,11 +123,18 @@ change. Only name and password can be changed for any user.</p>
 admins included (401 if not logged in, 403 otherwise). Admins edit other users
 through `/admin_update_account`, which cannot change passwords.
 
+**Changing the password** requires `current_password`. A logged-in session alone is not enough, so someone with access to an unlocked browser can't take over the account.
+- Missing or wrong `current_password`: 403 "Current password is incorrect".
+- New password shorter than 8 characters, or the same as the current one: 400.
+- Accounts that sign in with Google only have no password (`has_password: false` from `/get_user_by_id`): 400.
+
 Example input:
 
     {
-      id:"a9872357-475a-47ab-8455-441cdd8b9744",
-      // Optionally include any fields to update
+      id: "a9872357-475a-47ab-8455-441cdd8b9744",
+      name: "New Name",                 // optional
+      password: "new-password",          // optional
+      current_password: "old-password"   // required when password is sent
     }
 
 Example Output:

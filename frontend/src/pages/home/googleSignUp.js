@@ -25,7 +25,6 @@ function GoogleSignUp({ open, onCancel, googleValues }) {
           isStudent: res.data?.role === "student",
           isAdmin: res.data?.role === "admin",
           role: res.data?.role,
-          authMethod: "google",
         };
 
         localStorage.setItem("userInfo", JSON.stringify(userInfo));

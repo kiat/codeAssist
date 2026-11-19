@@ -1,7 +1,5 @@
 import uuid
 import requests
-import random
-import string
 from flask import Blueprint, request, jsonify, current_app, session
 from sqlalchemy.exc import IntegrityError
 from api import db
@@ -13,6 +11,23 @@ from util.auth import require_admin, require_authenticated, require_self_or_admi
 
 
 user = Blueprint('user', __name__)
+
+MIN_PASSWORD_LENGTH = 8
+
+
+def _password_matches(password, stored):
+    """True when `password` is the account's password.
+
+    Handles both hashed passwords and old accounts stored in plain text. An
+    empty stored password means the account has no password (Google sign-in
+    only) and never matches.
+    """
+    if not stored or not isinstance(password, str) or not password:
+        return False
+    if is_hashed(stored):
+        return verify_password(password, stored)
+    return password == stored
+
 
 @user.route('/create_user', methods=["POST"])
 def create_user():
@@ -113,14 +128,10 @@ def user_login():
     else:
         stored_hash = getattr(db_user, 'password')
 
-    if is_hashed(stored_hash):
-        # Verify the provided password against the stored (hashed) password
-        if not verify_password(password, stored_hash):
-            raise NotFoundError("Email and password combination not found")
-    else:
-        if password != stored_hash:
-            raise NotFoundError("Email and password combination not found") 
-        
+    if not _password_matches(password, stored_hash):
+        raise NotFoundError("Email and password combination not found")
+
+    if not is_hashed(stored_hash):
         # Updates accounts that had their passwords stored in plaintext
         if not isinstance(db_user, dict) and needs_rehash(password):
             db_user.password = hash_password(password)
@@ -161,10 +172,6 @@ def create_google_user():
     if request.method != "POST":
         return "all good"
 
-    # generate random, encrypted password to be used within the database
-    characters = string.ascii_letters + string.digits + string.punctuation
-    password = ''.join(random.choice(characters) for _ in range(12))
-
     user_id = str(uuid.uuid4())
     name = request.json['name']
     email_address = data['email']
@@ -180,7 +187,10 @@ def create_google_user():
         "id": user_id,
         "name": name,
         "email_address": email_address,
-        "password": hash_password(password),
+        # No local password: this account signs in with Google only. Login
+        # never accepts an empty password, and the Edit Account page hides the
+        # password change for it (see has_password in /get_user_by_id).
+        "password": "",
         "sis_user_id": sis_user_id,
         "role": role
     }
@@ -302,6 +312,9 @@ def get_user_by_id():
         raise NotFoundError("User does not exist")
     
     instructor = UserSchema().dump(instructor_obj)
+    # The password itself is never sent; the page only needs to know whether
+    # there is one to change (Google-only accounts have none).
+    instructor["has_password"] = bool(getattr(instructor_obj, "password", None))
 
 
     return jsonify(instructor)
@@ -353,9 +366,10 @@ def update_account():
     '''
     /update_account updates the name and/or password of a user.
     Requires from the frontend a JSON containing:
-    @param id        the user id (required)
-    @param name      the name for the user (optional)
-    @param password  the password for the user (optional)
+    @param id                the user id (required)
+    @param name              the name for the user (optional)
+    @param password          the new password (optional)
+    @param current_password  the current password (required with password)
     '''
     session_user_id = require_authenticated()
 
@@ -376,6 +390,7 @@ def update_account():
 
     new_name = request.json.get('name')
     new_password = request.json.get('password')
+    current_password = request.json.get('current_password')
 
 
     # Find the user in the database
@@ -388,6 +403,18 @@ def update_account():
     if new_name:
         user.name = new_name
     if new_password:
+        # A session alone is not enough to change the password: someone with
+        # access to a logged-in browser could otherwise take over the account.
+        if not isinstance(new_password, str):
+            raise BadRequestError("Password must be text")
+        if not user.password:
+            raise BadRequestError("This account signs in with Google, so it has no password to change.")
+        if not _password_matches(current_password, user.password):
+            raise ForbiddenError("Current password is incorrect")
+        if len(new_password) < MIN_PASSWORD_LENGTH:
+            raise BadRequestError(f"New password must be at least {MIN_PASSWORD_LENGTH} characters")
+        if _password_matches(new_password, user.password):
+            raise BadRequestError("New password must be different from the current one")
         user.password = hash_password(new_password)
 
     # Commit changes to the database
