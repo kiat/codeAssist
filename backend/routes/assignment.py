@@ -1,5 +1,6 @@
 import uuid
 from flask import Blueprint, request, jsonify
+from sqlalchemy import func
 from api import db
 from api.models import (
     Assignment,
@@ -7,15 +8,18 @@ from api.models import (
     Submission,
     RegradeRequest,
     Course,
+    Enrollment,
     cleanup_assignment_container,
     cleanup_assignment_directories,
 )
 from routes.submission import discard_container_lock, assignment_container_lock
 from api.schemas import AssignmentSchema, CourseSchema, AssignmentExtensionSchema
-from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError
-from util.auth import require_authenticated, require_course_role
+from util.errors import NotFoundError, BadRequestError, InternalProcessingError, ConflictError, ForbiddenError
+from util.auth import require_authenticated, require_course_role, get_user_global_role
+from util.submission_files import normalize_submission_files
 from ai_feedback.settings import (
     serialize_assignment_ai_settings,
+    enforce_assignment_vertex_access,
     split_ai_settings_payload,
     update_assignment_ai_settings,
 )
@@ -60,7 +64,7 @@ def update_assignment():
     assignment_name = data["name"]
     course_id = data["course_id"]
 
-    require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can update assignments")
+    user_id, _ = require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can update assignments")
 
     # Check for name conflict in the same course
     existing_assignment = db.session.query(Assignment).filter(
@@ -83,6 +87,9 @@ def update_assignment():
     if not assignment_obj:
         raise NotFoundError("Assignment not found")
 
+    if "submission_files" in assignment_data:
+        assignment_data["submission_files"] = normalize_submission_files(assignment_data["submission_files"])
+
     # Validate that at least one submission method is enabled
     allow_upload = data.get("allow_file_upload")
     enable_editor = data.get("enable_code_editor")
@@ -97,6 +104,8 @@ def update_assignment():
             raise BadRequestError("At least one submission method (file upload or code editor) must be enabled")
 
     if ai_settings_data:
+        course_obj = db.session.query(Course).filter_by(id=assignment_obj.course_id).first()
+        enforce_assignment_vertex_access(assignment_obj, course_obj, ai_settings_data, user_id)
         try:
             update_assignment_ai_settings(assignment_obj, ai_settings_data)
         except ValueError as e:
@@ -123,13 +132,16 @@ def get_assignment():
     @param assignment_id    the id of the assignment
     '''
     assignment_id = request.args.get("assignment_id")
-    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
-
     if not assignment_id:
         raise BadRequestError("Missing assignment_id")
-    
+
+    require_authenticated()
+
+    assignment_obj = db.session.query(Assignment).filter_by(id=assignment_id).first()
     if not assignment_obj:
         raise NotFoundError("Assignment not found")
+
+    require_course_role(assignment_obj.course_id, {"instructor", "ta", "student"}, "You are not enrolled in this course")
 
     result = AssignmentSchema().dump(assignment_obj, many=False)
     result.update(serialize_assignment_ai_settings(assignment_obj))
@@ -155,7 +167,7 @@ def create_assignment():
 
     _normalize_assignment_description(assignment_data)
 
-    require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can create assignments")
+    user_id, _ = require_course_role(course_id, {"instructor", "ta"}, "Only instructors or TAs can create assignments")
 
     try:
     # Check if assignment already exists for the course
@@ -175,11 +187,14 @@ def create_assignment():
             raise BadRequestError("At least one submission method (file upload or code editor) must be enabled")
 
         assignment_data, ai_settings_data = split_ai_settings_payload(assignment_data)
+        assignment_data["submission_files"] = normalize_submission_files(assignment_data.get("submission_files"))
 
         valid_assignment_data = {k: v for k, v in assignment_data.items() if v is not None or isinstance(v, bool)}
 
         new_assignment = Assignment(**valid_assignment_data)
         if ai_settings_data:
+            course_obj = db.session.query(Course).filter_by(id=course_id).first()
+            enforce_assignment_vertex_access(new_assignment, course_obj, ai_settings_data, user_id)
             try:
                 update_assignment_ai_settings(new_assignment, ai_settings_data)
             except ValueError as e:
@@ -195,7 +210,7 @@ def create_assignment():
 
         result = AssignmentSchema().dump(created_assignment)
         return jsonify(result), 200
-    except (BadRequestError, NotFoundError) as e:
+    except (BadRequestError, NotFoundError, ForbiddenError) as e:
         raise e
     except Exception as e:
         db.session.rollback()
@@ -395,6 +410,14 @@ def get_extension():
     if not assignment_id or not student_id:
         raise BadRequestError("Missing assignment_id or student_id")
 
+    # Students read their own extension; staff read any student's.
+    user_id = require_authenticated()
+    if str(user_id) != str(student_id):
+        extension_assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+        if not extension_assignment:
+            raise NotFoundError("Assignment not found")
+        require_course_role(extension_assignment.course_id, {"instructor", "ta"}, "Only instructors or TAs can view other students' extensions")
+
     try:
         extension = db.session.query(AssignmentExtension).filter_by(
             assignment_id=assignment_id, 
@@ -422,6 +445,16 @@ def get_extension():
 @assignment.route('/get_assignment_extensions', methods=["GET"])
 def get_assignment_extensions():
     assignment_id = request.args.get("assignment_id")
+    if not assignment_id:
+        raise BadRequestError("Missing assignment_id")
+
+    require_authenticated()
+
+    extension_assignment = db.session.query(Assignment).filter_by(id=assignment_id).first()
+    if not extension_assignment:
+        raise NotFoundError("Assignment not found")
+    require_course_role(extension_assignment.course_id, {"instructor", "ta"}, "Only instructors or TAs can view extensions")
+
     # Fetch extension for this assignment and student
     extensions = db.session.query(AssignmentExtension).filter_by(assignment_id=assignment_id)
 
@@ -458,11 +491,22 @@ def delete_extension():
 
 @assignment.route('/courses', methods=["GET"])
 def get_courses():
-    instructor_id = request.args.get("instructor_id")
-    if instructor_id:
-        courses = db.session.query(Course).filter_by(instructor_id=instructor_id).all()
-    else:
+    '''
+    /courses lists the courses the caller teaches (instructor or TA), used to
+    pick a target course when duplicating an assignment. An admin who passes
+    no instructor_id gets every course. instructor_id is otherwise ignored:
+    the list always comes from the caller's own enrollments.
+    '''
+    user_id = require_authenticated()
+    if not request.args.get("instructor_id") and get_user_global_role(user_id) == "admin":
         courses = db.session.query(Course).all()
+    else:
+        courses = (
+            db.session.query(Course)
+            .join(Enrollment, Enrollment.course_id == Course.id)
+            .filter(Enrollment.student_id == user_id, func.lower(Enrollment.role).in_(["instructor", "ta"]))
+            .all()
+        )
     
     courses_data = CourseSchema().dump(courses, many=True)
     return jsonify(courses_data)

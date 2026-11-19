@@ -1,5 +1,6 @@
 import pytest
 from api import create_app
+from ai_feedback.providers.errors import ProviderPermissionError, ProviderTimeoutError
 from util.errors import BadRequestError, ConflictError, NotFoundError, InternalProcessingError
 from routes.course import allowed_file, create_enrollment_bulk
 
@@ -27,7 +28,9 @@ def mock_course_query(mocker):
     return mock_query, mock_schema
 
 
-def test_create_course_success(client, mocker, mock_course_query):
+def test_create_course_success(client, login_as, mocker, mock_course_query):
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     mock_query, mock_schema = mock_course_query
 
     mock_instructor = mocker.Mock()
@@ -59,7 +62,9 @@ def test_create_course_success(client, mocker, mock_course_query):
     assert mock_add.call_count == 2
 
 
-def test_create_course_missing_instructor_returns_not_found(client, mocker, mock_course_query):
+def test_create_course_missing_instructor_returns_not_found(client, login_as, mocker, mock_course_query):
+    login_as("missing-user")
+    mocker.patch("routes.course.get_user_global_role", return_value="admin")
     mock_query, _ = mock_course_query
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         None,
@@ -82,7 +87,9 @@ def test_create_course_missing_instructor_returns_not_found(client, mocker, mock
     mock_add.assert_not_called()
 
 
-def test_create_course_duplicate_entry_code(client, mock_course_query):
+def test_create_course_duplicate_entry_code(client, login_as, mocker, mock_course_query):
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     mock_query, _ = mock_course_query
     mock_query.return_value.filter_by.return_value.first.return_value = True
 
@@ -100,7 +107,9 @@ def test_create_course_duplicate_entry_code(client, mock_course_query):
     assert response.json["message"] == "Course with the provided entry code already exists"
 
 
-def test_create_course_missing_fields(client):
+def test_create_course_missing_fields(client, login_as, mocker):
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     payload = {
         "name": "CS101",
         "semester": "Fall",
@@ -114,7 +123,8 @@ def test_create_course_missing_fields(client):
     assert response.json["message"] == "Missing required fields"
 
 
-def test_enroll_course_success(client, mocker):
+def test_enroll_course_success(client, mocker, login_as):
+    login_as("student-456")
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_commit = mocker.patch("routes.course.db.session.commit")
     mock_add = mocker.patch("routes.course.db.session.add")
@@ -141,7 +151,8 @@ def test_enroll_course_success(client, mocker):
     mock_commit.assert_called_once()
 
 
-def test_enroll_course_already_enrolled(client, mocker):
+def test_enroll_course_already_enrolled(client, mocker, login_as):
+    login_as("student-456")
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_course = mocker.Mock()
     mock_course.id = "course-123"
@@ -163,7 +174,8 @@ def test_enroll_course_already_enrolled(client, mocker):
     assert response.json["message"] == "User is already enrolled in this course"
 
 
-def test_enroll_course_invalid_code(client, mocker):
+def test_enroll_course_invalid_code(client, mocker, login_as):
+    login_as("student-456")
     mock_query = mocker.patch("routes.course.db.session.query")
 
     # course does not exist
@@ -638,6 +650,47 @@ def test_get_user_enrollments_success(client, mocker, login_as):
     assert response.status_code == 200
     assert response.json == [{"id": "course-123", "name": "CS101", "enrollment_role": "student"}]
 
+def test_get_user_enrollments_own_id_param_allowed(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = []
+    mock_query.return_value.filter.return_value = []
+    mocker.patch("routes.course.CourseSchema").return_value.dump.return_value = []
+    role_lookup = mocker.patch("util.auth.get_user_global_role")
+
+    login_as("user-123")
+
+    response = client.get("/get_user_enrollments?user_id=user-123")
+
+    assert response.status_code == 200
+    role_lookup.assert_not_called()
+    mock_query.return_value.filter_by.assert_called_with(student_id="user-123")
+
+def test_get_user_enrollments_other_user_forbidden_for_non_admin(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("util.auth.get_user_global_role", return_value="student")
+
+    login_as("user-123")
+
+    response = client.get("/get_user_enrollments?user_id=other-user")
+
+    assert response.status_code == 403
+    mock_query.assert_not_called()
+
+def test_get_user_enrollments_admin_can_view_other_user(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(course_id="course-9", role="student")]
+    mock_query.return_value.filter.return_value = []
+    mocker.patch("routes.course.CourseSchema").return_value.dump.return_value = [{"id": "course-9", "name": "CS429"}]
+    mocker.patch("util.auth.get_user_global_role", return_value="admin")
+
+    login_as("admin-1")
+
+    response = client.get("/get_user_enrollments?user_id=student-7")
+
+    assert response.status_code == 200
+    mock_query.return_value.filter_by.assert_called_with(student_id="student-7")
+    assert response.json == [{"id": "course-9", "name": "CS429", "enrollment_role": "student"}]
+
 def test_get_user_enrollments_unauthenticated(client):
     response = client.get("/get_user_enrollments")
     assert response.status_code == 401
@@ -753,6 +806,7 @@ def test_get_course_info_success(client, mocker, login_as):
     mocker.patch("util.auth.get_user_course_role", return_value="student")
     login_as("student-uuid")
     mock_query = mocker.patch("routes.course.db.session.query")
+    mocker.patch("routes.course.has_vertex_configuration", return_value=False)
 
     mock_course = mocker.Mock(
         id="course-123",
@@ -765,6 +819,7 @@ def test_get_course_info_success(client, mocker, login_as):
         gemini_api_key="",
         claude_api_key="",
         ollama_base_url="",
+        vertex_enabled=False,
     )
 
     mock_query.return_value.filter_by.return_value.first.return_value = mock_course
@@ -788,6 +843,9 @@ def test_get_course_info_success(client, mocker, login_as):
             "default_ai_temperature": 0.5,
             "has_openai_api_key": True,
             "has_gemini_api_key": False,
+            "has_gemini_vertex_config": False,
+            "vertex_enabled": False,
+            "has_vertex_server_config": False,
             "has_claude_api_key": False,
             "has_ollama_api_key": False,
         }
@@ -796,6 +854,55 @@ def test_get_course_info_success(client, mocker, login_as):
     assert "openai_api_key_value" not in response.json[0]
     assert "gemini_api_key_value" not in response.json[0]
     assert "claude_api_key_value" not in response.json[0]
+
+COURSE_SECRET_FIELDS = ("openai_api_key", "gemini_api_key", "claude_api_key", "ollama_base_url")
+
+
+def _course_with_keys():
+    from api.models import Course
+    return Course(
+        id="course-123",
+        name="CS101",
+        instructor_id="instructor-uuid",
+        semester="Fall",
+        year="2026",
+        entryCode="ABC123",
+        openai_api_key="encrypted-openai",
+        gemini_api_key="encrypted-gemini",
+        claude_api_key="encrypted-claude",
+        ollama_base_url="http://10.0.0.5:11434",
+    )
+
+
+def test_get_course_info_does_not_return_api_keys_to_student(client, mocker, login_as):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = _course_with_keys()
+
+    response = client.get("/get_course_info", query_string={"course_id": "course-123"})
+
+    assert response.status_code == 200
+    course_data = response.json[0]
+    for field in COURSE_SECRET_FIELDS:
+        assert field not in course_data
+    assert course_data["has_openai_api_key"] is True
+    assert course_data["has_ollama_api_key"] is True
+
+
+def test_get_user_enrollments_does_not_return_api_keys(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = [mocker.Mock(course_id="course-123", role="student")]
+    mock_query.return_value.filter.return_value = [_course_with_keys()]
+    login_as("student-uuid")
+
+    response = client.get("/get_user_enrollments")
+
+    assert response.status_code == 200
+    assert response.json[0]["name"] == "CS101"
+    for field in COURSE_SECRET_FIELDS:
+        assert field not in response.json[0]
+
 
 def test_get_course_info_missing_course_id(client):
     response = client.get("/get_course_info")
@@ -864,11 +971,15 @@ def test_create_enrollment_bulk_rejects_invalid_role(mocker):
     with pytest.raises(BadRequestError):
         create_enrollment_bulk(data)
 
-def test_create_course_get_not_allowed(client):
+def test_create_course_get_not_allowed(client, login_as, mocker):
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     response = client.get("/create_course")
     assert response.status_code == 415
 
-def test_create_course_db_error(client, mocker):
+def test_create_course_db_error(client, login_as, mocker):
+    login_as("inst-1")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
     mock_query = mocker.patch("routes.course.db.session.query")
     mock_query.return_value.filter_by.return_value.first.side_effect = [
         None,
@@ -924,7 +1035,8 @@ def test_delete_course_db_error(client, mocker, login_as):
     assert response.status_code == 409
     assert response.json["message"] == "Cannot delete course with assignments"
 
-def test_enroll_course_db_error(client, mocker):
+def test_enroll_course_db_error(client, mocker, login_as):
+    login_as("student-123")
     mocker.patch("routes.course.db.session.query")
     mocker.patch("routes.course.db.session.add")
     mocker.patch("routes.course.db.session.commit", side_effect=Exception("fail"))
@@ -1171,23 +1283,10 @@ def test_test_ai_model_openai_success(client, mocker):
 
 
 def test_test_ai_model_gemini_success(client, mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": '{"insights":["Model test passed."],"annotations":[]}'
-                        }
-                    ]
-                }
-            }
-        ]
-    }
-
-    mock_post = mocker.patch("routes.course.requests.post", return_value=mock_response)
+    mock_generate = mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value='{"insights":["Model test passed."],"annotations":[]}',
+    )
 
     response = client.post(
         "/test_ai_model",
@@ -1202,29 +1301,17 @@ def test_test_ai_model_gemini_success(client, mocker):
     assert response.json["provider"] == "gemini"
     assert response.json["model"] == "gemini-1.5-flash"
 
-    mock_post.assert_called_once()
-    assert "gemini-1.5-flash:generateContent" in mock_post.call_args.args[0]
-    assert mock_post.call_args.kwargs["params"] == {"key": "test-gemini-key"}
+    mock_generate.assert_called_once()
+    assert mock_generate.call_args.args[0] == "gemini"
+    assert mock_generate.call_args.args[1] == "test-gemini-key"
+    assert mock_generate.call_args.args[2] == "gemini-1.5-flash"
 
 
-def test_test_ai_model_gemini_uses_feedback_generation_config(client, mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": '{"insights":["Model test passed."],"annotations":[]}'
-                        }
-                    ]
-                }
-            }
-        ]
-    }
-
-    mock_post = mocker.patch("routes.course.requests.post", return_value=mock_response)
+def test_test_ai_model_gemini_uses_shared_generation_helper(client, mocker):
+    mock_generate = mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value='{"insights":["Model test passed."],"annotations":[]}',
+    )
 
     response = client.post(
         "/test_ai_model",
@@ -1237,30 +1324,17 @@ def test_test_ai_model_gemini_uses_feedback_generation_config(client, mocker):
 
     assert response.status_code == 200
 
-    generation_config = mock_post.call_args.kwargs["json"]["generationConfig"]
-    assert generation_config["maxOutputTokens"] == 1600
-    assert generation_config["responseMimeType"] == "application/json"
-    assert generation_config["thinkingConfig"] == {"thinkingBudget": 0}
+    assert mock_generate.call_args.args[0] == "gemini"
+    assert mock_generate.call_args.args[1] == "test-gemini-key"
+    assert mock_generate.call_args.args[2] == "gemini-2.5-flash"
+    assert "Return only this JSON object" in mock_generate.call_args.args[3]
 
 
 def test_test_ai_model_gemini_invalid_json_returns_error(client, mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": "This model can chat, but did not return JSON."
-                        }
-                    ]
-                }
-            }
-        ]
-    }
-
-    mocker.patch("routes.course.requests.post", return_value=mock_response)
+    mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value="This model can chat, but did not return JSON.",
+    )
 
     response = client.post(
         "/test_ai_model",
@@ -1276,13 +1350,12 @@ def test_test_ai_model_gemini_invalid_json_returns_error(client, mocker):
 
 
 def test_test_ai_model_gemini_unavailable_returns_error(client, mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 503
-    mock_response.text = (
-        '{"error":{"message":"This model is currently experiencing high demand."}}'
+    mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        side_effect=ProviderTimeoutError(
+            "This model is currently experiencing high demand."
+        ),
     )
-
-    mocker.patch("routes.course.requests.post", return_value=mock_response)
 
     response = client.post(
         "/test_ai_model",
@@ -1293,8 +1366,196 @@ def test_test_ai_model_gemini_unavailable_returns_error(client, mocker):
         },
     )
 
-    assert response.status_code == 503
-    assert "Selected Gemini model cannot be used" in response.json["error"]
+    assert response.status_code == 504
+    assert response.json["code"] == "PROVIDER_TIMEOUT_ERROR"
+    assert response.json["error"] == "AI provider request timed out."
+
+
+@pytest.fixture
+def vertex_configured(monkeypatch):
+    monkeypatch.setenv("VERTEX_AI_AUTH_MODE", "api_key")
+    monkeypatch.setenv("VERTEX_AI_API_KEY", "test-vertex-key")
+
+
+@pytest.fixture
+def vertex_course_enabled(mocker):
+    """These tests mock the course role without creating a course row, so
+    stand in for an admin having enabled Vertex on the course."""
+    return mocker.patch("routes.course.course_vertex_enabled", return_value=True)
+
+
+def test_fetch_ai_models_gemini_vertex_returns_supported_models(
+    client, mocker, login_as, vertex_configured, vertex_course_enabled):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={
+            "provider": "gemini_vertex",
+            "course_id": "course-1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["models"] == [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-pro",
+    ]
+
+
+def test_fetch_ai_models_gemini_vertex_requires_login(client, vertex_configured):
+    response = client.post(
+        "/fetch_ai_models",
+        json={"provider": "gemini_vertex", "course_id": "course-1"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_fetch_ai_models_gemini_vertex_requires_course_id(
+    client, login_as, vertex_configured
+):
+    login_as("instructor-uuid")
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={"provider": "gemini_vertex"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_fetch_ai_models_gemini_vertex_rejects_student(
+    client, mocker, login_as, vertex_configured
+):
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={"provider": "gemini_vertex", "course_id": "course-1"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_fetch_ai_models_gemini_vertex_not_configured(
+    client, mocker, login_as, monkeypatch, vertex_course_enabled):
+    monkeypatch.setenv("VERTEX_AI_AUTH_MODE", "api_key")
+    monkeypatch.delenv("VERTEX_AI_API_KEY", raising=False)
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={"provider": "gemini_vertex", "course_id": "course-1"},
+    )
+
+    assert response.status_code == 400
+    assert "not configured" in response.json["message"]
+
+
+def test_fetch_ai_models_gemini_vertex_uses_env_override(
+    client, mocker, login_as, monkeypatch, vertex_configured, vertex_course_enabled):
+    monkeypatch.setenv("VERTEX_AI_MODELS", " gemini-2.5-pro, gemini-next-flash ,")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+
+    response = client.post(
+        "/fetch_ai_models",
+        json={
+            "provider": "gemini_vertex",
+            "course_id": "course-1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["models"] == ["gemini-2.5-pro", "gemini-next-flash"]
+
+
+def test_test_ai_api_key_gemini_vertex_uses_server_configuration(client, mocker, login_as, vertex_course_enabled):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+    mock_test = mocker.patch(
+        "routes.course._test_vertex_connection",
+        return_value="OK",
+    )
+
+    response = client.post(
+        "/test_ai_api_key",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+            "location": "us-central1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["success"] is True
+    assert response.json["message"] == "Vertex AI connection succeeded."
+    assert response.json["provider"] == "gemini_vertex"
+    mock_test.assert_called_once()
+
+
+def test_test_ai_model_gemini_vertex_success(client, mocker, login_as, vertex_course_enabled):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+    mock_generate = mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value='{"insights":["Model test passed."],"annotations":[]}',
+    )
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+            "location": "us-central1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["success"] is True
+    assert response.json["provider"] == "gemini_vertex"
+    assert response.json["model"] == "gemini-2.5-flash"
+    assert mock_generate.call_args.args[:3] == (
+        "gemini_vertex",
+        None,
+        "gemini-2.5-flash",
+    )
+    assert mock_generate.call_args.kwargs["location"] == "us-central1"
+
+
+def test_test_ai_model_gemini_vertex_sanitizes_provider_errors(client, mocker, login_as, vertex_course_enabled):
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+    mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        side_effect=ProviderPermissionError(
+            "service-account@example.iam.gserviceaccount.com lacks aiplatform",
+        ),
+    )
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json["success"] is False
+    assert response.json["code"] == "PROVIDER_PERMISSION_ERROR"
+    assert "service-account" not in response.json["error"]
+    assert response.json["error"] == (
+        "CodeAssist does not have permission to use this AI provider."
+    )
 
 
 def test_test_ai_model_claude_success(client, mocker):
@@ -1365,7 +1626,11 @@ def test_fetch_ai_models_gemini_filters_and_sorts_models(client, mocker):
                 "supportedGenerationMethods": ["generateContent"],
             },
             {
-                "name": "models/gemini-1.5-flash",
+                "name": "models/gemini-next-flash",
+                "supportedGenerationMethods": ["generateContent"],
+            },
+            {
+                "name": "models/gemini-2.5-flash-lite",
                 "supportedGenerationMethods": ["generateContent"],
             },
             {
@@ -1386,9 +1651,11 @@ def test_fetch_ai_models_gemini_filters_and_sorts_models(client, mocker):
     )
 
     assert response.status_code == 200
-    assert response.json["models"][0] == "gemini-1.5-flash"
-    assert "gemini-2.5-flash" in response.json["models"]
-    assert "text-embedding-004" not in response.json["models"]
+    assert response.json["models"] == [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-next-flash",
+    ]
 
 
 def test_fetch_ai_models_claude_filters_unavailable_models(client, mocker):
@@ -1880,6 +2147,62 @@ def test_update_ai_settings_updates_openai_key_and_defaults(client, mocker, logi
     mock_commit.assert_called_once()
 
 
+def test_update_ai_settings_accepts_gemini_vertex_without_api_key(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_encrypt = mocker.patch("routes.course.encrypt_api_key")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model_name": "gemini-2.5-flash",
+            "feedback_style": "balanced",
+            "temperature": 0.2,
+        },
+    )
+
+    assert response.status_code == 200
+    assert mock_course.default_ai_provider == "gemini_vertex"
+    assert mock_course.default_ai_model == "gemini-2.5-flash"
+    assert mock_course.default_feedback_style == "balanced"
+    assert mock_course.default_ai_temperature == 0.2
+    mock_encrypt.assert_not_called()
+    mock_commit.assert_called_once()
+
+
+def test_update_ai_settings_rejects_gemini_vertex_api_key(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+
+    login_as("instructor-uuid")
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model_name": "gemini-2.5-flash",
+            "api_key": "do-not-store-this",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "managed by server configuration" in response.json["message"]
+    mock_commit.assert_not_called()
+
+
 def test_update_ai_settings_invalid_temperature_returns_400(client, mocker, login_as):
     mock_query = mocker.patch("routes.course.db.session.query")
     mocker.patch("util.auth.get_user_course_role", return_value="instructor")
@@ -2085,6 +2408,229 @@ def test_update_ai_settings_ollama_non_whitelisted_url_returns_400(client, mocke
     assert "Ollama host is not permitted" in response.json["message"]
 
 
+def test_test_ai_model_gemini_vertex_unauthenticated(client, mocker):
+    mock_generate = mocker.patch("routes.course._generate_gemini_model_test")
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+        },
+    )
+
+    assert response.status_code == 401
+    mock_generate.assert_not_called()
+
+
+def test_test_ai_model_gemini_vertex_requires_course_id(client, mocker, login_as):
+    mock_generate = mocker.patch("routes.course._generate_gemini_model_test")
+    login_as("instructor-uuid")
+
+    response = client.post(
+        "/test_ai_model",
+        json={"provider": "gemini_vertex", "model": "gemini-2.5-flash"},
+    )
+
+    assert response.status_code == 400
+    mock_generate.assert_not_called()
+
+
+def test_test_ai_model_gemini_vertex_student_forbidden(client, mocker, login_as):
+    mock_generate = mocker.patch("routes.course._generate_gemini_model_test")
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+        },
+    )
+
+    assert response.status_code == 403
+    assert "Only instructors or TAs" in response.json["message"]
+    mock_generate.assert_not_called()
+
+
+def test_test_ai_model_gemini_vertex_allows_ta(client, mocker, login_as, vertex_course_enabled):
+    mocker.patch(
+        "routes.course._generate_gemini_model_test",
+        return_value='{"insights":["Model test passed."],"annotations":[]}',
+    )
+    mocker.patch("util.auth.get_user_course_role", return_value="ta")
+    login_as("ta-uuid")
+
+    response = client.post(
+        "/test_ai_model",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_test_ai_api_key_gemini_vertex_unauthenticated(client, mocker):
+    mock_test = mocker.patch("routes.course._test_vertex_connection")
+
+    response = client.post(
+        "/test_ai_api_key",
+        json={"course_id": "course-123", "provider": "gemini_vertex"},
+    )
+
+    assert response.status_code == 401
+    mock_test.assert_not_called()
+
+
+def test_test_ai_api_key_gemini_vertex_requires_course_id(client, mocker, login_as):
+    mock_test = mocker.patch("routes.course._test_vertex_connection")
+    login_as("instructor-uuid")
+
+    response = client.post("/test_ai_api_key", json={"provider": "gemini_vertex"})
+
+    assert response.status_code == 400
+    mock_test.assert_not_called()
+
+
+def test_test_ai_api_key_gemini_vertex_student_forbidden(client, mocker, login_as):
+    mock_test = mocker.patch("routes.course._test_vertex_connection")
+    mocker.patch("util.auth.get_user_course_role", return_value="student")
+    login_as("student-uuid")
+
+    response = client.post(
+        "/test_ai_api_key",
+        json={"course_id": "course-123", "provider": "gemini_vertex"},
+    )
+
+    assert response.status_code == 403
+    mock_test.assert_not_called()
+
+
+def test_gemini_model_test_leaves_room_for_thinking_tokens(mocker):
+    from routes.course import (
+        GEMINI_TEST_MAX_OUTPUT_TOKENS,
+        _generate_gemini_model_test,
+        _test_vertex_connection,
+    )
+
+    mocker.patch("routes.course.create_gemini_client", return_value=object())
+    mock_provider = mocker.patch("routes.course.GeminiProvider")
+    mock_provider.return_value.generate.return_value = "OK"
+
+    _generate_gemini_model_test("gemini", "key", "gemini-2.5-pro", "prompt")
+    _test_vertex_connection({}, model="gemini-2.5-pro")
+
+    assert GEMINI_TEST_MAX_OUTPUT_TOKENS >= 400
+    for call in mock_provider.return_value.generate.call_args_list:
+        assert call.kwargs["max_output_tokens"] == GEMINI_TEST_MAX_OUTPUT_TOKENS
+
+
+def test_update_ai_settings_rejects_unsupported_vertex_model(client, mocker, login_as, monkeypatch):
+    monkeypatch.delenv("VERTEX_AI_MODELS", raising=False)
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+    login_as("instructor-uuid")
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model_name": "gemini-1.5-pro",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "not supported" in response.json["message"]
+    mock_commit.assert_not_called()
+
+
+def test_update_ai_settings_accepts_supported_vertex_model(client, mocker, login_as, monkeypatch):
+    monkeypatch.delenv("VERTEX_AI_MODELS", raising=False)
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_commit = mocker.patch("routes.course.db.session.commit")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    mock_course = mocker.Mock()
+    mock_query.return_value.filter_by.return_value.first.return_value = mock_course
+    login_as("instructor-uuid")
+
+    response = client.put(
+        "/update_ai_settings",
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model_name": "gemini-2.5-pro",
+        },
+    )
+
+    assert response.status_code == 200
+    assert mock_course.default_ai_model == "gemini-2.5-pro"
+    mock_commit.assert_called_once()
+
+
+@pytest.mark.parametrize("endpoint", ["/test_ai_model", "/test_ai_api_key"])
+def test_vertex_test_endpoints_reject_invalid_location(client, mocker, login_as, endpoint, vertex_course_enabled):
+    mock_client = mocker.patch("routes.course.create_gemini_client")
+    mocker.patch("util.auth.get_user_course_role", return_value="instructor")
+    login_as("instructor-uuid")
+
+    response = client.post(
+        endpoint,
+        json={
+            "course_id": "course-123",
+            "provider": "gemini_vertex",
+            "model": "gemini-2.5-flash",
+            "location": "../../evil",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Invalid Vertex AI location" in response.json["message"]
+    mock_client.assert_not_called()
+
+
+def test_get_courses_by_instructor_returns_401_when_logged_out(client, mocker):
+    mock_query = mocker.patch("routes.course.db.session.query")
+
+    response = client.get("/get_courses_by_instructor", query_string={"instructor_id": "inst-1"})
+
+    assert response.status_code == 401
+    mock_query.assert_not_called()
+
+
+@pytest.mark.parametrize("role", ["student", "instructor"])
+def test_get_courses_by_instructor_returns_403_for_non_admin(client, mocker, login_as, role):
+    login_as("inst-1")
+    mocker.patch("util.auth.get_user_global_role", return_value=role)
+    mock_query = mocker.patch("routes.course.db.session.query")
+
+    response = client.get("/get_courses_by_instructor", query_string={"instructor_id": "inst-1"})
+
+    assert response.status_code == 403
+    mock_query.assert_not_called()
+
+
+def test_get_courses_by_instructor_as_admin(client, mocker, login_as):
+    login_as("admin-1")
+    mocker.patch("util.auth.get_user_global_role", return_value="admin")
+    mock_query = mocker.patch("routes.course.db.session.query")
+    mock_query.return_value.filter_by.return_value.all.return_value = []
+
+    response = client.get("/get_courses_by_instructor", query_string={"instructor_id": "inst-1"})
+
+    assert response.status_code == 200
+    assert response.json == []
+
+
 def test_delete_all_assignments_defers_teardown_until_after_commit(client, mocker, login_as):
     """Bulk delete must commit before any container or archive is destroyed."""
     events = []
@@ -2141,3 +2687,111 @@ def test_delete_all_assignments_commit_failure_preserves_archives(client, mocker
     mock_rollback.assert_called()
     cleanup_container.assert_not_called()
     cleanup_dirs.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# create_course / enroll_course / leave_course auth (#379)
+# ---------------------------------------------------------------------------
+
+_COURSE_PAYLOAD = {
+    "name": "CS101",
+    "instructor_id": "user-123",
+    "semester": "Fall",
+    "year": "2025",
+    "entryCode": "ABCD1234",
+}
+
+
+def test_create_course_unauthenticated(client, mocker):
+    add = mocker.patch("routes.course.db.session.add")
+    response = client.post("/create_course", json=_COURSE_PAYLOAD)
+    assert response.status_code == 401
+    add.assert_not_called()
+
+
+def test_create_course_forbidden_for_student(client, mocker, login_as):
+    add = mocker.patch("routes.course.db.session.add")
+    login_as("user-123")
+    mocker.patch("routes.course.get_user_global_role", return_value="student")
+
+    response = client.post("/create_course", json=_COURSE_PAYLOAD)
+
+    assert response.status_code == 403
+    add.assert_not_called()
+
+
+def test_create_course_instructor_cannot_create_for_someone_else(client, mocker, login_as):
+    add = mocker.patch("routes.course.db.session.add")
+    login_as("other-instructor")
+    mocker.patch("routes.course.get_user_global_role", return_value="instructor")
+
+    response = client.post("/create_course", json=_COURSE_PAYLOAD)
+
+    assert response.status_code == 403
+    assert response.json["message"] == "You can only create courses for yourself"
+    add.assert_not_called()
+
+
+def test_create_course_admin_can_create_for_instructor(client, mocker, login_as, mock_course_query):
+    mock_query, mock_schema = mock_course_query
+    mock_query.return_value.filter_by.return_value.first.side_effect = [None, mocker.Mock()]
+    mock_add = mocker.patch("routes.course.db.session.add")
+    mocker.patch("routes.course.db.session.commit")
+    mock_schema.return_value.dump.return_value = {"id": "course-id", "name": "CS101"}
+    login_as("admin-uuid")
+    mocker.patch("routes.course.get_user_global_role", return_value="admin")
+
+    response = client.post("/create_course", json=_COURSE_PAYLOAD)
+
+    assert response.status_code == 201
+    enrollment = mock_add.call_args_list[1].args[0]
+    assert enrollment.student_id == "user-123"
+    assert enrollment.role == "instructor"
+
+
+def test_enroll_course_unauthenticated(client, mocker):
+    add = mocker.patch("routes.course.db.session.add")
+    response = client.post("/enroll_course", json={"user_id": "student-456", "entryCode": "JOIN123"})
+    assert response.status_code == 401
+    add.assert_not_called()
+
+
+def test_enroll_course_cannot_enroll_someone_else(client, mocker, login_as):
+    add = mocker.patch("routes.course.db.session.add")
+    login_as("attacker")
+
+    response = client.post("/enroll_course", json={"user_id": "student-456", "entryCode": "JOIN123"})
+
+    assert response.status_code == 403
+    add.assert_not_called()
+
+
+def test_leave_course_unauthenticated(client, mocker):
+    delete = mocker.patch("routes.course.db.session.delete")
+    response = client.post("/leave_course", json={"user_id": "student-456", "course_id": "course-123"})
+    assert response.status_code == 401
+    delete.assert_not_called()
+
+
+def test_leave_course_cannot_remove_someone_else(client, mocker, login_as):
+    delete = mocker.patch("routes.course.db.session.delete")
+    login_as("attacker")
+
+    response = client.post("/leave_course", json={"user_id": "student-456", "course_id": "course-123"})
+
+    assert response.status_code == 403
+    delete.assert_not_called()
+
+
+def test_leave_course_self(client, mocker, login_as):
+    mock_query = mocker.patch("routes.course.db.session.query")
+    enrollment = mocker.Mock(role="student")
+    mock_query.return_value.filter_by.return_value.first.return_value = enrollment
+    delete = mocker.patch("routes.course.db.session.delete")
+    mocker.patch("routes.course.db.session.commit")
+    login_as("student-456")
+
+    response = client.post("/leave_course", json={"user_id": "student-456", "course_id": "course-123"})
+
+    assert response.status_code == 200
+    delete.assert_called_once_with(enrollment)

@@ -15,7 +15,7 @@ export default function AdminStudentManage() {
   useEffect(() => {
     async function fetchStudent() {
       try {
-        const res = await fetch(`${process.env.REACT_APP_API_URL}/get_user_by_id?id=${studentId}`);
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/get_user_by_id?id=${studentId}`, { credentials: "include" });
         const data = await res.json();
         setStudent(data);
         form.setFieldsValue({
@@ -25,7 +25,7 @@ export default function AdminStudentManage() {
         });
         
         // Fetch enrolled courses
-        const coursesRes = await fetch(`${process.env.REACT_APP_API_URL}/get_user_enrollments?user_id=${studentId}`);
+        const coursesRes = await fetch(`${process.env.REACT_APP_API_URL}/get_user_enrollments?user_id=${studentId}`, { credentials: "include" });
         const coursesData = await coursesRes.json();
         setEnrolledCourses(coursesData);
       } catch (e) {
@@ -42,6 +42,7 @@ export default function AdminStudentManage() {
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL}/admin_update_account`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: studentId,
@@ -70,6 +71,7 @@ export default function AdminStudentManage() {
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL}/delete_user?id=${studentId}`, {
         method: "DELETE",
+        credentials: "include",
       });
       if (res.ok) {
         message.success("Student removed successfully");

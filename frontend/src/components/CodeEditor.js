@@ -10,6 +10,7 @@ import {
   ClockCircleOutlined,
   CaretRightOutlined,
   EditOutlined,
+  LockOutlined,
 } from "@ant-design/icons";
 
 // CodeMirror 6 imports
@@ -107,6 +108,7 @@ const oneDarkTheme = EditorView.theme({
  *   autoSaveStatus  – 'idle' | 'saving' | 'saved' | 'error'
  *   fileName        – string
  *   onFileNameChange – (newFileName) => void
+ *   fileNameLocked  – boolean (instructor set the name; not editable)
  *   language        – string (e.g. "python")
  *   readOnly        – boolean
  */
@@ -121,6 +123,7 @@ export default function CodeEditor({
   autoSaveStatus = "idle",
   fileName = "solution.py",
   onFileNameChange,
+  fileNameLocked = false,
   language = "python",
   readOnly = false,
 }) {
@@ -299,6 +302,13 @@ export default function CodeEditor({
                 style={{ width: 200, fontFamily: 'monospace', fontSize: 13 }}
                 autoFocus
               />
+            ) : fileNameLocked ? (
+              <Tooltip title="File name set by your instructor">
+                <span style={styles.fileName}>
+                  {fileName}
+                  <LockOutlined style={{ marginLeft: 4, fontSize: 11, color: '#636d83' }} />
+                </span>
+              </Tooltip>
             ) : (
               <Tooltip title="Click to edit filename (important for autograder)">
                 <span

@@ -127,8 +127,12 @@ const SubmissionsManager = () => {
         `${process.env.REACT_APP_API_URL}/get_course_enrollment?course_id=${courseInfo.id}`,
         { credentials: "include" }
       );
-      const students = await response.json();
-      if (students && students.length > 0) {
+      const enrolled = await response.json();
+      // Only students submit; drop the instructor and TAs
+      const students = Array.isArray(enrolled)
+        ? enrolled.filter((s) => (s.role || "student").toLowerCase() === "student")
+        : [];
+      if (students.length > 0) {
         await fetchSubmissions(students);
       } else {
         setTableData([]);

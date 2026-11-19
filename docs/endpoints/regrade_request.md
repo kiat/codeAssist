@@ -181,6 +181,8 @@ Example Output:
 
 ## POST /send_regrade_request
 
+**Auth:** logged in as the student who owns the submission.
+
 **Accepts JSON data**
 
 **Description:**
@@ -225,6 +227,8 @@ Example Output:
     }
 ## POST /check_regrade_request
 
+**Auth:** the submission's owner, or an instructor or TA of its course.
+
 **Accepts JSON data**
 
 **Description:**
@@ -250,6 +254,8 @@ or
     }
 
 ## POST /delete_regrade_request
+
+**Auth:** the submission's owner, or an instructor of its course (not TAs).
 
 **Accepts JSON data**
 
@@ -291,6 +297,8 @@ Example Output:
     }
 
 ## GET /get_student_regrade_requests
+
+**Auth:** logged in as the student in `student_id`, or as an instructor or TA of `course_id`.
 
 **Accepts Query String**
 

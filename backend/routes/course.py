@@ -21,11 +21,30 @@ from api.schemas import AssignmentSchema, CourseSchema, EnrollmentSchema, UserSc
 from util.errors import BadRequestError, InternalProcessingError, ConflictError, NotFoundError, ForbiddenError, UnauthorizedError
 from util.encryption_utils import encrypt_api_key, decrypt_api_key
 from util.url_utils import validate_ollama_url
-from util.auth import require_authenticated, require_course_role
+from util.auth import require_admin, require_authenticated, require_course_role, get_user_global_role
 from ai_feedback.integration import (
     CORRECTNESS_SYSTEM_PROMPT,
-    get_gemini_generation_config,
     parse_feedback_json,
+)
+from ai_feedback.providers.errors import AIProviderError
+from ai_feedback.settings import (
+    VERTEX_NOT_ENABLED_MESSAGE,
+    course_vertex_enabled,
+    normalize_vertex_location,
+)
+from ai_feedback.providers.gemini import (
+    GEMINI_PROVIDER,
+    GEMINI_VERTEX_PROVIDER,
+    GeminiProvider,
+    build_developer_api_config,
+    build_vertex_config,
+    create_gemini_client,
+    get_supported_models,
+    has_vertex_configuration,
+    is_supported_developer_model,
+    is_supported_model,
+    sort_gemini_models,
+    validate_model,
 )
 from openai import OpenAI
 
@@ -33,7 +52,107 @@ course = Blueprint("course", __name__)
 
 ALLOWED_EXTENSIONS = {'csv'}
 UPLOAD_FOLDER = 'uploads'
-SUPPORTED_AI_PROVIDERS = {"openai", "gemini", "claude", "ollama"}
+GEMINI_PROVIDERS = {GEMINI_PROVIDER, GEMINI_VERTEX_PROVIDER}
+SUPPORTED_AI_PROVIDERS = {
+    "openai",
+    GEMINI_PROVIDER,
+    GEMINI_VERTEX_PROVIDER,
+    "claude",
+    "ollama",
+}
+# Gemini 2.5 Pro cannot disable thinking, and thinking tokens count toward the
+# output limit, so the model test needs room beyond the short JSON reply.
+GEMINI_TEST_MAX_OUTPUT_TOKENS = 512
+
+
+def _provider_error_status(error):
+    status_by_code = {
+        "PROVIDER_CONFIGURATION_ERROR": 400,
+        "PROVIDER_AUTHENTICATION_ERROR": 401,
+        "PROVIDER_PERMISSION_ERROR": 403,
+        "PROVIDER_MODEL_ERROR": 400,
+        "PROVIDER_RATE_LIMIT_ERROR": 429,
+        "PROVIDER_TIMEOUT_ERROR": 504,
+        "UNSUPPORTED_PROVIDER": 400,
+    }
+    return status_by_code.get(getattr(error, "code", ""), 500)
+
+
+def _provider_error_response(error):
+    message = getattr(error, "public_message", "AI provider request failed.")
+    return jsonify({
+        "success": False,
+        "code": getattr(error, "code", "PROVIDER_ERROR"),
+        "message": message,
+        "error": message,
+    }), _provider_error_status(error)
+
+
+def _require_vertex_test_access(course_id):
+    """Vertex credentials belong to the server, so only course staff may spend them."""
+    if not course_id:
+        raise BadRequestError("Missing course_id")
+
+    require_course_role(
+        course_id,
+        {"instructor", "ta"},
+        "Only instructors or TAs can test Vertex AI",
+    )
+
+    course_obj = db.session.query(Course).filter_by(id=course_id).first()
+    if not course_vertex_enabled(course_obj):
+        raise ForbiddenError(VERTEX_NOT_ENABLED_MESSAGE)
+
+
+def _get_vertex_location(data):
+    location = (
+        (data or {}).get("location")
+        or (data or {}).get("ai_feedback_vertex_location")
+    )
+    try:
+        return normalize_vertex_location(location)
+    except ValueError as e:
+        raise BadRequestError(str(e))
+
+
+def _generate_gemini_model_test(provider, api_key, model, prompt, location=None):
+    validate_model(provider, model)
+    if provider == GEMINI_VERTEX_PROVIDER:
+        client_config = build_vertex_config(location)
+    else:
+        client_config = build_developer_api_config(api_key)
+
+    # The test button should report failures right away instead of retrying.
+    provider_adapter = GeminiProvider(
+        create_gemini_client(client_config),
+        max_attempts=1,
+    )
+    return provider_adapter.generate(
+        model=model,
+        prompt=f"{CORRECTNESS_SYSTEM_PROMPT}\n\n{prompt}",
+        temperature=0,
+        max_output_tokens=GEMINI_TEST_MAX_OUTPUT_TOKENS,
+        response_mime_type="application/json",
+    )
+
+
+def _test_vertex_connection(data, model=None):
+    selected_model = model or get_supported_models(GEMINI_VERTEX_PROVIDER)[0]
+    prompt = "Reply with exactly: OK"
+    validate_model(GEMINI_VERTEX_PROVIDER, selected_model)
+
+    provider_adapter = GeminiProvider(
+        create_gemini_client(build_vertex_config(_get_vertex_location(data))),
+        max_attempts=1,
+    )
+    response_text = provider_adapter.generate(
+        model=selected_model,
+        prompt=prompt,
+        temperature=0,
+        max_output_tokens=GEMINI_TEST_MAX_OUTPUT_TOKENS,
+    )
+
+    return response_text
 
 def is_supported_openai_model(model_id):
     """
@@ -77,33 +196,7 @@ def is_supported_gemini_model(model_id):
     Keep normal Gemini text generation models.
     Remove research, antigravity, embedding, audio, image, and other special models.
     """
-    blocked_keywords = [
-        "embedding",
-        "aqa",
-        "imagen",
-        "veo",
-        "tts",
-        "native-audio",
-        "live",
-        "learnlm",
-        "deep-research",
-        "antigravity",
-        "preview",
-        "exp",
-        "experimental",
-    ]
-
-    blocked_models = {
-        "gemini-2.0-flash",
-    }
-
-    if model_id in blocked_models:
-        return False
-
-    if any(keyword in model_id.lower() for keyword in blocked_keywords):
-        return False
-
-    return model_id.startswith("gemini-")
+    return is_supported_developer_model(model_id)
 
 
 def is_supported_claude_model(model_id):
@@ -177,15 +270,28 @@ def create_course():
     @param year             year of the course
     @param entryCode        entryCode of the course
     """
-    data = request.json
+    user_id = require_authenticated()
+    global_role = get_user_global_role(user_id)
+    if global_role not in ("instructor", "admin"):
+        raise ForbiddenError("Only instructors can create courses")
+
+    data = request.json or {}
     required_fields = ["name", "instructor_id", "semester", "year", "entryCode"]
 
     # validate request
     if not all(field in data and data[field] for field in required_fields):
         raise BadRequestError("Missing required fields")
+
+    # Instructors create courses for themselves; the admin panel creates them for others.
+    if str(data["instructor_id"]) != str(user_id) and global_role != "admin":
+        raise ForbiddenError("You can only create courses for yourself")
     
     # set default value for allowEntryCode if not provided
     data["allowEntryCode"] = data.get("allowEntryCode", True)
+
+    # Vertex access spends server credits and is granted by an admin.
+    if global_role != "admin":
+        data.pop("vertex_enabled", None)
 
     # check for duplicate entryCode
     if db.session.query(Course).filter_by(entryCode=data["entryCode"]).first():
@@ -221,12 +327,17 @@ def enroll_course():
     @param entryCode        entryCode of the course
     @param user_id       id of the student
     """
-    data = request.json
+    user_id = require_authenticated()
+
+    data = request.json or {}
     required_fields = ["user_id", "entryCode"]
 
     # validate request
     if not all(field in data for field in required_fields):
         raise BadRequestError("Missing required fields")
+
+    if str(data["user_id"]) != str(user_id):
+        raise ForbiddenError("You can only enroll yourself")
 
     course = db.session.query(Course).filter_by(entryCode=data["entryCode"]).first()
     
@@ -256,12 +367,18 @@ def enroll_course():
     
 @course.route("/leave_course", methods=["POST"])
 def leave_course():
-    data = request.json
+    session_user_id = require_authenticated()
+
+    data = request.json or {}
     user_id = data.get("user_id")
     course_id = data.get("course_id")
 
     if not user_id or not course_id:
         raise BadRequestError("Missing user_id or course_id")
+
+    # Removing other students goes through the staff enrollment routes.
+    if str(user_id) != str(session_user_id):
+        raise ForbiddenError("You can only leave a course yourself")
 
     enrollment = db.session.query(Enrollment).filter_by(
         student_id=user_id,
@@ -281,6 +398,9 @@ def leave_course():
     except:
         db.session.rollback()
         raise InternalProcessingError("Failed to leave course")
+
+UPDATABLE_COURSE_FIELDS = ("description", "name", "semester", "year", "entryCode", "allowEntryCode")
+
 
 @course.route("/update_course", methods=["PUT"])
 def update_course():
@@ -308,10 +428,15 @@ def update_course():
     if existing_class and existing_class.id != data["course_id"]:
         raise ConflictError("Course with the provided entry code already exists")
     
-    course_id = data["course_id"]    
-    del data["course_id"]
+    course_id = data["course_id"]
 
-    updated_course_info = {getattr(Course, name): val for name, val in data.items()}
+    # Only the documented course fields. Everything else (owner, AI provider
+    # and keys, vertex_enabled) has its own route with its own checks.
+    updated_course_info = {
+        getattr(Course, name): data[name]
+        for name in UPDATABLE_COURSE_FIELDS
+        if name in data
+    }
 
     try:
         db.session.query(Course).filter_by(id=course_id).update(updated_course_info)
@@ -661,6 +786,13 @@ def get_my_enrollment_role():
 def get_user_enrollments():
     user_id = require_authenticated()
 
+    # Admins can look up another user's enrollments (admin student page);
+    # everyone else only ever sees their own.
+    target_id = request.args.get("user_id")
+    if target_id and target_id != user_id:
+        require_admin("Only admins can view another user's enrollments")
+        user_id = target_id
+
     enrollments = db.session.query(Enrollment).filter_by(student_id=user_id).all()
     enrollment_role_by_course = {e.course_id: e.role for e in enrollments}
     course_ids = list(enrollment_role_by_course.keys())
@@ -751,6 +883,9 @@ def get_course_info():
 
         "has_openai_api_key": bool(course_obj.openai_api_key),
         "has_gemini_api_key": bool(course_obj.gemini_api_key),
+        "has_gemini_vertex_config": has_vertex_configuration() and course_vertex_enabled(course_obj),
+        "vertex_enabled": course_vertex_enabled(course_obj),
+        "has_vertex_server_config": has_vertex_configuration(),
         "has_claude_api_key": bool(course_obj.claude_api_key),
         "has_ollama_api_key": bool(course_obj.ollama_base_url),
     })
@@ -814,11 +949,24 @@ def update_ai_settings():
     if provider and provider not in SUPPORTED_AI_PROVIDERS:
         raise BadRequestError("Unsupported AI provider")
 
+    if provider == GEMINI_VERTEX_PROVIDER and not course_vertex_enabled(course_obj):
+        raise ForbiddenError(VERTEX_NOT_ENABLED_MESSAGE)
+
     if provider:
         course_obj.default_ai_provider = provider
 
     if model_name:
         course_obj.default_ai_model = model_name
+
+    if (provider or model_name) and course_obj.default_ai_provider in GEMINI_PROVIDERS:
+        if course_obj.default_ai_model and not is_supported_model(
+            course_obj.default_ai_provider,
+            course_obj.default_ai_model,
+        ):
+            raise BadRequestError(
+                f"Model '{course_obj.default_ai_model}' is not supported for "
+                f"{course_obj.default_ai_provider}"
+            )
 
     if feedback_style:
         course_obj.default_feedback_style = feedback_style
@@ -843,12 +991,16 @@ def update_ai_settings():
             if url:
                 validate_ollama_url(url)
             course_obj.ollama_base_url = url
+        elif provider == GEMINI_VERTEX_PROVIDER:
+            raise BadRequestError(
+                "Gemini over Vertex AI credentials are managed by server configuration"
+            )
         else:
             encrypted_api_key = encrypt_api_key(api_key)
 
             if provider == "openai":
                 course_obj.openai_api_key = encrypted_api_key
-            elif provider == "gemini":
+            elif provider == GEMINI_PROVIDER:
                 course_obj.gemini_api_key = encrypted_api_key
             elif provider == "claude":
                 course_obj.claude_api_key = encrypted_api_key
@@ -872,6 +1024,17 @@ def fetch_ai_models():
     if not provider:
         raise BadRequestError("Missing provider")
 
+    if provider not in SUPPORTED_AI_PROVIDERS:
+        raise BadRequestError("Unsupported AI provider")
+
+    if provider == GEMINI_VERTEX_PROVIDER:
+        # The list is static and costs nothing, but keep the same access rule
+        # as the other Vertex endpoints.
+        _require_vertex_test_access(course_id)
+        if not has_vertex_configuration():
+            raise BadRequestError("Vertex AI is not configured on this server")
+        return jsonify({"models": get_supported_models(GEMINI_VERTEX_PROVIDER)}), 200
+
     try:
         if not api_key:
             # Course auth only applies when falling back to the course's saved
@@ -889,7 +1052,7 @@ def fetch_ai_models():
 
             if provider == "openai" and course_obj.openai_api_key:
                 api_key = decrypt_api_key(course_obj.openai_api_key)
-            elif provider == "gemini" and course_obj.gemini_api_key:
+            elif provider == GEMINI_PROVIDER and course_obj.gemini_api_key:
                 api_key = decrypt_api_key(course_obj.gemini_api_key)
             elif provider == "claude" and course_obj.claude_api_key:
                 api_key = decrypt_api_key(course_obj.claude_api_key)
@@ -943,7 +1106,7 @@ def fetch_ai_models():
 
             return jsonify({"models": sorted_models}), 200
 
-        if provider == "gemini":
+        if provider == GEMINI_PROVIDER:
             response = requests.get(
                 "https://generativelanguage.googleapis.com/v1beta/models",
                 params={"key": api_key},
@@ -966,24 +1129,7 @@ def fetch_ai_models():
                 ):
                     model_ids.append(model_name)
 
-            preferred_order = [
-                "gemini-1.5-flash",
-                "gemini-1.5-pro",
-                "gemini-2.5-flash",
-                "gemini-2.5-pro",
-            ]
-
-            sorted_models = sorted(
-                set(model_ids),
-                key=lambda model: (
-                    preferred_order.index(model)
-                    if model in preferred_order
-                    else len(preferred_order),
-                    model
-                )
-            )
-
-            return jsonify({"models": sorted_models}), 200
+            return jsonify({"models": sort_gemini_models(model_ids)}), 200
 
         if provider == "claude":
             response = requests.get(
@@ -1035,6 +1181,8 @@ def fetch_ai_models():
 
     except (BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError):
         raise
+    except AIProviderError as e:
+        return _provider_error_response(e)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 @course.route("/test_ai_api_key", methods=["POST"])
@@ -1047,6 +1195,22 @@ def test_ai_api_key():
 
     if not provider:
         raise BadRequestError("Missing provider")
+
+    if provider not in SUPPORTED_AI_PROVIDERS:
+        raise BadRequestError("Unsupported AI provider")
+
+    if provider == GEMINI_VERTEX_PROVIDER:
+        _require_vertex_test_access(course_id)
+        try:
+            _test_vertex_connection(data, model=data.get("model"))
+            return jsonify({
+                "success": True,
+                "message": "Vertex AI connection succeeded.",
+                "provider": provider,
+                "model": data.get("model") or get_supported_models(provider)[0],
+            }), 200
+        except AIProviderError as e:
+            return _provider_error_response(e)
 
     try:
         if not api_key:
@@ -1062,7 +1226,7 @@ def test_ai_api_key():
 
             if provider == "openai" and course_obj.openai_api_key:
                 api_key = decrypt_api_key(course_obj.openai_api_key)
-            elif provider == "gemini" and course_obj.gemini_api_key:
+            elif provider == GEMINI_PROVIDER and course_obj.gemini_api_key:
                 api_key = decrypt_api_key(course_obj.gemini_api_key)
             elif provider == "claude" and course_obj.claude_api_key:
                 api_key = decrypt_api_key(course_obj.claude_api_key)
@@ -1080,7 +1244,7 @@ def test_ai_api_key():
                 "provider": provider,
             }), 200
 
-        if provider == "gemini":
+        if provider == GEMINI_PROVIDER:
             response = requests.get(
                 "https://generativelanguage.googleapis.com/v1beta/models",
                 params={"key": api_key},
@@ -1138,6 +1302,8 @@ def test_ai_api_key():
 
     except (BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError):
         raise
+    except AIProviderError as e:
+        return _provider_error_response(e)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
@@ -1157,7 +1323,42 @@ def test_ai_model():
     if not model:
         raise BadRequestError("Missing model")
 
+    if provider not in SUPPORTED_AI_PROVIDERS:
+        raise BadRequestError("Unsupported AI provider")
+
     try:
+        if provider == GEMINI_VERTEX_PROVIDER:
+            _require_vertex_test_access(course_id)
+            test_prompt = (
+                "Return only this JSON object: "
+                "{\"insights\":[\"Model test passed.\"],\"annotations\":[]}"
+            )
+            raw_response = _generate_gemini_model_test(
+                provider,
+                None,
+                model,
+                test_prompt,
+                location=_get_vertex_location(data),
+            )
+            parsed_feedback, _ = parse_feedback_json(
+                raw_response,
+                "Gemini over Vertex AI",
+                [],
+            )
+
+            if isinstance(parsed_feedback, dict) and parsed_feedback.get("error"):
+                return jsonify({
+                    "error": "Selected Vertex AI Gemini model did not return valid JSON feedback"
+                }), 400
+
+            return jsonify({
+                "success": True,
+                "message": "Vertex AI Gemini model is usable",
+                "provider": provider,
+                "model": model,
+                "response": parsed_feedback,
+            }), 200
+
         if not api_key:
             if not course_id:
                 raise BadRequestError("Missing course_id or api_key")
@@ -1171,7 +1372,7 @@ def test_ai_model():
 
             if provider == "openai" and course_obj.openai_api_key:
                 api_key = decrypt_api_key(course_obj.openai_api_key)
-            elif provider == "gemini" and course_obj.gemini_api_key:
+            elif provider == GEMINI_PROVIDER and course_obj.gemini_api_key:
                 api_key = decrypt_api_key(course_obj.gemini_api_key)
             elif provider == "claude" and course_obj.claude_api_key:
                 api_key = decrypt_api_key(course_obj.claude_api_key)
@@ -1228,38 +1429,17 @@ def test_ai_model():
                 "response": parsed_feedback,
             }), 200
 
-        if provider == "gemini":
-            response = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                params={"key": api_key},
-                json={
-                    "contents": [
-                        {
-                            "role": "user",
-                            "parts": [
-                                {
-                                    "text": f"{CORRECTNESS_SYSTEM_PROMPT}\n\n{test_prompt}",
-                                }
-                            ],
-                        }
-                    ],
-                    "generationConfig": get_gemini_generation_config(model, 0),
-                },
-                timeout=30,
-            )
+        if provider == GEMINI_PROVIDER:
+            try:
+                raw_response = _generate_gemini_model_test(
+                    provider,
+                    api_key,
+                    model,
+                    test_prompt,
+                )
+            except AIProviderError as e:
+                return _provider_error_response(e)
 
-            if response.status_code >= 400:
-                return jsonify({
-                    "error": f"Selected Gemini model cannot be used: {response.text}"
-                }), response.status_code
-
-            data = response.json()
-            candidate = data.get("candidates", [{}])[0]
-            raw_response = "".join(
-                part.get("text", "")
-                for part in candidate.get("content", {}).get("parts", [])
-                if not part.get("thought")
-            )
             parsed_feedback = validate_feedback_response(raw_response, "Gemini")
 
             if parsed_feedback is None:
@@ -1364,6 +1544,8 @@ def test_ai_model():
 
     except (BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError):
         raise
+    except AIProviderError as e:
+        return _provider_error_response(e)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
@@ -1374,6 +1556,8 @@ def get_courses_by_instructor():
     Requires from the frontend a query param:
     @param instructor_id    the id of the instructor
     """
+    require_admin("Only administrators can view an instructor's courses")
+
     instructor_id = request.args.get("instructor_id")
     if not instructor_id or instructor_id == "":
         raise BadRequestError("Missing instructor_id argument")

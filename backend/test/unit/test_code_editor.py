@@ -960,6 +960,44 @@ def test_ai_chat_ollama_validates_base_url_before_request(mocker):
     mock_post.assert_not_called()
 
 
+def test_ai_chat_gemini_vertex_uses_server_managed_client(mocker):
+    from routes.code_editor import _get_ai_chat_reply
+
+    captured = {}
+    fake_config = object()
+    fake_client = object()
+
+    class FakeGeminiProvider:
+        def __init__(self, client):
+            captured["client"] = client
+
+        def generate(self, **kwargs):
+            captured.update(kwargs)
+            return "Check the recursive base case."
+
+    mocker.patch("routes.code_editor.validate_model")
+    mocker.patch("routes.code_editor.build_vertex_config", return_value=fake_config)
+    mocker.patch("routes.code_editor.create_gemini_client", return_value=fake_client)
+    mocker.patch("routes.code_editor.GeminiProvider", FakeGeminiProvider)
+
+    reply = _get_ai_chat_reply(
+        "gemini_vertex",
+        None,
+        None,
+        "help me debug",
+        "gemini-2.5-flash",
+        0.4,
+        vertex_location="us-central1",
+    )
+
+    assert reply == "Check the recursive base case."
+    assert captured["client"] is fake_client
+    assert captured["model"] == "gemini-2.5-flash"
+    assert captured["temperature"] == 0.4
+    assert captured["max_output_tokens"] == 700
+    assert "help me debug" in captured["prompt"]
+
+
 def test_ai_chat_course_not_found_reports_course_issue(client, mocker):
     mock_student = mocker.Mock()
     mock_student.coding_insights = "No history."
@@ -1064,3 +1102,118 @@ def test_ai_chat_uses_custom_claude_provider_without_openai_key(client, mocker):
         == "claude-sonnet-5"
     )
     assert "temperature" not in mock_post.call_args.kwargs["json"]
+
+
+# ---------------------------------------------------------------------------
+# required submission file name
+# ---------------------------------------------------------------------------
+
+def _open_editor_assignment(mocker, submission_files=None):
+    from datetime import datetime, timezone, timedelta
+
+    assignment = mocker.Mock()
+    assignment.enable_code_editor = True
+    assignment.published = True
+    assignment.late_submission = False
+    assignment.published_date = datetime.now(timezone.utc) - timedelta(days=1)
+    assignment.due_date = datetime.now(timezone.utc) + timedelta(days=1)
+    assignment.late_due_date = None
+    assignment.autograder_image_name = ""
+    assignment.autograder_timeout = 30
+    assignment.submission_files = submission_files
+    return assignment
+
+
+def test_submit_code_uses_required_file_name(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._verify_enrollment")
+    assignment = _open_editor_assignment(mocker, ["calculator.py"])
+
+    assignment_query = mocker.Mock()
+    assignment_query.filter_by.return_value.first.return_value = assignment
+    extension_query = mocker.Mock()
+    extension_query.filter_by.return_value.first.return_value = None
+    count_query = mocker.Mock()
+    count_query.filter_by.return_value.count.return_value = 0
+    mocker.patch("routes.code_editor.db.session.query", side_effect=[
+        assignment_query, extension_query, count_query, mocker.Mock(),
+    ])
+    mock_add = mocker.patch("routes.code_editor.db.session.add")
+    mocker.patch("routes.code_editor.db.session.commit")
+    mocker.patch("routes.code_editor.os.makedirs")
+    mock_open = mocker.patch("builtins.open", mocker.mock_open())
+    mock_save_final_draft = mocker.patch("routes.code_editor._save_final_draft")
+
+    resp = client.post("/submit_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+        "file_name": "a2.py",
+    })
+
+    assert resp.status_code == 200
+    assert mock_add.call_args.args[0].file_name == "calculator.py"
+    assert mock_open.call_args.args[0].endswith("calculator.py")
+    assert mock_save_final_draft.call_args.args[3] == "calculator.py"
+
+
+def test_save_code_draft_sanitizes_file_name(client, mocker):
+    mock_add = mocker.patch("routes.code_editor.db.session.add")
+    mocker.patch("routes.code_editor.db.session.commit")
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = _open_editor_assignment(mocker)
+    mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = None
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
+    resp = client.post("/save_code_draft", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+        "file_name": "../../evil.py",
+    })
+
+    assert resp.status_code == 201
+    assert mock_add.call_args.args[0].file_name == "evil.py"
+
+
+def test_save_code_draft_uses_required_file_name(client, mocker):
+    mock_add = mocker.patch("routes.code_editor.db.session.add")
+    mocker.patch("routes.code_editor.db.session.commit")
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    mock_query.return_value.filter_by.return_value.first.return_value = _open_editor_assignment(mocker, ["spiral.py"])
+    mock_query.return_value.filter_by.return_value.order_by.return_value.first.return_value = None
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "stu-1"
+
+    resp = client.post("/save_code_draft", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('hi')",
+        "file_name": "renamed.py",
+    })
+
+    assert resp.status_code == 201
+    assert mock_add.call_args.args[0].file_name == "spiral.py"
+
+
+def test_run_code_uses_required_file_name(client, mocker):
+    mocker.patch("routes.code_editor._verify_student")
+    mocker.patch("routes.code_editor._check_run_code_rate_limit")
+    mocker.patch("routes.code_editor._verify_enrollment")
+    mock_query = mocker.patch("routes.code_editor.db.session.query")
+    assignment = _open_editor_assignment(mocker, ["calculator.py"])
+    mock_query.return_value.filter_by.return_value.first.side_effect = [assignment, None]
+    run = mocker.patch("routes.code_editor._run_code_in_container", return_value=("ok\n", "", 0))
+
+    resp = client.post("/run_code", json={
+        "student_id": "stu-1",
+        "assignment_id": "asgn-1",
+        "content": "print('ok')",
+        "file_name": "../x.py",
+    })
+
+    assert resp.status_code == 200
+    assert run.call_args.args[2] == "calculator.py"

@@ -2,11 +2,26 @@ import copy
 import json
 import re
 
+from util.auth import get_user_course_role
 from util.encryption_utils import encrypt_api_key
+from util.errors import ForbiddenError
+from ai_feedback.providers.gemini import (
+    GEMINI_PROVIDER,
+    GEMINI_VERTEX_PROVIDER,
+    is_supported_model,
+)
 
 
 LEGACY_FEEDBACK_PROMPT_ID = "legacy_feedback_prompt"
 MAX_AI_FEEDBACK_REQUESTS = 1000
+SUPPORTED_AI_FEEDBACK_PROVIDERS = {
+    "openai",
+    GEMINI_PROVIDER,
+    GEMINI_VERTEX_PROVIDER,
+    "claude",
+    "ollama",
+}
+VERTEX_LOCATION_PATTERN = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
 
 DEFAULT_AI_ALLOWED_INPUTS = {
     "assignment_description": True,
@@ -119,6 +134,7 @@ AI_FEEDBACK_SETTING_KEYS = {
     "ai_feedback_provider",
     "ai_feedback_model",
     "ai_feedback_api_key",
+    "ai_feedback_vertex_location",
     "ai_feedback_temperature",
     "ai_feedback_style",
     "ai_feedback_max_requests",
@@ -291,6 +307,86 @@ def normalize_non_negative_int(
     return value
 
 
+def normalize_vertex_location(value):
+    if value in (None, ""):
+        return None
+
+    location = str(value).strip()
+    if not location:
+        return None
+
+    if not VERTEX_LOCATION_PATTERN.fullmatch(location):
+        raise ValueError("Invalid Vertex AI location")
+
+    return location
+
+
+VERTEX_NOT_ENABLED_MESSAGE = (
+    "Gemini over Vertex AI is not enabled for this course. "
+    "Ask an administrator to enable it."
+)
+VERTEX_INSTRUCTOR_ONLY_MESSAGE = (
+    "Only instructors can set an assignment to use Gemini over Vertex AI"
+)
+
+
+def course_vertex_enabled(course):
+    return bool(getattr(course, "vertex_enabled", False))
+
+
+def _requests_vertex_override_change(assignment, data):
+    """True if `data` would newly set, or change, a Vertex override on the assignment."""
+    if "use_course_ai_default" in data:
+        uses_default = data["use_course_ai_default"] is not False
+    else:
+        uses_default = getattr(assignment, "use_course_ai_default", True) is not False
+    if uses_default:
+        return False
+
+    current_provider = getattr(assignment, "ai_feedback_provider", None)
+    new_provider = data.get("ai_feedback_provider", current_provider)
+    if new_provider != GEMINI_VERTEX_PROVIDER:
+        return False
+
+    had_vertex_override = (
+        getattr(assignment, "use_course_ai_default", True) is False
+        and current_provider == GEMINI_VERTEX_PROVIDER
+    )
+    if not had_vertex_override:
+        return True
+
+    if (
+        "ai_feedback_model" in data
+        and data["ai_feedback_model"] != getattr(assignment, "ai_feedback_model", None)
+    ):
+        return True
+
+    if "ai_feedback_vertex_location" in data:
+        try:
+            new_location = normalize_vertex_location(data["ai_feedback_vertex_location"])
+        except ValueError:
+            # Let update_assignment_ai_settings report the invalid value.
+            return False
+        if new_location != getattr(assignment, "ai_feedback_vertex_location", None):
+            return True
+
+    return False
+
+
+def enforce_assignment_vertex_access(assignment, course, data, user_id):
+    """Vertex spends the server's credits, so only instructors of a course an
+    admin has enabled may point an assignment at it. Call before applying `data`.
+    Re-saving an existing Vertex override unchanged is allowed for TAs."""
+    if not _requests_vertex_override_change(assignment, data):
+        return
+
+    if not course_vertex_enabled(course):
+        raise ForbiddenError(VERTEX_NOT_ENABLED_MESSAGE)
+
+    if get_user_course_role(user_id, course.id) != "instructor":
+        raise ForbiddenError(VERTEX_INSTRUCTOR_ONLY_MESSAGE)
+
+
 def serialize_assignment_ai_settings(assignment):
     feedback_prompts = normalize_feedback_prompts(
         getattr(assignment, "ai_feedback_prompts", None),
@@ -311,6 +407,11 @@ def serialize_assignment_ai_settings(assignment):
         ) is not False,
         "ai_feedback_provider": getattr(assignment, "ai_feedback_provider", None),
         "ai_feedback_model": getattr(assignment, "ai_feedback_model", None),
+        "ai_feedback_vertex_location": getattr(
+            assignment,
+            "ai_feedback_vertex_location",
+            None,
+        ),
         "has_assignment_ai_key": bool(
             getattr(assignment, "ai_feedback_api_key", None)
         ),
@@ -368,6 +469,8 @@ def update_assignment_ai_settings(assignment, data):
     if assignment.use_course_ai_default:
         assignment.ai_feedback_provider = None
         assignment.ai_feedback_model = None
+        if hasattr(assignment, "ai_feedback_vertex_location"):
+            assignment.ai_feedback_vertex_location = None
         if hasattr(assignment, "ai_feedback_api_key"):
             assignment.ai_feedback_api_key = ""
     else:
@@ -376,10 +479,30 @@ def update_assignment_ai_settings(assignment, data):
             and data["ai_feedback_provider"] != previous_provider
         )
         if "ai_feedback_provider" in data:
-            assignment.ai_feedback_provider = data["ai_feedback_provider"]
+            provider = data["ai_feedback_provider"]
+            if provider not in SUPPORTED_AI_FEEDBACK_PROVIDERS:
+                raise ValueError("Unsupported AI provider")
+            assignment.ai_feedback_provider = provider
         if "ai_feedback_model" in data:
             assignment.ai_feedback_model = data["ai_feedback_model"]
-        if "ai_feedback_api_key" in data:
+
+        current_provider = getattr(assignment, "ai_feedback_provider", None)
+        current_model = getattr(assignment, "ai_feedback_model", None)
+
+        if (
+            ("ai_feedback_provider" in data or "ai_feedback_model" in data)
+            and current_provider in (GEMINI_PROVIDER, GEMINI_VERTEX_PROVIDER)
+            and current_model
+            and not is_supported_model(current_provider, current_model)
+        ):
+            raise ValueError(
+                f"Model '{current_model}' is not supported for {current_provider}"
+            )
+
+        if current_provider == GEMINI_VERTEX_PROVIDER:
+            if hasattr(assignment, "ai_feedback_api_key"):
+                assignment.ai_feedback_api_key = ""
+        elif "ai_feedback_api_key" in data:
             credential = str(data.get("ai_feedback_api_key") or "").strip()
             if credential:
                 assignment.ai_feedback_api_key = encrypt_api_key(credential)
@@ -387,6 +510,14 @@ def update_assignment_ai_settings(assignment, data):
                 assignment.ai_feedback_api_key = ""
         elif provider_changed and hasattr(assignment, "ai_feedback_api_key"):
             assignment.ai_feedback_api_key = ""
+
+        if current_provider == GEMINI_VERTEX_PROVIDER:
+            if "ai_feedback_vertex_location" in data:
+                assignment.ai_feedback_vertex_location = normalize_vertex_location(
+                    data.get("ai_feedback_vertex_location")
+                )
+        elif hasattr(assignment, "ai_feedback_vertex_location"):
+            assignment.ai_feedback_vertex_location = None
 
     if "ai_feedback_style" in data:
         assignment.ai_feedback_style = data["ai_feedback_style"]

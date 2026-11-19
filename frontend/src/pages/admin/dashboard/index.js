@@ -17,9 +17,9 @@ export default function AdminDashboard() {
   const fetchStats = useCallback(async () => {
     try {
       // TODO: Implement these API endpoints
-      const coursesRes = await fetch(`${process.env.REACT_APP_API_URL}/get_all_courses`);
-      const instructorsRes = await fetch(`${process.env.REACT_APP_API_URL}/get_all_instructors`);
-      const studentsRes = await fetch(`${process.env.REACT_APP_API_URL}/get_all_students`);
+      const coursesRes = await fetch(`${process.env.REACT_APP_API_URL}/get_all_courses`, { credentials: "include" });
+      const instructorsRes = await fetch(`${process.env.REACT_APP_API_URL}/get_all_instructors`, { credentials: "include" });
+      const studentsRes = await fetch(`${process.env.REACT_APP_API_URL}/get_all_students`, { credentials: "include" });
 
       const courses = await coursesRes.json();
       const instructors = await instructorsRes.json();

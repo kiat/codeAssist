@@ -75,24 +75,7 @@ export default () => {
           { credentials: "include" }
         );
         const extensionsData = await extensionsResponse.json();
-        const updatedExtensions = await Promise.all(
-          extensionsData.map(async (extension) => {
-            try {
-              const student = await fetch(
-                `${process.env.REACT_APP_API_URL}/get_user_by_id?id=${extension.student_id}`,
-                { credentials: "include" }
-              );
-              const studentData = await student.json();
-              return {
-                ...extension,
-                name: studentData.name,
-              };
-            } catch (error) {
-              console.error("Error fetching extension data:", error);
-            }
-          })
-        );
-        setExtensions(updatedExtensions);
+        setExtensions(extensionsData);
       } catch (error) {
         message.error("Failed to fetch extensions.");
         console.error("Error fetching extensions:", error);
@@ -194,7 +177,17 @@ export default () => {
     },
   ];
 
-  const filteredExtensions = extensions.filter((extension) =>
+  // Student names come from the course roster already loaded for the
+  // extension modal, so no per-student user lookup is needed.
+  const studentNamesById = Object.fromEntries(
+    (Array.isArray(courseStudents) ? courseStudents : []).map((student) => [student.id, student.name])
+  );
+  const namedExtensions = extensions.map((extension) => ({
+    ...extension,
+    name: studentNamesById[extension.student_id] || "",
+  }));
+
+  const filteredExtensions = namedExtensions.filter((extension) =>
     extension.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -281,7 +274,7 @@ export default () => {
       <ExtensionModal
         open={extensionModalOpen}
         onCancel={toggleExtensionModalOpen}
-        students={courseStudents}
+        students={(Array.isArray(courseStudents) ? courseStudents : []).filter((s) => (s.role || "student").toLowerCase() === "student")}
         assignmentInfo={assignmentInfo}
         onFinish={finishForm}
         form={form}

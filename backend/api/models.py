@@ -44,6 +44,10 @@ class Course(db.Model):
     default_feedback_style = db.Column(db.String, default="hint-based")
     default_ai_temperature = db.Column(db.Float, default=0.5)
 
+    # Gemini over Vertex AI bills the deployment's Google Cloud project, so
+    # only an admin can turn it on for a course.
+    vertex_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+
 @dataclass
 class Enrollment(db.Model):
     __tablename__ = "enrollments"
@@ -81,6 +85,9 @@ class Assignment(db.Model):
     container_id = db.Column(db.String)
     autograder_image_name = db.Column(db.String)
     autograder_timeout = db.Column(db.Integer, default=300)
+    # File names the autograder copies from /autograder/submission/, set by the
+    # instructor. Null means the student picks the name.
+    submission_files = db.Column(db.JSON, nullable=True)
 
     # -- Submission Method Settings --
     allow_file_upload = db.Column(db.Boolean, default=True)
@@ -93,6 +100,7 @@ class Assignment(db.Model):
     ai_feedback_provider = db.Column(db.String, nullable=True)
     ai_feedback_model = db.Column(db.String, nullable=True)
     ai_feedback_api_key = db.Column(db.String, default="")
+    ai_feedback_vertex_location = db.Column(db.String, nullable=True)
     ai_feedback_prompt = db.Column(db.Text, nullable=True)
     ai_feedback_prompts = db.Column(db.JSON, nullable=True)
     ai_allowed_inputs = db.Column(db.JSON, nullable=True)

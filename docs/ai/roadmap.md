@@ -5,10 +5,11 @@ P0 = correctness/trust or security gap affecting every submission/course today;
 P1 = real inconsistency worth fixing before it compounds; P2 = test-debt and
 hardening; P3 = longer-term design work.
 
-Last updated: 2026-08-04, after PR
-[#352](https://github.com/kiat/codeAssist/pull/352) merged the previously open
-assignment-description, ZIP-source-extraction, `/ai_chat` permission-filtering,
-and per-submission feedback-history fixes.
+Last updated: 2026-08-06, after PR
+[#365](https://github.com/kiat/codeAssist/pull/365) added Gemini over Vertex AI
+support and PR [#352](https://github.com/kiat/codeAssist/pull/352) merged the
+previously open assignment-description, ZIP-source-extraction, `/ai_chat`
+permission-filtering, and per-submission feedback-history fixes.
 
 Scope note: the current direction is controlled, assignment-level AI feedback:
 instructors decide which prompts/questions matter for each assignment, and
@@ -17,33 +18,6 @@ Course-level provider/model defaults can remain useful, but prompt/question
 configuration should stay at the assignment level.
 
 ## Currently Open
-
-### P1 - Gemini over Google Cloud Vertex AI support
-
-**Problem:** Current `main` supports the Gemini Developer API only:
-`SUPPORTED_AI_PROVIDERS` includes `gemini`, course settings store
-`gemini_api_key`, and provider calls use the API-key `generateContent` path.
-Kia requested an additional "Gemini over Vertex AI" mode backed by Google Cloud
-Vertex AI, which uses Google Cloud project/location configuration and ADC or
-Vertex-compatible credentials instead of the existing `gemini_api_key` request
-path.
-
-**Fix:** Add a distinct provider mode or Gemini backend option for Vertex AI.
-The implementation should avoid storing test credentials in docs or code. It
-will likely need:
-
-- provider/config naming such as `gemini_vertex` or `gemini` with a
-  `use_vertex_ai` flag
-- project and location settings, e.g. `GOOGLE_CLOUD_PROJECT` and
-  `GOOGLE_CLOUD_LOCATION`
-- a Vertex-compatible client path, separate from the existing Gemini Developer
-  API key path
-- course/assignment UI copy that makes "Gemini Developer API" vs. "Gemini over
-  Vertex AI" clear to instructors
-- tests for provider/model resolution and sanitized error handling
-
-**Verify:** Mock the Vertex client and assert the right project/location/model
-are used. Also verify the existing Gemini Developer API path still works.
 
 ### P0 - Course-level AI settings endpoints need authorization checks
 
@@ -89,6 +63,16 @@ elsewhere.
 **Fix:** Log raw provider/exception detail server-side, then return a structured
 generic client error via the same `BadRequestError` / `InternalProcessingError`
 style used in other routes.
+
+## Recently Completed
+
+### P1 - Gemini over Google Cloud Vertex AI support
+
+PR [#365](https://github.com/kiat/codeAssist/pull/365) added the
+`gemini_vertex` provider mode, server-managed Vertex credentials, project and
+location configuration, a separate Gemini/Vertex client path, UI copy that keeps
+Gemini Developer API distinct from Gemini over Vertex AI, and tests for provider
+resolution plus sanitized provider errors.
 
 ### P3 - Real student-history / AI-memory design
 

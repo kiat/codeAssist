@@ -110,7 +110,7 @@ export default () => {
       const { email } = values;
 
       try {
-        const res = await getUserByEmail({ email: email });
+        const res = await getUserByEmail({ email: email, course_id: courseId });
         await createEnrollment({
           student_id: res.data.id,
           course_id: courseId,
@@ -141,7 +141,7 @@ export default () => {
 
       async function enrollEntry(item) {
         try {
-          const res = await getUserByEmail({ email: item });
+          const res = await getUserByEmail({ email: item, course_id: courseId });
           await createEnrollment({
             student_id: res.data.id,
             course_id: courseId,

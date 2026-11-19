@@ -47,8 +47,11 @@ Example input:
       "name": "Assignment 1.1",
       "published": true,
       "due_date": "12/07/2022",
-      "autograder_points": 55.0
+      "autograder_points": 55.0,
+      "submission_files": ["calculator.py"]
     }
+
+`submission_files` (also accepted by `/create_assignment`) lists the exact file names the autograder copies from `/autograder/submission/`. Each name must be a plain file name with an extension (no spaces or path separators); an invalid name returns 400. Send `[]` to clear it. When it is set, the code editor locks the file name to the first entry, and an upload with a single required name is saved under that name. Omitting the field leaves it unchanged.
 
 Example output:
 
@@ -122,6 +125,8 @@ Example Output:
 
 ## GET /get_assignment
 
+**Auth:** logged in and enrolled in the assignment's course (instructor, TA or student).
+
 **Accepts Query String**
 
 **Description:**
@@ -175,6 +180,8 @@ Example Output:
 
 ## GET /get_extension
 
+**Auth:** logged in as the student in `student_id`, or as an instructor or TA of the assignment's course.
+
 **Accepts Query String**
 
 **Description**
@@ -200,6 +207,8 @@ Example Output:
 
 
 ## GET /get_assignment_extensions
+
+**Auth:** instructor or TA of the assignment's course.
 
 **Accepts Query String**
 
@@ -254,3 +263,7 @@ Example Output:
     }
 
 ---
+
+## GET /courses
+
+**Auth:** logged in. Returns the courses where the caller is an instructor or TA, for the Duplicate Assignment dialog. The `instructor_id` parameter is ignored, except that an admin who sends no `instructor_id` gets every course.
