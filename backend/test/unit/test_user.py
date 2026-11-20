@@ -491,7 +491,7 @@ def test_update_account(client, mocker, login_as):
     random_uuid = uuid.uuid4()
     login_as(str(random_uuid))
 
-    payload = {"id": str(random_uuid), "name": "Updated Name", "password": "Updated Password"}
+    payload = {"id": str(random_uuid), "name": "Updated Name", "password": "Updated Password", "current_password": "oldpassword"}
     
     user_mock = mocker.Mock()
     user_mock.id = str(random_uuid)
@@ -546,7 +546,7 @@ def test_update_account_only_password(client, mocker, login_as):
     random_uuid = uuid.uuid4()
     login_as(str(random_uuid))
 
-    payload = {"id": str(random_uuid), "password": "Updated Password"}
+    payload = {"id": str(random_uuid), "password": "Updated Password", "current_password": "oldpassword"}
     
     user_mock = mocker.Mock()
     user_mock.id = str(random_uuid)
@@ -602,8 +602,9 @@ def test_update_user_rolls_back_on_exception(client, mocker, login_as):
     login_as(str(random_uuid))
     user_mock = mocker.Mock() 
     user_mock.id = random_uuid
+    user_mock.password = "oldpassword"
 
-    payload = {"id": str(random_uuid), "password": "Updated Password"}
+    payload = {"id": str(random_uuid), "password": "Updated Password", "current_password": "oldpassword"}
 
     mock_session = mocker.patch("routes.user.db.session")
     mock_session.query.return_value.filter_by.return_value.first.return_value = user_mock
@@ -649,7 +650,8 @@ def test_get_user_by_id(client, mocker, login_as):
         "coding_insights": "No history.",
         "email_address":  "user@gmail.com",
         "role":  "student",
-        "sis_user_id": "123"
+        "sis_user_id": "123",
+        "has_password": True,
     }
 
     mock_query.assert_called_once() 
@@ -1044,6 +1046,134 @@ def test_update_account_admin_cannot_update_other_user(client, mocker, login_as_
     assert response.status_code == 403
     mock_query.assert_not_called()
     mock_commit.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Changing your own password needs the current one (#393)
+# ---------------------------------------------------------------------------
+
+def _account(mocker, login_as, password="oldpassword"):
+    user_id = str(uuid.uuid4())
+    login_as(user_id)
+    user = mocker.Mock()
+    user.id = user_id
+    user.name = "Pat"
+    user.password = password
+    query = mocker.patch("routes.user.db.session.query")
+    query.return_value.filter_by.return_value.first.return_value = user
+    commit = mocker.patch("routes.user.db.session.commit")
+    return user, commit
+
+
+@pytest.mark.parametrize("current", [None, "", "wrong-password"])
+def test_update_account_rejects_missing_or_wrong_current_password(client, mocker, login_as, current):
+    user, commit = _account(mocker, login_as)
+    payload = {"id": user.id, "password": "brand-new-pass"}
+    if current is not None:
+        payload["current_password"] = current
+
+    response = client.put("/update_account", json=payload)
+
+    assert response.status_code == 403
+    assert response.json["message"] == "Current password is incorrect"
+    assert user.password == "oldpassword"
+    commit.assert_not_called()
+
+
+def test_update_account_checks_hashed_passwords(client, mocker, login_as):
+    from util import encryption_utils
+
+    mocker.patch.object(encryption_utils, "PASSWORD_SALT", "pepper-for-test")
+    stored = encryption_utils.hash_password("oldpassword")
+    user, commit = _account(mocker, login_as, password=stored)
+
+    wrong = client.put("/update_account", json={"id": user.id, "password": "brand-new-pass", "current_password": "nope"})
+    assert wrong.status_code == 403
+
+    right = client.put("/update_account", json={"id": user.id, "password": "brand-new-pass", "current_password": "oldpassword"})
+    assert right.status_code == 200
+    assert encryption_utils.verify_password("brand-new-pass", user.password)
+    commit.assert_called_once()
+
+
+def test_update_account_rejects_short_password(client, mocker, login_as):
+    user, commit = _account(mocker, login_as)
+
+    response = client.put("/update_account", json={"id": user.id, "password": "short", "current_password": "oldpassword"})
+
+    assert response.status_code == 400
+    assert "at least 8 characters" in response.json["message"]
+    commit.assert_not_called()
+
+
+def test_update_account_rejects_unchanged_password(client, mocker, login_as):
+    user, commit = _account(mocker, login_as)
+
+    response = client.put("/update_account", json={"id": user.id, "password": "oldpassword", "current_password": "oldpassword"})
+
+    assert response.status_code == 400
+    assert "different" in response.json["message"]
+    commit.assert_not_called()
+
+
+def test_update_account_name_only_needs_no_password(client, mocker, login_as):
+    user, commit = _account(mocker, login_as)
+
+    response = client.put("/update_account", json={"id": user.id, "name": "New Name"})
+
+    assert response.status_code == 200
+    assert user.name == "New Name"
+    assert user.password == "oldpassword"
+    commit.assert_called_once()
+
+
+def test_google_only_account_cannot_set_a_password(client, mocker, login_as):
+    user, commit = _account(mocker, login_as, password="")
+
+    response = client.put("/update_account", json={"id": user.id, "password": "brand-new-pass", "current_password": ""})
+
+    assert response.status_code == 400
+    assert "signs in with Google" in response.json["message"]
+    commit.assert_not_called()
+
+
+def test_google_only_account_cannot_log_in_with_a_password(client, mocker):
+    user = mocker.Mock()
+    user.id = str(uuid.uuid4())
+    user.password = ""
+    mocker.patch("routes.user.db.session.query").return_value.filter_by.return_value.first.return_value = user
+
+    response = client.post("/user_login", json={"email": "g@example.com", "password": "anything"})
+
+    assert response.status_code == 404
+
+
+def test_get_user_by_id_reports_google_only_accounts(client, mocker, login_as):
+    user_id = str(uuid.uuid4())
+    login_as(user_id)
+    user = mocker.Mock()
+    user.id = user_id
+    user.password = ""
+    mocker.patch("routes.user.db.session.query").return_value.filter_by.return_value.first.return_value = user
+    mocker.patch("routes.user.UserSchema").return_value.dump.return_value = {"id": user_id}
+
+    response = client.get("/get_user_by_id", query_string={"id": user_id})
+
+    assert response.json["has_password"] is False
+
+
+def test_google_sign_up_creates_an_account_without_a_password(client, mocker):
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {"email": "g@example.com"}
+    mocker.patch("routes.user.requests.get", return_value=mock_response)
+    add = mocker.patch("routes.user.db.session.add")
+    mocker.patch("routes.user.db.session.commit")
+    mocker.patch("routes.user.db.session.query").return_value.filter_by.return_value = [{}]
+    mocker.patch("routes.user.UserSchema").return_value.dump.return_value = [{"role": "student"}]
+
+    client.post("/create_google_user", json={"credential": "t", "eid": "g1", "name": "G"})
+
+    assert add.call_args.args[0].password == ""
 
 
 def _target_user(mocker, mock_query, role="student", user_id="11111111-1111-1111-1111-111111111111"):

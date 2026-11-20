@@ -113,14 +113,26 @@ def test_update_user_account_integration(client):
     data = response.get_json() 
     user_id = data["id"]
 
+    # Changing the password without the current one is refused
+    response = client.put('/update_account', json={
+        "id": user_id,
+        "password": "charles123"
+    })
+    assert response.status_code == 403
+
     # Update the user
     response = client.put('/update_account', json={
         "id": user_id, 
         "name": "Charles",
-        "password": "charles123"
+        "password": "charles123",
+        "current_password": "charlie123",
     })
 
     assert response.status_code == 200
+
+    # The new password logs in and the old one no longer does
+    assert client.post('/user_login', json={"email": "charlie@example.com", "password": "charles123"}).status_code == 200
+    assert client.post('/user_login', json={"email": "charlie@example.com", "password": "charlie123"}).status_code == 404
 
     get_again = client.get('/get_user_by_id', query_string={
         "id": user_id
